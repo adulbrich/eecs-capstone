@@ -46,7 +46,8 @@ public term), author, submitter, sponsor
 
 **Student**:
 A person taking a capstone course. Not a role: a student is a user. The word appears
-on a project that a student proposed and on the analytics that count teams.
+on a project that a student proposed, on the analytics that count teams, and in
+placement, where a student need not have an account at all.
 _Avoid_: learner
 
 **Mentor**:
@@ -113,9 +114,10 @@ public listing hides it by default; the "are looking for team members" switch is
 what shows it. A flag on the project, edited by staff alone from the staff
 panel's Programs and teams section, orthogonal to status.
 
-The app never records who would join, only whether there is room: bidding and
-assignment happen outside it, which is why there is no word here for the student on
-the other side of the flag.
+The server never records who would join, only whether there is room: students bid
+outside the app, and staff place them with a tool that keeps every bid and placement
+in the staff member's browser (see **Placement**), so no record on the server names
+the student on the other side of the flag.
 
 The stored column keeps its old name, `projects.accepting_applicants`, as do the
 `acceptingApplicants` field on every wire schema and the `acceptingOnly` search
@@ -249,6 +251,35 @@ What a link to a page looks like when a chat app or a social platform expands it
 the title, the social summary, and a brand card shared by every page. Not a search
 result; the catalog is deliberately kept out of those.
 _Avoid_: unfurl (the act, not the thing), card, embed, rich preview
+
+## Placement
+
+**Bid**:
+One student's ranked choice of one project, with the comment the student wrote for
+it. Students bid outside the app, in a survey; staff bring the bids into placement
+as a file. A bid's priority is its rank, 1 for the first choice.
+_Avoid_: preference, choice, application, ranking (for the bid itself; rank is fine
+for its number)
+
+**Placement**:
+One student on one team of one project, and by extension the set of them staff
+produce for a term. Staff make placements with a tool that favours the projects each
+student bid highest on, within the team sizes and ceilings staff set, and that runs
+in the staff member's own browser: no bid or placement ever reaches the server
+([ADR-0056](./docs/adr/0056-placement-runs-in-the-browser.md)). A student the tool
+cannot place is **unplaced**.
+_Avoid_: assignment, matching, allocation, team formation
+
+**Pin**:
+A placement staff fixed by hand, which every later run keeps. A pin names a project,
+not a team: the tool still picks which of the project's teams. The bids file calls
+it `override`.
+_Avoid_: lock, force, override (the file's column, not the word)
+
+**Max teams**:
+How many teams placement may form for a project, starting from its teams supported.
+A ceiling, not a target, and 0 leaves the project out of placement.
+_Avoid_: team count (that is the mentor's number), slots, capacity
 
 ## Both domains
 
