@@ -21,9 +21,10 @@ import { describe, expect, it } from "vitest";
  * found six that were not.
  *
  * What it cannot see is where a value came from. It finds every initializer
- * that is not a plain literal and asks that somebody has said which class it
- * is in; the reading of data flow is the classifier's, written beside the
- * entry.
+ * that is not a plain literal, written as a hook's argument, a `defaultValues`
+ * key or a JSX attribute (not one spread in from an object), and asks that
+ * somebody has said which class it is in; the reading of data flow is the
+ * classifier's, written beside the entry.
  */
 
 /**
