@@ -98,7 +98,7 @@ describe("route guards below _authed", () => {
   }
 
   for (const [id, route] of Object.entries(ADMIN_GATED)) {
-    it(`${id} admits admins and sends staff back to /admin`, () => {
+    it(`${id} admits admins and sends anyone else back to /admin`, () => {
       const guard = guardOf(route);
       expect(redirectOf(guard, "user")).toBe("/admin");
       expect(redirectOf(guard, "instructor")).toBe("/admin");
