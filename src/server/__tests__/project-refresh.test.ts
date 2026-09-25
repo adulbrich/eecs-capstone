@@ -172,7 +172,7 @@ const realSocialSummary = () =>
   );
 
 // A model call Bedrock refuses, for either writer.
-const refusedModelCall = () => Promise.reject(new Error("refusedModelCall"));
+const refusedModelCall = () => Promise.reject(new Error("throttled"));
 
 const INTEREST_ROW = {
   userId: "u1",
