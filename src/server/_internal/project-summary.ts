@@ -228,3 +228,28 @@ export const adminProjectSummarySelect = {
   proposerName: user.name,
   publishedAt: projects.publishedAt,
 };
+
+// The six prose columns the staff table never renders. Named with a leading
+// underscore so the rest binding below is the only thing read.
+const {
+  description: _description,
+  problemStatement: _problemStatement,
+  objectives: _objectives,
+  minQualifications: _minQualifications,
+  prefQualifications: _prefQualifications,
+  licenseRestrictions: _licenseRestrictions,
+  ...adminProjectListColumns
+} = adminProjectSummarySelect;
+
+/**
+ * The staff table's projection: `adminProjectSummarySelect` without the six
+ * prose columns. The table renders none of them, the search matches them in
+ * SQL against the tsvector rather than in the browser, and the CSV export
+ * reads its own wider projection, so carrying them only cost payload: about
+ * 2.5 KB a row, every row, on every visit to an unpaged table (#482).
+ *
+ * Derived from the staff projection rather than trimming it, because the
+ * export and the mentorship tests read that one whole. Join `user` (on
+ * `projects.proposerId`) before using it, same as the projection it narrows.
+ */
+export const adminProjectListSelect = adminProjectListColumns;
