@@ -36,7 +36,9 @@ export function solvePlacement(
     return runModel(highs, model, input, base);
   } catch (error) {
     // HiGHS validates the model before it runs and throws on a value it
-    // cannot take, such as a NaN weight from a hand-edited workspace.
+    // cannot take, such as a NaN weight from a hand-edited workspace. Any
+    // other throw on the way to a result lands here too, and the page shows
+    // it the same way.
     return {
       ...base,
       status: "error",

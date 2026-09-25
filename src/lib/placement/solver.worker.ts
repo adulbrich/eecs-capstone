@@ -10,14 +10,16 @@ let highs: Promise<Highs> | undefined;
 
 self.onmessage = async (event: MessageEvent<PlacementInput>) => {
   try {
-    highs ??= loadHighs({ locateFile: () => wasmUrl });
+    // A failed load must not stay cached for the next message.
+    highs ??= loadHighs({ locateFile: () => wasmUrl }).catch((error) => {
+      highs = undefined;
+      throw error;
+    });
     self.postMessage({
       ok: true,
       result: solvePlacement(await highs, event.data),
     });
   } catch (error) {
-    // A failed load must not stay cached for the next message.
-    highs = undefined;
     self.postMessage({
       ok: false,
       message: error instanceof Error ? error.message : String(error),
