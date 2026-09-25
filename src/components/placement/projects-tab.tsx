@@ -201,6 +201,11 @@ function ProjectsImport({
                   data: { statuses: ["published"], program: program.id },
                 });
                 const loaded = projectsFromPortal(rows);
+                if (loaded.projects.length === 0) {
+                  throw new Error(
+                    `${program.label} has no published projects.`
+                  );
+                }
                 onPortal(
                   loaded.projects,
                   {

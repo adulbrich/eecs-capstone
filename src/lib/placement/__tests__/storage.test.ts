@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it } from "vitest";
 import {
   EMPTY_WORKSPACE,
   readStoredWorkspace,
-  UNREADABLE_WORKSPACE_KEY,
+  UNREADABLE_WORKSPACE_PREFIX,
   WORKSPACE_STORAGE_KEY,
   writeStoredWorkspace,
 } from "#/lib/placement/workspace";
@@ -23,11 +23,16 @@ describe("readStoredWorkspace", () => {
     expect(readStoredWorkspace()).toEqual({ status: "none" });
   });
 
-  it("copies an unreadable workspace aside before the page can overwrite it", () => {
+  it("copies each unreadable workspace aside, keeping earlier copies", async () => {
     window.localStorage.setItem(WORKSPACE_STORAGE_KEY, '{"version":9}');
     expect(readStoredWorkspace()).toEqual({ status: "unreadable" });
-    expect(window.localStorage.getItem(UNREADABLE_WORKSPACE_KEY)).toBe(
-      '{"version":9}'
-    );
+    await new Promise((resolve) => setTimeout(resolve, 2));
+    window.localStorage.setItem(WORKSPACE_STORAGE_KEY, '{"version":8}');
+    readStoredWorkspace();
+    const copies = Object.keys(window.localStorage)
+      .filter((key) => key.startsWith(UNREADABLE_WORKSPACE_PREFIX))
+      .map((key) => window.localStorage.getItem(key))
+      .sort();
+    expect(copies).toEqual(['{"version":8}', '{"version":9}']);
   });
 });

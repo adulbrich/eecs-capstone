@@ -143,12 +143,16 @@ export function serializeWorkspace(workspace: Workspace): string {
 // Storage can throw (a private window, a full quota, a browser that blocks
 // it), and a workspace that cannot be saved must still work for the visit.
 
-/** Where an unreadable saved workspace is moved, rather than overwritten. */
-export const UNREADABLE_WORKSPACE_KEY = `${WORKSPACE_STORAGE_KEY}:unreadable`;
+/**
+ * Where an unreadable saved workspace is moved, rather than overwritten: one
+ * key per copy, stamped with when it was moved, so a second unreadable copy
+ * cannot replace the first.
+ */
+export const UNREADABLE_WORKSPACE_PREFIX = `${WORKSPACE_STORAGE_KEY}:unreadable:`;
 
 /**
  * The saved workspace, or none. One that no longer parses (a later schema,
- * a hand edit) is copied aside under `UNREADABLE_WORKSPACE_KEY` before the
+ * a hand edit) is copied aside under `UNREADABLE_WORKSPACE_PREFIX` before the
  * page starts empty, because the page's next save would otherwise replace
  * it and lose every bid in it.
  */
@@ -165,7 +169,10 @@ export function readStoredWorkspace():
     if (parsed.ok) {
       return { status: "ok", workspace: parsed.workspace };
     }
-    window.localStorage.setItem(UNREADABLE_WORKSPACE_KEY, raw);
+    window.localStorage.setItem(
+      `${UNREADABLE_WORKSPACE_PREFIX}${new Date().toISOString()}`,
+      raw
+    );
     return { status: "unreadable" };
   } catch {
     return { status: "none" };

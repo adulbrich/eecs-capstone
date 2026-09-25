@@ -33,6 +33,9 @@ export function NumberInput({
   value: number | undefined;
 }) {
   const [text, setText] = useState("");
+  // The message waits for the reader to leave the field, so clearing it to
+  // type a new number is not announced as an error on the way.
+  const [left, setLeft] = useState(false);
   useEffect(() => {
     setText(value === undefined ? "" : String(value));
   }, [value]);
@@ -57,6 +60,7 @@ export function NumberInput({
         aria-label={label}
         className="h-8 w-20"
         inputMode={integer ? "numeric" : "decimal"}
+        onBlur={() => setLeft(true)}
         onChange={(e) => {
           setText(e.target.value);
           const accepted = accept(e.target.value);
@@ -70,7 +74,7 @@ export function NumberInput({
       />
       <FieldError
         message={
-          invalid
+          invalid && left
             ? `${integer ? "A whole number" : "A number"} from ${min} to ${max}.`
             : null
         }
