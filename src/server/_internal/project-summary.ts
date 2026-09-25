@@ -198,9 +198,10 @@ export const projectSummarySelect = {
 };
 
 /**
- * The staff listing's projection: the public one plus proposer identity and
- * the lifecycle dates. Proposer identity is staff information and is what
- * keeps this separate from `projectSummarySelect`.
+ * The staff projection: the public one plus proposer identity and the
+ * lifecycle dates. Proposer identity is staff information and is what keeps
+ * this separate from `projectSummarySelect`. The CSV export reads it whole;
+ * the staff table reads `adminProjectListSelect`, which drops its prose.
  *
  * Join `user` (on `projects.proposerId`) before using it.
  */
@@ -230,7 +231,8 @@ export const adminProjectSummarySelect = {
 };
 
 // The six prose columns the staff table never renders. Named with a leading
-// underscore so the rest binding below is the only thing read.
+// underscore so the rest binding below is the only thing read, and bound
+// here rather than in an exported destructure, which would export them too.
 const {
   description: _description,
   problemStatement: _problemStatement,
@@ -243,10 +245,11 @@ const {
 
 /**
  * The staff table's projection: `adminProjectSummarySelect` without the six
- * prose columns. The table renders none of them, the search matches them in
- * SQL against the tsvector rather than in the browser, and the CSV export
- * reads its own wider projection, so carrying them only cost payload: about
- * 2.5 KB a row, every row, on every visit to an unpaged table (#482).
+ * prose columns. The table renders none of them, the search runs in SQL
+ * rather than in the browser (against the tsvector, which covers five of them;
+ * `licenseRestrictions` was never searched), and the CSV export reads its own
+ * wider projection, so carrying them only cost payload: about 1 KB a row,
+ * every row, on every visit to an unpaged table (#482).
  *
  * Derived from the staff projection rather than trimming it, because the
  * export and the mentorship tests read that one whole. Join `user` (on
