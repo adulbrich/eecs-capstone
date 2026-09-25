@@ -1352,8 +1352,10 @@ aws --profile aws-capstone1 logs tail /ecs/eecs-capstone --since 3h --region us-
 
 The pattern adds the two capitalised error lines the alarm leaves out, because
 they carry the error text the refresh line does not. Every failure it shows
-followed a save that succeeded; the row kept its previous vector or summary,
-and the next save or a backfill sweep puts it right.
+followed a save that succeeded, and the row kept its previous vector or
+summary. A project's next save or a backfill sweep puts it right; no sweep
+covers interest embeddings, so a user's is put right only by their next save
+of their interests.
 
 **Expect some mail that is not an incident.**
 

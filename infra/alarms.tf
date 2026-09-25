@@ -275,6 +275,8 @@ resource "aws_cloudwatch_metric_alarm" "db_pool_waiting" {
 # refresh line already reports, so matching them would count it twice.
 # `project-refresh.test.ts` runs this pattern against the line the code prints,
 # so rewording either side fails a test instead of quietly zeroing the metric.
+# DEPLOYMENT.md has the `aws logs tail` command that lists the lines behind a
+# mail.
 #
 # No `default_value`. With one, every unmatched line on the group would publish
 # a zero; without it the metric exists only when something failed.
@@ -292,9 +294,10 @@ resource "aws_cloudwatch_log_metric_filter" "ai_write_failures" {
 }
 
 # About fifteen refreshes a day and one failure in the last thirty days, so a
-# single failure is the noise a design without retries accepts (the next save,
-# or a sweep, puts the row right) and two in three hours is a pattern: Bedrock
-# down, or a setting the endpoint refuses, like the `minimal` effort that failed
+# single failure is the noise a design without retries accepts (a project's
+# next save or a sweep puts it right; an interest embedding waits for that
+# user's next save, since no sweep covers it) and two in three hours more
+# likely has a cause: Bedrock down, or a setting the endpoint refuses, like the `minimal` effort that failed
 # every social summary on 2026-09-21 without anybody hearing of it
 # (`docs/QUIRKS.md`, Amazon Bedrock). One three-hour period rather than three
 # one-hour ones because the question is how many failed, not in how many hours
