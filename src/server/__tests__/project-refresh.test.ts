@@ -1,16 +1,36 @@
 import { readFileSync } from "node:fs";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import type { RefreshOutcome } from "#/server/_internal/project-embeddings";
 import {
   refreshProjectInBackground,
   settleProjectRefreshes,
 } from "#/server/_internal/project-refresh";
+import type { SocialSummaryOutcome } from "#/server/_internal/project-social-summary";
 
 const calls: string[] = [];
 let releaseFirst: () => void = () => undefined;
 /** Per project id, the outcomes the two mocked writers report. */
-const outcomes = new Map<string, { embedding: string; summary: string }>();
+const outcomes = new Map<
+  string,
+  { embedding: RefreshOutcome; summary: SocialSummaryOutcome }
+>();
 
-vi.mock("#/server/_internal/project-embeddings", () => ({
+/**
+ * What every `db.select().from().where()` resolves to, so the real writers
+ * below can be driven to their failure lines without a database.
+ */
+const selectRows = vi.hoisted(() => vi.fn<() => Promise<unknown[]>>());
+
+vi.mock("#/db", () => ({
+  db: { select: () => ({ from: () => ({ where: () => selectRows() }) }) },
+}));
+
+// The rest of the module stays real: `refreshSocialSummary` imports
+// `isEmbeddableStatus` and `rowStillReads` from it.
+vi.mock("#/server/_internal/project-embeddings", async (importOriginal) => ({
+  ...(await importOriginal<
+    typeof import("#/server/_internal/project-embeddings")
+  >()),
   refreshProjectEmbedding: async (id: string) => {
     if (id === "throws") {
       throw new Error("escaped the refresh's own catch");
@@ -37,7 +57,9 @@ afterEach(async () => {
   releaseFirst();
   await settleProjectRefreshes();
   calls.length = 0;
+  selectRows.mockReset();
   vi.restoreAllMocks();
+  vi.unstubAllEnvs();
 });
 
 describe("refreshProjectInBackground", () => {
@@ -126,8 +148,8 @@ function filterMatches(line: string): boolean {
 /** The line a real refresh logs for one pair of outcomes. */
 async function refreshLine(
   id: string,
-  embedding: string,
-  summary: string
+  embedding: RefreshOutcome,
+  summary: SocialSummaryOutcome
 ): Promise<string> {
   const log = vi.spyOn(console, "log").mockImplementation(() => undefined);
   outcomes.set(id, { embedding, summary });
@@ -139,6 +161,44 @@ async function refreshLine(
   return String(log.mock.calls.at(-1)?.[0]);
 }
 
+/** The real writers, past the mocks this file puts in front of them. */
+const realEmbeddings = () =>
+  vi.importActual<typeof import("#/server/_internal/project-embeddings")>(
+    "#/server/_internal/project-embeddings"
+  );
+const realSocialSummary = () =>
+  vi.importActual<typeof import("#/server/_internal/project-social-summary")>(
+    "#/server/_internal/project-social-summary"
+  );
+
+const refusingEmbed = () => Promise.reject(new Error("throttled"));
+
+const INTEREST_ROW = {
+  userId: "u1",
+  interestsText: "robotics",
+  embedding: null,
+  embeddingSourceHash: null,
+};
+
+/** A live project with no vector and no summary, so both writers call out. */
+const PROJECT_ROW = {
+  id: "p1",
+  status: "published",
+  deletedAt: null,
+  title: "A rover",
+  description: "Drives on sand.",
+  problemStatement: null,
+  objectives: null,
+  minQualifications: null,
+  prefQualifications: null,
+  licenseRestrictions: null,
+  embedding: null,
+  embeddingSourceHash: null,
+  socialSummary: null,
+  socialSummarySourceHash: null,
+  socialSummaryIsManual: false,
+};
+
 describe("the ai_write_failures metric filter in infra/alarms.tf", () => {
   it("is only OR'd quoted phrases, the shape filterMatches imitates", () => {
     const pattern = filterPattern();
@@ -146,7 +206,7 @@ describe("the ai_write_failures metric filter in infra/alarms.tf", () => {
     expect(pattern.replace(OR_PHRASE, "").trim()).toBe("");
   });
 
-  it.each([
+  it.each<[RefreshOutcome, SocialSummaryOutcome, boolean]>([
     ["failed", "updated", true],
     ["updated", "failed", true],
     ["failed", "failed", true],
@@ -162,17 +222,65 @@ describe("the ai_write_failures metric filter in infra/alarms.tf", () => {
     }
   );
 
-  it("counts a failed interest embedding once and a project's own error lines not at all", () => {
-    // The interest line is the only record of that writer. The two project
-    // lines report the failure the refresh line already counted.
-    expect(
-      filterMatches("Embedding failed for user interests u1 Error: throttled")
-    ).toBe(true);
-    expect(filterMatches("Embedding failed for project p1 Error: x")).toBe(
-      false
-    );
-    expect(
-      filterMatches("Social summary failed for project p1: truncated")
-    ).toBe(false);
-  });
+  it.each([
+    {
+      writer: "refreshInterestsEmbedding",
+      counted: true,
+      printed: /^Embedding failed for user interests u1$/,
+      fail: async () => {
+        selectRows.mockResolvedValue([INTEREST_ROW]);
+        const { refreshInterestsEmbedding } = await realEmbeddings();
+        return refreshInterestsEmbedding("u1", refusingEmbed);
+      },
+    },
+    {
+      writer: "refreshProjectEmbedding",
+      counted: false,
+      printed: /^Embedding failed for project p1$/,
+      fail: async () => {
+        selectRows.mockResolvedValue([PROJECT_ROW]);
+        const { refreshProjectEmbedding } = await realEmbeddings();
+        return refreshProjectEmbedding("p1", refusingEmbed);
+      },
+    },
+    {
+      writer: "refreshSocialSummary, the model call failing,",
+      counted: false,
+      printed: /^Social summary failed for project p1: /,
+      fail: async () => {
+        selectRows.mockResolvedValue([PROJECT_ROW]);
+        const { refreshSocialSummary } = await realSocialSummary();
+        return refreshSocialSummary("p1", () =>
+          Promise.reject(new Error("throttled"))
+        );
+      },
+    },
+    {
+      writer: "refreshSocialSummary, the read throwing,",
+      counted: false,
+      printed: /^Social summary failed for project p1$/,
+      fail: async () => {
+        selectRows.mockRejectedValue(new Error("connection refused"));
+        const { refreshSocialSummary } = await realSocialSummary();
+        return refreshSocialSummary("p1");
+      },
+    },
+  ])(
+    "$writer prints an error line the filter counts: $counted",
+    async ({ counted, printed, fail }) => {
+      // The interest line is the only record of that writer. The project
+      // lines report a failure the refresh line already counted, so matching
+      // them would count it twice. The flag is stubbed on because the unit
+      // suite reads your dotenv files, where it may be off.
+      vi.stubEnv("BEDROCK_SOCIAL_SUMMARY_ENABLED", "true");
+      const error = vi
+        .spyOn(console, "error")
+        .mockImplementation(() => undefined);
+
+      expect(await fail()).toBe("failed");
+      const line = String(error.mock.calls[0]?.[0]);
+      expect(line).toMatch(printed);
+      expect(filterMatches(line)).toBe(counted);
+    }
+  );
 });
