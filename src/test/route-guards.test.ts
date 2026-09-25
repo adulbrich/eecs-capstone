@@ -130,11 +130,10 @@ describe("route guards below _authed", () => {
   });
 
   it("reads the session nowhere below _authed.tsx", () => {
-    // The import, not the call, so an alias cannot slip past.
+    // The module path, not the call or one spelling of the import, so a
+    // renamed binding, the `#/` or `@/` alias and a relative path all count.
     expect(
-      routeFiles().filter((file) =>
-        sourceOf(file).includes("#/lib/auth-guards")
-      )
+      routeFiles().filter((file) => sourceOf(file).includes("lib/auth-guards"))
     ).toEqual([]);
   });
 });
