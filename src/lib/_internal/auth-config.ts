@@ -24,9 +24,9 @@ export interface AuthConfig {
   isProduction: boolean;
   onid: {
     /**
-     * Derived from `ONID_DISCOVERY_URL` like `issuer` below, and for a second
-     * reason: configured with a discovery URL, `genericOAuth` fetches the
-     * document twice on every sign-in (#553). Empty when the URL is unset.
+     * Derived from `ONID_DISCOVERY_URL` like `issuer` below; see
+     * `endpointsFromDiscoveryUrl` for why it is not left to discovery (#553).
+     * Empty when the URL is unset.
      */
     authorizationUrl: string;
     clientId: string;

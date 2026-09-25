@@ -19,21 +19,27 @@ export function onidProviderConfig(
 ): GenericOAuthConfig {
   return {
     providerId: "onid",
-    // Static, and no `discoveryUrl` beside them: with one set, Better Auth
-    // fetches it in every sign-in and callback handler and overwrites both
-    // of these with what it returns (#553).
+    // Static, with no `discoveryUrl` beside them; see
+    // `endpointsFromDiscoveryUrl` for why (#553).
     authorizationUrl: onid.authorizationUrl,
     tokenUrl: onid.tokenUrl,
     // The one other thing discovery supplied. The callback compares it with
-    // the `iss` query parameter (RFC 9207) when Entra sends one, and takes it
-    // from the discovery document when this is unset, so dropping discovery
-    // without passing it would switch that check off without a word.
+    // an RFC 9207 `iss` query parameter, but only if Entra sends one, and this
+    // tenant's discovery document does not advertise that it does. So this is
+    // a conditional safeguard, kept so the check still runs if Entra ever
+    // starts sending `iss`. What pins sign-in to the tenant is the `iss` claim
+    // check in `onidUserInfo`.
     issuer: onid.issuer,
     clientId: onid.clientId,
     clientSecret: onid.clientSecret,
     // `profile` is not decoration: Entra gates the `oid` claim behind it,
     // and `oid` is the account id. Dropping it forks every account onto
     // the `sub` fallback.
+    //
+    // `offline_access` is absent on purpose. It buys a refresh token, and a
+    // refresh token is only useful for calling an API as the user later. We
+    // call nothing: the session is ours, not Microsoft's, so holding one
+    // would be a stored credential with no purpose.
     scopes: ["openid", "profile", "email"],
     pkce: true,
     getUserInfo,

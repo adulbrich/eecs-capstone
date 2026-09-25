@@ -726,29 +726,22 @@ export const auth = betterAuth({
     // OIDC relying party rather than a SAML SP, which is why this is the
     // genericOAuth plugin and not @better-auth/sso.
     //
-    // Three things about this config are worth not "fixing". The entry itself
-    // is `onidProviderConfig` in `src/lib/_internal/onid-provider.ts`, where a
-    // unit test can drive Better Auth's handlers with it.
+    // The entry itself is `onidProviderConfig` in
+    // `src/lib/_internal/onid-provider.ts`, where a unit test can drive Better
+    // Auth's handlers with it, and it carries the notes on its scopes and
+    // issuer.
     //
-    // The endpoints are derived from ONID_DISCOVERY_URL by string manipulation,
-    // the way the issuer is, and there is no `discoveryUrl`. Handing it one
-    // looks tidier and costs two uncached GETs to Microsoft on every sign-in,
-    // one per handler, which is what #553 took out. The tenant still lives in
-    // one environment variable, so a tenant change is still not a deploy; what
-    // is given up is following Microsoft if it ever moves the v2.0 endpoints,
-    // a fixed shape that Better Auth's own `microsoftEntraId` helper hardcodes
-    // too.
+    // Two things about this config are worth not "fixing".
+    //
+    // There is no `discoveryUrl`: the endpoints are derived from
+    // ONID_DISCOVERY_URL instead, and docs/ONID-SSO.md, "How the endpoints are
+    // resolved", says why (#553).
     //
     // The callback path is /api/auth/oauth2/callback/onid, which does not match
     // the /api/auth/callback/github shape beside it. That is the 1.6 generic
     // OAuth path, and Entra matches redirect URIs exactly against what UIT
     // allowlisted. better-auth 1.7 converges the two shapes, which is why
     // package.json pins ~1.6 rather than ^1.6.
-    //
-    // offline_access is absent on purpose. It buys a refresh token, and a
-    // refresh token is only useful for calling an API as the user later. We
-    // call nothing: the session is ours, not Microsoft's, so holding one would
-    // be a stored credential with no purpose.
     genericOAuth({
       config: [
         onidProviderConfig(authConfig.onid, (tokens) =>

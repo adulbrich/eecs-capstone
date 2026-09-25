@@ -71,9 +71,13 @@ and `issuer`, with no `discoveryUrl`. That absence is the point (#553). Given a
 `discoveryUrl`, Better Auth 1.6 GETs the document in the `/sign-in/oauth2`
 handler and again in the callback, uncached, and overwrites any static URL with
 what comes back, so every sign-in cost two round trips to Microsoft before the
-token exchange. The issuer has to be passed because discovery was also what fed
-the callback's RFC 9207 check on an `iss` query parameter. No userinfo endpoint
-is configured, because `getUserInfo` is ours and reads only the ID token.
+token exchange. The issuer is passed because discovery was also what fed the
+callback's RFC 9207 check on an `iss` query parameter. That check runs only if
+Entra sends the parameter, and this tenant's discovery document does not
+advertise `authorization_response_iss_parameter_supported`, so it is a
+conditional safeguard kept for the day Entra does. The tenant is enforced by
+the `iss` claim pin in `onidUserInfo`, not by this. No userinfo endpoint is
+configured, because `getUserInfo` is ours and reads only the ID token.
 
 The variable keeps its name and its full discovery URL value, so the tenant
 still lives in one place and a tenant change is still a variable, not a deploy.

@@ -50,8 +50,9 @@ const ISSUER_VERSION_SUFFIX = /\/v2\.0$/;
  * way as the issuer, so that no sign-in fetches the discovery document (#553).
  *
  * Handing `genericOAuth` a `discoveryUrl` instead makes it GET the document
- * twice per sign-in, once in each handler, with no cache, and a static URL
- * passed beside it is overwritten by what the fetch returns. Entra's v2.0
+ * twice per sign-in, once in `/sign-in/oauth2` and once in its callback, with
+ * no cache, and both handlers overwrite a static URL passed beside it with
+ * what the fetch returns. Entra's v2.0
  * endpoints are a fixed shape under the tenant, the one Better Auth's own
  * `microsoftEntraId` helper builds from a tenant id: drop the `/v2.0` from the
  * issuer and append `/oauth2/v2.0/authorize` or `/oauth2/v2.0/token`.
@@ -68,10 +69,10 @@ export function endpointsFromDiscoveryUrl(discoveryUrl: string): {
   if (!issuer) {
     return { authorizationUrl: "", tokenUrl: "" };
   }
-  const tenant = issuer.replace(ISSUER_VERSION_SUFFIX, "");
+  const tenantBase = issuer.replace(ISSUER_VERSION_SUFFIX, "");
   return {
-    authorizationUrl: `${tenant}/oauth2/v2.0/authorize`,
-    tokenUrl: `${tenant}/oauth2/v2.0/token`,
+    authorizationUrl: `${tenantBase}/oauth2/v2.0/authorize`,
+    tokenUrl: `${tenantBase}/oauth2/v2.0/token`,
   };
 }
 
