@@ -125,7 +125,9 @@ If a layout needs a child route to be a meaningful destination, give it at least
 
 A route's `beforeLoad` is executed during SSR AND on every client-side navigation. So `beforeLoad` cannot directly call any module that imports server-only deps (like `@tanstack/react-start/server`). Wrap the server-only code in a `createServerFn` and call that from `beforeLoad`. See `src/lib/auth-guards.ts` for the pattern.
 
-Because it runs on every navigation, each `getSession()` in a `beforeLoad` is a round trip per navigation, and a nested page paid one per layer: three identical reads before `/admin/projects` could start its loader. `_authed.tsx` is the one read. It redirects a signed-out viewer and returns `{ user }`, and every `beforeLoad` below it guards on `context.user` instead of reading again (#633). The parent's `beforeLoad` finishes before a child's starts, so the child never sees a missing user. A new page under `_authed` follows suit; a fresh read there needs a stated reason.
+### Guards below `_authed` read `context.user`, not the session
+
+A `getSession()` in a `beforeLoad` is a round trip on every load, and a nested page used to pay one per layer: three identical reads before `/admin/projects` could start its loader. `_authed.tsx` is the one read. It redirects a signed-out viewer and returns `{ user }`, and every `beforeLoad` below it guards on `context.user` (#633); `src/test/route-guards.test.ts` pins which roles each admits and that nothing below `_authed.tsx` reads the session. The parent's `beforeLoad` finishes before a child's starts (router-core's `load-client`, serially, awaited), so the child never sees a missing user. A hover preload is a load of its own and reads once too, so a hover then a click reads twice. A new page under `_authed` guards on `context.user`; a fresh read there needs a stated reason.
 
 ### Route search params via `validateSearch`
 
