@@ -8,10 +8,10 @@ import { describe, expect, it } from "vitest";
  *
  * A `useState`, `useRef` or `useReducer` initializer and an uncontrolled
  * `defaultValue` or `defaultChecked` run once, at mount. A TanStack Form
- * `defaultValues` is nearly as sticky: `useForm` compares it by value on
- * every render and swaps new defaults in, but only while no field is touched,
- * so a form the user has started editing keeps the rest of its mount-time
- * values. One seeded from loader data keeps whatever frame it mounted on, so
+ * `defaultValues` is nearly as sticky: new defaults reach the form only
+ * until a field is touched, and a blur touches one, so a form the user has
+ * so much as tabbed through keeps its mount-time values (QUIRKS, TanStack
+ * Form). One seeded from loader data keeps whatever frame it mounted on, so
  * it is correct only while `src/router.tsx` blocks on a stale reload (#474,
  * #499), which the router tests at the end hold. ADR-0029's Consequences
  * sort the seeds into four classes and say why the unkeyed ones rely on that
@@ -302,8 +302,9 @@ function commentEnd(source: string, start: number): number {
  *
  * Counted, not matched: a line regex misses an initializer Biome has wrapped
  * over several lines, and a non-greedy one stops at the first `)` of
- * `useState(() => programs.map((p) => p.id))`. Strings, template holes and
- * comments are skipped so a bracket inside one is text. `<` counts only when
+ * `useState(() => programs.map((p) => p.id))`. Strings and template holes
+ * are skipped so a bracket inside one is text; comments are gone already,
+ * since every caller reads what `blankComments` returns. `<` counts only when
  * `open` is one, which is a type parameter list, and the `>` of an `=>` never
  * closes it: `useState<Record<string, () => void>>(x)` is one list.
  *
@@ -318,8 +319,6 @@ function closeOf(source: string, open: number): number {
     const char = source[i];
     if (char === '"' || char === "'" || char === "`") {
       i = stringEnd(source, i) - 1;
-    } else if (isCommentStart(source, i)) {
-      i = commentEnd(source, i) - 1;
     } else if (char in CLOSER) {
       expected.push(CLOSER[char]);
     } else if (angles && char === "<") {
@@ -342,15 +341,13 @@ function closeOf(source: string, open: number): number {
  * character in `stops`, which is how a property value ends at the `,` or `}`
  * after it.
  */
-function topLevel(text: string, stops = ""): string[] {
+function splitTopLevel(text: string, stops = ""): string[] {
   const parts: string[] = [];
   let from = 0;
   for (let i = 0; i < text.length; i++) {
     const char = text[i];
     if (char === '"' || char === "'" || char === "`") {
       i = stringEnd(text, i) - 1;
-    } else if (isCommentStart(text, i)) {
-      i = commentEnd(text, i) - 1;
     } else if (char in CLOSER) {
       i = closeOf(text, i);
     } else if (stops.includes(char)) {
@@ -379,7 +376,9 @@ const PRIMITIVE =
 const EMPTY_COLLECTION = /^new (?:Set|Map)(?:<[^()]*>)?\(\)$/;
 const LAZY = /^\(\)\s*=>\s*([\s\S]*)$/;
 const PROPERTY = /^\s*(?:[\w$]+|"[^"]*"|'[^']*')\s*:\s*([\s\S]*)$/;
-const ASSERTION = /^\s+(?:satisfies|as)\s/;
+// One named type, so `[] as Row[] && loaderData.rows` is not a literal.
+const ASSERTION =
+  /^\s+(?:satisfies|as)\s+(?:const|[\w$.]+(?:<[^()]*>)?(?:\[\])*)\s*$/;
 
 /**
  * A plain literal, which cannot carry loader data: a primitive, an empty
@@ -405,7 +404,7 @@ function isLiteral(raw: string): boolean {
   if (rest.trim() !== "" && !ASSERTION.test(rest)) {
     return false;
   }
-  const items = topLevel(text.slice(1, close)).filter(
+  const items = splitTopLevel(text.slice(1, close)).filter(
     (item) => item.trim() !== ""
   );
   if (open === "(") {
@@ -492,7 +491,7 @@ function regexEnd(source: string, start: number): number {
  *
  * It keeps its own template and hole state rather than calling `stringEnd`
  * on a backtick, because a comment inside a `${}` hole must be blanked, and
- * `closeOf`, which `stringEnd` uses to jump a hole, skips comments unblanked.
+ * `stringEnd` jumps a hole whole.
  */
 function blankComments(source: string): string {
   const out = source.split("");
@@ -563,7 +562,7 @@ function hookSeeds(source: string): Seed[] {
     const args = source.slice(open + 1, closeOf(source, open));
     // `useReducer(reducer, initialArg, init?)`: the reducer is not a seed.
     const init =
-      kind === "useReducer" ? topLevel(args).slice(1).join(",") : args;
+      kind === "useReducer" ? splitTopLevel(args).slice(1).join(",") : args;
     seeds.push({ init, kind });
   }
   return seeds;
@@ -575,7 +574,7 @@ function formSeeds(source: string): Seed[] {
     const start = match.index + match[0].length;
     const init =
       match[1] === ":"
-        ? topLevel(source.slice(start), ",)}")[0]
+        ? splitTopLevel(source.slice(start), ",)}")[0]
         : // Shorthand, `{ defaultValues }`: a variable, never a literal.
           "defaultValues";
     seeds.push({ init, kind: "defaultValues" });
@@ -751,11 +750,13 @@ describe("once-only seeds", () => {
         /* seed */ const [a] = useState(record.x);
         {/* Name */}<Input defaultValue={user.name} />
         const sep = " // "; const [v] = useState(loaderData.v);
+        const [rows2] = useState([] as Row[] && loaderData.rows);
       `)
     ).toEqual([
       'useState(record.title ?? "(untitled)")',
       "useState(record.x)",
       "useState(loaderData.v)",
+      "useState([] as Row[] && loaderData.rows)",
       "defaultValue(user.name)",
     ]);
   });
@@ -833,7 +834,8 @@ function blankCommentsByParser(path: string, source: string): string {
         }
       } else if (
         kind !== ts.SyntaxKind.WhitespaceTrivia &&
-        kind !== ts.SyntaxKind.NewLineTrivia
+        kind !== ts.SyntaxKind.NewLineTrivia &&
+        kind !== ts.SyntaxKind.ShebangTrivia
       ) {
         break;
       }
