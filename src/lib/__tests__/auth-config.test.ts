@@ -54,6 +54,16 @@ describe("buildAuthConfig", () => {
     );
   });
 
+  it("derives the ONID endpoints from the discovery URL", () => {
+    const config = buildAuthConfig(CONFIGURED);
+    expect(config.onid.authorizationUrl).toBe(
+      "https://login.microsoftonline.com/tenant-guid-fake/oauth2/v2.0/authorize"
+    );
+    expect(config.onid.tokenUrl).toBe(
+      "https://login.microsoftonline.com/tenant-guid-fake/oauth2/v2.0/token"
+    );
+  });
+
   it("derives an empty issuer from an unset discovery URL, so ONID fails closed", () => {
     expect(buildAuthConfig({} as NodeJS.ProcessEnv).onid.issuer).toBe("");
   });
@@ -95,7 +105,8 @@ describe("buildAuthConfig", () => {
     expect(config.github).toEqual({ clientId: "", clientSecret: "" });
     expect(config.onid.clientId).toBe("");
     expect(config.onid.clientSecret).toBe("");
-    expect(config.onid.discoveryUrl).toBe("");
+    expect(config.onid.authorizationUrl).toBe("");
+    expect(config.onid.tokenUrl).toBe("");
   });
 });
 
