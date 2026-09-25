@@ -2,8 +2,9 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Bell, BellRing } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
+import { authClient } from "#/lib/auth-client";
 import { useAction } from "#/lib/use-action";
-import { useSignedIn } from "#/lib/use-signed-in";
+import { useHasMounted } from "#/lib/use-has-mounted";
 import {
   listMyNotifications,
   markAllRead,
@@ -35,13 +36,22 @@ const NOTIFICATIONS_KEY = ["notifications"] as const;
  *
  * The poll pauses while the tab is hidden and the focus refetch fires when it
  * comes back, which is what the hand-rolled `focus` listener was for.
+ *
+ * The key carries the user id. Signing out reloads the page, but a session can
+ * also end without one (another tab, expiry, a ban), and signing in navigates
+ * on the client, so a bare key would show the next user the previous user's
+ * cached notifications until their own read answered.
  */
 export function NotificationBell() {
   const [open, setOpen] = useState(false);
-  const signedIn = useSignedIn();
+  // `useSignedIn`'s gate, keeping the id: false until mounted, so the first
+  // client render matches the signed-out markup the server produced.
+  const { data: session } = authClient.useSession();
+  const hasMounted = useHasMounted();
+  const userId = hasMounted ? session?.user?.id : undefined;
   const queryClient = useQueryClient();
   const { data, refetch } = useQuery({
-    queryKey: NOTIFICATIONS_KEY,
+    queryKey: [...NOTIFICATIONS_KEY, userId],
     queryFn: async () => {
       const [{ count }, { rows }] = await Promise.all([
         unreadCount(),
@@ -49,7 +59,7 @@ export function NotificationBell() {
       ]);
       return { count, rows: rows as Notification[] };
     },
-    enabled: signedIn,
+    enabled: userId !== undefined,
     refetchInterval: 60_000,
     refetchOnWindowFocus: true,
     // The next tick is the retry; a refusal (a session that ended in another
