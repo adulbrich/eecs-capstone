@@ -117,25 +117,56 @@ describe("admin project export", () => {
 
   it("keeps the six prose columns out of the listing's rows (#482)", async () => {
     const admin = await makeUser(`e-${Date.now()}@x.com`, "admin");
-    await createProjectAs(admin, baseProject("Epsilon drone"));
+    const prose = {
+      description: "Epsilon description",
+      problemStatement: "Epsilon problem",
+      objectives: "Epsilon objectives",
+      minQualifications: "Epsilon minimum",
+      prefQualifications: "Epsilon preferred",
+      licenseRestrictions: "Epsilon license",
+    };
+    // License notes are kept only on a project that requires an agreement.
+    await createProjectAs(admin, {
+      ...baseProject("Epsilon drone"),
+      ...prose,
+      requiresNdaIp: true,
+    });
 
-    const filter = { ...ALL_PROJECTS, q: "Epsilon" };
+    const filter = { ...ALL_PROJECTS, q: "Epsilon drone" };
     const listed = await listAdminProjectsAs(admin, filter);
     const exported = await exportAdminProjectsAs(admin, filter);
 
-    const prose = [
-      "description",
-      "problemStatement",
-      "objectives",
-      "minQualifications",
-      "prefQualifications",
-      "licenseRestrictions",
-    ];
+    // The whole key set, not just the six absent keys, so a prose column
+    // added to the shared projection cannot flow into the list unnoticed.
     expect(listed.rows).toHaveLength(1);
-    for (const key of prose) {
-      expect(listed.rows[0]).not.toHaveProperty(key);
-      expect(exported.rows[0]).toHaveProperty(key);
-    }
+    expect(Object.keys(listed.rows[0]).sort()).toEqual(
+      [
+        "acceptingApplicants",
+        "categories",
+        "contactEmail",
+        "contactName",
+        "createdAt",
+        "deletedAt",
+        "id",
+        "imageUrl",
+        "mentorEmail",
+        "mentorName",
+        "programs",
+        "proposerEmail",
+        "proposerId",
+        "proposerName",
+        "publishedAt",
+        "requiresNdaIp",
+        "status",
+        "studentProposed",
+        "teamsSupported",
+        "title",
+        "updatedAt",
+        "url",
+      ].sort()
+    );
+    expect(exported.rows).toHaveLength(1);
+    expect(exported.rows[0]).toMatchObject(prose);
   });
 
   it("joins categories as '; '-separated, ordered by type then name", async () => {
