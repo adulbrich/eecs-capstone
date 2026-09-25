@@ -65,9 +65,9 @@ async function refreshAndLog(
   const embedding = await refreshProjectEmbedding(projectId, deps.embed);
   const summary = await refreshSocialSummary(projectId, deps.summarize);
   // The `ai_write_failures` metric filter in `infra/alarms.tf` counts this
-  // line when either outcome is `failed`, by the lowercase phrases around
-  // each outcome. Reword it and the alarm goes quiet; the test for this file
-  // runs the filter's pattern against the line to catch that.
+  // line when either outcome is `failed`, by a regex anchored at its start.
+  // Reword it and the alarm goes quiet; the test for this file runs the
+  // filter's pattern against the line to catch that.
   console.log(
     `Project refresh for ${projectId}: embedding ${embedding}, social summary ${summary}, ${Date.now() - queuedAt} ms`
   );
