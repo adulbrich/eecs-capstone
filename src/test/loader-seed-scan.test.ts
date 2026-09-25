@@ -920,7 +920,9 @@ describe("the stale reload mode the census rests on", () => {
   });
 
   it("is not overridden by any route's loader", () => {
-    const overrides = [...sourceFiles(join(SRC_DIR, "routes"))]
+    // All of src/, not only src/routes: a loader object built elsewhere and
+    // spread into a route carries its staleReloadMode with it.
+    const overrides = [...sourceFiles(SRC_DIR)]
       .filter((path) =>
         /\bstaleReloadMode\b/.test(blankComments(readFileSync(path, "utf8")))
       )
@@ -928,7 +930,7 @@ describe("the stale reload mode the census rests on", () => {
       .sort();
     expect(
       overrides,
-      `These routes set staleReloadMode on their loader.\n${remedy}\n\n` +
+      `These files set staleReloadMode on a loader.\n${remedy}\n\n` +
         overrides.join("\n")
     ).toEqual([]);
   });
