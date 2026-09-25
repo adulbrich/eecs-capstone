@@ -1,5 +1,6 @@
 import { readdirSync, readFileSync } from "node:fs";
 import { join, relative } from "node:path";
+import ts from "typescript";
 import { describe, expect, it } from "vitest";
 
 /**
@@ -90,7 +91,7 @@ const CENSUS = new Map<string, { class: SeedClass; why: string }>([
     "src/components/staff-program-section.tsx: useState(teamsSupported)",
     {
       class: "A",
-      why: "the project's team count, from the record /projects/$projectId loads",
+      why: "the project's teams supported, from the record /projects/$projectId loads",
     },
   ],
   [
@@ -261,7 +262,9 @@ const CLOSER: Record<string, string> = { "(": ")", "[": "]", "{": "}" };
 /**
  * Just past the string or template literal that opens at `start`. A quoted
  * string ends at its line's end at the latest, as it must in JavaScript, so
- * an apostrophe in JSX text misreads the rest of that line and no further.
+ * an apostrophe in JSX text misreads the rest of that line and no further. A
+ * backtick has no such stop: a stray one runs to the next backtick, or to the
+ * end of the file.
  */
 function stringEnd(source: string, start: number): number {
   const quote = source[start];
@@ -478,6 +481,18 @@ function regexEnd(source: string, start: number): number {
  * `<Input defaultValue={user.name} />`, or a `//` inside a string earlier on
  * it. Strings, template literals and their `${}` holes, and regex literals are
  * walked so a `//` or `/*` inside one is text.
+ *
+ * It is a lexer without a parser, so some shapes fool it: JSX text holding
+ * `http://` (it blanks the rest of the line) or `/*` (the rest of the file),
+ * a stray backtick in JSX text (it flips template state for the rest of the
+ * file), and a regex literal right after `)`, as in `if (x) /\/\//.test(y)`.
+ * None occurs in `src/` today, and a test further down holds it to
+ * TypeScript's parser over every file the scan reads, so one that appears
+ * fails loudly rather than dropping a seed.
+ *
+ * It keeps its own template and hole state rather than calling `stringEnd`
+ * on a backtick, because a comment inside a `${}` hole must be blanked, and
+ * `closeOf`, which `stringEnd` uses to jump a hole, skips comments unblanked.
  */
 function blankComments(source: string): string {
   const out = source.split("");
@@ -743,6 +758,130 @@ describe("once-only seeds", () => {
       "useState(loaderData.v)",
       "defaultValue(user.name)",
     ]);
+  });
+
+  it("ends a quoted string at its line's end, so an apostrophe in JSX text misreads only that line", () => {
+    // Were the apostrophe read as a string running on to the next quote, the
+    // comment below would be taken for its text and never blanked.
+    expect(
+      labelsIn(`
+        <p>Don't lose this</p>
+        // useState(record.prose) is prose.
+        const [v] = useState(record.v);
+      `)
+    ).toEqual(["useState(record.v)"]);
+  });
+});
+
+/**
+ * `source` with every comment TypeScript's parser finds blanked the way
+ * `blankComments` blanks one: the oracle the hand lexer is held to.
+ *
+ * A comment is trivia, the gap before a token, so every leaf of the tree
+ * `getChildren` builds (which adds the punctuation and keywords the AST
+ * leaves implicit) has the trivia from its full start rescanned with the
+ * parser's own scanner. JSX text is the one leaf whose full text is text
+ * rather than trivia, so it is never rescanned, and a comment in JSX braces
+ * is found as the trivia before that expression's `}`. JSDoc nodes are
+ * skipped, because the comment each one parses is also the trivia of the
+ * token after it. This is exact for every construct: nothing is left out of
+ * the comparison.
+ */
+function blankCommentsByParser(path: string, source: string): string {
+  const file = ts.createSourceFile(
+    path,
+    source,
+    ts.ScriptTarget.Latest,
+    true,
+    path.endsWith(".tsx") ? ts.ScriptKind.TSX : ts.ScriptKind.TS
+  );
+  const scanner = ts.createScanner(
+    ts.ScriptTarget.Latest,
+    false,
+    file.languageVariant,
+    source
+  );
+  const out = source.split("");
+  const visit = (node: ts.Node): void => {
+    if (
+      node.kind >= ts.SyntaxKind.FirstJSDocNode &&
+      node.kind <= ts.SyntaxKind.LastJSDocNode
+    ) {
+      return;
+    }
+    const children = node.getChildren(file);
+    if (children.length > 0) {
+      for (const child of children) {
+        visit(child);
+      }
+      return;
+    }
+    if (node.kind === ts.SyntaxKind.JsxText) {
+      return;
+    }
+    scanner.resetTokenState(node.pos);
+    for (;;) {
+      const kind = scanner.scan();
+      if (
+        kind === ts.SyntaxKind.SingleLineCommentTrivia ||
+        kind === ts.SyntaxKind.MultiLineCommentTrivia
+      ) {
+        for (let j = scanner.getTokenStart(); j < scanner.getTokenEnd(); j++) {
+          if (out[j] !== "\n") {
+            out[j] = " ";
+          }
+        }
+      } else if (
+        kind !== ts.SyntaxKind.WhitespaceTrivia &&
+        kind !== ts.SyntaxKind.NewLineTrivia
+      ) {
+        break;
+      }
+    }
+  };
+  visit(file);
+  return out.join("");
+}
+
+/** Where `blankComments` first parts from the parser in `path`, if it does. */
+function lexerDivergence(path: string): string | undefined {
+  const source = readFileSync(path, "utf8");
+  const hand = blankComments(source);
+  const parser = blankCommentsByParser(path, source);
+  if (hand === parser) {
+    return;
+  }
+  let at = 0;
+  while (hand[at] === parser[at]) {
+    at++;
+  }
+  const before = source.slice(0, at).split("\n");
+  const what =
+    hand[at] === " "
+      ? "blanks code the parser keeps"
+      : "keeps a comment the parser blanks";
+  return (
+    `${relative(process.cwd(), path)}:${before.length}:${(before.at(-1)?.length ?? 0) + 1} ` +
+    `(offset ${at}) ${what}: ${JSON.stringify(source.slice(at, at + 40))}`
+  );
+}
+
+describe("the comment blanking the scan reads through", () => {
+  it("agrees with TypeScript's parser on every file the scan walks", () => {
+    const diverged = [...sourceFiles(SRC_DIR)]
+      .map(lexerDivergence)
+      .filter((line) => line !== undefined);
+    expect(
+      diverged,
+      "blankComments, the hand lexer the seed scan reads through, diverged\n" +
+        "from TypeScript's parser at the first offset named below. Where it\n" +
+        "blanks code, a seed there is dropped without a red test; where it\n" +
+        "keeps a comment, prose there reads as a seed. Its docstring lists\n" +
+        "the shapes known to fool it. Teach blankComments the construct at\n" +
+        "that offset, in src/test/loader-seed-scan.test.ts, and add a fixture\n" +
+        "for it beside the others.\n\n" +
+        diverged.join("\n")
+    ).toEqual([]);
   });
 });
 
