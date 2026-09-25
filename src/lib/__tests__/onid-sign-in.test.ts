@@ -5,11 +5,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { buildAuthConfig } from "../_internal/auth-config";
 import { onidProviderConfig } from "../_internal/onid-provider";
 
-// #553: configured with a `discoveryUrl`, `genericOAuth` GETs Microsoft's
-// discovery document in the sign-in handler and again in the callback, with
-// no cache. This drives Better Auth's real handlers with the ONID entry
-// `src/lib/auth.ts` uses, built by the same function from the same kind of
-// environment, and counts every outbound fetch.
+// #553: ONID sign-in must never fetch the discovery document; see
+// `endpointsFromDiscoveryUrl` for why. This drives Better Auth's real handlers
+// with the ONID entry `src/lib/auth.ts` uses, built by the same function from
+// the same kind of environment, and counts every outbound fetch.
 //
 // Not `auth.ts` itself: it builds its auth object at module scope over the
 // Drizzle adapter, so importing it needs a database. The memory adapter keeps
@@ -142,20 +141,27 @@ describe("ONID sign-in without discovery", () => {
     expect(fetched).toEqual([]);
   });
 
-  it("exchanges the code at the derived token endpoint and nothing else", async () => {
-    const callback = await signInAndCallBack(buildAuth());
+  it("fetches only the token endpoint across two consecutive sign-ins with their callbacks", async () => {
+    const auth = buildAuth();
 
-    // A redirect back to the app, not to the error page: the callback got all
-    // the way through the token exchange and our `getUserInfo`.
-    expect(callback.status).toBe(302);
-    expect(callback.headers.get("location")).not.toContain("error");
-    expect(getUserInfo).toHaveBeenCalledOnce();
-    expect(fetched).toEqual([TOKEN_URL]);
+    for (let attempt = 0; attempt < 2; attempt += 1) {
+      const callback = await signInAndCallBack(auth);
+      // A redirect back to the app, not to the error page: the callback got
+      // all the way through the token exchange and our `getUserInfo`.
+      expect(callback.status).toBe(302);
+      expect(callback.headers.get("location")).not.toContain("error");
+    }
+
+    expect(getUserInfo).toHaveBeenCalledTimes(2);
+    expect(fetched).toEqual([TOKEN_URL, TOKEN_URL]);
+    expect(fetched).not.toContain(DISCOVERY_URL);
   });
 
-  it("refuses the RFC 9207 iss parameter of another tenant, as discovery used to make it", async () => {
+  it("refuses the RFC 9207 iss parameter of another tenant if Entra sends one", async () => {
     // Discovery supplied the expected issuer for this check. Passing it
-    // statically is what keeps the check on without the fetch.
+    // statically keeps the check running without the fetch, for the day Entra
+    // sends `iss`; today it does not advertise that it will, and the tenant is
+    // pinned by the `iss` claim check in `onidUserInfo`.
     const callback = await signInAndCallBack(buildAuth(), {
       iss: "https://login.microsoftonline.com/other-tenant/v2.0",
     });
