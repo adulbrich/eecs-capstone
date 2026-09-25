@@ -48,7 +48,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "#/components/ui/select";
-import { getSession } from "#/lib/auth-guards";
 import { isOpenCustomLine } from "#/lib/inventory-custom-workflow";
 import { lineTimeline } from "#/lib/inventory-timeline";
 import { pageTitle } from "#/lib/page-title";
@@ -99,12 +98,8 @@ const searchSchema = z.object({
 export const Route = createFileRoute("/_authed/admin/inventory/requests")({
   validateSearch: searchSchema,
   head: () => ({ meta: [{ title: pageTitle("Inventory Requests") }] }),
-  beforeLoad: async () => {
-    const session = await getSession();
-    if (!session?.user) {
-      throw redirect({ to: "/sign-in" });
-    }
-    if (!isStaff(session.user)) {
+  beforeLoad: ({ context }) => {
+    if (!isStaff(context.user)) {
       throw redirect({ to: "/" });
     }
   },

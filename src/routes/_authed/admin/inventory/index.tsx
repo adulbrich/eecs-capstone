@@ -45,7 +45,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "#/components/ui/select";
-import { getSession } from "#/lib/auth-guards";
 import { defineCsvColumns, toCsv } from "#/lib/csv";
 import { formatHoldShort, holdFromStoredRow } from "#/lib/hold";
 import {
@@ -95,12 +94,8 @@ const searchSchema = z.object({
 export const Route = createFileRoute("/_authed/admin/inventory/")({
   validateSearch: searchSchema,
   head: () => ({ meta: [{ title: pageTitle("Inventory") }] }),
-  beforeLoad: async () => {
-    const session = await getSession();
-    if (!session?.user) {
-      throw redirect({ to: "/sign-in" });
-    }
-    if (!isStaff(session.user)) {
+  beforeLoad: ({ context }) => {
+    if (!isStaff(context.user)) {
       throw redirect({ to: "/" });
     }
   },
