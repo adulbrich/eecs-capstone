@@ -15,7 +15,8 @@
  *
  * The token is not signature-verified, deliberately. It arrives in the response
  * body of a back-channel POST we make ourselves, over TLS to the tenant's token
- * endpoint on login.microsoftonline.com, authenticated with the client secret. OpenID Connect Core 3.1.3.7 permits skipping validation for a token
+ * endpoint on login.microsoftonline.com, authenticated with the client secret.
+ * OpenID Connect Core 3.1.3.7 permits skipping validation for a token
  * obtained that way, and Better Auth's default decodes without verifying for
  * the same reason.
  */

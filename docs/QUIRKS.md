@@ -125,6 +125,8 @@ If a layout needs a child route to be a meaningful destination, give it at least
 
 A route's `beforeLoad` is executed during SSR AND on every client-side navigation. So `beforeLoad` cannot directly call any module that imports server-only deps (like `@tanstack/react-start/server`). Wrap the server-only code in a `createServerFn` and call that from `beforeLoad`. See `src/lib/auth-guards.ts` for the pattern.
 
+Because it runs on every navigation, each `getSession()` in a `beforeLoad` is a round trip per navigation, and a nested page paid one per layer: three identical reads before `/admin/projects` could start its loader. `_authed.tsx` is the one read. It redirects a signed-out viewer and returns `{ user }`, and every `beforeLoad` below it guards on `context.user` instead of reading again (#633). The parent's `beforeLoad` finishes before a child's starts, so the child never sees a missing user. A new page under `_authed` follows suit; a fresh read there needs a stated reason.
+
 ### Route search params via `validateSearch`
 
 ```ts
