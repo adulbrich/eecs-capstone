@@ -294,7 +294,7 @@ export const ACCESS_CONTRACT: Record<string, AccessDeclaration> = {
   },
   "server/projects-queries.ts:listAdminProjects": {
     level: "staff",
-    note: "Reads adminProjectSummarySelect, so it carries proposerEmail, mentorEmail and contactEmail. Staff is what keeps the first two out of a public read; the search matches both addresses and the mentor's resolved name, so a public caller could not have them by inference either.",
+    note: "Reads adminProjectListSelect, the staff projection less its six prose columns (#482), so it still carries proposerEmail, mentorEmail and contactEmail. Staff is what keeps the first two out of a public read; the search matches both addresses and the mentor's resolved name, so a public caller could not have them by inference either.",
   },
   "server/projects-queries.ts:listMentoredProjects": {
     level: "authenticated",

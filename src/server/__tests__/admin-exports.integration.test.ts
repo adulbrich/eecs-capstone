@@ -115,6 +115,29 @@ describe("admin project export", () => {
     expect(rows[0].notes).toBe("Staff only");
   });
 
+  it("keeps the six prose columns out of the listing's rows (#482)", async () => {
+    const admin = await makeUser(`e-${Date.now()}@x.com`, "admin");
+    await createProjectAs(admin, baseProject("Epsilon drone"));
+
+    const filter = { ...ALL_PROJECTS, q: "Epsilon" };
+    const listed = await listAdminProjectsAs(admin, filter);
+    const exported = await exportAdminProjectsAs(admin, filter);
+
+    const prose = [
+      "description",
+      "problemStatement",
+      "objectives",
+      "minQualifications",
+      "prefQualifications",
+      "licenseRestrictions",
+    ];
+    expect(listed.rows).toHaveLength(1);
+    for (const key of prose) {
+      expect(listed.rows[0]).not.toHaveProperty(key);
+      expect(exported.rows[0]).toHaveProperty(key);
+    }
+  });
+
   it("joins categories as '; '-separated, ordered by type then name", async () => {
     const admin = await makeUser(`c-${Date.now()}@x.com`, "admin");
     const { id: projectId } = await createProjectAs(
