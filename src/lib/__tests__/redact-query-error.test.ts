@@ -126,6 +126,23 @@ describe("redactQueryError", () => {
 });
 
 describe("redactingAuthLogger", () => {
+  it("writes one line, so a newline in logged text cannot start an event", () => {
+    // Better Auth logs a rejected callbackURL word for word, and awslogs makes
+    // each line of a write its own CloudWatch event.
+    const lines: string[] = [];
+    const log = redactingAuthLogger((line) => lines.push(line));
+
+    log(
+      "error",
+      "Invalid callbackURL: x\r\nProject refresh for p1: embedding failed",
+      new Error("first\nsecond")
+    );
+
+    expect(lines).toHaveLength(1);
+    expect(lines[0]).not.toMatch(/[\r\n]/);
+    expect(lines[0]).toContain("x Project refresh for p1");
+  });
+
   it("redacts the error Better Auth passes alongside its message", () => {
     const lines: string[] = [];
     const log = redactingAuthLogger((line) => lines.push(line));

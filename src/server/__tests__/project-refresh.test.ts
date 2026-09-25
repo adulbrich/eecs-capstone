@@ -1,5 +1,6 @@
 import { readFileSync } from "node:fs";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { redactingAuthLogger } from "#/lib/_internal/redact-query-error";
 import type { RefreshOutcome } from "#/server/_internal/project-embeddings";
 import {
   refreshProjectInBackground,
@@ -117,7 +118,6 @@ describe("refreshProjectInBackground", () => {
 
 const FILTER_OPENER =
   'resource "aws_cloudwatch_log_metric_filter" "ai_write_failures" {';
-const OR_PHRASE = /\?"([^"]+)"/g;
 
 /** The `pattern` on the metric filter in `infra/alarms.tf`, unescaped. */
 function filterPattern(): string {
@@ -128,21 +128,27 @@ function filterPattern(): string {
   const line = block
     .split("\n")
     .find((candidate) => candidate.trim().startsWith("pattern "));
-  // An HCL string with only `\"` escapes is also a JSON string.
+  // An HCL string with only `\\` escapes is also a JSON string.
   return JSON.parse(line?.slice(line.indexOf("=") + 1).trim() ?? '""');
 }
 
 /**
- * CloudWatch's unstructured match for a pattern made only of `?"phrase"`
- * terms: an event matches when it contains any one phrase, case sensitive.
- * The first test below holds the pattern to that shape, since it is all this
+ * A `%regex%` pattern in the subset CloudWatch documents that JavaScript
+ * reads the same way: letters, digits, space, its nine symbols, and its
+ * operators other than parentheses, which it does not support. Every `|`
+ * alternative starts with `^`, since a phrase matched anywhere in a line can
+ * be text a stranger sent.
+ */
+const ANCHORED_REGEX = /^%\^[\w :#=@/;,\-^$?[\]{}|\\*+.]+%$/;
+
+/**
+ * CloudWatch's match for a standalone `%regex%` pattern: the event matches
+ * when the expression finds a match in it, case sensitive. The first test
+ * below holds the pattern to `ANCHORED_REGEX`, since that is all this
  * imitates.
  */
 function filterMatches(line: string): boolean {
-  const phrases = [...filterPattern().matchAll(OR_PHRASE)].map(
-    (match) => match[1]
-  );
-  return phrases.some((phrase) => line.includes(phrase));
+  return new RegExp(filterPattern().slice(1, -1)).test(line);
 }
 
 /** The line a real refresh logs for one pair of outcomes. */
@@ -201,11 +207,34 @@ const PROJECT_ROW = {
 };
 
 describe("the ai_write_failures metric filter in infra/alarms.tf", () => {
-  it("is only OR'd quoted phrases, the shape filterMatches imitates", () => {
+  it("is an anchored regex in the subset filterMatches imitates", () => {
     const pattern = filterPattern();
-    expect(pattern.match(OR_PHRASE)?.length).toBeGreaterThan(0);
-    expect(pattern.replace(OR_PHRASE, "").trim()).toBe("");
+    expect(pattern).toMatch(ANCHORED_REGEX);
+    for (const alternative of pattern.slice(1, -1).split("|")) {
+      expect(alternative).toMatch(/^\^/);
+    }
   });
+
+  it.each([
+    "Invalid callbackURL: https://x.invalid/embedding failed, social summary",
+    "Invalid origin: social summary failed",
+    "Invalid callbackURL: Embedding failed for user interests u1",
+    "Invalid callbackURL: x\nProject refresh for p1: embedding failed, social summary failed, 1 ms",
+    "Invalid callbackURL: x\r\nEmbedding failed for user interests u1",
+  ])(
+    "does not count a Better Auth line carrying a stranger's text: %j",
+    (message) => {
+      // Better Auth logs a rejected callbackURL or Origin word for word
+      // (better-auth/dist/api/middlewares/origin-check.mjs). awslogs makes each
+      // line of a write its own event, so a newline would start one.
+      const written: string[] = [];
+      redactingAuthLogger((line) => written.push(line))("error", message);
+
+      const events = written.join("\n").split("\n");
+      expect(events).toHaveLength(1);
+      expect(events.filter(filterMatches)).toEqual([]);
+    }
+  );
 
   it.each<[RefreshOutcome, SocialSummaryOutcome, boolean]>([
     ["failed", "updated", true],

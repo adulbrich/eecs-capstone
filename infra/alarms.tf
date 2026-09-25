@@ -254,21 +254,24 @@ resource "aws_cloudwatch_metric_alarm" "db_pool_waiting" {
 # or publish has committed and catches everything, so a Bedrock outage costs
 # the proposer nothing; before this it told nobody either (#548).
 #
-# Three quoted phrases joined by `?`, which is OR and the only way the
-# unstructured syntax documents to combine alternatives; it has no grouping, so
-# "the refresh line with either outcome failed" is written as the two outcome
-# phrases that only that line can contain. Matching is case sensitive, which is
-# what keeps each failure counted once:
+# A regex, anchored at the start of the line, because a phrase matched anywhere
+# can be written by a stranger: Better Auth logs a rejected `callbackURL` or
+# `Origin` word for word, so two unauthenticated requests carrying "social
+# summary failed" would mail, or hold the alarm in ALARM through a real outage.
+# `redactingAuthLogger` collapses newlines, so that text cannot start a line of
+# its own either. The syntax has no parentheses, so each `|` alternative
+# carries its own `^`. Case sensitive, which is what keeps each failure
+# counted once:
 #
-# - "embedding failed, social summary" and "social summary failed" are halves
-#   of `Project refresh for <id>: embedding <outcome>, social summary
-#   <outcome>, <n> ms`, the one line `refreshAndLog` in
-#   `src/server/_internal/project-refresh.ts` prints per refresh. A line with
-#   both failed is one event and counts once. A truncated summary reports
-#   `failed` through the same line.
-# - "Embedding failed for user interests" is the error
-#   `refreshInterestsEmbedding` in `project-embeddings.ts` prints, the third
-#   automatic writer, which has no refresh line of its own.
+# - The first two alternatives are `Project refresh for <id>: embedding
+#   <outcome>, social summary <outcome>, <n> ms`, the one line `refreshAndLog`
+#   in `src/server/_internal/project-refresh.ts` prints per refresh, when
+#   either outcome is `failed`. A line with both failed is one event and counts
+#   once. A truncated summary reports `failed` through the same line. A task
+#   stopped mid-refresh prints nothing, and that write is not counted.
+# - The third is the error `refreshInterestsEmbedding` in
+#   `project-embeddings.ts` prints, the third automatic writer, which has no
+#   refresh line of its own.
 #
 # The capitalised `Embedding failed for project` and `Social summary failed
 # for project` errors are left out on purpose: each is the same failure the
@@ -276,15 +279,15 @@ resource "aws_cloudwatch_metric_alarm" "db_pool_waiting" {
 # `project-refresh.test.ts` runs this pattern against the line the code prints,
 # so rewording either side fails a test instead of quietly zeroing the metric.
 # The `aws logs tail` recipe in DEPLOYMENT.md, which lists the lines behind a
-# mail, carries its own copy of these phrases and no test checks it, so change
-# it in the same commit.
+# mail, matches looser phrases on purpose and no test checks it, so change it
+# in the same commit.
 #
 # No `default_value`. With one, every unmatched line on the group would publish
 # a zero; without it the metric exists only when something failed.
 resource "aws_cloudwatch_log_metric_filter" "ai_write_failures" {
   name           = "${var.project}-ai-write-failures"
   log_group_name = aws_cloudwatch_log_group.app.name
-  pattern        = "?\"embedding failed, social summary\" ?\"social summary failed\" ?\"Embedding failed for user interests\""
+  pattern        = "%^Project refresh for \\S+: embedding failed,|^Project refresh for \\S+: embedding [a-z]+, social summary failed,|^Embedding failed for user interests %"
 
   metric_transformation {
     name      = "AiWriteFailures"
@@ -302,15 +305,16 @@ resource "aws_cloudwatch_log_metric_filter" "ai_write_failures" {
 # the `minimal` effort that failed every social summary on 2026-09-21 without
 # anybody hearing of it (`docs/QUIRKS.md`, Amazon Bedrock). One three-hour
 # period rather than three one-hour ones because the question is how many
-# failed, not in how many hours any did. The sum is per period, so two
-# failures that land in different periods do not add up and do not mail.
+# failed, not in how many hours any did. The window slides (no
+# `evaluation_window` is set), so any two failures within three hours of each
+# other mail, wherever the clock hours fall.
 #
 # `notBreaching` because the filter publishes nothing until something fails,
 # so missing data is the healthy state rather than a gap to worry about. It
-# also means an OK after ALARM says only that three hours passed with fewer than
-# two failures, not that anything was fixed: a configuration still refused on
-# every call goes OK whenever refreshes are sparse, so read the recovery mail
-# that way.
+# also means an OK after ALARM says only that at least three hours passed with
+# fewer than two failures, not that anything was fixed: a configuration still
+# refused on every call goes OK whenever refreshes are sparse, so read the
+# recovery mail that way.
 resource "aws_cloudwatch_metric_alarm" "ai_write_failures" {
   alarm_name        = "${var.project}-ai-write-failures"
   alarm_description = "Automatic AI writes (a project embedding, a social summary or an interest embedding) failed at least twice in three hours. The saves that started them succeeded, and each row kept what it had before."
