@@ -302,7 +302,11 @@ resource "aws_cloudwatch_log_metric_filter" "ai_write_failures" {
 # periods do not add up and do not mail.
 #
 # `notBreaching` because the filter publishes nothing until something fails,
-# so missing data is the healthy state rather than a gap to worry about.
+# so missing data is the healthy state rather than a gap to worry about. It
+# also means an OK after ALARM says only that three hours passed with fewer than
+# two failures, not that anything was fixed: a configuration still refused on
+# every call goes OK whenever refreshes are sparse, so read the recovery mail
+# that way.
 resource "aws_cloudwatch_metric_alarm" "ai_write_failures" {
   alarm_name        = "${var.project}-ai-write-failures"
   alarm_description = "Automatic AI writes (a project embedding, a social summary or an interest embedding) failed at least twice in three hours. The saves that started them succeeded, and each row kept what it had before."
