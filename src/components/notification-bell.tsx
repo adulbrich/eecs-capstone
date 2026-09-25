@@ -1,4 +1,5 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { isRedirect } from "@tanstack/react-router";
 import { Bell, BellRing } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
@@ -56,17 +57,28 @@ export function NotificationBell() {
   const { data } = useQuery({
     queryKey,
     queryFn: async () => {
-      const [{ count }, { rows }] = await Promise.all([
-        unreadCount(),
-        listMyNotifications(),
-      ]);
-      return { count, rows: rows as Notification[] };
+      try {
+        const [{ count }, { rows }] = await Promise.all([
+          unreadCount(),
+          listMyNotifications(),
+        ]);
+        return { count, rows: rows as Notification[] };
+      } catch (error) {
+        // The server ended the session (expiry, a ban) before this tab
+        // heard. `requireUser` refuses with a redirect, and the router's
+        // query integration navigates on any redirect a query throws, which
+        // would carry a tab mid-edit to /sign-in on the next tick.
+        if (isRedirect(error)) {
+          return { count: 0, rows: [] };
+        }
+        throw error;
+      }
     },
     enabled: userId !== undefined,
     refetchInterval: 60_000,
     refetchOnWindowFocus: true,
-    // The next tick is the retry; a refusal (a session that ended in another
-    // tab) should cost the two reads once a minute, not four times each.
+    // The next tick is the retry; a failed read should cost the two requests
+    // once a minute, not four times each.
     retry: false,
   });
   const unread = data?.count ?? 0;

@@ -1,9 +1,11 @@
 // @vitest-environment jsdom
 import {
   focusManager,
+  QueryCache,
   QueryClient,
   QueryClientProvider,
 } from "@tanstack/react-query";
+import { redirect } from "@tanstack/react-router";
 import {
   act,
   cleanup,
@@ -190,6 +192,29 @@ describe("NotificationBell, mounted twice", () => {
     for (const bell of bells()) {
       expect(bell.textContent).toBe("");
     }
+  });
+
+  it("clears the count, without a redirect, when the server has ended the session", async () => {
+    // `requireUser` refuses with a redirect, and the router's query
+    // integration navigates on any redirect that reaches the query cache's
+    // `onError`, so a tick would carry a tab mid-edit to /sign-in.
+    const onError = vi.fn();
+    const qc = new QueryClient({ queryCache: new QueryCache({ onError }) });
+    session = { user: { id: "u1" } };
+    render(twoBells(qc));
+    await settledOnMount();
+
+    mockedCount.mockRejectedValueOnce(redirect({ to: "/sign-in" }));
+    await act(async () => {
+      await qc.invalidateQueries({ queryKey: ["notifications"] });
+    });
+
+    await waitFor(() => {
+      for (const bell of bells()) {
+        expect(bell.textContent).toBe("");
+      }
+    });
+    expect(onError).not.toHaveBeenCalled();
   });
 
   it("makes no request for a signed-out viewer", async () => {
