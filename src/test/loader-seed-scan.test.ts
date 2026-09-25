@@ -10,8 +10,8 @@ import { describe, expect, it } from "vitest";
  * `defaultValue` or `defaultChecked` run once, at mount. A TanStack Form
  * `defaultValues` is nearly as sticky: new defaults reach the form only
  * until a field is touched, and a blur touches one, so a form the user has
- * so much as tabbed through keeps its mount-time values (QUIRKS, TanStack
- * Form). One seeded from loader data keeps whatever frame it mounted on, so
+ * so much as tabbed through keeps the values it held at that first touch
+ * (QUIRKS, TanStack Form). One seeded from loader data keeps whatever frame it mounted on, so
  * it is correct only while `src/router.tsx` blocks on a stale reload (#474,
  * #499), which the router tests at the end hold. ADR-0029's Consequences
  * sort the seeds into four classes and say why the unkeyed ones rely on that
@@ -376,14 +376,16 @@ const PRIMITIVE =
 const EMPTY_COLLECTION = /^new (?:Set|Map)(?:<[^()]*>)?\(\)$/;
 const LAZY = /^\(\)\s*=>\s*([\s\S]*)$/;
 const PROPERTY = /^\s*(?:[\w$]+|"[^"]*"|'[^']*')\s*:\s*([\s\S]*)$/;
-// One named type, so `[] as Row[] && loaderData.rows` is not a literal.
+// One named type, so `[] as Row[] && loaderData.rows` is not a literal; its
+// type arguments hold no `&`, `|` or `?`, so they cannot reach across one.
 const ASSERTION =
-  /^\s+(?:satisfies|as)\s+(?:const|[\w$.]+(?:<[^()]*>)?(?:\[\])*)\s*$/;
+  /^\s+(?:satisfies|as)\s+(?:const|[\w$.]+(?:<[^()&|?]*>)?(?:\[\])*)\s*$/;
 
 /**
  * A plain literal, which cannot carry loader data: a primitive, an empty
  * `Set` or `Map`, a lazy initializer returning one, or an array or object
- * built only from them, with or without a `satisfies` or `as` after it.
+ * built only from them, optionally followed by `as const` or by `as` or
+ * `satisfies` and one named type.
  * Everything else is a seed somebody has to classify.
  */
 function isLiteral(raw: string): boolean {
@@ -751,12 +753,14 @@ describe("once-only seeds", () => {
         {/* Name */}<Input defaultValue={user.name} />
         const sep = " // "; const [v] = useState(loaderData.v);
         const [rows2] = useState([] as Row[] && loaderData.rows);
+        const [vals] = useState({} as Partial<V> && loaderData.v as Partial<V>);
       `)
     ).toEqual([
       'useState(record.title ?? "(untitled)")',
       "useState(record.x)",
       "useState(loaderData.v)",
       "useState([] as Row[] && loaderData.rows)",
+      "useState({} as Partial<V> && loaderData.v as Partial<V>)",
       "defaultValue(user.name)",
     ]);
   });
@@ -785,8 +789,9 @@ describe("once-only seeds", () => {
  * rather than trivia, so it is never rescanned, and a comment in JSX braces
  * is found as the trivia before that expression's `}`. JSDoc nodes are
  * skipped, because the comment each one parses is also the trivia of the
- * token after it. This is exact for every construct: nothing is left out of
- * the comparison.
+ * token after it. A shebang is stepped over like whitespace, since a rescan
+ * from offset 0 meets it before any comment; nothing else is left out of the
+ * comparison.
  */
 function blankCommentsByParser(path: string, source: string): string {
   const file = ts.createSourceFile(
