@@ -318,11 +318,15 @@ Better Auth's session-validation middleware checks `user.banned` on every reques
 
 ### `genericOAuth` prefers the userinfo endpoint whenever the email claim is missing
 
-The default `getUserInfo` in `better-auth/dist/plugins/generic-oauth/routes.mjs` takes its ID-token branch only when the decoded token has BOTH `sub` and `email`. Anything else falls through to the discovered `userinfo_endpoint` with a bearer GET. That is a reasonable default and it is wrong for ONID in the one case that matters.
+The default `getUserInfo` in `better-auth/dist/plugins/generic-oauth/routes.mjs` takes its ID-token branch only when the decoded token has BOTH `sub` and `email`. Anything else falls through to the provider's `userinfo_endpoint` (from `userInfoUrl`, or from discovery) with a bearer GET. That is a reasonable default and it is wrong for ONID in the one case that matters.
 
 Two facts collide. Tenant-custom claims ride in the ID token and are absent from Microsoft Graph's `/oidc/userinfo` response, which carries a fixed set (`sub`, `name`, `given_name`, `family_name`, `email`, `picture`). And Entra does not guarantee `email`. So a user without an email claim is routed to the one source that cannot supply the `username` claim we fall back to, and sign-in fails with `email_is_missing`.
 
 `src/lib/_internal/onid-profile.ts` is why: a custom `getUserInfo` that reads the ID token and nothing else. Do not "simplify" it back to the default. Note also that a tenant's discovery document is tenant-wide and says nothing about per-application claim policies, so `claims_supported` will not list a custom claim that is genuinely being released.
+
+### `genericOAuth` refetches `discoveryUrl` on the ONID sign-in path, and there it beats the static URLs
+
+Given a `discoveryUrl`, the `/sign-in/oauth2` handler and the `/oauth2/callback` handler in `better-auth/dist/plugins/generic-oauth/routes.mjs` both GET the document on every request, with no cache, and overwrite `authorizationUrl` and `tokenUrl` with what it returns, so passing both does not save the fetch on the path ONID sign-in takes. Not every path behaves that way, which is what makes it easy to misread: `/oauth2/link`, and the provider's `createAuthorizationURL` in `index.mjs` that `/sign-in/social` and `/link-social` reach, prefer a static URL and fetch only when it is missing. The provider's `validateAuthorizationCode` and `refreshAccessToken` in `index.mjs` do not; they fetch whenever `discoveryUrl` is set. ONID therefore passes no `discoveryUrl`: `onidProviderConfig` in `src/lib/_internal/onid-provider.ts` hands over endpoints derived from `ONID_DISCOVERY_URL` by string manipulation, plus `issuer`, which the callback otherwise takes from discovery; `docs/ONID-SSO.md`, "How the endpoints are resolved", says what that check does and does not enforce. `src/lib/__tests__/onid-sign-in.test.ts` counts the fetches (#553).
 
 ### The ONID callback path is not the GitHub callback path, and the version pin holds it there
 

@@ -14,6 +14,7 @@ import {
   type OnidProfile,
   onidProfileFromIdToken,
 } from "#/lib/_internal/onid-profile";
+import { onidProviderConfig } from "#/lib/_internal/onid-provider";
 import {
   redactingAuthLogger,
   redactQueryError,
@@ -725,32 +726,27 @@ export const auth = betterAuth({
     // OIDC relying party rather than a SAML SP, which is why this is the
     // genericOAuth plugin and not @better-auth/sso.
     //
-    // Two things about this config are worth not "fixing":
+    // The entry itself is `onidProviderConfig` in
+    // `src/lib/_internal/onid-provider.ts`, where a unit test can drive Better
+    // Auth's handlers with it, and it carries the notes on its scopes and
+    // issuer.
+    //
+    // Two things about this config are worth not "fixing".
+    //
+    // There is no `discoveryUrl`: the endpoints are derived from
+    // ONID_DISCOVERY_URL instead, and docs/ONID-SSO.md, "How the endpoints are
+    // resolved", says why (#553).
     //
     // The callback path is /api/auth/oauth2/callback/onid, which does not match
     // the /api/auth/callback/github shape beside it. That is the 1.6 generic
     // OAuth path, and Entra matches redirect URIs exactly against what UIT
     // allowlisted. better-auth 1.7 converges the two shapes, which is why
     // package.json pins ~1.6 rather than ^1.6.
-    //
-    // offline_access is absent on purpose. It buys a refresh token, and a
-    // refresh token is only useful for calling an API as the user later. We
-    // call nothing: the session is ours, not Microsoft's, so holding one would
-    // be a stored credential with no purpose.
     genericOAuth({
       config: [
-        {
-          providerId: "onid",
-          discoveryUrl: authConfig.onid.discoveryUrl,
-          clientId: authConfig.onid.clientId,
-          clientSecret: authConfig.onid.clientSecret,
-          // `profile` is not decoration: Entra gates the `oid` claim behind it,
-          // and `oid` is the account id. Dropping it forks every account onto
-          // the `sub` fallback.
-          scopes: ["openid", "profile", "email"],
-          pkce: true,
-          getUserInfo: (tokens) => onidUserInfo(tokens.idToken),
-        },
+        onidProviderConfig(authConfig.onid, (tokens) =>
+          onidUserInfo(tokens.idToken)
+        ),
       ],
     }),
     tanstackStartCookies(),

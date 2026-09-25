@@ -51,6 +51,41 @@ range, a routine `npm update` would break ONID sign-in with no code change and
 no failing test. **Upgrading to 1.7 requires UIT to allowlist the new URI
 first.**
 
+## How the endpoints are resolved
+
+Nothing is fetched to find them. Everything tenant-specific is derived from
+`ONID_DISCOVERY_URL` by string manipulation in
+`src/lib/_internal/onid-profile.ts`, and the discovery document itself is never
+requested:
+
+```
+ONID_DISCOVERY_URL  https://login.microsoftonline.com/<tenant>/v2.0/.well-known/openid-configuration
+issuer              https://login.microsoftonline.com/<tenant>/v2.0
+authorize endpoint  https://login.microsoftonline.com/<tenant>/oauth2/v2.0/authorize
+token endpoint      https://login.microsoftonline.com/<tenant>/oauth2/v2.0/token
+```
+
+`onidProviderConfig` in `src/lib/_internal/onid-provider.ts` hands the two
+endpoints and the issuer to `genericOAuth` as `authorizationUrl`, `tokenUrl`
+and `issuer`, with no `discoveryUrl`. That absence is the point (#553). Given a
+`discoveryUrl`, Better Auth 1.6 GETs the document in the `/sign-in/oauth2`
+handler and again in the callback, uncached, and overwrites any static URL with
+what comes back, so every sign-in cost two round trips to Microsoft before the
+token exchange. The issuer is passed because discovery was also what fed the
+callback's RFC 9207 check on an `iss` query parameter. That check runs only if
+Entra sends the parameter, and this tenant's discovery document does not
+advertise `authorization_response_iss_parameter_supported`, so it is a
+conditional safeguard kept for the day Entra does. The tenant is enforced by
+the `iss` claim pin in `onidUserInfo`, not by this. No userinfo endpoint is
+configured, because `getUserInfo` is ours and reads only the ID token.
+
+The variable keeps its name and its full discovery URL value, so the tenant
+still lives in one place and a tenant change is still a variable, not a deploy.
+The trade is that the endpoint shape is hardcoded; it is the shape Better Auth's
+own `microsoftEntraId` helper builds from a tenant ID. `onid-sign-in.test.ts`
+drives the real handlers with this config and fails if a sign-in fetches
+anything but the token endpoint.
+
 ## How identity maps
 
 Everything is read from the ID token by
@@ -95,7 +130,7 @@ domain this tenant owns.
 
 **We do not use the default `getUserInfo`, and cannot.** Better Auth's default
 takes its ID-token branch only when `sub` and `email` are both present, and
-otherwise falls through to the discovered `userinfo_endpoint`. For this tenant
+otherwise falls through to the provider's `userinfo_endpoint`. For this tenant
 that endpoint is Microsoft Graph, whose OIDC response carries a fixed claim set
 that does not include a tenant-custom `username`. The default therefore routes
 the exact case UIT warned about to the one source that cannot answer it.

@@ -164,7 +164,8 @@ resource "aws_ecs_task_definition" "app" {
         { name = "TRUSTED_PROXY_CIDR", value = var.vpc_cidr },
         { name = "GITHUB_CLIENT_ID", value = var.github_client_id },
         { name = "ONID_CLIENT_ID", value = var.onid_client_id },
-        # The tenant discovery document. An env var rather than a literal in
+        # The tenant discovery URL. The app derives the issuer and endpoints
+        # from it and never fetches it. An env var rather than a literal in
         # src/lib/auth.ts so a tenant change, or a test tenant if UIT ever
         # provide one, is a variable and not a deploy.
         { name = "ONID_DISCOVERY_URL", value = var.onid_discovery_url },

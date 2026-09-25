@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  endpointsFromDiscoveryUrl,
   issuerFromDiscoveryUrl,
   onidProfileOrRejection,
 } from "../_internal/onid-profile";
@@ -210,6 +211,39 @@ describe("onidProfileFromIdToken", () => {
 
     it("maps an unset discovery URL to an empty issuer", () => {
       expect(issuerFromDiscoveryUrl("")).toBe("");
+    });
+  });
+
+  describe("endpointsFromDiscoveryUrl", () => {
+    const TENANT_BASE = `https://login.microsoftonline.com/${TENANT}`;
+
+    it("builds the v2.0 authorize and token endpoints under the tenant", () => {
+      expect(
+        endpointsFromDiscoveryUrl(`${ISSUER}/.well-known/openid-configuration`)
+      ).toEqual({
+        authorizationUrl: `${TENANT_BASE}/oauth2/v2.0/authorize`,
+        tokenUrl: `${TENANT_BASE}/oauth2/v2.0/token`,
+      });
+    });
+
+    it("tolerates a trailing slash and surrounding whitespace", () => {
+      expect(
+        endpointsFromDiscoveryUrl(
+          `  ${ISSUER}/.well-known/openid-configuration/  `
+        )
+      ).toEqual({
+        authorizationUrl: `${TENANT_BASE}/oauth2/v2.0/authorize`,
+        tokenUrl: `${TENANT_BASE}/oauth2/v2.0/token`,
+      });
+    });
+
+    it("maps an unset discovery URL to empty endpoints, not relative paths", () => {
+      // Empty is what makes `/sign-in/oauth2` refuse with a configuration
+      // error; `/oauth2/v2.0/authorize` would be a redirect to nowhere.
+      expect(endpointsFromDiscoveryUrl("")).toEqual({
+        authorizationUrl: "",
+        tokenUrl: "",
+      });
     });
   });
 
