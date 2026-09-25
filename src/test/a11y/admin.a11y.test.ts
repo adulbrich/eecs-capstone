@@ -323,6 +323,50 @@ test("admin mentors list", async ({ page }) => {
   await checkA11y(page);
 });
 
+// Placement keeps its workspace in localStorage, so each context starts
+// empty. The files are invented (#648).
+const PLACEMENT_PROJECTS_CSV =
+  "title,max_teams,min_students,max_students\nTide Clock,2,,\nRobot Arm,,2,3\n";
+const PLACEMENT_BIDS_CSV = [
+  "email,name,priority,project,comment,override,avoid",
+  'ada@example.edu,Ada Park,1,Tide Clock,"Tides, and clocks",,',
+  "ada@example.edu,Ada Park,2,Robot Arm,,,Sam from lab",
+  "ben@example.edu,Ben Ito,1,Robot Arm,,true,",
+  "cy@example.edu,Cy Moss,1,Moon Base,,,",
+].join("\n");
+
+test("admin placement, empty", async ({ page }) => {
+  await page.goto("/admin/placement");
+  await waitForHydration(page);
+  await expect(page.getByText("From a program")).toBeVisible();
+  await checkA11y(page);
+});
+
+test("@smoke admin placement, projects and bids loaded", async ({ page }) => {
+  await page.goto("/admin/placement");
+  await waitForHydration(page);
+  await page.getByLabel("Projects CSV file").setInputFiles({
+    name: "projects.csv",
+    mimeType: "text/csv",
+    buffer: Buffer.from(PLACEMENT_PROJECTS_CSV),
+  });
+  await expect(page.getByRole("cell", { name: "Tide Clock" })).toBeVisible();
+  await checkA11y(page);
+
+  await page.getByRole("tab", { name: /Bids/ }).click();
+  await page.getByLabel("Bids CSV file").setInputFiles({
+    name: "bids.csv",
+    mimeType: "text/csv",
+    buffer: Buffer.from(PLACEMENT_BIDS_CSV),
+  });
+  await expect(page.getByText("1 row left out")).toBeVisible();
+  await checkA11y(page);
+
+  await page.getByRole("tab", { name: "Parameters" }).click();
+  await expect(page.getByLabel("Min students")).toBeVisible();
+  await checkA11y(page);
+});
+
 // The rest of this file exercises behavior that only a browser can prove:
 // static SSR checks confirm markup is present or absent, but never actually
 // click a sort header, toggle a column, resize the viewport, or scroll.

@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   EMPTY_WORKSPACE,
   parseWorkspace,
+  projectsFromPortal,
   serializeWorkspace,
   toPlacementInput,
   type Workspace,
@@ -66,5 +67,21 @@ describe("toPlacementInput", () => {
     const input = toPlacementInput(WORKSPACE, []);
     expect(input.projects.map((p) => p.maxTeams)).toEqual([3, 2]);
     expect(input.parameters).not.toHaveProperty("maxTeams");
+  });
+});
+
+describe("projectsFromPortal", () => {
+  it("keys by id, takes max teams from teams supported, and reports shared titles", () => {
+    const result = projectsFromPortal([
+      { id: "a", title: "Tide Clock", teamsSupported: 2 },
+      { id: "b", title: "tide  clock", teamsSupported: 1 },
+      { id: "c", title: "Robot Arm", teamsSupported: 1 },
+    ]);
+    expect(result.projects.map((p) => [p.key, p.maxTeams])).toEqual([
+      ["a", 2],
+      ["b", 1],
+      ["c", 1],
+    ]);
+    expect(result.duplicates).toEqual(["tide  clock"]);
   });
 });
