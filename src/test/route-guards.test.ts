@@ -3,6 +3,7 @@ import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { isRedirect } from "@tanstack/react-router";
 import { describe, expect, it } from "vitest";
+import { USER_ROLES } from "#/lib/vocabularies";
 import { Route as adminLayout } from "#/routes/_authed/admin";
 import { Route as analytics } from "#/routes/_authed/admin/analytics";
 import { Route as categoryEdit } from "#/routes/_authed/admin/categories/$categoryId";
@@ -22,7 +23,7 @@ import { Route as itemNew } from "#/routes/_authed/inventory/new";
 
 /**
  * The guards below `_authed` ask about `context.user`, the user `_authed`
- * read once for the navigation, instead of reading the session again (#633).
+ * read once for the load, instead of reading the session again (#633).
  * The browser suites reach them only through a server render (`page.goto`),
  * so this runs each one directly, which is also the path a client navigation
  * takes, and pins which roles each lets through.
@@ -68,6 +69,24 @@ const ADMIN_GATED = {
   "/_authed/admin/users/$userId": userDetail,
 };
 
+const ROUTES_DIR = join(process.cwd(), "src/routes/_authed");
+
+function routeFiles(): string[] {
+  return readdirSync(ROUTES_DIR, { recursive: true, encoding: "utf8" }).filter(
+    (file) => file.endsWith(".tsx") || file.endsWith(".ts")
+  );
+}
+
+function sourceOf(file: string): string {
+  return readFileSync(join(ROUTES_DIR, file), "utf8");
+}
+
+// "/_authed/admin/" is admin/index.tsx; "/_authed/admin" is admin.tsx.
+function fileOf(id: string): string {
+  const path = id.replace("/_authed/", "");
+  return `${path.endsWith("/") ? `${path}index` : path}.tsx`;
+}
+
 describe("route guards below _authed", () => {
   for (const [id, route] of Object.entries(STAFF_GATED)) {
     it(`${id} admits staff and sends anyone else home`, () => {
@@ -94,13 +113,28 @@ describe("route guards below _authed", () => {
     });
   });
 
+  it("covers every role there is", () => {
+    // A role added to the vocabulary has to be decided for every guard here.
+    expect([...USER_ROLES].sort()).toEqual(["admin", "instructor", "user"]);
+  });
+
+  it("covers every guarded route below _authed.tsx", () => {
+    const tested = [...Object.keys(STAFF_GATED), ...Object.keys(ADMIN_GATED)]
+      .map(fileOf)
+      .sort();
+    expect(
+      routeFiles()
+        .filter((file) => sourceOf(file).includes("beforeLoad"))
+        .sort()
+    ).toEqual(tested);
+  });
+
   it("reads the session nowhere below _authed.tsx", () => {
-    const root = join(process.cwd(), "src/routes/_authed");
-    const files = readdirSync(root, { recursive: true, encoding: "utf8" })
-      .filter((file) => file.endsWith(".tsx") || file.endsWith(".ts"))
-      .filter((file) =>
-        readFileSync(join(root, file), "utf8").includes("getSession(")
-      );
-    expect(files).toEqual([]);
+    // The import, not the call, so an alias cannot slip past.
+    expect(
+      routeFiles().filter((file) =>
+        sourceOf(file).includes("#/lib/auth-guards")
+      )
+    ).toEqual([]);
   });
 });
