@@ -42,6 +42,7 @@ import { assertStaff, isStaff, type Viewer } from "#/lib/viewer";
 import type { ProjectStatus } from "#/lib/vocabularies";
 import type { AdminProjectsFilter } from "../projects-queries";
 import {
+  adminProjectListSelect,
   adminProjectSummarySelect,
   inNoProgram,
   mentorNameSql,
@@ -305,7 +306,7 @@ export async function listAdminProjectsAs(
 
   const [rows, proposers, datelessInScope] = await Promise.all([
     db
-      .select(adminProjectSummarySelect)
+      .select(adminProjectListSelect)
       .from(projects)
       // Left, not inner: `proposerId` is `onDelete: "set null"`, so an inner join
       // would silently drop projects whose proposer account was removed.
