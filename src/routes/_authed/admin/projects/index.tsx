@@ -61,7 +61,6 @@ import {
   statusSelectionLabel,
   toggleStatus,
 } from "#/lib/admin-project-filters";
-import { getSession } from "#/lib/auth-guards";
 import { defineCsvColumns, toCsv } from "#/lib/csv";
 import { pageTitle } from "#/lib/page-title";
 import { projectImageSrc } from "#/lib/project-image";
@@ -192,12 +191,8 @@ export const Route = createFileRoute("/_authed/admin/projects/")({
   validateSearch: searchSchema,
   search: { middlewares: [stripSearchParams(SWITCH_DEFAULTS)] },
   head: () => ({ meta: [{ title: pageTitle("Projects") }] }),
-  beforeLoad: async () => {
-    const session = await getSession();
-    if (!session?.user) {
-      throw redirect({ to: "/sign-in" });
-    }
-    if (!isStaff(session.user)) {
+  beforeLoad: ({ context }) => {
+    if (!isStaff(context.user)) {
       throw redirect({ to: "/" });
     }
   },

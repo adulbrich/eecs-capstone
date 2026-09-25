@@ -6,7 +6,6 @@ import {
 } from "@tanstack/react-router";
 import { toast } from "sonner";
 import { InventoryForm } from "#/components/inventory-form";
-import { getSession } from "#/lib/auth-guards";
 import type {
   InventoryItemPublic,
   InventoryItemStaff,
@@ -34,12 +33,8 @@ export const Route = createFileRoute("/_authed/inventory/$itemId/edit")({
   // `_authed` guarantees a signed-in user, not a staff one, and this URL is
   // now guessable from the public detail page. Defence in depth over
   // `updateInventoryItemAs`, which asserts staff on its own.
-  beforeLoad: async () => {
-    const session = await getSession();
-    if (!session?.user) {
-      throw redirect({ to: "/sign-in" });
-    }
-    if (!isStaff(session.user)) {
+  beforeLoad: ({ context }) => {
+    if (!isStaff(context.user)) {
       throw redirect({ to: "/" });
     }
   },

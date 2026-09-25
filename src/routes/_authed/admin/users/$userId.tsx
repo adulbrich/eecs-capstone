@@ -16,7 +16,6 @@ import {
   BreadcrumbSeparator,
 } from "#/components/ui/breadcrumb";
 import { AI_FEATURE_NOUN } from "#/lib/ai-review-limits";
-import { getSession } from "#/lib/auth-guards";
 import { pageTitle } from "#/lib/page-title";
 import { signInMethods } from "#/lib/sign-in-methods";
 import { isAdmin } from "#/lib/viewer";
@@ -25,15 +24,11 @@ import { getUser } from "#/server/users";
 
 export const Route = createFileRoute("/_authed/admin/users/$userId")({
   head: () => ({ meta: [{ title: pageTitle("Manage User") }] }),
-  beforeLoad: async () => {
-    const session = await getSession();
-    if (!session?.user) {
-      throw redirect({ to: "/sign-in" });
-    }
-    if (!isAdmin(session.user)) {
+  beforeLoad: ({ context }) => {
+    if (!isAdmin(context.user)) {
       throw redirect({ to: "/admin" });
     }
-    return { actorId: session.user.id };
+    return { actorId: context.user.id };
   },
   loader: async ({ params }) => await getUser({ data: { id: params.userId } }),
   component: UserDetail,

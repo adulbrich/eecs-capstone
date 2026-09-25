@@ -36,7 +36,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "#/components/ui/select";
-import { getSession } from "#/lib/auth-guards";
 import { defineCsvColumns, toCsv } from "#/lib/csv";
 import { pageTitle } from "#/lib/page-title";
 import { PAGE_SIZE_DEFAULT } from "#/lib/pagination";
@@ -60,12 +59,8 @@ const searchSchema = z.object({
 export const Route = createFileRoute("/_authed/admin/users/")({
   validateSearch: searchSchema,
   head: () => ({ meta: [{ title: pageTitle("Users") }] }),
-  beforeLoad: async () => {
-    const session = await getSession();
-    if (!session?.user) {
-      throw redirect({ to: "/sign-in" });
-    }
-    if (!isAdmin(session.user)) {
+  beforeLoad: ({ context }) => {
+    if (!isAdmin(context.user)) {
       throw redirect({ to: "/admin" });
     }
   },

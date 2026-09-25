@@ -20,7 +20,6 @@ import {
   SelectValue,
 } from "#/components/ui/select";
 import { slotsHint } from "#/lib/analytics-copy";
-import { getSession } from "#/lib/auth-guards";
 import { pageTitle } from "#/lib/page-title";
 import { PROJECT_STATUS_LABEL } from "#/lib/project-workflow";
 import { resolveRange } from "#/lib/report-range";
@@ -56,12 +55,8 @@ const searchSchema = z.object({
 export const Route = createFileRoute("/_authed/admin/analytics")({
   validateSearch: searchSchema,
   head: () => ({ meta: [{ title: pageTitle("Analytics") }] }),
-  beforeLoad: async () => {
-    const session = await getSession();
-    if (!session?.user) {
-      throw redirect({ to: "/sign-in" });
-    }
-    if (!isStaff(session.user)) {
+  beforeLoad: ({ context }) => {
+    if (!isStaff(context.user)) {
       throw redirect({ to: "/" });
     }
   },

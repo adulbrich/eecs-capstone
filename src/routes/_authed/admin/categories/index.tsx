@@ -42,7 +42,6 @@ import { Input } from "#/components/ui/input";
 import { Label } from "#/components/ui/label";
 import { ListCount } from "#/components/ui/pagination";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "#/components/ui/tabs";
-import { getSession } from "#/lib/auth-guards";
 import { defineCsvColumns, toCsv } from "#/lib/csv";
 import { pageTitle } from "#/lib/page-title";
 import type { SortState } from "#/lib/table-state";
@@ -66,12 +65,8 @@ const searchSchema = z.object({
 export const Route = createFileRoute("/_authed/admin/categories/")({
   validateSearch: searchSchema,
   head: () => ({ meta: [{ title: pageTitle("Categories") }] }),
-  beforeLoad: async () => {
-    const session = await getSession();
-    if (!session?.user) {
-      throw redirect({ to: "/sign-in" });
-    }
-    if (!isStaff(session.user)) {
+  beforeLoad: ({ context }) => {
+    if (!isStaff(context.user)) {
       throw redirect({ to: "/" });
     }
   },

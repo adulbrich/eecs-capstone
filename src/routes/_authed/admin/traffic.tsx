@@ -18,7 +18,6 @@ import {
 import { Card } from "#/components/ui/card";
 import { Input } from "#/components/ui/input";
 import { Label } from "#/components/ui/label";
-import { getSession } from "#/lib/auth-guards";
 import { pageTitle } from "#/lib/page-title";
 import { DAY_PATTERN, resolveRange } from "#/lib/report-range";
 import type { SortState } from "#/lib/table-state";
@@ -45,12 +44,8 @@ type ProjectRow = TrafficView["projects"][number];
 export const Route = createFileRoute("/_authed/admin/traffic")({
   validateSearch: searchSchema,
   head: () => ({ meta: [{ title: pageTitle("Traffic") }] }),
-  beforeLoad: async () => {
-    const session = await getSession();
-    if (!session?.user) {
-      throw redirect({ to: "/sign-in" });
-    }
-    if (!isStaff(session.user)) {
+  beforeLoad: ({ context }) => {
+    if (!isStaff(context.user)) {
       throw redirect({ to: "/" });
     }
   },

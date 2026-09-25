@@ -11,19 +11,14 @@ import {
   Users,
 } from "lucide-react";
 import { Card } from "#/components/ui/card";
-import { getSession } from "#/lib/auth-guards";
 import { pageTitle } from "#/lib/page-title";
 import { isAdmin, isStaff } from "#/lib/viewer";
 import { getAdminStats } from "#/server/admin";
 
 export const Route = createFileRoute("/_authed/admin/")({
   head: () => ({ meta: [{ title: pageTitle("Admin") }] }),
-  beforeLoad: async () => {
-    const session = await getSession();
-    if (!session?.user) {
-      throw redirect({ to: "/sign-in" });
-    }
-    if (!isStaff(session.user)) {
+  beforeLoad: ({ context }) => {
+    if (!isStaff(context.user)) {
       throw redirect({ to: "/" });
     }
   },
