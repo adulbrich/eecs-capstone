@@ -242,6 +242,10 @@ The proposer control is staff-only and has no read-only path: `ProposerSummary` 
 
 When a server function throws a `ZodError`, the helper `src/lib/apply-server-errors.ts` maps issues back to field-level errors via `setFieldMeta`. Wrap form `onSubmit` with `try` / `catch` and call it; if it returns false (non-Zod error), surface the message in a top-level banner. Don't expect server validation errors to appear silently next to fields without this helper.
 
+### `defaultValues` follows new props only until a field is touched, and a blur touches it
+
+`useForm` passes its options to `FormApi.update` on every render, and `update` compares the new `defaultValues` with the old by value and swaps them into the form's values only while `form.state.isTouched` is false. `FieldApi.handleBlur` sets `isTouched` without changing the value, and both forms wire `onBlur={field.handleBlur}`, so focusing a field and tabbing away stops the swap for the whole form. `update` still replaces `form.options.defaultValues` every time, so `form.resetField(name)`, which takes no value, resets a field to the newest defaults, and a field's `meta.isDefaultValue` compares against the newest defaults as well, so it cannot say whether the field still holds the old ones. Code that follows new defaults into a touched form has to keep the previous defaults itself and reset each field whose value still equals them. No form here does, because the router blocks on a stale reload; [ADR-0029](./adr/0029-a-revisit-waits-for-its-loader.md) has the census and the reason.
+
 ---
 
 ## Better Auth
