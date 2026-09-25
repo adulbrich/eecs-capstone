@@ -41,10 +41,8 @@ const NOTIFICATIONS_KEY = ["notifications"] as const;
  * browser window whose tab stayed visible no longer refetches, and the next
  * tick picks the change up instead.
  *
- * The key carries the user id. Signing out reloads the page, but a session can
- * also end without one (another tab, expiry, a ban), and signing in navigates
- * on the client, so a bare key would show the next user the previous user's
- * cached notifications until their own read answered.
+ * The key carries the user id: see docs/QUIRKS.md, "A TanStack Query key for
+ * the viewer's own data carries their user id".
  */
 export function NotificationBell() {
   const [open, setOpen] = useState(false);
@@ -54,8 +52,9 @@ export function NotificationBell() {
   const hasMounted = useHasMounted();
   const userId = hasMounted ? session?.user?.id : undefined;
   const queryClient = useQueryClient();
-  const { data, refetch } = useQuery({
-    queryKey: [...NOTIFICATIONS_KEY, userId],
+  const queryKey = [...NOTIFICATIONS_KEY, userId];
+  const { data } = useQuery({
+    queryKey,
     queryFn: async () => {
       const [{ count }, { rows }] = await Promise.all([
         unreadCount(),
@@ -73,10 +72,10 @@ export function NotificationBell() {
   const unread = data?.count ?? 0;
   const rows = data?.rows ?? [];
 
-  // After a write, by prefix, so it reaches the entry whatever id it is under;
-  // opening the popover refetches this viewer's entry directly instead.
+  // One read of this viewer's entry, shared by every mounted bell: after a
+  // write, and when the popover opens.
   function refresh() {
-    return queryClient.invalidateQueries({ queryKey: NOTIFICATIONS_KEY });
+    return queryClient.invalidateQueries({ queryKey });
   }
 
   // Both of these were awaited from a `void` call with no catch, so a refusal
@@ -111,7 +110,7 @@ export function NotificationBell() {
       onOpenChange={(next) => {
         setOpen(next);
         if (next) {
-          void refetch();
+          void refresh();
         }
       }}
       open={open}

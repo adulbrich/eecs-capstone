@@ -806,7 +806,7 @@ bind every turn, so they live in [`../AGENTS.md`](../AGENTS.md) instead of here.
 
 ### A TanStack Query key for the viewer's own data carries their user id
 
-The query cache outlives the component and the session that filled it. Signing out reloads the page (`src/lib/sign-out.ts`), but a session can also end without one (another tab, expiry, a ban), and signing in navigates on the client (`email-code-form.tsx`), so a key like `["notifications"]` shows the next user the previous user's cached rows until their own read answers. Key per-viewer reads on `session.user.id`, as `notification-bell.tsx` does (#634). `bookmarks-button.tsx` and the cart buttons predate this and still use bare keys.
+The query cache outlives the component and the session that filled it. Signing out reloads the page (`src/lib/sign-out.ts`), but a session can also end without one (another tab, expiry, a ban), and signing in navigates on the client (`email-code-form.tsx`), so a key like `["notifications"]` shows the next user the previous user's cached rows until their own read answers. Key per-viewer reads on `session.user.id`, as `notification-bell.tsx` does (#634). `bookmarks-button.tsx` and the borrow list buttons (`borrow-list-button.tsx`, `add-to-cart-button.tsx`) predate this and still use bare keys.
 
 ### Every search field is `searchQuerySchema`, and it clamps rather than rejects
 

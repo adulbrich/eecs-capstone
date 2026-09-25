@@ -83,9 +83,10 @@ function twoBells(qc: QueryClient) {
   );
 }
 
-function renderTwoBells(qc = new QueryClient()) {
+function renderTwoBells() {
+  const qc = new QueryClient();
   const view = render(twoBells(qc));
-  return { ...view, rerender: () => view.rerender(twoBells(qc)) };
+  return { rerenderTwoBells: () => view.rerender(twoBells(qc)) };
 }
 
 function bells() {
@@ -174,7 +175,7 @@ describe("NotificationBell, mounted twice", () => {
 
   it("never shows one user's notifications to the next in the same tab", async () => {
     session = { user: { id: "u1" } };
-    const { rerender } = renderTwoBells();
+    const { rerenderTwoBells } = renderTwoBells();
     await settledOnMount();
 
     // u1's session ends without a reload and u2 signs in on the client. u2's
@@ -183,7 +184,7 @@ describe("NotificationBell, mounted twice", () => {
     mockedCount.mockImplementationOnce(pending);
     mockedList.mockImplementationOnce(pending);
     session = { user: { id: "u2" } };
-    rerender();
+    rerenderTwoBells();
 
     await waitFor(() => expect(mockedCount).toHaveBeenCalledTimes(2));
     for (const bell of bells()) {
