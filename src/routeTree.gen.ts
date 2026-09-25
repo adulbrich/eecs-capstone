@@ -21,6 +21,7 @@ import { Route as ApiHealthzRouteImport } from './routes/api/healthz'
 import { Route as ApiTrafficRouteImport } from './routes/api/traffic'
 import { Route as AuthedAdminIndexRouteImport } from './routes/_authed/admin/index'
 import { Route as AuthedAdminAnalyticsRouteImport } from './routes/_authed/admin/analytics'
+import { Route as AuthedAdminPlacementRouteImport } from './routes/_authed/admin/placement'
 import { Route as AuthedAdminTrafficRouteImport } from './routes/_authed/admin/traffic'
 import { Route as AuthedInventoryNewRouteImport } from './routes/_authed/inventory/new'
 import { Route as AuthedInventoryRequestRouteImport } from './routes/_authed/inventory/request'
@@ -102,6 +103,11 @@ const AuthedAdminIndexRoute = AuthedAdminIndexRouteImport.update({
 const AuthedAdminAnalyticsRoute = AuthedAdminAnalyticsRouteImport.update({
   id: '/analytics',
   path: '/analytics',
+  getParentRoute: () => AuthedAdminRoute,
+} as any)
+const AuthedAdminPlacementRoute = AuthedAdminPlacementRouteImport.update({
+  id: '/placement',
+  path: '/placement',
   getParentRoute: () => AuthedAdminRoute,
 } as any)
 const AuthedAdminTrafficRoute = AuthedAdminTrafficRouteImport.update({
@@ -244,6 +250,7 @@ export interface FileRoutesByFullPath {
   '/api/healthz': typeof ApiHealthzRoute
   '/api/traffic': typeof ApiTrafficRoute
   '/admin/analytics': typeof AuthedAdminAnalyticsRoute
+  '/admin/placement': typeof AuthedAdminPlacementRoute
   '/admin/traffic': typeof AuthedAdminTrafficRoute
   '/inventory/new': typeof AuthedInventoryNewRoute
   '/inventory/request': typeof AuthedInventoryRequestRoute
@@ -279,6 +286,7 @@ export interface FileRoutesByTo {
   '/api/healthz': typeof ApiHealthzRoute
   '/api/traffic': typeof ApiTrafficRoute
   '/admin/analytics': typeof AuthedAdminAnalyticsRoute
+  '/admin/placement': typeof AuthedAdminPlacementRoute
   '/admin/traffic': typeof AuthedAdminTrafficRoute
   '/inventory/new': typeof AuthedInventoryNewRoute
   '/inventory/request': typeof AuthedInventoryRequestRoute
@@ -318,6 +326,7 @@ export interface FileRoutesById {
   '/api/traffic': typeof ApiTrafficRoute
   '/_public/': typeof PublicIndexRoute
   '/_authed/admin/analytics': typeof AuthedAdminAnalyticsRoute
+  '/_authed/admin/placement': typeof AuthedAdminPlacementRoute
   '/_authed/admin/traffic': typeof AuthedAdminTrafficRoute
   '/_authed/inventory/new': typeof AuthedInventoryNewRoute
   '/_authed/inventory/request': typeof AuthedInventoryRequestRoute
@@ -356,6 +365,7 @@ export interface FileRouteTypes {
     | '/api/healthz'
     | '/api/traffic'
     | '/admin/analytics'
+    | '/admin/placement'
     | '/admin/traffic'
     | '/inventory/new'
     | '/inventory/request'
@@ -391,6 +401,7 @@ export interface FileRouteTypes {
     | '/api/healthz'
     | '/api/traffic'
     | '/admin/analytics'
+    | '/admin/placement'
     | '/admin/traffic'
     | '/inventory/new'
     | '/inventory/request'
@@ -429,6 +440,7 @@ export interface FileRouteTypes {
     | '/api/traffic'
     | '/_public/'
     | '/_authed/admin/analytics'
+    | '/_authed/admin/placement'
     | '/_authed/admin/traffic'
     | '/_authed/inventory/new'
     | '/_authed/inventory/request'
@@ -550,6 +562,13 @@ declare module '@tanstack/react-router' {
       path: '/analytics'
       fullPath: '/admin/analytics'
       preLoaderRoute: typeof AuthedAdminAnalyticsRouteImport
+      parentRoute: typeof AuthedAdminRoute
+    }
+    '/_authed/admin/placement': {
+      id: '/_authed/admin/placement'
+      path: '/placement'
+      fullPath: '/admin/placement'
+      preLoaderRoute: typeof AuthedAdminPlacementRouteImport
       parentRoute: typeof AuthedAdminRoute
     }
     '/_authed/admin/traffic': {
@@ -725,6 +744,7 @@ declare module '@tanstack/react-router' {
 
 interface AuthedAdminRouteChildren {
   AuthedAdminAnalyticsRoute: typeof AuthedAdminAnalyticsRoute
+  AuthedAdminPlacementRoute: typeof AuthedAdminPlacementRoute
   AuthedAdminTrafficRoute: typeof AuthedAdminTrafficRoute
   AuthedAdminIndexRoute: typeof AuthedAdminIndexRoute
   AuthedAdminCategoriesCategoryIdRoute: typeof AuthedAdminCategoriesCategoryIdRoute
@@ -741,6 +761,7 @@ interface AuthedAdminRouteChildren {
 
 const AuthedAdminRouteChildren: AuthedAdminRouteChildren = {
   AuthedAdminAnalyticsRoute: AuthedAdminAnalyticsRoute,
+  AuthedAdminPlacementRoute: AuthedAdminPlacementRoute,
   AuthedAdminTrafficRoute: AuthedAdminTrafficRoute,
   AuthedAdminIndexRoute: AuthedAdminIndexRoute,
   AuthedAdminCategoriesCategoryIdRoute: AuthedAdminCategoriesCategoryIdRoute,

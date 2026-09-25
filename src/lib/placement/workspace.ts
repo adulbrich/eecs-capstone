@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { normalizeTitle } from "#/lib/placement/csv";
 import {
   DEFAULT_PLACEMENT_PARAMETERS,
   type PlacementInput,
@@ -183,5 +184,33 @@ export function toPlacementInput(
     })),
     students,
     parameters,
+  };
+}
+
+/**
+ * Published projects from the portal, keyed by id. Two with the same title
+ * would leave a bid unable to say which one it means, so the second is
+ * reported and a bid naming that title goes to the first.
+ */
+export function projectsFromPortal(
+  rows: readonly { id: string; teamsSupported: number; title: string }[]
+): { duplicates: string[]; projects: WorkspaceProject[] } {
+  const seen = new Set<string>();
+  const duplicates: string[] = [];
+  for (const row of rows) {
+    const title = normalizeTitle(row.title);
+    if (seen.has(title)) {
+      duplicates.push(row.title);
+    }
+    seen.add(title);
+  }
+  return {
+    duplicates,
+    projects: rows.map((row) => ({
+      key: row.id,
+      title: row.title,
+      maxTeams: row.teamsSupported,
+      weightMultiplier: 1,
+    })),
   };
 }
