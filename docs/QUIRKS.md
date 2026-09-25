@@ -804,6 +804,10 @@ here.
 The git rules (stage by name, never commit to `main`, no session links on a remote)
 bind every turn, so they live in [`../AGENTS.md`](../AGENTS.md) instead of here.
 
+### A TanStack Query key for the viewer's own data carries their user id
+
+The query cache outlives the component and the session that filled it. Signing out reloads the page (`src/lib/sign-out.ts`), but a session can also end without one (another tab, expiry, a ban), and signing in navigates on the client (`email-code-form.tsx`), so a key like `["notifications"]` shows the next user the previous user's cached rows until their own read answers. Key per-viewer reads on `session.user.id`, as `notification-bell.tsx` does (#634). `bookmarks-button.tsx` and the cart buttons predate this and still use bare keys.
+
 ### Every search field is `searchQuerySchema`, and it clamps rather than rejects
 
 The `q` and `query` fields of the eight search schemas under `src/server/` are all `searchQuerySchema` from `src/lib/search-query.ts`, which trims, cuts at `SEARCH_QUERY_MAX` and never throws. They disagreed until #478: four capped at 200 and threw `too_big` out of `.parse` past it, four had no cap at all, and a 201-character paste into the public listing's box reached the framework's default error page, because no route defines an `errorComponent`. Clamping happens on the server rather than through a `maxLength` on each input, because a server function is reachable without the UI. `search-query-schemas.test.ts` reads the AST and fails a search field that goes back to a bare `z.string()`.

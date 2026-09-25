@@ -73,6 +73,8 @@ export function NotificationBell() {
   const unread = data?.count ?? 0;
   const rows = data?.rows ?? [];
 
+  // After a write, by prefix, so it reaches the entry whatever id it is under;
+  // opening the popover refetches this viewer's entry directly instead.
   function refresh() {
     return queryClient.invalidateQueries({ queryKey: NOTIFICATIONS_KEY });
   }
