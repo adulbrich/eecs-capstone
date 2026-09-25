@@ -170,7 +170,7 @@ const COLUMNS = defineAdminColumns<Row>()([
   {
     accessorFn: (row) => row.comment || undefined,
     cell: ({ row }) => (
-      <div className="md:min-w-xs md:max-w-xl md:whitespace-pre-line">
+      <div className="whitespace-pre-line md:min-w-xs md:max-w-xl">
         {row.original.comment || "-"}
       </div>
     ),
