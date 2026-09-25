@@ -200,8 +200,9 @@ export async function refreshProjectEmbedding(
  *
  * Never throws. Callers run it after their transaction has committed, so a
  * Bedrock outage leaves the vector null or stale and the user's action still
- * succeeds. `scripts/backfill-embeddings.ts` sweeps up whatever this leaves
- * behind.
+ * succeeds. No sweep covers it: `scripts/backfill-embeddings.ts` and its
+ * `.mjs` twin select projects only, so a failed write stays until the user
+ * saves their interests again.
  */
 export async function refreshInterestsEmbedding(
   userId: string,
@@ -252,6 +253,8 @@ export async function refreshInterestsEmbedding(
       .where(eq(userInterests.userId, userId));
     return "updated";
   } catch (error) {
+    // The `ai_write_failures` metric filter in `infra/alarms.tf` counts this
+    // line by its exact wording, since no refresh line reports this writer.
     console.error(
       `Embedding failed for user interests ${userId}`,
       redactQueryError(error)

@@ -1,21 +1,20 @@
-# Alarms on the five numbers that have gone bad in production, or would have
+# Alarms on the six numbers that have gone bad in production, or would have
 # been the first sign that something had. CloudWatch has recorded every one of
 # them since the account was built and told nobody: before this file the only
 # alarms on the account were the two Application Auto Scaling creates for its
 # own CPU policy, which exist to move `desired_count` and mail no one. The
 # 2026-09-21 load test found the connection pool pinned at 59 of 60 with
 # session lookups failing, and the only reason anybody knew is that a person
-# happened to be watching the metric (#571).
+# happened to be watching the metric (#571). The last alarm is the exception:
+# CloudWatch held only the log lines for it, and the metric filter beside it is
+# what makes them a number (#548).
 #
 # Thresholds here are a starting point rather than a measurement. Each one is
 # set above what a normal month produces and below what the incident it is
 # named for produced, which is the most that can be said before the first time
 # one fires. Retune them in place; nothing else reads these numbers.
-#
-# Not covered here: the AI writer failures (#548), which want a metric filter
-# on the log group before they are a metric at all.
 
-# One topic for all five. Splitting by severity would be premature: there is
+# One topic for all six. Splitting by severity would be premature: there is
 # one recipient and every alarm below means somebody should look.
 resource "aws_sns_topic" "alarms" {
   name = "${var.project}-alarms"
@@ -43,8 +42,8 @@ resource "aws_sns_topic_subscription" "alarm_email" {
 # Every alarm below notifies on the way in and on the way out, so a recovery is
 # mailed too. Without the second one the only signal is the opening mail, and an
 # alarm that has quietly gone back to OK reads exactly like one nobody has
-# fixed. Named once rather than ten times so that "both ways, one topic" is a
-# single fact rather than five copies to keep in step.
+# fixed. Named once rather than twelve times so that "both ways, one topic" is a
+# single fact rather than six copies to keep in step.
 locals {
   alarm_notifications = [aws_sns_topic.alarms.arn]
 }
@@ -248,4 +247,91 @@ resource "aws_cloudwatch_metric_alarm" "db_pool_waiting" {
   ok_actions    = local.alarm_notifications
 
   tags = { Name = "${var.project}-db-pool-waiting" }
+}
+
+# A failed automatic AI write, counted from the app's own log because nothing
+# else records one. The background refresh ADR-0053 describes runs after a save
+# or publish has committed and catches everything, so a Bedrock outage costs
+# the proposer nothing; before this it told nobody either (#548).
+#
+# A regex, anchored at the start of the line, because a phrase matched anywhere
+# can be written by a stranger: Better Auth logs a rejected `callbackURL` or
+# `Origin` word for word, so two unauthenticated requests carrying "social
+# summary failed" would mail, or hold the alarm in ALARM through a real outage.
+# `redactingAuthLogger` collapses newlines, so that text cannot start a line of
+# its own either. The syntax has no parentheses, so each `|` alternative
+# carries its own `^`. Case sensitive, which is what keeps each failure
+# counted once:
+#
+# - The first two alternatives are `Project refresh for <id>: embedding
+#   <outcome>, social summary <outcome>, <n> ms`, the one line `refreshAndLog`
+#   in `src/server/_internal/project-refresh.ts` prints per refresh, when
+#   either outcome is `failed`. A line with both failed is one event and counts
+#   once. A truncated summary reports `failed` through the same line. A task
+#   stopped mid-refresh prints nothing, and that write is not counted.
+# - The third is the error `refreshInterestsEmbedding` in
+#   `project-embeddings.ts` prints, the third automatic writer, which has no
+#   refresh line of its own.
+#
+# The capitalised `Embedding failed for project` and `Social summary failed
+# for project` errors are left out on purpose: each is the same failure the
+# refresh line already reports, so matching them would count it twice.
+# `project-refresh.test.ts` runs this pattern against the line the code prints,
+# so rewording either side fails a test instead of quietly zeroing the metric.
+# The `aws logs tail` recipe in DEPLOYMENT.md, which lists the lines behind a
+# mail, matches looser phrases on purpose and no test checks it, so change it
+# in the same commit.
+#
+# No `default_value`. With one, every unmatched line on the group would publish
+# a zero; without it the metric exists only when something failed.
+resource "aws_cloudwatch_log_metric_filter" "ai_write_failures" {
+  name           = "${var.project}-ai-write-failures"
+  log_group_name = aws_cloudwatch_log_group.app.name
+  pattern        = "%^Project refresh for \\S+: embedding failed,|^Project refresh for \\S+: embedding [a-z]+, social summary failed,|^Embedding failed for user interests %"
+
+  metric_transformation {
+    name      = "AiWriteFailures"
+    namespace = "${var.project}/ai-writes"
+    value     = "1"
+    unit      = "Count"
+  }
+}
+
+# About fifteen refreshes a day and one failure in the last thirty days, so a
+# single failure is the noise a design without retries accepts (a project's
+# next save or a sweep puts it right; an interest embedding waits for that
+# user's next save, since no sweep covers it) and two in three hours more
+# likely has a cause: Bedrock down, or a setting the endpoint refuses, like
+# the `minimal` effort that failed every social summary on 2026-09-21 without
+# anybody hearing of it (`docs/QUIRKS.md`, Amazon Bedrock). One three-hour
+# period rather than three one-hour ones because the question is how many
+# failed, not in how many hours any did. The window slides (no
+# `evaluation_window` is set), so any two failures within three hours of each
+# other mail, wherever the clock hours fall.
+#
+# `notBreaching` because the filter publishes nothing until something fails,
+# so missing data is the healthy state rather than a gap to worry about. It
+# also means an OK after ALARM says only that at least three hours passed with
+# fewer than two failures, not that anything was fixed: a configuration still
+# refused on every call goes OK whenever refreshes are sparse, so read the
+# recovery mail that way.
+resource "aws_cloudwatch_metric_alarm" "ai_write_failures" {
+  alarm_name        = "${var.project}-ai-write-failures"
+  alarm_description = "Automatic AI writes (a project embedding, a social summary or an interest embedding) failed at least twice in three hours. The saves that started them succeeded, and each row kept what it had before."
+
+  namespace   = aws_cloudwatch_log_metric_filter.ai_write_failures.metric_transformation[0].namespace
+  metric_name = aws_cloudwatch_log_metric_filter.ai_write_failures.metric_transformation[0].name
+  statistic   = "Sum"
+
+  comparison_operator = "GreaterThanOrEqualToThreshold"
+  threshold           = 2
+  period              = 10800
+  evaluation_periods  = 1
+  datapoints_to_alarm = 1
+  treat_missing_data  = "notBreaching"
+
+  alarm_actions = local.alarm_notifications
+  ok_actions    = local.alarm_notifications
+
+  tags = { Name = "${var.project}-ai-write-failures" }
 }

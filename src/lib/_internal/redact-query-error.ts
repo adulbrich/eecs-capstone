@@ -170,8 +170,12 @@ export function redactingAuthLogger(
   return (level: string, message: string, ...args: unknown[]): void => {
     const extra = args.map((arg) => redactQueryError(arg));
     const safeMessage = redactQueryError(message);
-    write(
-      `[Better Auth] ${level}: ${safeMessage}${extra.length > 0 ? ` ${extra.join(" ")}` : ""}`
-    );
+    const line = `[Better Auth] ${level}: ${safeMessage}${extra.length > 0 ? ` ${extra.join(" ")}` : ""}`;
+    // One line, and only after redaction, which finds parameters by the
+    // newline in front of them. awslogs makes each line its own event, and
+    // Better Auth logs a rejected callbackURL word for word, so a newline in
+    // one would start an event a stranger wrote, which the `ai_write_failures`
+    // metric filter in `infra/alarms.tf` would count.
+    write(line.replace(/[\r\n]+/g, " "));
   };
 }
