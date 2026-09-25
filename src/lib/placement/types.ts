@@ -19,6 +19,15 @@ export interface PlacementProject {
   weightMultiplier: number;
 }
 
+/**
+ * A project as the workspace holds it: a blank max teams means the page
+ * default, resolved when a run starts, so changing the default reaches every
+ * project that never set its own.
+ */
+export type WorkspaceProject = Omit<PlacementProject, "maxTeams"> & {
+  maxTeams?: number;
+};
+
 export interface PlacementBid {
   comment: string;
   /** 1 for the student's first choice. */

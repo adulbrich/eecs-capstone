@@ -1,0 +1,187 @@
+import { z } from "zod";
+import {
+  DEFAULT_PLACEMENT_PARAMETERS,
+  type PlacementInput,
+  type PlacementParameters,
+  type PlacementStudent,
+  type WorkspaceProject,
+} from "#/lib/placement/types";
+
+/**
+ * Everything the placement page knows, kept in one localStorage key in the
+ * staff member's browser and nowhere else (ADR-0056). The bids stay as the
+ * file's own text and are parsed on read, because replacing the projects
+ * has to re-match every bid by title, and a parsed bid has already lost it.
+ */
+
+export const WORKSPACE_STORAGE_KEY = "cs-capstone:placement:v1";
+
+export interface WorkspaceParameters extends PlacementParameters {
+  /** The ceiling for a project that sets none of its own. */
+  maxTeams: number;
+}
+
+export type ProjectSource =
+  | { kind: "portal"; programId: string; programLabel: string }
+  | { kind: "csv"; filename: string };
+
+export interface Workspace {
+  bids: { filename: string; text: string } | null;
+  parameters: WorkspaceParameters;
+  projectSource: ProjectSource | null;
+  projects: WorkspaceProject[];
+  version: 1;
+}
+
+export const DEFAULT_WORKSPACE_PARAMETERS: WorkspaceParameters = {
+  ...DEFAULT_PLACEMENT_PARAMETERS,
+  maxTeams: 1,
+};
+
+export const EMPTY_WORKSPACE: Workspace = {
+  version: 1,
+  projectSource: null,
+  projects: [],
+  bids: null,
+  parameters: DEFAULT_WORKSPACE_PARAMETERS,
+};
+
+/** The bounds the parameters panel enforces, so an import cannot skip them. */
+export const PARAMETER_LIMITS = {
+  students: { min: 1, max: 20 },
+  maxTeams: { min: 0, max: 10 },
+  weight: { min: 0, max: 1000 },
+  multiplier: { min: 0, max: 10 },
+  timeLimitSeconds: { min: 1, max: 600 },
+} as const;
+
+const count = (limits: { min: number; max: number }) =>
+  z.number().int().min(limits.min).max(limits.max);
+
+const projectSchema = z.object({
+  key: z.string().min(1),
+  title: z.string().min(1),
+  maxTeams: count(PARAMETER_LIMITS.maxTeams).optional(),
+  minStudents: count(PARAMETER_LIMITS.students).optional(),
+  maxStudents: count(PARAMETER_LIMITS.students).optional(),
+  weightMultiplier: z
+    .number()
+    .min(PARAMETER_LIMITS.multiplier.min)
+    .max(PARAMETER_LIMITS.multiplier.max),
+});
+
+const workspaceSchema = z
+  .object({
+    version: z.literal(1),
+    projectSource: z
+      .discriminatedUnion("kind", [
+        z.object({
+          kind: z.literal("portal"),
+          programId: z.string(),
+          programLabel: z.string(),
+        }),
+        z.object({ kind: z.literal("csv"), filename: z.string() }),
+      ])
+      .nullable(),
+    projects: z.array(projectSchema),
+    bids: z.object({ filename: z.string(), text: z.string() }).nullable(),
+    parameters: z.object({
+      rankWeights: z
+        .array(
+          z
+            .number()
+            .min(PARAMETER_LIMITS.weight.min)
+            .max(PARAMETER_LIMITS.weight.max)
+        )
+        .max(20),
+      minStudents: count(PARAMETER_LIMITS.students),
+      maxStudents: count(PARAMETER_LIMITS.students),
+      maxTeams: count(PARAMETER_LIMITS.maxTeams),
+      allowUnranked: z.boolean(),
+      requireOneTeamPerProject: z.boolean(),
+      timeLimitSeconds: z
+        .number()
+        .min(PARAMETER_LIMITS.timeLimitSeconds.min)
+        .max(PARAMETER_LIMITS.timeLimitSeconds.max),
+    }),
+  })
+  .refine((w) => w.parameters.minStudents <= w.parameters.maxStudents, {
+    message: "The minimum team size is above the maximum.",
+  });
+
+/** A workspace from an exported file or from storage, or why it is not one. */
+export function parseWorkspace(
+  json: string
+): { ok: true; workspace: Workspace } | { ok: false; message: string } {
+  let value: unknown;
+  try {
+    value = JSON.parse(json);
+  } catch {
+    return { ok: false, message: "The file is not JSON." };
+  }
+  const parsed = workspaceSchema.safeParse(value);
+  if (!parsed.success) {
+    return {
+      ok: false,
+      message: `The file is not a placement workspace: ${parsed.error.issues[0]?.message ?? "unknown problem"}.`,
+    };
+  }
+  return { ok: true, workspace: parsed.data };
+}
+
+export function serializeWorkspace(workspace: Workspace): string {
+  return JSON.stringify(workspace, null, 2);
+}
+
+// Storage can throw (a private window, a full quota, a browser that blocks
+// it), and a workspace that cannot be saved must still work for the visit.
+
+export function readStoredWorkspace(): Workspace | null {
+  try {
+    const raw = window.localStorage.getItem(WORKSPACE_STORAGE_KEY);
+    if (raw === null) {
+      return null;
+    }
+    const parsed = parseWorkspace(raw);
+    return parsed.ok ? parsed.workspace : null;
+  } catch {
+    return null;
+  }
+}
+
+/** False when the browser refused the write. */
+export function writeStoredWorkspace(workspace: Workspace): boolean {
+  try {
+    window.localStorage.setItem(
+      WORKSPACE_STORAGE_KEY,
+      JSON.stringify(workspace)
+    );
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+export function clearStoredWorkspace() {
+  try {
+    window.localStorage.removeItem(WORKSPACE_STORAGE_KEY);
+  } catch {
+    // Nothing to do: the page resets its own state either way.
+  }
+}
+
+/** What a run hands the solver: page defaults filled into every project. */
+export function toPlacementInput(
+  workspace: Workspace,
+  students: PlacementStudent[]
+): PlacementInput {
+  const { maxTeams, ...parameters } = workspace.parameters;
+  return {
+    projects: workspace.projects.map((p) => ({
+      ...p,
+      maxTeams: p.maxTeams ?? maxTeams,
+    })),
+    students,
+    parameters,
+  };
+}
