@@ -252,6 +252,8 @@ export async function refreshInterestsEmbedding(
       .where(eq(userInterests.userId, userId));
     return "updated";
   } catch (error) {
+    // The `ai_write_failures` metric filter in `infra/alarms.tf` counts this
+    // line by its exact wording, since no refresh line reports this writer.
     console.error(
       `Embedding failed for user interests ${userId}`,
       redactQueryError(error)
