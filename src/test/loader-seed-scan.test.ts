@@ -5,15 +5,19 @@ import { describe, expect, it } from "vitest";
 /**
  * Every once-only seed in `src/`, held to the census in ADR-0029.
  *
- * A `useState`, `useRef` or `useReducer` initializer, a TanStack Form
- * `defaultValues` and an uncontrolled `defaultValue` or `defaultChecked` all
- * run once, at mount. One seeded from loader data keeps whatever frame it
- * mounted on, so it is correct only while `src/router.tsx` blocks on a stale
- * reload (#474, #499). ADR-0029's Consequences sort the seeds into four
- * classes and say why the unkeyed ones rely on that option by decision; this
- * is the part that is enforced, in the style of `error-text-scan.test.ts`. A
- * rule in a doc is remembered: the first version of that ADR said the routes
- * seeding from loader data were keyed, and a sweep found six that were not.
+ * A `useState`, `useRef` or `useReducer` initializer and an uncontrolled
+ * `defaultValue` or `defaultChecked` run once, at mount. A TanStack Form
+ * `defaultValues` is nearly as sticky: `useForm` compares it by value on
+ * every render and swaps new defaults in, but only while no field is touched,
+ * so a form the user has started editing keeps the rest of its mount-time
+ * values. One seeded from loader data keeps whatever frame it mounted on, so
+ * it is correct only while `src/router.tsx` blocks on a stale reload (#474,
+ * #499), which the router tests at the end hold. ADR-0029's Consequences
+ * sort the seeds into four classes and say why the unkeyed ones rely on that
+ * option by decision; this is the part that is enforced, in the style of
+ * `error-text-scan.test.ts`. A rule in a doc is remembered: the first version
+ * of that ADR said the routes seeding from loader data were keyed, and a
+ * sweep found six that were not.
  *
  * What it cannot see is where a value came from. It finds every initializer
  * that is not a plain literal and asks that somebody has said which class it
@@ -24,8 +28,9 @@ import { describe, expect, it } from "vitest";
 /**
  * The four classes, as ADR-0029 names them.
  *
- * - A: seeded from loader data, no key, no resync. Correct because the router
- *   blocks, by decision.
+ * - A: seeded from loader data, no key, no resync of its own. Correct because
+ *   the router blocks, by decision. The two forms here resync while untouched,
+ *   and the router option covers a user who touches one before a reload.
  * - B: seeded from loader data and keyed on the record, so a new record
  *   remounts it.
  * - C: seeded once and resynced by an effect.
@@ -245,20 +250,27 @@ const CENSUS = new Map<string, { class: SeedClass; why: string }>([
 ]);
 
 const SRC_DIR = join(process.cwd(), "src");
-// Compared by full path, not by name, for the reason `brand-link-scan.ts`
-// gives: a bare-name check would exempt any directory called `test` anywhere
-// under `src/`, a production one included, and would do so silently.
+// Compared by full path, not by name, for the reason
+// `src/lib/__tests__/vocabulary-scan.ts` gives: a bare-name check would
+// exempt any directory called `test` anywhere under `src/`, a production one
+// included, and would do so silently.
 const TEST_DIR = join(SRC_DIR, "test");
 
 const CLOSER: Record<string, string> = { "(": ")", "[": "]", "{": "}" };
 
-/** Just past the string or template literal that opens at `start`. */
+/**
+ * Just past the string or template literal that opens at `start`. A quoted
+ * string ends at its line's end at the latest, as it must in JavaScript, so
+ * an apostrophe in JSX text misreads the rest of that line and no further.
+ */
 function stringEnd(source: string, start: number): number {
   const quote = source[start];
   for (let i = start + 1; i < source.length; i++) {
     const char = source[i];
     if (char === "\\") {
       i++;
+    } else if (quote !== "`" && char === "\n") {
+      return i;
     } else if (quote === "`" && char === "$" && source[i + 1] === "{") {
       i = closeOf(source, i + 1);
     } else if (char === quote) {
@@ -350,22 +362,6 @@ function topLevel(text: string, stops = ""): string[] {
   return parts;
 }
 
-function withoutComments(text: string): string {
-  let out = "";
-  let from = 0;
-  for (let i = 0; i < text.length; i++) {
-    const char = text[i];
-    if (char === '"' || char === "'" || char === "`") {
-      i = stringEnd(text, i) - 1;
-    } else if (isCommentStart(text, i)) {
-      out += `${text.slice(from, i)} `;
-      from = commentEnd(text, i);
-      i = from - 1;
-    }
-  }
-  return out + text.slice(from);
-}
-
 /** One line, no padding inside brackets, no trailing comma: Biome's wrap undone. */
 function normalize(text: string): string {
   return text
@@ -430,21 +426,105 @@ type Kind =
   | "defaultChecked";
 
 interface Seed {
-  /** The initializer's source, comments removed. */
+  /** The initializer's source, comments blanked. */
   init: string;
   kind: Kind;
 }
 
 /**
- * Whether a match sits in a comment, judged from its own line: a docstring
- * line, a `//` line, or a trailing `//` before it. Coarser than the walk, and
- * enough: the prose that names these hooks is in comments of those shapes.
+ * Whether a `/` at `at` opens a regex literal rather than dividing: it does
+ * after an operator, an opening bracket or `return`, and not after a value.
+ * `<` and `>` are left out, so the `/` of a JSX `</div>` or `/>` is never one.
  */
-function inComment(source: string, at: number): boolean {
-  const before = source.slice(source.lastIndexOf("\n", at - 1) + 1, at);
+function opensRegex(source: string, at: number): boolean {
+  let i = at - 1;
+  while (i >= 0 && /\s/.test(source[i])) {
+    i--;
+  }
   return (
-    /^\s*(?:\*|\/\/|\/\*|\{\/\*)/.test(before) || /(?:^|\s)\/\//.test(before)
+    i < 0 ||
+    "(,=:[!&|?{};+-*%~^".includes(source[i]) ||
+    /\breturn$/.test(source.slice(Math.max(0, i - 6), i + 1))
   );
+}
+
+/** Just past the regex literal whose opening `/` is at `start`. */
+function regexEnd(source: string, start: number): number {
+  let inClass = false;
+  for (let i = start + 1; i < source.length; i++) {
+    const char = source[i];
+    if (char === "\\") {
+      i++;
+    } else if (char === "\n") {
+      return i;
+    } else if (inClass) {
+      inClass = char !== "]";
+    } else if (char === "[") {
+      inClass = true;
+    } else if (char === "/") {
+      return i + 1;
+    }
+  }
+  return source.length;
+}
+
+/**
+ * `source` with every comment blanked to spaces, newlines kept, so it has the
+ * same length and every offset into it is an offset into the file.
+ *
+ * The scan runs over this rather than asking of each match whether its line
+ * looks like a comment. A per-line test silently drops a real seed that
+ * follows a block comment on its line, such as a JSX label comment before an
+ * `<Input defaultValue={user.name} />`, or a `//` inside a string earlier on
+ * it. Strings, template literals and their `${}` holes, and regex literals are
+ * walked so a `//` or `/*` inside one is text.
+ */
+function blankComments(source: string): string {
+  const out = source.split("");
+  // One entry per open template hole: the `{` depth inside it.
+  const holes: number[] = [];
+  let inTemplate = false;
+  const blank = (from: number, to: number) => {
+    for (let j = from; j < to; j++) {
+      if (out[j] !== "\n") {
+        out[j] = " ";
+      }
+    }
+  };
+  for (let i = 0; i < source.length; i++) {
+    const char = source[i];
+    if (inTemplate) {
+      if (char === "\\") {
+        i++;
+      } else if (char === "`") {
+        inTemplate = false;
+      } else if (char === "$" && source[i + 1] === "{") {
+        holes.push(0);
+        inTemplate = false;
+        i++;
+      }
+    } else if (char === '"' || char === "'") {
+      i = stringEnd(source, i) - 1;
+    } else if (char === "`") {
+      inTemplate = true;
+    } else if (isCommentStart(source, i)) {
+      const end = commentEnd(source, i);
+      blank(i, end);
+      i = end - 1;
+    } else if (char === "/" && opensRegex(source, i)) {
+      i = regexEnd(source, i) - 1;
+    } else if (char === "{" && holes.length > 0) {
+      holes[holes.length - 1]++;
+    } else if (char === "}" && holes.length > 0) {
+      if (holes.at(-1) === 0) {
+        holes.pop();
+        inTemplate = true;
+      } else {
+        holes[holes.length - 1]--;
+      }
+    }
+  }
+  return out.join("");
 }
 
 const HOOK = /\b(useState|useRef|useReducer)\s*(?=[<(])/g;
@@ -454,9 +534,6 @@ const UNCONTROLLED = /\b(defaultValue|defaultChecked)=([{"'])/g;
 function hookSeeds(source: string): Seed[] {
   const seeds: Seed[] = [];
   for (const match of source.matchAll(HOOK)) {
-    if (inComment(source, match.index)) {
-      continue;
-    }
     const kind = match[1] as Kind;
     let open = match.index + match[0].length;
     if (source[open] === "<") {
@@ -480,9 +557,6 @@ function hookSeeds(source: string): Seed[] {
 function formSeeds(source: string): Seed[] {
   const seeds: Seed[] = [];
   for (const match of source.matchAll(FORM_DEFAULTS)) {
-    if (inComment(source, match.index)) {
-      continue;
-    }
     const start = match.index + match[0].length;
     const init =
       match[1] === ":"
@@ -492,9 +566,6 @@ function formSeeds(source: string): Seed[] {
     seeds.push({ init, kind: "defaultValues" });
   }
   for (const match of source.matchAll(UNCONTROLLED)) {
-    if (inComment(source, match.index)) {
-      continue;
-    }
     const open = match.index + match[0].length - 1;
     const init =
       match[2] === "{"
@@ -507,9 +578,10 @@ function formSeeds(source: string): Seed[] {
 
 /** Every once-only initializer in `source` that is not a plain literal. */
 function onceOnlySeeds(source: string): Seed[] {
-  return [...hookSeeds(source), ...formSeeds(source)]
-    .map((seed) => ({ ...seed, init: withoutComments(seed.init) }))
-    .filter((seed) => !isLiteral(seed.init));
+  const code = blankComments(source);
+  return [...hookSeeds(code), ...formSeeds(code)].filter(
+    (seed) => !isLiteral(seed.init)
+  );
 }
 
 function label(seed: Seed): string {
@@ -553,8 +625,9 @@ describe("once-only seeds", () => {
     expect(
       unclassified,
       "A once-only initializer that is not a plain literal is not in the\n" +
-        "census. It runs once, at mount, so one seeded from loader data keeps\n" +
-        "whatever frame it mounted on. Read the census in\n" +
+        "census. It is read at mount (a form's until a field is touched), so\n" +
+        "one seeded from loader data keeps whatever frame it mounted on. Read\n" +
+        "the census in\n" +
         "docs/adr/0029-a-revisit-waits-for-its-loader.md, classify each site\n" +
         "below as A, B, C or D in CENSUS with the reason, and name a new A, B\n" +
         "or C site in that ADR's Consequences too. A site whose initializer\n" +
@@ -660,7 +733,53 @@ describe("once-only seeds", () => {
          * So is useState(record.name) in a docstring.
          */
         const [title] = useState(record.title ?? "(untitled)");
+        /* seed */ const [a] = useState(record.x);
+        {/* Name */}<Input defaultValue={user.name} />
+        const sep = " // "; const [v] = useState(loaderData.v);
       `)
-    ).toEqual(['useState(record.title ?? "(untitled)")']);
+    ).toEqual([
+      'useState(record.title ?? "(untitled)")',
+      "useState(record.x)",
+      "useState(loaderData.v)",
+      "defaultValue(user.name)",
+    ]);
+  });
+});
+
+/**
+ * The option the census rests on. Class A is correct only while a stale
+ * revisit blocks, so reverting the router default, or opting one route out,
+ * silently changes what every class A seed means. Both read the source with
+ * comments blanked, so a commented-out line counts for nothing.
+ */
+describe("the stale reload mode the census rests on", () => {
+  const remedy =
+    "ADR-0029's class A seeds are correct only while a stale revisit\n" +
+    "blocks. Before changing this, apply the remedy in the Consequences of\n" +
+    "docs/adr/0029-a-revisit-waits-for-its-loader.md to every class A seed\n" +
+    "the change reaches, and reclassify them in CENSUS.";
+
+  it("is blocking by default, in src/router.tsx", () => {
+    const router = blankComments(
+      readFileSync(join(SRC_DIR, "router.tsx"), "utf8")
+    );
+    expect(
+      /\bdefaultStaleReloadMode:\s*"blocking"/.test(router),
+      `src/router.tsx no longer sets defaultStaleReloadMode: "blocking".\n${remedy}`
+    ).toBe(true);
+  });
+
+  it("is not overridden by any route's loader", () => {
+    const overrides = [...sourceFiles(join(SRC_DIR, "routes"))]
+      .filter((path) =>
+        /\bstaleReloadMode\b/.test(blankComments(readFileSync(path, "utf8")))
+      )
+      .map((path) => relative(process.cwd(), path))
+      .sort();
+    expect(
+      overrides,
+      `These routes set staleReloadMode on their loader.\n${remedy}\n\n` +
+        overrides.join("\n")
+    ).toEqual([]);
   });
 });
