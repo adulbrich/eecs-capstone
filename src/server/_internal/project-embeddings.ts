@@ -200,8 +200,9 @@ export async function refreshProjectEmbedding(
  *
  * Never throws. Callers run it after their transaction has committed, so a
  * Bedrock outage leaves the vector null or stale and the user's action still
- * succeeds. `scripts/backfill-embeddings.ts` sweeps up whatever this leaves
- * behind.
+ * succeeds. No sweep covers it: `scripts/backfill-embeddings.ts` selects
+ * projects only, so a failed write stays until the user saves their interests
+ * again.
  */
 export async function refreshInterestsEmbedding(
   userId: string,

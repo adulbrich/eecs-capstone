@@ -172,7 +172,7 @@ const realSocialSummary = () =>
   );
 
 // A model call Bedrock refuses, for either writer.
-const throttled = () => Promise.reject(new Error("throttled"));
+const refusedModelCall = () => Promise.reject(new Error("refusedModelCall"));
 
 const INTEREST_ROW = {
   userId: "u1",
@@ -231,7 +231,7 @@ describe("the ai_write_failures metric filter in infra/alarms.tf", () => {
       fail: async () => {
         selectRows.mockResolvedValue([INTEREST_ROW]);
         const { refreshInterestsEmbedding } = await realEmbeddings();
-        return refreshInterestsEmbedding("u1", throttled);
+        return refreshInterestsEmbedding("u1", refusedModelCall);
       },
     },
     {
@@ -241,7 +241,7 @@ describe("the ai_write_failures metric filter in infra/alarms.tf", () => {
       fail: async () => {
         selectRows.mockResolvedValue([PROJECT_ROW]);
         const { refreshProjectEmbedding } = await realEmbeddings();
-        return refreshProjectEmbedding("p1", throttled);
+        return refreshProjectEmbedding("p1", refusedModelCall);
       },
     },
     {
@@ -251,7 +251,7 @@ describe("the ai_write_failures metric filter in infra/alarms.tf", () => {
       fail: async () => {
         selectRows.mockResolvedValue([PROJECT_ROW]);
         const { refreshSocialSummary } = await realSocialSummary();
-        return refreshSocialSummary("p1", throttled);
+        return refreshSocialSummary("p1", refusedModelCall);
       },
     },
     {

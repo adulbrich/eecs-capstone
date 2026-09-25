@@ -275,8 +275,9 @@ resource "aws_cloudwatch_metric_alarm" "db_pool_waiting" {
 # refresh line already reports, so matching them would count it twice.
 # `project-refresh.test.ts` runs this pattern against the line the code prints,
 # so rewording either side fails a test instead of quietly zeroing the metric.
-# DEPLOYMENT.md has the `aws logs tail` command that lists the lines behind a
-# mail.
+# The `aws logs tail` recipe in DEPLOYMENT.md, which lists the lines behind a
+# mail, carries its own copy of these phrases and no test checks it, so change
+# it in the same commit.
 #
 # No `default_value`. With one, every unmatched line on the group would publish
 # a zero; without it the metric exists only when something failed.
@@ -297,12 +298,12 @@ resource "aws_cloudwatch_log_metric_filter" "ai_write_failures" {
 # single failure is the noise a design without retries accepts (a project's
 # next save or a sweep puts it right; an interest embedding waits for that
 # user's next save, since no sweep covers it) and two in three hours more
-# likely has a cause: Bedrock down, or a setting the endpoint refuses, like the `minimal` effort that failed
-# every social summary on 2026-09-21 without anybody hearing of it
-# (`docs/QUIRKS.md`, Amazon Bedrock). One three-hour period rather than three
-# one-hour ones because the question is how many failed, not in how many hours
-# any did. The sum is per period, so two failures that land in different
-# periods do not add up and do not mail.
+# likely has a cause: Bedrock down, or a setting the endpoint refuses, like
+# the `minimal` effort that failed every social summary on 2026-09-21 without
+# anybody hearing of it (`docs/QUIRKS.md`, Amazon Bedrock). One three-hour
+# period rather than three one-hour ones because the question is how many
+# failed, not in how many hours any did. The sum is per period, so two
+# failures that land in different periods do not add up and do not mail.
 #
 # `notBreaching` because the filter publishes nothing until something fails,
 # so missing data is the healthy state rather than a gap to worry about. It
