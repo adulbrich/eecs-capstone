@@ -218,7 +218,8 @@ export const projects = pgTable(
     // Public. A boolean rather than a status: "published and closed" is a
     // valid state, and a new enum value would force every transition guard
     // and email to decide what it means. Staff and the proposer edit it as an
-    // ordinary form field. If bidding (#33) is ever built, it keys on this.
+    // ordinary form field. Placement (#644) runs in the browser and never
+    // reads it (ADR-0056).
     acceptingApplicants: boolean("accepting_applicants")
       .notNull()
       .default(true),
@@ -450,41 +451,6 @@ export const projectStatusHistory = pgTable(
     index("project_status_history_project_idx").on(t.projectId, t.createdAt),
   ]
 );
-
-export const projectBids = pgTable("project_bids", {
-  id: uuid("id").defaultRandom().primaryKey(),
-  projectId: uuid("project_id")
-    .references(() => projects.id)
-    .notNull(),
-  studentId: text("student_id")
-    .references(() => user.id, { onDelete: "restrict" })
-    .notNull(),
-  programId: uuid("program_id")
-    .references(() => programs.id)
-    .notNull(),
-  motivation: text("motivation").notNull(),
-  qualifications: text("qualifications"),
-  rank: integer("rank").notNull(), // 1-5 preference
-  createdAt: timestamp("created_at", { withTimezone: true })
-    .notNull()
-    .defaultNow(),
-});
-
-export const projectAssignments = pgTable("project_assignments", {
-  id: uuid("id").defaultRandom().primaryKey(),
-  projectId: uuid("project_id")
-    .references(() => projects.id)
-    .notNull(),
-  studentId: text("student_id")
-    .references(() => user.id, { onDelete: "restrict" })
-    .notNull(),
-  assignedBy: text("assigned_by")
-    .references(() => user.id, { onDelete: "restrict" })
-    .notNull(),
-  createdAt: timestamp("created_at", { withTimezone: true })
-    .notNull()
-    .defaultNow(),
-});
 
 export const projectBookmarks = pgTable(
   "project_bookmarks",

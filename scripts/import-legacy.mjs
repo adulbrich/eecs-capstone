@@ -463,34 +463,6 @@ async function main() {
   const client = await pool.connect();
   try {
     if (undo) {
-      // Most child tables cascade, but `project_bids` and
-      // `project_assignments` reference `projects.id` with no `onDelete`, so
-      // Postgres restricts. One bid on one legacy project fails the whole
-      // batch, and the raw FK error names a constraint rather than a project.
-      // Say which rows block, and stop.
-      const blocked = await client.query(
-        `SELECT p.id, p.title,
-                (SELECT count(*) FROM project_bids b WHERE b.project_id = p.id)::int AS bids,
-                (SELECT count(*) FROM project_assignments a WHERE a.project_id = p.id)::int AS assignments
-         FROM projects p
-         WHERE p.id = ANY($1)
-           AND (EXISTS (SELECT 1 FROM project_bids b WHERE b.project_id = p.id)
-             OR EXISTS (SELECT 1 FROM project_assignments a WHERE a.project_id = p.id))`,
-        [ids]
-      );
-      if (blocked.rows.length > 0) {
-        console.error(
-          `Refusing to undo: ${blocked.rows.length} imported project(s) have bids or assignments.`
-        );
-        for (const r of blocked.rows) {
-          console.error(`  ${r.id} ${r.title} (${r.bids} bids, ${r.assignments} assignments)`);
-        }
-        console.error(
-          "Remove those first, or archive the import in place instead of deleting it."
-        );
-        process.exitCode = 1;
-        return;
-      }
       const deleted = await client.query(
         "DELETE FROM projects WHERE id = ANY($1) RETURNING id",
         [ids]
