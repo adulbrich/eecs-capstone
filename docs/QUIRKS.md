@@ -177,7 +177,7 @@ Navigating from `/projects/A` to `/projects/B` re-runs the loader and re-renders
 
 `src/router.tsx` sets `defaultStaleReloadMode: "blocking"`, so a revisit waits for its loader rather than painting the last visit's rows behind a refetch. [ADR-0029](./adr/0029-a-revisit-waits-for-its-loader.md) is the decision and what it costs.
 
-The gotcha it leaves behind outlives that decision: a `useState` initializer does not re-run when props change, so an input seeded from loader data keeps whatever frame it mounted on while everything rendering that data directly re-renders around it. The breadcrumb and the input on the same page can therefore disagree, reading the same field from the same source. Key the child holding the seeds on the record; ADR-0029's Consequences say which two routes are keyed and on what. Staying on the page after `await router.invalidate()` needs none of this, because the component stays mounted and no seed is involved.
+The gotcha it leaves behind outlives that decision: a `useState` initializer does not re-run when props change, so an input seeded from loader data keeps whatever frame it mounted on while everything rendering that data directly re-renders around it. The breadcrumb and the input on the same page can therefore disagree, reading the same field from the same source. ADR-0029's Consequences carry the census of every such seed: which are keyed on the record, which resync, which rely on the router option by decision, and the remedy if that option is ever reverted or one route opts out. A route opts out on its loader object, `loader: { handler, staleReloadMode: "background" }`, not as a route option; a loader written as a plain function always takes the router default. `src/test/loader-seed-scan.test.ts` fails on a new once-only initializer until it is classified there. Staying on the page after `await router.invalidate()` needs none of this, because the component stays mounted and no seed is involved.
 
 ### A redirect thrown from a `queryFn` navigates the tab
 
@@ -241,6 +241,10 @@ The proposer control is staff-only and has no read-only path: `ProposerSummary` 
 ### Server errors via `applyServerErrors`
 
 When a server function throws a `ZodError`, the helper `src/lib/apply-server-errors.ts` maps issues back to field-level errors via `setFieldMeta`. Wrap form `onSubmit` with `try` / `catch` and call it; if it returns false (non-Zod error), surface the message in a top-level banner. Don't expect server validation errors to appear silently next to fields without this helper.
+
+### `defaultValues` follows new props only until a field is touched, and a blur touches it
+
+`useForm` passes its options to `FormApi.update` in a layout effect after every render, and `update` compares the new `defaultValues` with the old by value and swaps them into the form's values only while `form.state.isTouched` is false. `FieldApi.handleBlur` sets `isTouched` without changing the value, and both forms wire `onBlur={field.handleBlur}`, so focusing a field and tabbing away stops the swap for the whole form. `update` still replaces `form.options.defaultValues` every time, so `form.resetField(name)`, which takes no value, resets a field to the newest defaults, and a field's `meta.isDefaultValue` cannot say whether the field still holds the old ones: it is recomputed only when the form's store changes, and `update` on a touched form writes nothing there, so right after a reload it still reads the old defaults and flips to the new ones at the next store write. Code that follows new defaults into a touched form has to keep the previous defaults itself and reset each field whose default moved and whose value still equals the old one; `resetField` also clears that field's errors and touched state, so leave the others alone. No form here does, because the router blocks on a stale reload; [ADR-0029](./adr/0029-a-revisit-waits-for-its-loader.md) has the census and the reason.
 
 ---
 
