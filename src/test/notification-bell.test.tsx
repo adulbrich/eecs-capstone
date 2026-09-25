@@ -74,14 +74,18 @@ afterEach(() => {
 });
 
 // The header's two rows, one per breakpoint: CSS hides one, both mount.
-function renderTwoBells() {
-  const qc = new QueryClient();
-  return render(
+function twoBells(qc: QueryClient) {
+  return (
     <QueryClientProvider client={qc}>
       <NotificationBell />
       <NotificationBell />
     </QueryClientProvider>
   );
+}
+
+function renderTwoBells(qc = new QueryClient()) {
+  const view = render(twoBells(qc));
+  return { ...view, rerender: () => view.rerender(twoBells(qc)) };
 }
 
 function bells() {
@@ -170,14 +174,7 @@ describe("NotificationBell, mounted twice", () => {
 
   it("never shows one user's notifications to the next in the same tab", async () => {
     session = { user: { id: "u1" } };
-    const qc = new QueryClient();
-    const tree = () => (
-      <QueryClientProvider client={qc}>
-        <NotificationBell />
-        <NotificationBell />
-      </QueryClientProvider>
-    );
-    const { rerender } = render(tree());
+    const { rerender } = renderTwoBells();
     await settledOnMount();
 
     // u1's session ends without a reload and u2 signs in on the client. u2's
@@ -186,7 +183,7 @@ describe("NotificationBell, mounted twice", () => {
     mockedCount.mockImplementationOnce(pending);
     mockedList.mockImplementationOnce(pending);
     session = { user: { id: "u2" } };
-    rerender(tree());
+    rerender();
 
     await waitFor(() => expect(mockedCount).toHaveBeenCalledTimes(2));
     for (const bell of bells()) {
