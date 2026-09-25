@@ -14,8 +14,6 @@ const TABLES = [
   "inventory_requests",
   "inventory_items",
   "project_bookmarks",
-  "project_assignments",
-  "project_bids",
   "project_status_history",
   "project_comments",
   "project_collaborators",
