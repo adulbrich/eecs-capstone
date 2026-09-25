@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { FieldError } from "#/components/ui/field";
 import { Input } from "#/components/ui/input";
 
 /**
@@ -48,22 +49,32 @@ export function NumberInput({
       n <= max;
     return ok ? { value: n } : null;
   };
+  const invalid = accept(text) === null;
   return (
-    <Input
-      aria-invalid={accept(text) === null}
-      aria-label={label}
-      className="h-8 w-20"
-      inputMode={integer ? "numeric" : "decimal"}
-      onChange={(e) => {
-        setText(e.target.value);
-        const accepted = accept(e.target.value);
-        if (accepted !== null) {
-          onCommit(accepted.value);
+    <div>
+      <Input
+        aria-invalid={invalid}
+        aria-label={label}
+        className="h-8 w-20"
+        inputMode={integer ? "numeric" : "decimal"}
+        onChange={(e) => {
+          setText(e.target.value);
+          const accepted = accept(e.target.value);
+          if (accepted !== null) {
+            onCommit(accepted.value);
+          }
+        }}
+        placeholder={placeholder}
+        type="text"
+        value={text}
+      />
+      <FieldError
+        message={
+          invalid
+            ? `${integer ? "A whole number" : "A number"} from ${min} to ${max}.`
+            : null
         }
-      }}
-      placeholder={placeholder}
-      type="text"
-      value={text}
-    />
+      />
+    </div>
   );
 }

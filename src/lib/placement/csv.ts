@@ -27,11 +27,33 @@ function parseRows(text: string): {
   issues: ImportIssue[];
   rows: Row[];
 } {
+  // Papa renames a repeated header ("title_1") and keeps both columns, so a
+  // reader keyed by name would silently use one and drop the other.
+  const seen = new Set<string>();
+  const repeated = new Set<string>();
   const parsed = Papa.parse<Row>(text, {
     header: true,
     skipEmptyLines: "greedy",
-    transformHeader: (header) => header.trim().toLowerCase(),
+    transformHeader: (header) => {
+      const name = header.trim().toLowerCase();
+      if (seen.has(name)) {
+        repeated.add(name);
+      }
+      seen.add(name);
+      return name;
+    },
   });
+  if (repeated.size > 0) {
+    return {
+      fields: [],
+      rows: [],
+      issues: [...repeated].map((name) => ({
+        level: "error",
+        row: 1,
+        message: `The header has "${name}" more than once; each column must appear once.`,
+      })),
+    };
+  }
   const issues: ImportIssue[] = parsed.errors
     // A one-column file has no delimiter to detect, and is still valid.
     .filter((e) => e.code !== "UndetectableDelimiter")
@@ -88,7 +110,10 @@ export function parseProjectsCsv(text: string): {
   projects: WorkspaceProject[];
 } {
   const { fields, issues, rows } = parseRows(text);
-  const missing = missingColumns(fields, ["title"]);
+  const missing =
+    fields.length === 0 && issues.length > 0
+      ? []
+      : missingColumns(fields, ["title"]);
   if (missing.length > 0) {
     return { projects: [], issues: [...issues, ...missing] };
   }
@@ -278,7 +303,10 @@ export function parseBidsCsv(
   projects: readonly Pick<WorkspaceProject, "key" | "title">[]
 ): { issues: ImportIssue[]; students: PlacementStudent[] } {
   const { fields, issues, rows } = parseRows(text);
-  const missing = missingColumns(fields, ["email", "priority", "project"]);
+  const missing =
+    fields.length === 0 && issues.length > 0
+      ? []
+      : missingColumns(fields, ["email", "priority", "project"]);
   if (missing.length > 0) {
     return { students: [], issues: [...issues, ...missing] };
   }

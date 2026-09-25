@@ -1,6 +1,7 @@
 import { Upload } from "lucide-react";
-import { type ReactNode, useCallback, useRef } from "react";
+import { type ReactNode, useCallback, useRef, useState } from "react";
 import { Button } from "#/components/ui/button";
+import { FieldError } from "#/components/ui/field";
 
 /**
  * A hidden file input, a function that opens it, and the chosen file's
@@ -19,6 +20,7 @@ export function useFilePicker({
   onText: (text: string, filename: string) => void;
 }) {
   const ref = useRef<HTMLInputElement>(null);
+  const [error, setError] = useState<string | null>(null);
   const open = useCallback(() => ref.current?.click(), []);
   const input = (
     <input
@@ -28,29 +30,38 @@ export function useFilePicker({
       onChange={async (event) => {
         const file = event.target.files?.[0];
         event.target.value = "";
-        if (file) {
-          onText(await file.text(), file.name);
+        if (!file) {
+          return;
+        }
+        // A file moved or locked between the pick and the read.
+        try {
+          const text = await file.text();
+          setError(null);
+          onText(text, file.name);
+        } catch {
+          setError(`Could not read ${file.name}. Choose it again.`);
         }
       }}
       ref={ref}
       type="file"
     />
   );
-  return { input, open };
+  return { error, input, open };
 }
 
 export function FilePickerButton({
   children,
   ...options
 }: Parameters<typeof useFilePicker>[0] & { children: ReactNode }) {
-  const { input, open } = useFilePicker(options);
+  const { error, input, open } = useFilePicker(options);
   return (
-    <>
+    <div>
       <Button onClick={open} size="sm" type="button" variant="outline">
         <Upload aria-hidden="true" />
         {children}
       </Button>
       {input}
-    </>
+      <FieldError message={error} />
+    </div>
   );
 }

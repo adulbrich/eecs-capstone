@@ -75,7 +75,7 @@ export function BidsTab({
           onConfirm={() => update((w) => ({ ...w, bids: null }))}
           title={`Remove the bids from ${workspace.bids.filename}?`}
         >
-          <Button size="sm" type="button" variant="outline">
+          <Button size="sm" type="button" variant="ghost">
             <Trash2 aria-hidden="true" />
             Remove bids
           </Button>

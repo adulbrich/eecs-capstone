@@ -121,7 +121,7 @@ export function ProjectsTab({
           }}
           title={`Remove the ${workspace.projects.length} projects?`}
         >
-          <Button size="sm" type="button" variant="outline">
+          <Button size="sm" type="button" variant="ghost">
             <Trash2 aria-hidden="true" />
             Remove projects
           </Button>

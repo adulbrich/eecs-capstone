@@ -97,6 +97,7 @@ export function ParametersTab({
               label={`Priority ${index + 1}`}
             >
               <NumberInput
+                integer={false}
                 label={`Weight of priority ${index + 1}`}
                 max={PARAMETER_LIMITS.weight.max}
                 min={PARAMETER_LIMITS.weight.min}

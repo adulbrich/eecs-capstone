@@ -85,6 +85,13 @@ function PlacementPage() {
       </div>
       <FieldError
         message={
+          state.unreadable
+            ? "The workspace saved in this browser could not be read, so the page started empty. The old copy is kept under its own key in this browser's storage; ask the development team to recover it."
+            : null
+        }
+      />
+      <FieldError
+        message={
           state.saveFailed
             ? "This browser would not save the workspace, so it will be gone when the page closes. Export it to keep it."
             : null

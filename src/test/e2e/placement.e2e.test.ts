@@ -16,7 +16,7 @@ const PROJECTS_CSV =
   "title,max_teams,min_students,max_students\nTide Clock,2,,\nRobot Arm,,2,3\n";
 const BIDS_CSV = [
   "email,name,priority,project,comment,override,avoid",
-  `ada@${DOMAIN},Ada Park,1,Tide Clock,"Tides, and clocks",,`,
+  `ada@${DOMAIN},Ada Park,1,Tide Clock,"Tides, and\nclocks",,`,
   `ada@${DOMAIN},Ada Park,2,Robot Arm,,,Sam from lab`,
   `ben@${DOMAIN},Ben Ito,1,Robot Arm,,true,`,
 ].join("\n");
@@ -68,7 +68,9 @@ test.describe("placement workspace", () => {
 
     expect(sent.length).toBeGreaterThan(0);
     expect(sent.filter((r) => r.includes(DOMAIN))).toEqual([]);
-    expect(sent.filter((r) => r.includes("Sam from lab"))).toEqual([]);
+    for (const text of ["Sam from lab", "Ada Park", "Ben Ito", "clocks"]) {
+      expect(sent.filter((r) => r.includes(text))).toEqual([]);
+    }
   });
 
   test("an exported workspace imports identically in a fresh browser", async ({

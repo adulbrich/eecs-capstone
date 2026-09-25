@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   EMPTY_WORKSPACE,
+  isEmptyWorkspace,
   parseWorkspace,
   projectsFromPortal,
   serializeWorkspace,
@@ -59,6 +60,32 @@ describe("parseWorkspace", () => {
     expect(bad({ timeLimitSeconds: 0 })).toBe(false);
     expect(bad({ rankWeights: [Number.NaN] })).toBe(false);
     expect(bad({ maxTeams: -1 })).toBe(false);
+  });
+
+  it("refuses two projects with one key", () => {
+    const [first] = WORKSPACE.projects;
+    const twice = {
+      ...WORKSPACE,
+      projects: [first, { ...first, title: "Other" }],
+    };
+    expect(parseWorkspace(JSON.stringify(twice)).ok).toBe(false);
+  });
+});
+
+describe("isEmptyWorkspace", () => {
+  it("is true for the empty workspace after a round trip through a file", () => {
+    const parsed = parseWorkspace(serializeWorkspace(EMPTY_WORKSPACE));
+    expect(parsed.ok && isEmptyWorkspace(parsed.workspace)).toBe(true);
+  });
+
+  it("is false once there are projects, bids or changed parameters", () => {
+    expect(isEmptyWorkspace(WORKSPACE)).toBe(false);
+    expect(
+      isEmptyWorkspace({
+        ...EMPTY_WORKSPACE,
+        parameters: { ...EMPTY_WORKSPACE.parameters, minStudents: 2 },
+      })
+    ).toBe(false);
   });
 });
 

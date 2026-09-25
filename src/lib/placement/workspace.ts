@@ -108,7 +108,13 @@ const workspaceSchema = z
   })
   .refine((w) => w.parameters.minStudents <= w.parameters.maxStudents, {
     message: "The minimum team size is above the maximum.",
-  });
+  })
+  .refine(
+    (w) => new Set(w.projects.map((p) => p.key)).size === w.projects.length,
+    {
+      message: "Two projects share a key.",
+    }
+  );
 
 /** A workspace from an exported file or from storage, or why it is not one. */
 export function parseWorkspace(
@@ -137,16 +143,32 @@ export function serializeWorkspace(workspace: Workspace): string {
 // Storage can throw (a private window, a full quota, a browser that blocks
 // it), and a workspace that cannot be saved must still work for the visit.
 
-export function readStoredWorkspace(): Workspace | null {
+/** Where an unreadable saved workspace is moved, rather than overwritten. */
+export const UNREADABLE_WORKSPACE_KEY = `${WORKSPACE_STORAGE_KEY}:unreadable`;
+
+/**
+ * The saved workspace, or none. One that no longer parses (a later schema,
+ * a hand edit) is copied aside under `UNREADABLE_WORKSPACE_KEY` before the
+ * page starts empty, because the page's next save would otherwise replace
+ * it and lose every bid in it.
+ */
+export function readStoredWorkspace():
+  | { status: "none" }
+  | { status: "ok"; workspace: Workspace }
+  | { status: "unreadable" } {
   try {
     const raw = window.localStorage.getItem(WORKSPACE_STORAGE_KEY);
     if (raw === null) {
-      return null;
+      return { status: "none" };
     }
     const parsed = parseWorkspace(raw);
-    return parsed.ok ? parsed.workspace : null;
+    if (parsed.ok) {
+      return { status: "ok", workspace: parsed.workspace };
+    }
+    window.localStorage.setItem(UNREADABLE_WORKSPACE_KEY, raw);
+    return { status: "unreadable" };
   } catch {
-    return null;
+    return { status: "none" };
   }
 }
 
@@ -169,6 +191,24 @@ export function clearStoredWorkspace() {
   } catch {
     // Nothing to do: the page resets its own state either way.
   }
+}
+
+/**
+ * Nothing worth confirming before it is replaced: no projects, no bids, and
+ * the parameters as they start.
+ */
+export function isEmptyWorkspace(workspace: Workspace): boolean {
+  // Field by field, not one stringify: a parsed workspace carries its
+  // parameters in the schema's key order, not the default's.
+  const parameters = workspace.parameters as unknown as Record<string, unknown>;
+  return (
+    workspace.projects.length === 0 &&
+    workspace.bids === null &&
+    Object.entries(DEFAULT_WORKSPACE_PARAMETERS).every(
+      ([key, value]) =>
+        JSON.stringify(parameters[key]) === JSON.stringify(value)
+    )
+  );
 }
 
 /** What a run hands the solver: page defaults filled into every project. */

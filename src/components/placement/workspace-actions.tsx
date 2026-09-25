@@ -7,7 +7,7 @@ import { Button } from "#/components/ui/button";
 import { FieldError } from "#/components/ui/field";
 import { downloadText } from "#/lib/placement/download";
 import {
-  EMPTY_WORKSPACE,
+  isEmptyWorkspace,
   parseWorkspace,
   serializeWorkspace,
   type Workspace,
@@ -39,7 +39,7 @@ export function WorkspaceActions({
       }
     },
   });
-  const empty = workspace === EMPTY_WORKSPACE;
+  const empty = isEmptyWorkspace(workspace);
   const importButton = (
     <Button
       onClick={empty ? picker.open : undefined}
@@ -95,13 +95,18 @@ export function WorkspaceActions({
           }}
           title="Clear all placement data?"
         >
-          <Button disabled={empty} size="sm" type="button" variant="outline">
+          <Button
+            disabled={empty}
+            size="sm"
+            type="button"
+            variant="destructive"
+          >
             <Trash2 aria-hidden="true" />
             Clear all data
           </Button>
         </ConfirmDialog>
       </div>
-      <FieldError message={error} />
+      <FieldError message={error ?? picker.error} />
     </div>
   );
 }

@@ -3,6 +3,7 @@ import { parseBidsCsv } from "#/lib/placement/csv";
 import {
   clearStoredWorkspace,
   EMPTY_WORKSPACE,
+  isEmptyWorkspace,
   readStoredWorkspace,
   type Workspace,
   writeStoredWorkspace,
@@ -18,18 +19,21 @@ import {
 export function usePlacementWorkspace() {
   const [workspace, setWorkspace] = useState<Workspace | null>(null);
   const [saveFailed, setSaveFailed] = useState(false);
+  const [unreadable, setUnreadable] = useState(false);
 
   useEffect(() => {
-    setWorkspace(readStoredWorkspace() ?? EMPTY_WORKSPACE);
+    const stored = readStoredWorkspace();
+    setUnreadable(stored.status === "unreadable");
+    setWorkspace(stored.status === "ok" ? stored.workspace : EMPTY_WORKSPACE);
   }, []);
 
   useEffect(() => {
     if (workspace === null) {
       return;
     }
-    // The empty workspace is the cleared one: leave the key absent rather
-    // than write the defaults straight back after "Clear all data".
-    if (workspace === EMPTY_WORKSPACE) {
+    // An empty workspace leaves the key absent rather than writing the
+    // defaults straight back after "Clear all data".
+    if (isEmptyWorkspace(workspace)) {
       clearStoredWorkspace();
       setSaveFailed(false);
       return;
@@ -54,7 +58,7 @@ export function usePlacementWorkspace() {
     [bidsText, projects]
   );
 
-  return { workspace, bids, saveFailed, update, replace, clear };
+  return { workspace, bids, saveFailed, unreadable, update, replace, clear };
 }
 
 export type PlacementWorkspace = ReturnType<typeof usePlacementWorkspace>;

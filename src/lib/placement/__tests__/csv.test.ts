@@ -138,6 +138,22 @@ describe("parseBidsCsv", () => {
     ]);
   });
 
+  it("refuses a header that names a column twice", () => {
+    const result = parseBidsCsv(
+      "email,priority,project,priority\nada@example.edu,1,Tide Clock,9",
+      PROJECTS
+    );
+    expect(result.students).toEqual([]);
+    expect(result.issues).toEqual([
+      {
+        level: "error",
+        row: 1,
+        message:
+          'The header has "priority" more than once; each column must appear once.',
+      },
+    ]);
+  });
+
   it("returns nothing for an empty file", () => {
     const result = parseBidsCsv("", PROJECTS);
     expect(result.students).toEqual([]);
