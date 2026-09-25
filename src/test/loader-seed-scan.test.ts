@@ -8,17 +8,17 @@ import { describe, expect, it } from "vitest";
  *
  * A `useState`, `useRef` or `useReducer` initializer and an uncontrolled
  * `defaultValue` or `defaultChecked` run once, at mount. A TanStack Form
- * `defaultValues` is nearly as sticky: new defaults reach the form only
- * until a field is touched, and a blur touches one, so a form the user has
- * so much as tabbed through keeps the values it held at that first touch
- * (QUIRKS, TanStack Form). One seeded from loader data keeps whatever frame it mounted on, so
- * it is correct only while `src/router.tsx` blocks on a stale reload (#474,
- * #499), which the router tests at the end hold. ADR-0029's Consequences
- * sort the seeds into four classes and say why the unkeyed ones rely on that
- * option by decision; this is the part that is enforced, in the style of
+ * `defaultValues` is nearly as sticky: new defaults reach the form only until a
+ * field is touched, and a blur touches one, so a form the user has so much as
+ * tabbed through keeps the values it held at that first touch (QUIRKS, TanStack
+ * Form). One seeded from loader data keeps whatever frame it mounted on, so it
+ * is correct only while `src/router.tsx` blocks on a stale reload (#474, #499),
+ * which the router tests at the end hold. ADR-0029's Consequences sort the
+ * seeds into four classes and say why the unkeyed ones rely on that option by
+ * decision; this is the part that is enforced, in the style of
  * `error-text-scan.test.ts`. A rule in a doc is remembered: the first version
- * of that ADR said the routes seeding from loader data were keyed, and a
- * sweep found six that were not.
+ * of that ADR said the routes seeding from loader data were keyed, and a sweep
+ * found six that were not.
  *
  * What it cannot see is where a value came from. It finds every initializer
  * that is not a plain literal and asks that somebody has said which class it
@@ -376,10 +376,12 @@ const PRIMITIVE =
 const EMPTY_COLLECTION = /^new (?:Set|Map)(?:<[^()]*>)?\(\)$/;
 const LAZY = /^\(\)\s*=>\s*([\s\S]*)$/;
 const PROPERTY = /^\s*(?:[\w$]+|"[^"]*"|'[^']*')\s*:\s*([\s\S]*)$/;
-// One named type, so `[] as Row[] && loaderData.rows` is not a literal; its
-// type arguments hold no `&`, `|` or `?`, so they cannot reach across one.
+// One named type, so `[] as Row[] && loaderData.rows` is not a literal. Its
+// type arguments are names, commas and `[]` only, so the group closes at the
+// first `>` and cannot reach across an operator into a second `as A<B>`; a
+// nested or structural type argument reads as a seed, which is the safe way.
 const ASSERTION =
-  /^\s+(?:satisfies|as)\s+(?:const|[\w$.]+(?:<[^()&|?]*>)?(?:\[\])*)\s*$/;
+  /^\s+(?:satisfies|as)\s+(?:const|[\w$.]+(?:<[\w$.,\s[\]]*>)?(?:\[\])*)\s*$/;
 
 /**
  * A plain literal, which cannot carry loader data: a primitive, an empty
@@ -754,6 +756,7 @@ describe("once-only seeds", () => {
         const sep = " // "; const [v] = useState(loaderData.v);
         const [rows2] = useState([] as Row[] && loaderData.rows);
         const [vals] = useState({} as Partial<V> && loaderData.v as Partial<V>);
+        const [name] = useState("" as Brand<S> + loaderData.name as Brand<S>);
       `)
     ).toEqual([
       'useState(record.title ?? "(untitled)")',
@@ -761,6 +764,7 @@ describe("once-only seeds", () => {
       "useState(loaderData.v)",
       "useState([] as Row[] && loaderData.rows)",
       "useState({} as Partial<V> && loaderData.v as Partial<V>)",
+      'useState("" as Brand<S> + loaderData.name as Brand<S>)',
       "defaultValue(user.name)",
     ]);
   });
