@@ -31,8 +31,9 @@ const NOTIFICATIONS_KEY = ["notifications"] as const;
  * The header mounts this twice for a signed-in viewer, once per breakpoint
  * row, and CSS hides one. Both read one query key, so a mount, a focus or a
  * mark-read makes one read between them rather than one each (#634). Each
- * observer keeps its own interval timer; the two start in the same commit, and
- * the second tick joins the fetch the first one already has in flight.
+ * observer arms its own interval timer, but the first tick's fetch updates
+ * every observer on the key and each re-arms its timer from there, so one tick
+ * fires per minute.
  *
  * The poll pauses while the tab is hidden, and Query's focus refetch fires when
  * it is shown again. That is narrower than the hand-rolled `focus` listener it
@@ -66,7 +67,7 @@ export function NotificationBell() {
     refetchInterval: 60_000,
     refetchOnWindowFocus: true,
     // The next tick is the retry; a refusal (a session that ended in another
-    // tab) should cost one request a minute, not four.
+    // tab) should cost the two reads once a minute, not four times each.
     retry: false,
   });
   const unread = data?.count ?? 0;
