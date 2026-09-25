@@ -23,12 +23,13 @@ export function onidProviderConfig(
     // `endpointsFromDiscoveryUrl` for why (#553).
     authorizationUrl: onid.authorizationUrl,
     tokenUrl: onid.tokenUrl,
-    // The one other thing discovery supplied. The callback compares it with
-    // an RFC 9207 `iss` query parameter, but only if Entra sends one, and this
-    // tenant's discovery document does not advertise that it does. So this is
-    // a conditional safeguard, kept so the check still runs if Entra ever
-    // starts sending `iss`. What pins sign-in to the tenant is the `iss` claim
-    // check in `onidUserInfo`.
+    // The one other value discovery supplied that this config still needs
+    // (its userinfo endpoint goes unused, since `getUserInfo` is ours). The
+    // callback compares it with an RFC 9207 `iss` query parameter, but only if
+    // Entra sends one, and this tenant's discovery document does not advertise
+    // that it does. So this is a conditional safeguard, kept so the check
+    // still runs if Entra ever starts sending `iss`. What pins sign-in to the
+    // tenant is the `iss` claim check in `onidUserInfo`.
     issuer: onid.issuer,
     clientId: onid.clientId,
     clientSecret: onid.clientSecret,
