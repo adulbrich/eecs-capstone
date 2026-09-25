@@ -1329,7 +1329,7 @@ aws --profile aws-capstone1 cloudwatch set-alarm-state --region us-west-2 \
 data on its next period and overwrites whatever was set here, so nothing needs
 undoing.
 
-Five alarms exist, all on the one topic:
+Six alarms exist, all on the one topic:
 
 | Alarm | Fires when |
 | --- | --- |
@@ -1338,21 +1338,37 @@ Five alarms exist, all on the one topic:
 | `eecs-capstone-db-connections` | RDS held more than 100 connections for two minutes running |
 | `eecs-capstone-fleet-below-floor` | The service ran fewer than `app_min_tasks` for three minutes running |
 | `eecs-capstone-db-pool-waiting` | A request queued for a database connection in each of two consecutive minutes |
+| `eecs-capstone-ai-write-failures` | Automatic AI writes (project embedding, social summary, interest embedding) failed at least twice in three hours |
+
+The last one is not a CloudWatch metric AWS publishes: a metric filter on
+`/ecs/eecs-capstone` counts the log lines that report a failed write, and
+`infra/alarms.tf` names them. When it mails, the lines themselves say which
+rows and what went wrong:
+
+```bash
+aws --profile aws-capstone1 logs tail /ecs/eecs-capstone --since 3h --region us-west-2 \
+  --filter-pattern '?"embedding failed, social summary" ?"social summary failed" ?"Embedding failed for user interests" ?"Embedding failed for project" ?"Social summary failed for project"'
+```
+
+The pattern adds the two capitalised error lines the alarm leaves out, because
+they carry the error text the refresh line does not. Every failure it shows
+followed a save that succeeded; the row kept its previous vector or summary,
+and the next save or a backfill sweep puts it right.
 
 **Expect some mail that is not an incident.**
 
 Each alarm sends on its first transition into OK, and on the first apply all
-five start in INSUFFICIENT_DATA, so confirming the subscription is likely to be
-followed by up to five "OK" messages within a few minutes. Nothing is wrong;
+six start in INSUFFICIENT_DATA, so confirming the subscription is likely to be
+followed by up to six "OK" messages within a few minutes. Nothing is wrong;
 that is the alarms reaching a state for the first time.
 
 **A deploy may also mail.** A rolling deploy stops a task before starting its
 replacement (ADR-0043), so the fleet reads two of three while that happens,
 three times in sequence. Whether that lasts the three consecutive one-minute
-samples the last alarm needs has not been measured, so a deploy may send
-nothing, one pair, or several. Watch the first few deploys after this applies;
-ADR-0044 records why the threshold was left where it is and what moving it
-costs.
+samples `eecs-capstone-fleet-below-floor` needs has not been measured, so a
+deploy may send nothing, one pair, or several. Watch the first few deploys
+after this applies; ADR-0044 records why the threshold was left where it is and
+what moving it costs.
 
 ### Run a migration manually
 
