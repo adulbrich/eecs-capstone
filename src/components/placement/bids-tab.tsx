@@ -17,7 +17,7 @@ import type { SortState } from "#/lib/table-state";
 import { useAdminTable } from "#/lib/use-admin-table";
 import { useLocalTableSearch } from "#/lib/use-local-table-search";
 
-const DEFAULT_SORT: SortState = { desc: false, id: "student" };
+const DEFAULT_SORT: SortState = { desc: false, id: "priority" };
 
 export function BidsTab({
   state,
@@ -87,13 +87,120 @@ export function BidsTab({
   );
 }
 
+/**
+ * One bid, carrying its student, because a group header only sees its rows.
+ * A pin to a project outside the student's bids is a row of its own with no
+ * priority, so a student pinned there and bidding nothing still shows.
+ */
 interface Row {
   avoid: string | undefined;
-  bidCount: number;
+  comment: string;
   email: string;
-  firstChoice: string | undefined;
+  id: string;
   name: string;
-  pinnedTo: string | undefined;
+  pinned: boolean;
+  priority: number | null;
+  project: string;
+}
+
+const byName = (a: PlacementStudent, b: PlacementStudent) =>
+  (a.name || a.email).localeCompare(b.name || b.email) ||
+  a.email.localeCompare(b.email);
+
+/** Every student's bids, first choice first, students in name order. */
+function bidRows(
+  students: PlacementStudent[],
+  titles: Map<string, string>
+): Row[] {
+  return [...students].sort(byName).flatMap((s) => {
+    const title = (key: string) => titles.get(key) ?? key;
+    const student = { email: s.email, name: s.name, avoid: s.avoid };
+    const rows: Row[] = [...s.bids]
+      .sort((a, b) => a.priority - b.priority)
+      .map((bid) => ({
+        ...student,
+        id: `${s.email}:${bid.projectKey}`,
+        priority: bid.priority,
+        project: title(bid.projectKey),
+        comment: bid.comment,
+        pinned: bid.projectKey === s.pin,
+      }));
+    if (s.pin !== undefined && !s.bids.some((b) => b.projectKey === s.pin)) {
+      rows.push({
+        ...student,
+        id: `${s.email}:${s.pin}`,
+        priority: null,
+        project: title(s.pin),
+        comment: "",
+        pinned: true,
+      });
+    }
+    return rows;
+  });
+}
+
+// The rows arrive in a fixed order and nothing sorts, which keeps every
+// student's group together (UI-CONVENTIONS, "Grouping rows that arrived
+// together"). The sort below is inert.
+const COLUMNS = defineAdminColumns<Row>()([
+  {
+    accessorFn: (row) => (row.priority === null ? "Pin" : String(row.priority)),
+    cell: ({ row }) => row.original.priority ?? "Pinned",
+    enableHiding: false,
+    enableSorting: false,
+    header: "Priority",
+    id: "priority",
+  },
+  {
+    accessorFn: (row) => row.project,
+    cell: ({ row }) =>
+      row.original.pinned ? (
+        <span>
+          {row.original.project}{" "}
+          <span className="text-muted-foreground text-xs">(pinned)</span>
+        </span>
+      ) : (
+        row.original.project
+      ),
+    enableHiding: false,
+    enableSorting: false,
+    header: "Project",
+    id: "project",
+  },
+  {
+    accessorFn: (row) => row.comment || undefined,
+    cell: ({ row }) => (
+      <div className="md:min-w-xs md:max-w-xl md:whitespace-pre-line">
+        {row.original.comment || "-"}
+      </div>
+    ),
+    enableSorting: false,
+    header: "Comment",
+    id: "comment",
+  },
+]);
+
+function StudentHeader({ rows }: { rows: Row[] }) {
+  const [first] = rows;
+  const bids = rows.filter((r) => r.priority !== null).length;
+  return (
+    <div>
+      <span className="font-medium">{first.name || first.email}</span>
+      {first.name && (
+        <span className="ml-2 font-normal text-muted-foreground text-xs">
+          {first.email}
+        </span>
+      )}
+      <span className="ml-2 font-normal text-muted-foreground text-xs">
+        {bids} {bids === 1 ? "bid" : "bids"}
+      </span>
+      {first.avoid && (
+        <p className="font-normal text-sm">
+          Prefers not to work with: {first.avoid}
+        </p>
+      )}
+    </div>
+  );
 }
 
 function StudentsTable({
@@ -104,78 +211,12 @@ function StudentsTable({
   students: PlacementStudent[];
 }) {
   const { navigate, search } = useLocalTableSearch();
-  const titles = useMemo(
-    () => new Map(projects.map((p) => [p.key, p.title])),
-    [projects]
-  );
-  const rows: Row[] = students.map((s) => {
-    const first = s.bids.reduce<(typeof s.bids)[number] | undefined>(
-      (best, bid) =>
-        best === undefined || bid.priority < best.priority ? bid : best,
-      undefined
-    );
-    return {
-      email: s.email,
-      name: s.name,
-      bidCount: s.bids.length,
-      firstChoice: first && titles.get(first.projectKey),
-      pinnedTo: s.pin && titles.get(s.pin),
-      avoid: s.avoid,
-    };
-  });
-  const columns = useMemo(
-    () =>
-      defineAdminColumns<Row>()([
-        {
-          accessorFn: (row) => row.name || row.email,
-          cardHeader: true,
-          cell: ({ row }) => (
-            <div>
-              <div>{row.original.name || row.original.email}</div>
-              {row.original.name && (
-                <div className="text-muted-foreground text-xs">
-                  {row.original.email}
-                </div>
-              )}
-            </div>
-          ),
-          enableHiding: false,
-          header: "Student",
-          id: "student",
-        },
-        {
-          accessorFn: (row) => row.bidCount,
-          cell: ({ row }) => row.original.bidCount,
-          header: "Bids",
-          id: "bidCount",
-          sortFn: "basic",
-        },
-        {
-          accessorFn: (row) => row.firstChoice,
-          cell: ({ row }) => row.original.firstChoice ?? "-",
-          header: "First choice",
-          id: "firstChoice",
-          sortUndefined: "last",
-        },
-        {
-          accessorFn: (row) => row.pinnedTo,
-          cell: ({ row }) => row.original.pinnedTo ?? "-",
-          header: "Pinned to",
-          id: "pinnedTo",
-          sortUndefined: "last",
-        },
-        {
-          accessorFn: (row) => row.avoid,
-          cell: ({ row }) => row.original.avoid ?? "-",
-          header: "Prefers not to work with",
-          id: "avoid",
-          sortUndefined: "last",
-        },
-      ]),
-    []
+  const rows = useMemo(
+    () => bidRows(students, new Map(projects.map((p) => [p.key, p.title]))),
+    [projects, students]
   );
   const { tableProps } = useAdminTable({
-    columns,
+    columns: COLUMNS,
     defaultSort: DEFAULT_SORT,
     navigate,
     search,
@@ -184,10 +225,14 @@ function StudentsTable({
   return (
     <div className="mt-4">
       <AdminDataTable
-        caption="Students and their bids"
+        caption="Each student's bids, first choice first"
         data={rows}
         emptyMessage="No rows in the file could be used."
-        getRowId={(row) => row.email}
+        getRowId={(row) => row.id}
+        group={{
+          header: (groupRows) => <StudentHeader rows={groupRows} />,
+          key: (row) => row.email,
+        }}
         {...tableProps}
       />
     </div>
