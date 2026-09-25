@@ -1,7 +1,9 @@
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Bell, BellRing } from "lucide-react";
-import { useCallback, useEffect, useState } from "react";
+import { useState } from "react";
 import { toast } from "sonner";
 import { useAction } from "#/lib/use-action";
+import { useSignedIn } from "#/lib/use-signed-in";
 import {
   listMyNotifications,
   markAllRead,
@@ -22,34 +24,44 @@ interface Notification {
   type: string;
 }
 
+const NOTIFICATIONS_KEY = ["notifications"] as const;
+
+/**
+ * The header mounts this twice for a signed-in viewer, once per breakpoint
+ * row, and CSS hides one. Both read one query key, so a mount, a focus or a
+ * mark-read makes one read between them rather than one each (#634). Each
+ * observer keeps its own interval timer; the two start in the same commit, and
+ * the second tick joins the fetch the first one already has in flight.
+ *
+ * The poll pauses while the tab is hidden and the focus refetch fires when it
+ * comes back, which is what the hand-rolled `focus` listener was for.
+ */
 export function NotificationBell() {
   const [open, setOpen] = useState(false);
-  const [unread, setUnread] = useState(0);
-  const [rows, setRows] = useState<Notification[]>([]);
-
-  const refresh = useCallback(async () => {
-    try {
-      const [{ count }, { rows: r }] = await Promise.all([
+  const signedIn = useSignedIn();
+  const queryClient = useQueryClient();
+  const { data, refetch } = useQuery({
+    queryKey: NOTIFICATIONS_KEY,
+    queryFn: async () => {
+      const [{ count }, { rows }] = await Promise.all([
         unreadCount(),
         listMyNotifications(),
       ]);
-      setUnread(count);
-      setRows(r as Notification[]);
-    } catch {
-      // ignore (user not authenticated yet)
-    }
-  }, []);
+      return { count, rows: rows as Notification[] };
+    },
+    enabled: signedIn,
+    refetchInterval: 60_000,
+    refetchOnWindowFocus: true,
+    // The next tick is the retry; a refusal (a session that ended in another
+    // tab) should cost one request a minute, not four.
+    retry: false,
+  });
+  const unread = data?.count ?? 0;
+  const rows = data?.rows ?? [];
 
-  useEffect(() => {
-    void refresh();
-    const id = setInterval(refresh, 60_000);
-    const onFocus = () => void refresh();
-    window.addEventListener("focus", onFocus);
-    return () => {
-      clearInterval(id);
-      window.removeEventListener("focus", onFocus);
-    };
-  }, [refresh]);
+  function refresh() {
+    return queryClient.invalidateQueries({ queryKey: NOTIFICATIONS_KEY });
+  }
 
   // Both of these were awaited from a `void` call with no catch, so a refusal
   // was an unhandled rejection and the badge went on showing a count that was
@@ -83,7 +95,7 @@ export function NotificationBell() {
       onOpenChange={(next) => {
         setOpen(next);
         if (next) {
-          void refresh();
+          void refetch();
         }
       }}
       open={open}
