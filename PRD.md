@@ -590,15 +590,23 @@ catalogue that decided the matrix below; #288 shipped it.
 - [ ] Per-project card images, so two project links do not unfurl with the same
   picture (#533).
 
-## 17. Project Bidding & Assignment (Stretch)
+## 17. Placement
 
-- [ ] Partial: Schema scaffolded (`project_bids`, `project_assignments`) but no UI or
-  server logic yet.
-- [ ] Students bid on preferred projects (top 5) at the start of the year for a
-  specific program, with motivation and qualifications. Bids visible to admins
-  and project proposers, not to other students.
-- [ ] Admins assign students to projects from bids and preferences
-  (automatic or manual).
+- [ ] Students bid outside the app; staff place them with a tool at
+  `/admin/placement` that runs entirely in their browser, so no bid or placement
+  reaches the server ([ADR-0056](./docs/adr/0056-placement-runs-in-the-browser.md),
+  epic #644). This replaces the in-app bidding of #33, whose unused tables are
+  dropped in #646.
+- [ ] A solver in the browser (HiGHS in a Web Worker) that places students on
+  project teams within min and max team sizes and a max teams ceiling per
+  project, favouring higher-priority bids (#647).
+- [ ] Staff import a program's published projects or a projects CSV, and a bids
+  CSV; set defaults, rank weights and per-project overrides; and keep the
+  workspace in the browser with JSON export and import (#648).
+- [ ] Staff run placement, approve, move and pin students, re-run with pins, and
+  download the placement and the bids with pins as CSV (#649).
+- [ ] Analytics in a Sheet: bids per project, priority distribution, unplaced
+  students, projects with no team formed (#650).
 
 ## 18. Analytics Dashboard
 
