@@ -175,6 +175,10 @@ Navigating from `/projects/A` to `/projects/B` re-runs the loader and re-renders
 
 The gotcha it leaves behind outlives that decision: a `useState` initializer does not re-run when props change, so an input seeded from loader data keeps whatever frame it mounted on while everything rendering that data directly re-renders around it. The breadcrumb and the input on the same page can therefore disagree, reading the same field from the same source. Key the child holding the seeds on the record; ADR-0029's Consequences say which two routes are keyed and on what. Staying on the page after `await router.invalidate()` needs none of this, because the component stays mounted and no seed is involved.
 
+### A redirect thrown from a `queryFn` navigates the tab
+
+`setupRouterSsrQueryIntegration` in `src/router.tsx` leaves `handleRedirects` on, so it installs a query cache `onError` that calls `router.navigate` for any TanStack redirect a query throws. `requireUser` refuses with `redirect({ to: "/sign-in" })`, so once the server ends a session (expiry, a ban) without the tab hearing, the next refetch of a query over a `requireUser` server function carries the tab to `/sign-in` from whatever page it is on, unsaved edits included. `notification-bell.tsx` polls every 60 seconds from every page, so its `queryFn` returns an empty result on `isRedirect` instead (#634). `bookmarks-button.tsx`, `borrow-list-button.tsx` and `add-to-cart-button.tsx` still navigate, on a focus refetch. A new query that polls, or runs on a page with a form, catches the redirect the same way.
+
 ### `Route.useSearch()` lags `navigate()` by the loader round trip
 
 The URL changes at once; `useSearch` reads the rendered match, and a search change that alters `loaderDeps` is a new match, which renders only once its loader resolves. No route sets a `pendingComponent`, so nothing renders early and the lag is the whole round trip. A new `q` waits under either `defaultStaleReloadMode`; a revisit still in the router's cache waits only because ADR-0029 chose `"blocking"`. So code that writes a search param and watches it for outside changes sees its own write come back a round trip late, and a Back that cancels the write before it lands changes nothing it can see. `useDebouncedDraft` resynced the search box to its own previous commit and dropped every key typed in between (#501); it now compares against what it last committed or synced to, and `use-debounced-draft.test.tsx` covers the echo, the cancelled commit, and Back and Forward. Anything else that writes a search param on a timer and watches it needs the same allowance.
@@ -803,6 +807,10 @@ here.
 
 The git rules (stage by name, never commit to `main`, no session links on a remote)
 bind every turn, so they live in [`../AGENTS.md`](../AGENTS.md) instead of here.
+
+### A TanStack Query key for the viewer's own data carries their user id
+
+The query cache outlives the component and the session that filled it. Signing out reloads the page (`src/lib/sign-out.ts`), but a session can also end without one (another tab, expiry, a ban), and signing in navigates on the client (`email-code-form.tsx`), so a key like `["notifications"]` shows the next user the previous user's cached rows until their own read answers. Key per-viewer reads on `session.user.id`, as `notification-bell.tsx` does (#634). `bookmarks-button.tsx` and the borrow list buttons (`borrow-list-button.tsx`, `add-to-cart-button.tsx`) predate this and still use bare keys.
 
 ### Every search field is `searchQuerySchema`, and it clamps rather than rejects
 

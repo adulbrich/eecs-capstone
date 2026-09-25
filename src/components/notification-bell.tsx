@@ -1,7 +1,11 @@
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { isRedirect } from "@tanstack/react-router";
 import { Bell, BellRing } from "lucide-react";
-import { useCallback, useEffect, useState } from "react";
+import { useState } from "react";
 import { toast } from "sonner";
+import { authClient } from "#/lib/auth-client";
 import { useAction } from "#/lib/use-action";
+import { useHasMounted } from "#/lib/use-has-mounted";
 import {
   listMyNotifications,
   markAllRead,
@@ -22,34 +26,69 @@ interface Notification {
   type: string;
 }
 
+const NOTIFICATIONS_KEY = ["notifications"] as const;
+
+/**
+ * The header mounts this twice for a signed-in viewer, once per breakpoint
+ * row, and CSS hides one. Both read one query key, so a mount, a focus or a
+ * mark-read makes one read between them rather than one each (#634). Each
+ * observer arms its own interval timer, but the first tick's fetch updates
+ * every observer on the key and each re-arms its timer from there, so one tick
+ * fires per minute.
+ *
+ * The poll pauses while the tab is hidden, and Query's focus refetch fires when
+ * it is shown again. That is narrower than the hand-rolled `focus` listener it
+ * replaced: Query listens for `visibilitychange`, so switching back to a
+ * browser window whose tab stayed visible no longer refetches, and the next
+ * tick picks the change up instead.
+ *
+ * The key carries the user id: see docs/QUIRKS.md, "A TanStack Query key for
+ * the viewer's own data carries their user id".
+ */
 export function NotificationBell() {
   const [open, setOpen] = useState(false);
-  const [unread, setUnread] = useState(0);
-  const [rows, setRows] = useState<Notification[]>([]);
+  // `useSignedIn`'s gate, keeping the id: false until mounted, so the first
+  // client render matches the signed-out markup the server produced.
+  const { data: session } = authClient.useSession();
+  const hasMounted = useHasMounted();
+  const userId = hasMounted ? session?.user?.id : undefined;
+  const queryClient = useQueryClient();
+  const queryKey = [...NOTIFICATIONS_KEY, userId];
+  const { data } = useQuery({
+    queryKey,
+    queryFn: async () => {
+      try {
+        const [{ count }, { rows }] = await Promise.all([
+          unreadCount(),
+          listMyNotifications(),
+        ]);
+        return { count, rows: rows as Notification[] };
+      } catch (error) {
+        // The server ended the session (expiry, a ban) before this tab
+        // heard. `requireUser` refuses with a redirect, and the router's
+        // query integration navigates on any redirect a query throws, which
+        // would carry a tab mid-edit to /sign-in on the next tick.
+        if (isRedirect(error)) {
+          return { count: 0, rows: [] };
+        }
+        throw error;
+      }
+    },
+    enabled: userId !== undefined,
+    refetchInterval: 60_000,
+    refetchOnWindowFocus: true,
+    // The next tick is the retry; a failed read should cost the two requests
+    // once a minute, not four times each.
+    retry: false,
+  });
+  const unread = data?.count ?? 0;
+  const rows = data?.rows ?? [];
 
-  const refresh = useCallback(async () => {
-    try {
-      const [{ count }, { rows: r }] = await Promise.all([
-        unreadCount(),
-        listMyNotifications(),
-      ]);
-      setUnread(count);
-      setRows(r as Notification[]);
-    } catch {
-      // ignore (user not authenticated yet)
-    }
-  }, []);
-
-  useEffect(() => {
-    void refresh();
-    const id = setInterval(refresh, 60_000);
-    const onFocus = () => void refresh();
-    window.addEventListener("focus", onFocus);
-    return () => {
-      clearInterval(id);
-      window.removeEventListener("focus", onFocus);
-    };
-  }, [refresh]);
+  // One read of this viewer's entry, shared by every mounted bell: after a
+  // write, and when the popover opens.
+  function refresh() {
+    return queryClient.invalidateQueries({ queryKey });
+  }
 
   // Both of these were awaited from a `void` call with no catch, so a refusal
   // was an unhandled rejection and the badge went on showing a count that was
