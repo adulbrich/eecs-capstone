@@ -1,0 +1,666 @@
+import { readdirSync, readFileSync } from "node:fs";
+import { join, relative } from "node:path";
+import { describe, expect, it } from "vitest";
+
+/**
+ * Every once-only seed in `src/`, held to the census in ADR-0029.
+ *
+ * A `useState`, `useRef` or `useReducer` initializer, a TanStack Form
+ * `defaultValues` and an uncontrolled `defaultValue` or `defaultChecked` all
+ * run once, at mount. One seeded from loader data keeps whatever frame it
+ * mounted on, so it is correct only while `src/router.tsx` blocks on a stale
+ * reload (#474, #499). ADR-0029's Consequences sort the seeds into four
+ * classes and say why the unkeyed ones rely on that option by decision; this
+ * is the part that is enforced, in the style of `error-text-scan.test.ts`. A
+ * rule in a doc is remembered: the first version of that ADR said the routes
+ * seeding from loader data were keyed, and a sweep found six that were not.
+ *
+ * What it cannot see is where a value came from. It finds every initializer
+ * that is not a plain literal and asks that somebody has said which class it
+ * is in; the reading of data flow is the classifier's, written beside the
+ * entry.
+ */
+
+/**
+ * The four classes, as ADR-0029 names them.
+ *
+ * - A: seeded from loader data, no key, no resync. Correct because the router
+ *   blocks, by decision.
+ * - B: seeded from loader data and keyed on the record, so a new record
+ *   remounts it.
+ * - C: seeded once and resynced by an effect.
+ * - D: once-only but not seeded from loader data. Out of scope, and listed so
+ *   nobody chases it again.
+ */
+type SeedClass = "A" | "B" | "C" | "D";
+
+/**
+ * The census, keyed on the file and the initializer rather than a line number.
+ *
+ * A hook or input key is `<file>: <kind>(<initializer>)` with the whitespace
+ * collapsed and any type parameter dropped, so reformatting or retyping a site
+ * does not churn it; two identical initializers in one file share an entry. A
+ * form key is `<file>: defaultValues` alone, because the object is one entry
+ * per field and a key that changed whenever a field was added would teach
+ * people to update this list without reading it.
+ */
+const CENSUS = new Map<string, { class: SeedClass; why: string }>([
+  // Class A.
+  [
+    'src/components/custom-line-actions.tsx: useState(line.sourcingNote ?? "")',
+    {
+      class: "A",
+      why: "the sourcing note, from the line /admin/inventory/requests loads",
+    },
+  ],
+  [
+    "src/components/inventory-form.tsx: defaultValues",
+    {
+      class: "A",
+      why: "/inventory/$itemId/edit passes the loader's item as `initial`; /inventory/new passes none",
+    },
+  ],
+  [
+    "src/components/project-form.tsx: defaultValues",
+    {
+      class: "A",
+      why: "/projects/$projectId/edit passes the loader's project as `initial`; /projects/new passes none",
+    },
+  ],
+  [
+    "src/components/role-select.tsx: useState(initialRole)",
+    {
+      class: "A",
+      why: "the user's role, from the record /admin/users/$userId loads",
+    },
+  ],
+  [
+    "src/components/staff-program-section.tsx: useState(() => programs.map((p) => p.id))",
+    {
+      class: "A",
+      why: "the project's programs, from the record /projects/$projectId loads",
+    },
+  ],
+  [
+    "src/components/staff-program-section.tsx: useState(teamsSupported)",
+    {
+      class: "A",
+      why: "the project's team count, from the record /projects/$projectId loads",
+    },
+  ],
+  [
+    "src/components/staff-program-section.tsx: useState(() => !acceptingApplicants)",
+    {
+      class: "A",
+      why: "the team-full flag, from the record /projects/$projectId loads",
+    },
+  ],
+  [
+    "src/routes/_authed/admin/mentors/index.tsx: useState(mentor.mentorTeamCount)",
+    { class: "A", why: "a mentor's team count, from the listing's loader" },
+  ],
+  // Class B.
+  [
+    "src/routes/_authed/admin/categories/$categoryId.tsx: useState(category.name)",
+    { class: "B", why: "keyed on the seeded name and type" },
+  ],
+  [
+    'src/routes/_authed/admin/categories/$categoryId.tsx: useState(category.type ?? "")',
+    { class: "B", why: "keyed on the seeded name and type" },
+  ],
+  [
+    "src/routes/_authed/admin/programs/$programId.tsx: useState(program.courseId)",
+    { class: "B", why: "keyed on `String(program.updatedAt)`" },
+  ],
+  [
+    "src/routes/_authed/admin/programs/$programId.tsx: useState(program.courseName)",
+    { class: "B", why: "keyed on `String(program.updatedAt)`" },
+  ],
+  [
+    'src/routes/_authed/admin/programs/$programId.tsx: useState(program.description ?? "")',
+    { class: "B", why: "keyed on `String(program.updatedAt)`" },
+  ],
+  [
+    'src/routes/_authed/admin/programs/$programId.tsx: useState(program.expectedTeams === null ? "" : String(program.expectedTeams))',
+    { class: "B", why: "keyed on `String(program.updatedAt)`" },
+  ],
+  [
+    'src/routes/_authed/admin/programs/$programId.tsx: useState(program.termCount === null ? "" : String(program.termCount))',
+    { class: "B", why: "keyed on `String(program.updatedAt)`" },
+  ],
+  // Class C.
+  [
+    "src/components/instructor-manager.tsx: useState(initial)",
+    {
+      class: "C",
+      why: "`useEffect(() => setInstructors(initial), [initial])` resyncs it",
+    },
+  ],
+  [
+    "src/lib/use-debounced-draft.ts: useState(value)",
+    {
+      class: "C",
+      why: "the hook owns its resync, and its docstring names this failure for a search box",
+    },
+  ],
+  [
+    "src/lib/use-debounced-draft.ts: useRef(value)",
+    {
+      class: "C",
+      why: "what the draft last committed or synced to, the bookkeeping behind that resync",
+    },
+  ],
+  // Class D.
+  [
+    "src/components/comment-thread.tsx: useState(comment.content)",
+    {
+      class: "D",
+      why: "comments are fetched in an effect, since the detail loader carries none, and opening an edit resets the draft from the saved text",
+    },
+  ],
+  [
+    "src/components/custom-request-form.tsx: defaultValues",
+    {
+      class: "D",
+      why: "the first card's name is the search query that found nothing, from the URL",
+    },
+  ],
+  [
+    'src/components/local-time.tsx: useState(() => (iso ? utcText(iso, dateOnly) : ""))',
+    {
+      class: "D",
+      why: "display only: the server's text, replaced by an effect with the local one",
+    },
+  ],
+  [
+    "src/components/proposer-picker.tsx: useState(value)",
+    {
+      class: "D",
+      why: "captures the saved address at mount on purpose, to tell a pending change from it",
+    },
+  ],
+  [
+    "src/components/similar-projects.tsx: useState(readCollapsed)",
+    {
+      class: "D",
+      why: "a lazy initializer reading a per-viewer preference from localStorage",
+    },
+  ],
+  [
+    "src/components/staff-proposer-section.tsx: useState(proposer.email)",
+    {
+      class: "D",
+      why: "the proposer record the staff panel fetches in an effect, not loader data",
+    },
+  ],
+  [
+    "src/components/staff-proposer-section.tsx: useState(proposer.studentProposed)",
+    {
+      class: "D",
+      why: "the proposer record the staff panel fetches in an effect, not loader data",
+    },
+  ],
+  [
+    "src/routes/_authed/admin/traffic.tsx: useState(defaultSort)",
+    {
+      class: "D",
+      why: "a constant built from the table's `sortBy` prop, which every caller passes as a literal",
+    },
+  ],
+  [
+    'src/routes/_authed/profile.tsx: defaultValue(user.affiliation ?? "")',
+    {
+      class: "D",
+      why: "the signed-in user from route context, not loader data",
+    },
+  ],
+  [
+    'src/routes/_authed/profile.tsx: defaultValue(user.linkedin ?? "")',
+    {
+      class: "D",
+      why: "the signed-in user from route context, not loader data",
+    },
+  ],
+  [
+    'src/routes/_authed/profile.tsx: defaultValue(user.name ?? "")',
+    {
+      class: "D",
+      why: "the signed-in user from route context, not loader data",
+    },
+  ],
+  [
+    "src/routes/_authed/profile.tsx: useState(Boolean(user.wantsToMentor))",
+    {
+      class: "D",
+      why: "the signed-in user from route context, not loader data",
+    },
+  ],
+  [
+    "src/routes/_authed/profile.tsx: useState(user.mentorTeamCount ?? 1)",
+    {
+      class: "D",
+      why: "the signed-in user from route context, not loader data",
+    },
+  ],
+]);
+
+const SRC_DIR = join(process.cwd(), "src");
+// Compared by full path, not by name, for the reason `brand-link-scan.ts`
+// gives: a bare-name check would exempt any directory called `test` anywhere
+// under `src/`, a production one included, and would do so silently.
+const TEST_DIR = join(SRC_DIR, "test");
+
+const CLOSER: Record<string, string> = { "(": ")", "[": "]", "{": "}" };
+
+/** Just past the string or template literal that opens at `start`. */
+function stringEnd(source: string, start: number): number {
+  const quote = source[start];
+  for (let i = start + 1; i < source.length; i++) {
+    const char = source[i];
+    if (char === "\\") {
+      i++;
+    } else if (quote === "`" && char === "$" && source[i + 1] === "{") {
+      i = closeOf(source, i + 1);
+    } else if (char === quote) {
+      return i + 1;
+    }
+  }
+  return source.length;
+}
+
+function isCommentStart(source: string, i: number): boolean {
+  return source[i] === "/" && (source[i + 1] === "/" || source[i + 1] === "*");
+}
+
+/** Just past the comment that opens at `start`, or at the newline ending it. */
+function commentEnd(source: string, start: number): number {
+  if (source[start + 1] === "/") {
+    const end = source.indexOf("\n", start);
+    return end === -1 ? source.length : end;
+  }
+  const end = source.indexOf("*/", start + 2);
+  return end === -1 ? source.length : end + 2;
+}
+
+/**
+ * The index of the bracket closing the one at `open`.
+ *
+ * Counted, not matched: a line regex misses an initializer Biome has wrapped
+ * over several lines, and a non-greedy one stops at the first `)` of
+ * `useState(() => programs.map((p) => p.id))`. Strings, template holes and
+ * comments are skipped so a bracket inside one is text. `<` counts only when
+ * `open` is one, which is a type parameter list, and the `>` of an `=>` never
+ * closes it: `useState<Record<string, () => void>>(x)` is one list.
+ *
+ * Known limit, inert in this tree: a regex literal holding a bracket, or JSX
+ * text holding an apostrophe, inside the initializer would miscount. Neither
+ * occurs in one; fix it if one ever does rather than in advance.
+ */
+function closeOf(source: string, open: number): number {
+  const angles = source[open] === "<";
+  const expected: string[] = [];
+  for (let i = open; i < source.length; i++) {
+    const char = source[i];
+    if (char === '"' || char === "'" || char === "`") {
+      i = stringEnd(source, i) - 1;
+    } else if (isCommentStart(source, i)) {
+      i = commentEnd(source, i) - 1;
+    } else if (char in CLOSER) {
+      expected.push(CLOSER[char]);
+    } else if (angles && char === "<") {
+      expected.push(">");
+    } else if (
+      char === expected.at(-1) &&
+      !(char === ">" && source[i - 1] === "=")
+    ) {
+      expected.pop();
+      if (expected.length === 0) {
+        return i;
+      }
+    }
+  }
+  return source.length;
+}
+
+/**
+ * `text` split on its top-level commas, stopping early at the first top-level
+ * character in `stops`, which is how a property value ends at the `,` or `}`
+ * after it.
+ */
+function topLevel(text: string, stops = ""): string[] {
+  const parts: string[] = [];
+  let from = 0;
+  for (let i = 0; i < text.length; i++) {
+    const char = text[i];
+    if (char === '"' || char === "'" || char === "`") {
+      i = stringEnd(text, i) - 1;
+    } else if (isCommentStart(text, i)) {
+      i = commentEnd(text, i) - 1;
+    } else if (char in CLOSER) {
+      i = closeOf(text, i);
+    } else if (stops.includes(char)) {
+      parts.push(text.slice(from, i));
+      return parts;
+    } else if (char === ",") {
+      parts.push(text.slice(from, i));
+      from = i + 1;
+    }
+  }
+  parts.push(text.slice(from));
+  return parts;
+}
+
+function withoutComments(text: string): string {
+  let out = "";
+  let from = 0;
+  for (let i = 0; i < text.length; i++) {
+    const char = text[i];
+    if (char === '"' || char === "'" || char === "`") {
+      i = stringEnd(text, i) - 1;
+    } else if (isCommentStart(text, i)) {
+      out += `${text.slice(from, i)} `;
+      from = commentEnd(text, i);
+      i = from - 1;
+    }
+  }
+  return out + text.slice(from);
+}
+
+/** One line, no padding inside brackets, no trailing comma: Biome's wrap undone. */
+function normalize(text: string): string {
+  return text
+    .replace(/\s+/g, " ")
+    .replace(/([([{]) /g, "$1")
+    .replace(/,? ?([)\]}])/g, "$1")
+    .trim();
+}
+
+const PRIMITIVE =
+  /^(?:-?\d[\d_]*(?:\.\d+)?|true|false|null|undefined|"(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*'|`[^`$]*`)$/;
+const EMPTY_COLLECTION = /^new (?:Set|Map)(?:<[^()]*>)?\(\)$/;
+const LAZY = /^\(\)\s*=>\s*([\s\S]*)$/;
+const PROPERTY = /^\s*(?:[\w$]+|"[^"]*"|'[^']*')\s*:\s*([\s\S]*)$/;
+const ASSERTION = /^\s+(?:satisfies|as)\s/;
+
+/**
+ * A plain literal, which cannot carry loader data: a primitive, an empty
+ * `Set` or `Map`, a lazy initializer returning one, or an array or object
+ * built only from them, with or without a `satisfies` or `as` after it.
+ * Everything else is a seed somebody has to classify.
+ */
+function isLiteral(raw: string): boolean {
+  const text = raw.trim();
+  if (text === "" || PRIMITIVE.test(text) || EMPTY_COLLECTION.test(text)) {
+    return true;
+  }
+  const lazy = LAZY.exec(text)?.[1];
+  if (lazy !== undefined) {
+    return !lazy.startsWith("{") && isLiteral(lazy);
+  }
+  const open = text[0];
+  if (!(open in CLOSER)) {
+    return false;
+  }
+  const close = closeOf(text, 0);
+  const rest = text.slice(close + 1);
+  if (rest.trim() !== "" && !ASSERTION.test(rest)) {
+    return false;
+  }
+  const items = topLevel(text.slice(1, close)).filter(
+    (item) => item.trim() !== ""
+  );
+  if (open === "(") {
+    return items.length === 1 && isLiteral(items[0]);
+  }
+  if (open === "[") {
+    return items.every(isLiteral);
+  }
+  return items.every((item) => {
+    const value = PROPERTY.exec(item)?.[1];
+    return value !== undefined && isLiteral(value);
+  });
+}
+
+type Kind =
+  | "useState"
+  | "useRef"
+  | "useReducer"
+  | "defaultValues"
+  | "defaultValue"
+  | "defaultChecked";
+
+interface Seed {
+  /** The initializer's source, comments removed. */
+  init: string;
+  kind: Kind;
+}
+
+/**
+ * Whether a match sits in a comment, judged from its own line: a docstring
+ * line, a `//` line, or a trailing `//` before it. Coarser than the walk, and
+ * enough: the prose that names these hooks is in comments of those shapes.
+ */
+function inComment(source: string, at: number): boolean {
+  const before = source.slice(source.lastIndexOf("\n", at - 1) + 1, at);
+  return (
+    /^\s*(?:\*|\/\/|\/\*|\{\/\*)/.test(before) || /(?:^|\s)\/\//.test(before)
+  );
+}
+
+const HOOK = /\b(useState|useRef|useReducer)\s*(?=[<(])/g;
+const FORM_DEFAULTS = /\bdefaultValues\s*([:,}])/g;
+const UNCONTROLLED = /\b(defaultValue|defaultChecked)=([{"'])/g;
+
+function hookSeeds(source: string): Seed[] {
+  const seeds: Seed[] = [];
+  for (const match of source.matchAll(HOOK)) {
+    if (inComment(source, match.index)) {
+      continue;
+    }
+    const kind = match[1] as Kind;
+    let open = match.index + match[0].length;
+    if (source[open] === "<") {
+      open = closeOf(source, open) + 1;
+      while (/\s/.test(source[open] ?? "")) {
+        open++;
+      }
+    }
+    if (source[open] !== "(") {
+      continue;
+    }
+    const args = source.slice(open + 1, closeOf(source, open));
+    // `useReducer(reducer, initialArg, init?)`: the reducer is not a seed.
+    const init =
+      kind === "useReducer" ? topLevel(args).slice(1).join(",") : args;
+    seeds.push({ init, kind });
+  }
+  return seeds;
+}
+
+function formSeeds(source: string): Seed[] {
+  const seeds: Seed[] = [];
+  for (const match of source.matchAll(FORM_DEFAULTS)) {
+    if (inComment(source, match.index)) {
+      continue;
+    }
+    const start = match.index + match[0].length;
+    const init =
+      match[1] === ":"
+        ? topLevel(source.slice(start), ",)}")[0]
+        : // Shorthand, `{ defaultValues }`: a variable, never a literal.
+          "defaultValues";
+    seeds.push({ init, kind: "defaultValues" });
+  }
+  for (const match of source.matchAll(UNCONTROLLED)) {
+    if (inComment(source, match.index)) {
+      continue;
+    }
+    const open = match.index + match[0].length - 1;
+    const init =
+      match[2] === "{"
+        ? source.slice(open + 1, closeOf(source, open))
+        : source.slice(open, stringEnd(source, open));
+    seeds.push({ init, kind: match[1] as Kind });
+  }
+  return seeds;
+}
+
+/** Every once-only initializer in `source` that is not a plain literal. */
+function onceOnlySeeds(source: string): Seed[] {
+  return [...hookSeeds(source), ...formSeeds(source)]
+    .map((seed) => ({ ...seed, init: withoutComments(seed.init) }))
+    .filter((seed) => !isLiteral(seed.init));
+}
+
+function label(seed: Seed): string {
+  return seed.kind === "defaultValues"
+    ? "defaultValues"
+    : `${seed.kind}(${normalize(seed.init)})`;
+}
+
+function* sourceFiles(dir: string): Generator<string> {
+  for (const entry of readdirSync(dir, { withFileTypes: true })) {
+    const path = join(dir, entry.name);
+    if (entry.isDirectory()) {
+      if (path !== TEST_DIR && entry.name !== "__tests__") {
+        yield* sourceFiles(path);
+      }
+    } else if (/\.tsx?$/.test(entry.name) && !entry.name.includes(".test.")) {
+      yield path;
+    }
+  }
+}
+
+function treeSeeds(): Set<string> {
+  const found = new Set<string>();
+  for (const path of sourceFiles(SRC_DIR)) {
+    const file = relative(process.cwd(), path);
+    for (const seed of onceOnlySeeds(readFileSync(path, "utf8"))) {
+      found.add(`${file}: ${label(seed)}`);
+    }
+  }
+  return found;
+}
+
+function labelsIn(source: string): string[] {
+  return onceOnlySeeds(source).map(label);
+}
+
+describe("once-only seeds", () => {
+  it("are all in ADR-0029's census, and the census has none left over", () => {
+    const found = treeSeeds();
+    const unclassified = [...found].filter((site) => !CENSUS.has(site)).sort();
+    expect(
+      unclassified,
+      "A once-only initializer that is not a plain literal is not in the\n" +
+        "census. It runs once, at mount, so one seeded from loader data keeps\n" +
+        "whatever frame it mounted on. Read the census in\n" +
+        "docs/adr/0029-a-revisit-waits-for-its-loader.md, classify each site\n" +
+        "below as A, B, C or D in CENSUS with the reason, and name a new A, B\n" +
+        "or C site in that ADR's Consequences too. A site whose initializer\n" +
+        "was edited appears here under its new text; move its entry.\n\n" +
+        unclassified.join("\n")
+    ).toEqual([]);
+
+    // The other direction: a site that is gone should lose its entry, so
+    // the census cannot grow stale.
+    const stale = [...CENSUS.keys()].filter((site) => !found.has(site)).sort();
+    expect(
+      stale,
+      "These census entries match nothing in src/. Remove them, and from\n" +
+        "ADR-0029's Consequences if it names them.\n\n" +
+        stale.join("\n")
+    ).toEqual([]);
+  });
+
+  // The walk itself, against the shapes a line grep misses.
+  it("finds a multi-line initializer", () => {
+    expect(
+      labelsIn(`
+        const [name, setName] = useState(
+          record.name ??
+            fallback
+        );
+      `)
+    ).toEqual(["useState(record.name ?? fallback)"]);
+  });
+
+  it("finds a lazy initializer and reads past its nested parens", () => {
+    expect(
+      labelsIn("const [ids] = useState(() => record.items.map((i) => i.id));")
+    ).toEqual(["useState(() => record.items.map((i) => i.id))"]);
+  });
+
+  it("finds an initializer behind a type parameter, and drops the type", () => {
+    expect(
+      labelsIn(`
+        const [role] = useState<UserRole>(initialRole);
+        const [handlers] = useState<Record<string, () => void>>(
+          record.handlers
+        );
+        const [view] = useState<
+          Partial<Record<Field, Suggestion>>
+        >(record.view);
+      `)
+    ).toEqual([
+      "useState(initialRole)",
+      "useState(record.handlers)",
+      "useState(record.view)",
+    ]);
+  });
+
+  it("finds a useRef and a useReducer's initial argument, not its reducer", () => {
+    expect(
+      labelsIn(`
+        const seen = useRef(record.value);
+        const [state] = useReducer(reducer, record, init);
+        const [count] = useReducer(reducer, 0);
+      `)
+    ).toEqual(["useRef(record.value)", "useReducer(record, init)"]);
+  });
+
+  it("finds form defaults and uncontrolled inputs", () => {
+    expect(
+      labelsIn(`
+        const form = useForm({
+          defaultValues: {
+            name: initial?.name ?? "",
+          } satisfies FormValues,
+          validators: { onSubmit: schema },
+        });
+        const blank = useForm({ defaultValues: { name: "", count: 0 } });
+        <Input defaultValue={user.name ?? ""} />
+        <Checkbox defaultChecked={user.optIn} />
+        <Tabs defaultValue="details" />
+        <Checkbox defaultChecked />
+      `)
+    ).toEqual([
+      "defaultValues",
+      'defaultValue(user.name ?? "")',
+      "defaultChecked(user.optIn)",
+    ]);
+  });
+
+  it("skips plain literals, comments, and brackets inside strings", () => {
+    expect(
+      labelsIn(`
+        const [open] = useState(false);
+        const [error] = useState<string | null>(null);
+        const [draft] = useState("");
+        const [rows] = useState<Row[]>([]);
+        const [picked] = useState(() => new Set<string>());
+        const [filters] = useState({ page: 1, q: "" } as const);
+        const inputRef = useRef<HTMLInputElement>(null);
+        const [step] = useState(
+          // Where the flow starts.
+          "address"
+        );
+        // useState(record.name) in a comment is prose.
+        /**
+         * So is useState(record.name) in a docstring.
+         */
+        const [title] = useState(record.title ?? "(untitled)");
+      `)
+    ).toEqual(['useState(record.title ?? "(untitled)")']);
+  });
+});
