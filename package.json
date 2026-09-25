@@ -81,6 +81,7 @@
     "cmdk": "^1.1.1",
     "drizzle-kit": "^0.31.9",
     "drizzle-orm": "^0.45.1",
+    "highs": "^1.15.3",
     "input-otp": "^1.5.0",
     "isbot": "^5.2.2",
     "lucide-react": "^1.47.0",
