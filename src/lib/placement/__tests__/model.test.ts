@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { input, project, student } from "#/lib/__tests__/placement-fixtures";
+import { input, project, student } from "#/lib/placement/__tests__/fixtures";
 import { buildPlacementModel } from "#/lib/placement/model";
 
 describe("buildPlacementModel", () => {
@@ -59,6 +59,20 @@ describe("buildPlacementModel", () => {
       )
     );
     expect(model.diagnostics.seatShortfall).toEqual({ students: 3, seats: 2 });
+  });
+
+  it("reports teams the at-least-one rule demands beyond the students there are", () => {
+    const model = buildPlacementModel(
+      input(
+        [project("A"), project("B")],
+        ["a", "b", "c"].map((n) => student(`${n}@example.edu`, [])),
+        { allowUnranked: true, minStudents: 3 }
+      )
+    );
+    expect(model.diagnostics.requiredSeatShortfall).toEqual({
+      required: 6,
+      students: 3,
+    });
   });
 
   it("reports more pins on a project than it has seats", () => {

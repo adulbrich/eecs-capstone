@@ -20,7 +20,7 @@ export function solvePlacement(
   input: PlacementInput
 ): PlacementResult {
   const model = buildPlacementModel(input);
-  const empty: PlacementResult = {
+  const base: PlacementResult = {
     status: "optimal",
     placements: [],
     unplaced: model.unplaced,
@@ -29,9 +29,29 @@ export function solvePlacement(
     diagnostics: model.diagnostics,
   };
   if (model.students.length === 0) {
-    return empty;
+    return base;
   }
 
+  try {
+    return runModel(highs, model, input, base);
+  } catch (error) {
+    // HiGHS validates the model before it runs and throws on a value it
+    // cannot take, such as a NaN weight from a hand-edited workspace.
+    return {
+      ...base,
+      status: "error",
+      objective: null,
+      message: error instanceof Error ? error.message : String(error),
+    };
+  }
+}
+
+function runModel(
+  highs: Highs,
+  model: PlacementModel,
+  input: PlacementInput,
+  base: PlacementResult
+): PlacementResult {
   return highs.withModel(toModelData(highs, model), (m) => {
     m.options.set({
       output_flag: false,
@@ -44,17 +64,17 @@ export function solvePlacement(
       highs.constants.solutionStatus.feasible;
     if (status === "error") {
       return {
-        ...empty,
+        ...base,
         status,
         objective: null,
         message: `HiGHS stopped with model status ${m.getModelStatus()}`,
       };
     }
     if (!feasible) {
-      return { ...empty, status, objective: null };
+      return { ...base, status, objective: null };
     }
     return {
-      ...empty,
+      ...base,
       status,
       placements: readPlacements(model, m.getSolution().colValue),
       objective: m.getObjectiveValue(),

@@ -6,9 +6,9 @@ import {
   project,
   student,
   termFixture,
-} from "#/lib/__tests__/placement-fixtures";
+} from "#/lib/placement/__tests__/fixtures";
 import { solvePlacement } from "#/lib/placement/solve";
-import type { PlacementInput } from "#/lib/placement/types";
+import type { PlacementInput, PlacementResult } from "#/lib/placement/types";
 
 let highs: Highs;
 beforeAll(async () => {
@@ -120,7 +120,9 @@ describe("solvePlacement", () => {
     expect(result.placements).toHaveLength(150);
     assertValidPlacement(fixture, result.placements);
     expect(seconds).toBeLessThan(fixture.parameters.timeLimitSeconds / 3);
-  });
+    // Above HiGHS's own 30 s limit, so a slow run fails on the assertion
+    // rather than on Vitest's default 5 s (docs/QUIRKS.md, Vitest).
+  }, 60_000);
 
   it("honours a pin to a project the student did not bid on", () => {
     const fixture = input(
@@ -236,6 +238,65 @@ describe("solvePlacement", () => {
     expect(solvePlacement(highs, fixture(true)).placements).toEqual([
       { email: "pat@example.edu", projectKey: "A", team: 1, priority: null },
     ]);
+  });
+
+  it("reports a run the time limit stopped before any placement was found", () => {
+    const fixture = termFixture();
+    const result = solvePlacement(highs, {
+      ...fixture,
+      parameters: { ...fixture.parameters, timeLimitSeconds: 0 },
+    });
+    expect(result.status).toBe("time_limit");
+    expect(result.placements).toEqual([]);
+  });
+
+  it("returns the best placement and its gap when the time limit stops a run", () => {
+    // A real solve that stops with an incumbent but short of optimal depends
+    // on timing, so this drives the same branch through a stand-in model.
+    const stub = {
+      ...highs,
+      withModel: (
+        _data: unknown,
+        operation: (m: unknown) => PlacementResult
+      ): PlacementResult =>
+        operation({
+          options: { set: () => undefined },
+          run: () => undefined,
+          getModelStatus: () => highs.constants.modelStatus.timeLimit,
+          info: {
+            get: (name: string) =>
+              name === "primal_solution_status"
+                ? highs.constants.solutionStatus.feasible
+                : 0.04,
+          },
+          getSolution: () => ({ colValue: [1, 1] }),
+          getObjectiveValue: () => 100,
+        }),
+    } as unknown as Highs;
+    const result = solvePlacement(
+      stub,
+      input([project("A")], [student("pat@example.edu", ["A"])], small)
+    );
+    expect(result).toMatchObject({
+      status: "time_limit",
+      gap: 0.04,
+      objective: 100,
+      placements: [
+        { email: "pat@example.edu", projectKey: "A", team: 1, priority: 1 },
+      ],
+    });
+  });
+
+  it("returns an error status instead of throwing when HiGHS rejects the model", () => {
+    const result = solvePlacement(
+      highs,
+      input([project("A")], [student("pat@example.edu", ["A"])], {
+        ...small,
+        rankWeights: [Number.NaN],
+      })
+    );
+    expect(result.status).toBe("error");
+    expect(result.message).toMatch(/colCost/);
   });
 
   it("returns an empty optimal result when nobody can be placed", () => {

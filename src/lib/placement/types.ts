@@ -96,6 +96,10 @@ export interface PlacementDiagnostics {
   /** Projects whose eligible students cannot reach the project's minimum,
    * so they can form no team. Exempt from the at-least-one-team rule. */
   projectsBelowMin: string[];
+  /** The at-least-one-team rule asks each project it binds for its minimum,
+   * and together those exceed the students who can be placed. Catches the
+   * common way the rule makes a run infeasible, not every way. */
+  requiredSeatShortfall: { required: number; students: number } | null;
   /** Students who can be placed, and every seat at every project's max. */
   seatShortfall: { students: number; seats: number } | null;
 }

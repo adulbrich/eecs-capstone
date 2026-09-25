@@ -161,6 +161,7 @@ export function buildPlacementModel(input: PlacementInput): PlacementModel {
   const projectsBelowMin: string[] = [];
   const pinOverflow: PlacementDiagnostics["pinOverflow"] = [];
   let seats = 0;
+  let requiredSeats = 0;
   for (const project of active) {
     const { min, max } = bounds(project);
     const projectSeats = project.maxTeams * max;
@@ -169,6 +170,7 @@ export function buildPlacementModel(input: PlacementInput): PlacementModel {
     if ((eligibleCount.get(project.key) ?? 0) < min) {
       projectsBelowMin.push(project.key);
     } else if (parameters.requireOneTeamPerProject) {
+      requiredSeats += min;
       rows.push({
         entries: (slotsByProject.get(project.key) ?? []).map((k) => [k, 1]),
         lower: 1,
@@ -194,6 +196,10 @@ export function buildPlacementModel(input: PlacementInput): PlacementModel {
       seatShortfall:
         students.length > seats ? { students: students.length, seats } : null,
       projectsBelowMin,
+      requiredSeatShortfall:
+        requiredSeats > students.length
+          ? { required: requiredSeats, students: students.length }
+          : null,
       pinnedProjectsBelowMin: projectsBelowMin.filter(
         (key) => (pinnedCount.get(key) ?? 0) > 0
       ),
@@ -225,7 +231,12 @@ function resolveEligibility(
   const students: PlacementStudent[] = [];
   const eligibleByStudent: PlacementProject[][] = [];
   for (const student of input.students) {
-    const eligible = eligibleProjects(student, active, activeByKey, input);
+    const eligible = eligibleProjects(
+      student,
+      active,
+      activeByKey,
+      input.parameters.allowUnranked
+    );
     if (eligible.length === 0) {
       unplaced.push({
         email: student.email,
@@ -246,13 +257,13 @@ function eligibleProjects(
   student: PlacementStudent,
   active: PlacementProject[],
   activeByKey: Map<string, PlacementProject>,
-  input: PlacementInput
+  allowUnranked: boolean
 ): PlacementProject[] {
   if (student.pin !== undefined) {
     const pinned = activeByKey.get(student.pin);
     return pinned === undefined ? [] : [pinned];
   }
-  if (input.parameters.allowUnranked) {
+  if (allowUnranked) {
     return active;
   }
   const bidOn = new Set(student.bids.map((b) => b.projectKey));

@@ -16,6 +16,8 @@ self.onmessage = async (event: MessageEvent<PlacementInput>) => {
       result: solvePlacement(await highs, event.data),
     });
   } catch (error) {
+    // A failed load must not stay cached for the next message.
+    highs = undefined;
     self.postMessage({
       ok: false,
       message: error instanceof Error ? error.message : String(error),
