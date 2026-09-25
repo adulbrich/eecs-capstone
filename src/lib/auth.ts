@@ -14,6 +14,7 @@ import {
   type OnidProfile,
   onidProfileFromIdToken,
 } from "#/lib/_internal/onid-profile";
+import { onidProviderConfig } from "#/lib/_internal/onid-provider";
 import {
   redactingAuthLogger,
   redactQueryError,
@@ -725,7 +726,18 @@ export const auth = betterAuth({
     // OIDC relying party rather than a SAML SP, which is why this is the
     // genericOAuth plugin and not @better-auth/sso.
     //
-    // Two things about this config are worth not "fixing":
+    // Three things about this config are worth not "fixing". The entry itself
+    // is `onidProviderConfig` in `src/lib/_internal/onid-provider.ts`, where a
+    // unit test can drive Better Auth's handlers with it.
+    //
+    // The endpoints are derived from ONID_DISCOVERY_URL by string manipulation,
+    // the way the issuer is, and there is no `discoveryUrl`. Handing it one
+    // looks tidier and costs two uncached GETs to Microsoft on every sign-in,
+    // one per handler, which is what #553 took out. The tenant still lives in
+    // one environment variable, so a tenant change is still not a deploy; what
+    // is given up is following Microsoft if it ever moves the v2.0 endpoints,
+    // a fixed shape that Better Auth's own `microsoftEntraId` helper hardcodes
+    // too.
     //
     // The callback path is /api/auth/oauth2/callback/onid, which does not match
     // the /api/auth/callback/github shape beside it. That is the 1.6 generic
@@ -739,18 +751,9 @@ export const auth = betterAuth({
     // be a stored credential with no purpose.
     genericOAuth({
       config: [
-        {
-          providerId: "onid",
-          discoveryUrl: authConfig.onid.discoveryUrl,
-          clientId: authConfig.onid.clientId,
-          clientSecret: authConfig.onid.clientSecret,
-          // `profile` is not decoration: Entra gates the `oid` claim behind it,
-          // and `oid` is the account id. Dropping it forks every account onto
-          // the `sub` fallback.
-          scopes: ["openid", "profile", "email"],
-          pkce: true,
-          getUserInfo: (tokens) => onidUserInfo(tokens.idToken),
-        },
+        onidProviderConfig(authConfig.onid, (tokens) =>
+          onidUserInfo(tokens.idToken)
+        ),
       ],
     }),
     tanstackStartCookies(),

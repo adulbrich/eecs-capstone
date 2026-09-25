@@ -1,4 +1,7 @@
-import { issuerFromDiscoveryUrl } from "./onid-profile";
+import {
+  endpointsFromDiscoveryUrl,
+  issuerFromDiscoveryUrl,
+} from "./onid-profile";
 
 /**
  * The environment Better Auth is configured from, resolved once and typed.
@@ -20,9 +23,14 @@ export interface AuthConfig {
   github: { clientId: string; clientSecret: string };
   isProduction: boolean;
   onid: {
+    /**
+     * Derived from `ONID_DISCOVERY_URL` like `issuer` below, and for a second
+     * reason: configured with a discovery URL, `genericOAuth` fetches the
+     * document twice on every sign-in (#553). Empty when the URL is unset.
+     */
+    authorizationUrl: string;
     clientId: string;
     clientSecret: string;
-    discoveryUrl: string;
     /**
      * Derived rather than configured separately, because the discovery URL
      * already contains the tenant GUID and a second variable is a second thing
@@ -34,6 +42,8 @@ export interface AuthConfig {
      * deployed task is relying on.
      */
     issuer: string;
+    /** Derived with `authorizationUrl`, for the same reasons. */
+    tokenUrl: string;
   };
   /**
    * The trusted-proxy list Better Auth walks `X-Forwarded-For` against, as IP
@@ -80,9 +90,9 @@ export function buildAuthConfig(
     },
     isProduction: env.NODE_ENV === "production",
     onid: {
+      ...endpointsFromDiscoveryUrl(discoveryUrl),
       clientId: env.ONID_CLIENT_ID ?? "",
       clientSecret: env.ONID_CLIENT_SECRET ?? "",
-      discoveryUrl,
       issuer: issuerFromDiscoveryUrl(discoveryUrl),
     },
     // Not `=== "production"` like `isProduction` above. The two agree under

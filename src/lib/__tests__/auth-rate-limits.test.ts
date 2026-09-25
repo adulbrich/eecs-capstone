@@ -18,9 +18,7 @@ import {
 //
 // The rate limiter runs in the router's `onRequest`, ahead of routing, body
 // validation and the origin check, so an empty body is enough: every request
-// below is counted whatever the endpoint then makes of it. That is also why
-// no network call happens, even though `/sign-in/oauth2` would reach out to
-// the identity provider on a well-formed request.
+// below is counted whatever the endpoint then makes of it.
 
 const BASE_URL = "https://auth.test";
 const TRUSTED_PROXY = "10.0.0.0/16";

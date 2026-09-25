@@ -4,7 +4,7 @@
  * This exists because Better Auth's own `getUserInfo` cannot do the job. Its
  * ID-token branch requires BOTH `sub` and `email` to be present
  * (`better-auth/dist/plugins/generic-oauth/routes.mjs`), and falls through to
- * the discovered `userinfo_endpoint` otherwise. For this tenant that endpoint
+ * the provider's `userinfo_endpoint` otherwise. For this tenant that endpoint
  * is Microsoft Graph, whose OIDC response carries a fixed claim set and not the
  * tenant-custom `username` claim. So the one case UIT warned us about, a user
  * with no email claim, is exactly the case the default handler routes to the
@@ -14,9 +14,9 @@
  * off the sign-in path.
  *
  * The token is not signature-verified, deliberately. It arrives in the response
- * body of a back-channel POST we make ourselves, to an endpoint discovered over
- * TLS from the tenant's discovery document, authenticated with the client
- * secret. OpenID Connect Core 3.1.3.7 permits skipping validation for a token
+ * body of a back-channel POST we make ourselves, over TLS to the tenant's token
+ * endpoint on login.microsoftonline.com, authenticated with the client secret.
+ * OpenID Connect Core 3.1.3.7 permits skipping validation for a token
  * obtained that way, and Better Auth's default decodes without verifying for
  * the same reason.
  */
@@ -41,6 +41,38 @@ const DISCOVERY_SUFFIX = /\/\.well-known\/openid-configuration\/?$/;
  */
 export function issuerFromDiscoveryUrl(discoveryUrl: string): string {
   return discoveryUrl.trim().replace(DISCOVERY_SUFFIX, "");
+}
+
+const ISSUER_VERSION_SUFFIX = /\/v2\.0$/;
+
+/**
+ * The authorize and token endpoints, derived from the discovery URL the same
+ * way as the issuer, so that no sign-in fetches the discovery document (#553).
+ *
+ * Handing `genericOAuth` a `discoveryUrl` instead makes it GET the document
+ * twice per sign-in, once in each handler, with no cache, and a static URL
+ * passed beside it is overwritten by what the fetch returns. Entra's v2.0
+ * endpoints are a fixed shape under the tenant, the one Better Auth's own
+ * `microsoftEntraId` helper builds from a tenant id: drop the `/v2.0` from the
+ * issuer and append `/oauth2/v2.0/authorize` or `/oauth2/v2.0/token`.
+ *
+ * An unset discovery URL yields empty endpoints rather than a relative path,
+ * so `/sign-in/oauth2` refuses with Better Auth's configuration error, which
+ * is what it did when discovery had nothing to fetch.
+ */
+export function endpointsFromDiscoveryUrl(discoveryUrl: string): {
+  authorizationUrl: string;
+  tokenUrl: string;
+} {
+  const issuer = issuerFromDiscoveryUrl(discoveryUrl);
+  if (!issuer) {
+    return { authorizationUrl: "", tokenUrl: "" };
+  }
+  const tenant = issuer.replace(ISSUER_VERSION_SUFFIX, "");
+  return {
+    authorizationUrl: `${tenant}/oauth2/v2.0/authorize`,
+    tokenUrl: `${tenant}/oauth2/v2.0/token`,
+  };
 }
 
 /** Reads a claim only when it is a non-blank string. */
