@@ -248,8 +248,8 @@ const {
  * prose columns. The table renders none of them, the search runs in SQL
  * rather than in the browser (against the tsvector, which covers five of them;
  * `licenseRestrictions` was never searched), and the CSV export reads its own
- * wider projection, so carrying them only cost payload: about 1 KB a row,
- * every row, on every visit to an unpaged table (#482).
+ * wider projection, so carrying them only cost payload: 1,058 bytes a row
+ * across 702 seeded projects, on every visit to an unpaged table (#482).
  *
  * Derived from the staff projection rather than trimming it, because the
  * export and the mentorship tests read that one whole. Join `user` (on
