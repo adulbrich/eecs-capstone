@@ -168,6 +168,32 @@ describe("NotificationBell, mounted twice", () => {
     expect(mockedList).toHaveBeenCalledTimes(3);
   });
 
+  it("never shows one user's notifications to the next in the same tab", async () => {
+    session = { user: { id: "u1" } };
+    const qc = new QueryClient();
+    const tree = () => (
+      <QueryClientProvider client={qc}>
+        <NotificationBell />
+        <NotificationBell />
+      </QueryClientProvider>
+    );
+    const { rerender } = render(tree());
+    await settledOnMount();
+
+    // u1's session ends without a reload and u2 signs in on the client. u2's
+    // read never answers, so anything the bells show is u1's cache.
+    const pending = () => new Promise<never>(() => undefined);
+    mockedCount.mockImplementationOnce(pending);
+    mockedList.mockImplementationOnce(pending);
+    session = { user: { id: "u2" } };
+    rerender(tree());
+
+    await waitFor(() => expect(mockedCount).toHaveBeenCalledTimes(2));
+    for (const bell of bells()) {
+      expect(bell.textContent).toBe("");
+    }
+  });
+
   it("makes no request for a signed-out viewer", async () => {
     renderTwoBells();
     await act(async () => {
