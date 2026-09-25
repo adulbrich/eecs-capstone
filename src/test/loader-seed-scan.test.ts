@@ -756,7 +756,7 @@ describe("once-only seeds", () => {
         const sep = " // "; const [v] = useState(loaderData.v);
         const [rows2] = useState([] as Row[] && loaderData.rows);
         const [vals] = useState({} as Partial<V> && loaderData.v as Partial<V>);
-        const [name] = useState("" as Brand<S> + loaderData.name as Brand<S>);
+        const [name] = useState([] as Tuple<S> + loaderData.name as Tuple<S>);
       `)
     ).toEqual([
       'useState(record.title ?? "(untitled)")',
@@ -764,7 +764,7 @@ describe("once-only seeds", () => {
       "useState(loaderData.v)",
       "useState([] as Row[] && loaderData.rows)",
       "useState({} as Partial<V> && loaderData.v as Partial<V>)",
-      'useState("" as Brand<S> + loaderData.name as Brand<S>)',
+      "useState([] as Tuple<S> + loaderData.name as Tuple<S>)",
       "defaultValue(user.name)",
     ]);
   });
