@@ -1,8 +1,8 @@
 # EECS Capstone
 
 The Oregon State University EECS Capstone app: people propose capstone projects,
-staff review and publish them, students browse them, and everyone borrows shared
-equipment from an inventory. One context; this file is the glossary for all of it.
+staff review and publish them, students browse them, staff place students on them,
+and everyone borrows shared equipment from an inventory. One context; this file is the glossary for all of it.
 Decisions live in `docs/adr/`, gotchas in `docs/QUIRKS.md`, and this file holds
 neither.
 
@@ -116,7 +116,7 @@ panel's Programs and teams section, orthogonal to status.
 
 The server never records who would join, only whether there is room: students bid
 outside the app, and staff place them with a tool that keeps every bid and placement
-in the staff member's browser (see **Placement**), so no record on the server names
+in the staff member's browser, so no record on the server names
 the student on the other side of the flag.
 
 The stored column keeps its old name, `projects.accepting_applicants`, as do the
