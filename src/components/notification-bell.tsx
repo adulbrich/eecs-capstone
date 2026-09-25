@@ -34,8 +34,11 @@ const NOTIFICATIONS_KEY = ["notifications"] as const;
  * observer keeps its own interval timer; the two start in the same commit, and
  * the second tick joins the fetch the first one already has in flight.
  *
- * The poll pauses while the tab is hidden and the focus refetch fires when it
- * comes back, which is what the hand-rolled `focus` listener was for.
+ * The poll pauses while the tab is hidden, and Query's focus refetch fires when
+ * it is shown again. That is narrower than the hand-rolled `focus` listener it
+ * replaced: Query listens for `visibilitychange`, so switching back to a
+ * browser window whose tab stayed visible no longer refetches, and the next
+ * tick picks the change up instead.
  *
  * The key carries the user id. Signing out reloads the page, but a session can
  * also end without one (another tab, expiry, a ban), and signing in navigates
