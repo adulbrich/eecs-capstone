@@ -2,7 +2,6 @@ import { createFileRoute, redirect, useNavigate } from "@tanstack/react-router";
 import { toast } from "sonner";
 import { z } from "zod";
 import { InventoryForm } from "#/components/inventory-form";
-import { getSession } from "#/lib/auth-guards";
 import { pageTitle } from "#/lib/page-title";
 import { isStaff } from "#/lib/viewer";
 
@@ -24,12 +23,8 @@ export const Route = createFileRoute("/_authed/inventory/new")({
   head: () => ({ meta: [{ title: pageTitle("New Inventory Item") }] }),
   // Same reasoning as the edit route: `_authed` only guarantees signed-in.
   // `createInventoryItemAs` asserts staff independently.
-  beforeLoad: async () => {
-    const session = await getSession();
-    if (!session?.user) {
-      throw redirect({ to: "/sign-in" });
-    }
-    if (!isStaff(session.user)) {
+  beforeLoad: ({ context }) => {
+    if (!isStaff(context.user)) {
       throw redirect({ to: "/" });
     }
   },

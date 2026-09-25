@@ -36,7 +36,6 @@ import { FieldError } from "#/components/ui/field";
 import { Input } from "#/components/ui/input";
 import { Label } from "#/components/ui/label";
 import { ListCount } from "#/components/ui/pagination";
-import { getSession } from "#/lib/auth-guards";
 import { defineCsvColumns, toCsv } from "#/lib/csv";
 import { pageTitle } from "#/lib/page-title";
 import { PROGRAM_COURSE_ID_HINT } from "#/lib/program-fields";
@@ -55,12 +54,8 @@ const searchSchema = z.object({
 export const Route = createFileRoute("/_authed/admin/programs/")({
   validateSearch: searchSchema,
   head: () => ({ meta: [{ title: pageTitle("Programs") }] }),
-  beforeLoad: async () => {
-    const session = await getSession();
-    if (!session?.user) {
-      throw redirect({ to: "/sign-in" });
-    }
-    if (!isStaff(session.user)) {
+  beforeLoad: ({ context }) => {
+    if (!isStaff(context.user)) {
       throw redirect({ to: "/" });
     }
   },

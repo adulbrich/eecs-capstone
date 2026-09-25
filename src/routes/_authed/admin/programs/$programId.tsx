@@ -22,7 +22,6 @@ import { FieldError } from "#/components/ui/field";
 import { Input } from "#/components/ui/input";
 import { Label } from "#/components/ui/label";
 import { Textarea } from "#/components/ui/textarea";
-import { getSession } from "#/lib/auth-guards";
 import { pageTitle } from "#/lib/page-title";
 import { PROGRAM_COURSE_ID_HINT } from "#/lib/program-fields";
 import { useAction } from "#/lib/use-action";
@@ -31,12 +30,8 @@ import { deleteProgram, getProgram, updateProgram } from "#/server/programs";
 
 export const Route = createFileRoute("/_authed/admin/programs/$programId")({
   head: () => ({ meta: [{ title: pageTitle("Edit Program") }] }),
-  beforeLoad: async () => {
-    const session = await getSession();
-    if (!session?.user) {
-      throw redirect({ to: "/sign-in" });
-    }
-    if (!isStaff(session.user)) {
+  beforeLoad: ({ context }) => {
+    if (!isStaff(context.user)) {
       throw redirect({ to: "/" });
     }
   },

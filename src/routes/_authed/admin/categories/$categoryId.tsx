@@ -23,7 +23,6 @@ import { Button } from "#/components/ui/button";
 import { FieldError } from "#/components/ui/field";
 import { Input } from "#/components/ui/input";
 import { Label } from "#/components/ui/label";
-import { getSession } from "#/lib/auth-guards";
 import { pageTitle } from "#/lib/page-title";
 import { useAction } from "#/lib/use-action";
 import { isStaff } from "#/lib/viewer";
@@ -36,12 +35,8 @@ import {
 
 export const Route = createFileRoute("/_authed/admin/categories/$categoryId")({
   head: () => ({ meta: [{ title: pageTitle("Edit Category") }] }),
-  beforeLoad: async () => {
-    const session = await getSession();
-    if (!session?.user) {
-      throw redirect({ to: "/sign-in" });
-    }
-    if (!isStaff(session.user)) {
+  beforeLoad: ({ context }) => {
+    if (!isStaff(context.user)) {
       throw redirect({ to: "/" });
     }
   },
