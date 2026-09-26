@@ -110,6 +110,102 @@ test.describe("placement workspace", () => {
     }
   });
 
+  test("a Qualtrics export converts on upload, and the converted file re-imports to the same bids", async ({
+    page,
+  }) => {
+    const ids = [
+      "status",
+      "finished",
+      "recordedDate",
+      "recipientLastName",
+      "recipientFirstName",
+      "recipientEmail",
+      "QID30_1",
+      "QID30_2",
+      "QID3_11",
+      "QID3_12",
+    ];
+    const questions = [
+      "Response Type",
+      "Finished",
+      "Recorded Date",
+      "Recipient Last Name",
+      "Recipient First Name",
+      "Recipient Email",
+      "Rank your top 6 choices. - Tide Clock",
+      "Rank your top 6 choices. - Robot Arm:",
+      "Tell us why. - reason for choice 1",
+      "Tell us why. - reason for choice 2",
+    ];
+    const quote = (cells: string[]) =>
+      cells.map((c) => `"${c.replaceAll('"', '""')}"`).join(",");
+    const survey = [
+      quote(ids.map((_, i) => `Q${i}`)),
+      quote(questions),
+      quote(ids.map((id) => JSON.stringify({ ImportId: id }))),
+      quote([
+        "IP Address",
+        "True",
+        "2026-09-28 10:00:00",
+        "Park",
+        "Ada",
+        `ada@${DOMAIN}`,
+        "2",
+        "1",
+        "Robots, mostly",
+        "Tides",
+      ]),
+      quote([
+        "IP Address",
+        "True",
+        "2026-09-28 11:00:00",
+        "Ito",
+        "Ben",
+        `ben@${DOMAIN}`,
+        "1",
+        "",
+        "Clocks",
+        "",
+      ]),
+    ].join("\n");
+
+    await page.goto("/admin/placement");
+    await waitForHydration(page);
+    await page.getByLabel("Projects CSV file").setInputFiles({
+      name: "projects.csv",
+      mimeType: "text/csv",
+      buffer: Buffer.from(PROJECTS_CSV),
+    });
+    await page.getByRole("tab", { name: /Bids/ }).click();
+    await page.getByLabel("Bids CSV file").setInputFiles({
+      name: "survey.csv",
+      mimeType: "text/csv",
+      buffer: Buffer.from(survey),
+    });
+    await expect(
+      page.getByText("Converted from the Qualtrics export survey.csv.")
+    ).toBeVisible();
+    await expect(page.getByText("2 students and 3 bids")).toBeVisible();
+    await expect(page.getByText("Robots, mostly")).toBeVisible();
+
+    const download = page.waitForEvent("download");
+    await page.getByRole("button", { name: "Download converted CSV" }).click();
+    const converted = await readFile(await (await download).path(), "utf-8");
+
+    await page.getByRole("button", { name: "Remove bids" }).click();
+    await page
+      .getByRole("alertdialog")
+      .getByRole("button", { name: "Remove" })
+      .click();
+    await page.getByLabel("Bids CSV file").setInputFiles({
+      name: "converted.csv",
+      mimeType: "text/csv",
+      buffer: Buffer.from(converted),
+    });
+    await expect(page.getByText("2 students and 3 bids")).toBeVisible();
+    await expect(page.getByText("Robots, mostly")).toBeVisible();
+  });
+
   test("clearing all data empties the stored workspace after a confirmation", async ({
     page,
   }) => {
