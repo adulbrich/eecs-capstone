@@ -424,6 +424,7 @@ for (const width of [1280, 375]) {
       );
       expect(overflow).toBeLessThanOrEqual(0);
     }
+    await checkA11y(page);
   });
 }
 
