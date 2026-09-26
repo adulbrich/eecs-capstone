@@ -81,7 +81,10 @@ describe("parseBidsCsv", () => {
       "ada@example.edu,Ada,,Tide Clock,,,",
       "ada@example.edu,Ada,2,Robot Arm,,,"
     );
-    expect(errors(result)).toEqual([2, 3, 4, 5, 6, 7, 8]);
+    expect(errors(result)).toEqual([2, 3, 4, 5, 7, 8]);
+    expect(result.unmatched).toEqual([
+      { key: "moon base", title: "Moon Base", rows: [6] },
+    ]);
     expect(result.students[0].bids).toEqual([
       { projectKey: "p1", priority: 2, comment: "" },
     ]);
@@ -215,6 +218,76 @@ describe("parseProjectsCsv", () => {
   it("needs a title column", () => {
     expect(parseProjectsCsv("name\nRobot Arm").issues).toEqual([
       { level: "error", row: 1, message: 'The file has no "title" column.' },
+    ]);
+  });
+});
+
+describe("parseBidsCsv with title matches", () => {
+  const text = [
+    HEADER,
+    "ada@example.edu,Ada,1,Robot Arm Contoller,,,",
+    "ben@example.edu,Ben,1,robot arm contoller,,,",
+    "ben@example.edu,Ben,2,Moon Base,,,",
+  ].join("\n");
+
+  it("lists each unmatched title once, with its rows, as the file first spells it", () => {
+    expect(parseBidsCsv(text, PROJECTS).unmatched).toEqual([
+      {
+        key: "robot arm contoller",
+        title: "Robot Arm Contoller",
+        rows: [2, 3],
+      },
+      { key: "moon base", title: "Moon Base", rows: [4] },
+    ]);
+  });
+
+  it("places the bids of a matched title on its project", () => {
+    const result = parseBidsCsv(text, PROJECTS, {
+      "robot arm contoller": { projectKey: "p1" },
+    });
+    expect(result.unmatched.map((u) => u.key)).toEqual(["moon base"]);
+    expect(result.issues).toEqual([]);
+    expect(result.students.map((s) => s.bids[0].projectKey)).toEqual([
+      "p1",
+      "p1",
+    ]);
+  });
+
+  it("ignores a match to a project that is not in the list", () => {
+    const result = parseBidsCsv(text, PROJECTS, {
+      "robot arm contoller": { projectKey: "gone" },
+    });
+    expect(result.unmatched.map((u) => u.key)).toContain("robot arm contoller");
+  });
+
+  it("lets a project's own title win over a match that names it", () => {
+    const result = parseBidsCsv(
+      [HEADER, "ada@example.edu,Ada,1,Tide Clock,,,"].join("\n"),
+      PROJECTS,
+      { "tide clock": { projectKey: "p1" } }
+    );
+    expect(result.students[0].bids[0].projectKey).toBe("p3");
+  });
+
+  it("reports the later row when a match gives a student two bids on one project", () => {
+    const result = parseBidsCsv(
+      [
+        HEADER,
+        "ada@example.edu,Ada,2,Robot Arm Contoller,,,",
+        "ada@example.edu,Ada,4,Robot Arm,,,",
+      ].join("\n"),
+      PROJECTS,
+      { "robot arm contoller": { projectKey: "p1" } }
+    );
+    expect(result.issues).toEqual([
+      {
+        level: "error",
+        row: 3,
+        message: "The same project as row 2 for ada@example.edu.",
+      },
+    ]);
+    expect(result.students[0].bids).toEqual([
+      { projectKey: "p1", priority: 2, comment: "" },
     ]);
   });
 });

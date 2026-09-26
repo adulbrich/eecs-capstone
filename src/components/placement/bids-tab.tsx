@@ -8,6 +8,7 @@ import { ConfirmDialog } from "#/components/confirm-dialog";
 import { CsvFormatHelp } from "#/components/placement/csv-format";
 import { FilePickerButton } from "#/components/placement/file-picker-button";
 import { ImportIssues } from "#/components/placement/import-issues";
+import { TitleMatchesPanel } from "#/components/placement/title-matches";
 import type { PlacementWorkspace } from "#/components/placement/use-placement-workspace";
 import { Button } from "#/components/ui/button";
 import { downloadText } from "#/lib/placement/download";
@@ -81,13 +82,14 @@ export function BidsTab({
         <ConfirmDialog
           busyLabel="Removing..."
           confirmLabel="Remove"
-          description="The bids leave this workspace, and with them any placement and the pins set on it. Upload the file again to bring the bids back."
+          description="The bids leave this workspace, and with them any placement, the pins set on it and the titles matched by hand. Upload the file again to bring the bids back."
           onConfirm={() =>
             update((w) => ({
               ...w,
               bids: null,
               pins: undefined,
               result: undefined,
+              titleMatches: undefined,
             }))
           }
           title={`Remove the bids from ${workspace.bids.filename}?`}
@@ -123,6 +125,26 @@ export function BidsTab({
       <ImportIssues
         issues={workspace.bids.conversionIssues ?? []}
         label="survey export"
+      />
+      <TitleMatchesPanel
+        matches={workspace.titleMatches}
+        onMatch={(added) =>
+          update((w) => ({
+            ...w,
+            titleMatches: { ...w.titleMatches, ...added },
+          }))
+        }
+        onUndo={(key) =>
+          update((w) => {
+            const { [key]: _undone, ...rest } = w.titleMatches ?? {};
+            return {
+              ...w,
+              titleMatches: Object.keys(rest).length > 0 ? rest : undefined,
+            };
+          })
+        }
+        projects={workspace.projects}
+        unmatched={bids.unmatched}
       />
       <ImportIssues issues={bids.issues} label="bids" />
       <StudentsTable projects={workspace.projects} students={students} />

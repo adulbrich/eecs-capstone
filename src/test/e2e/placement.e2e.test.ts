@@ -329,6 +329,63 @@ test.describe("placement workspace", () => {
     await expect(sheet).toBeHidden();
   });
 
+  test("staff match a survey title to a project, and undo it", async ({
+    page,
+  }) => {
+    await page.goto("/admin/placement");
+    await waitForHydration(page);
+    await page.getByLabel("Projects CSV file").setInputFiles({
+      name: "projects.csv",
+      mimeType: "text/csv",
+      buffer: Buffer.from(PROJECTS_CSV),
+    });
+    await page.getByRole("tab", { name: /Bids/ }).click();
+    await page.getByLabel("Bids CSV file").setInputFiles({
+      name: "bids.csv",
+      mimeType: "text/csv",
+      buffer: Buffer.from(
+        [
+          "email,name,priority,project",
+          `ada@${DOMAIN},Ada Park,1,Tide Clok`,
+          `ben@${DOMAIN},Ben Ito,1,Tide Clok`,
+          `ben@${DOMAIN},Ben Ito,2,Moon Base`,
+        ].join("\n")
+      ),
+    });
+    const unmatched = page.getByRole("region", { name: "Unmatched titles" });
+    await expect(unmatched).toContainText("2 titles match no project");
+    await expect(page.getByText("0 students and 0 bids")).toBeVisible();
+
+    // "Tide Clok" is close enough to be suggested; "Moon Base" is not.
+    await expect(
+      unmatched.getByRole("combobox", { name: 'Project for "Tide Clok"' })
+    ).toContainText("Tide Clock");
+    await expect(
+      unmatched.getByRole("button", { name: 'Match "Moon Base"' })
+    ).toBeDisabled();
+    await unmatched.getByRole("button", { name: 'Match "Tide Clok"' }).click();
+
+    await expect(page.getByText("2 students and 2 bids")).toBeVisible();
+    const matched = page.getByRole("region", {
+      name: "Titles matched by hand",
+    });
+    await expect(matched).toContainText('"Tide Clok" matched to Tide Clock');
+    await expect(unmatched).toContainText("1 title matches no project");
+    await expect.poll(() => stored(page)).toContain('"titleMatches"');
+
+    await page.reload();
+    await waitForHydration(page);
+    await page.getByRole("tab", { name: /Bids/ }).click();
+    await expect(page.getByText("2 students and 2 bids")).toBeVisible();
+
+    await matched
+      .getByRole("button", { name: 'Undo the match for "Tide Clok"' })
+      .click();
+    await expect(page.getByText("0 students and 0 bids")).toBeVisible();
+    await expect(matched).toHaveCount(0);
+    await expect.poll(() => stored(page)).not.toContain('"titleMatches"');
+  });
+
   test("clearing all data empties the stored workspace after a confirmation", async ({
     page,
   }) => {
