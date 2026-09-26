@@ -367,6 +367,28 @@ test("@smoke admin placement, projects and bids loaded", async ({ page }) => {
   await checkA11y(page);
 });
 
+test("admin placement, a run on the results board", async ({ page }) => {
+  await page.goto("/admin/placement");
+  await waitForHydration(page);
+  await page.getByLabel("Projects CSV file").setInputFiles({
+    name: "projects.csv",
+    mimeType: "text/csv",
+    buffer: Buffer.from(PLACEMENT_PROJECTS_CSV),
+  });
+  await page.getByRole("tab", { name: /Bids/ }).click();
+  await page.getByLabel("Bids CSV file").setInputFiles({
+    name: "bids.csv",
+    mimeType: "text/csv",
+    buffer: Buffer.from(PLACEMENT_BIDS_CSV),
+  });
+  await page.getByRole("tab", { name: "Results" }).click();
+  await page.getByRole("button", { name: "Run placement" }).click();
+  await expect(page.getByText(/students placed/)).toBeVisible({
+    timeout: 20_000,
+  });
+  await checkA11y(page);
+});
+
 // The rest of this file exercises behavior that only a browser can prove:
 // static SSR checks confirm markup is present or absent, but never actually
 // click a sort header, toggle a column, resize the viewport, or scroll.

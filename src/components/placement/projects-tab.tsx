@@ -59,7 +59,15 @@ export function ProjectsTab({
   const setProjects = (
     projects: WorkspaceProject[],
     projectSource: Workspace["projectSource"]
-  ) => update((w) => ({ ...w, projects, projectSource }));
+  ) =>
+    // Pins and a result name project keys, so neither survives new projects.
+    update((w) => ({
+      ...w,
+      projects,
+      projectSource,
+      pins: undefined,
+      result: undefined,
+    }));
 
   const bidCounts = useMemo(() => {
     const counts = new Map<string, number>();
@@ -113,7 +121,7 @@ export function ProjectsTab({
         <ConfirmDialog
           busyLabel="Removing..."
           confirmLabel="Remove"
-          description="The projects and their settings leave this workspace. The bids stay, and are matched again by title when new projects load."
+          description="The projects and their settings leave this workspace, and with them any placement and the pins set on it. The bids stay, and are matched again by title when new projects load."
           onConfirm={() => {
             setIssues([]);
             setDuplicates([]);
@@ -279,7 +287,7 @@ function BoundsProblems({
       message={
         problems.length === 0
           ? null
-          : `Min students is above max students for ${problems.map((p) => p.title).join(", ")}, so no team can form there.`
+          : `Min students per team is above max students per team for ${problems.map((p) => p.title).join(", ")}, so no team can form there.`
       }
     />
   );
@@ -358,13 +366,13 @@ function ProjectsTable({
       ),
       count(
         "minStudents",
-        "Min students",
+        "Min students per team",
         parameters.minStudents,
         PARAMETER_LIMITS.students
       ),
       count(
         "maxStudents",
-        "Max students",
+        "Max students per team",
         parameters.maxStudents,
         PARAMETER_LIMITS.students
       ),
@@ -398,9 +406,10 @@ function ProjectsTable({
   return (
     <div className="mt-4">
       <p className="text-muted-foreground text-sm">
-        A blank cell uses the default from the Parameters tab. Max teams 0
-        leaves a project out. Weight multiplies every bid on the project: 1
-        leaves it alone, 0.25 steers students away.
+        A blank cell uses the default from the Parameters tab. Max teams is how
+        many teams the project may form, and 0 leaves it out; min and max
+        students apply to each of those teams. Weight multiplies every bid on
+        the project: 1 leaves it alone, 0.25 steers students away.
       </p>
       <AdminDataTable
         caption="Projects in this placement"

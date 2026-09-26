@@ -4,6 +4,7 @@ import {
   DEFAULT_PLACEMENT_PARAMETERS,
   type PlacementInput,
   type PlacementParameters,
+  type PlacementResult,
   type PlacementStudent,
   type WorkspaceProject,
 } from "#/lib/placement/types";
@@ -36,10 +37,26 @@ export interface Workspace {
     text: string;
   } | null;
   parameters: WorkspaceParameters;
+  /**
+   * Pins set on the results board, by email: a project key pins the student
+   * there, null unpins them, overriding the bids file either way.
+   */
+  pins?: Record<string, string | null>;
   projectSource: ProjectSource | null;
   projects: WorkspaceProject[];
+  /** The last run that produced a placement. */
+  result?: StoredResult;
   version: 1;
 }
+
+export type StoredResult = PlacementResult & {
+  /** When the run finished, as an ISO timestamp. */
+  at: string;
+  /** Set once a Move has changed the placement by hand since the run. */
+  edited?: boolean;
+  /** `inputFingerprint` of the workspace the run read. */
+  fingerprint: string;
+};
 
 export const DEFAULT_WORKSPACE_PARAMETERS: WorkspaceParameters = {
   ...DEFAULT_PLACEMENT_PARAMETERS,
@@ -78,6 +95,47 @@ const projectSchema = z.object({
     .max(PARAMETER_LIMITS.multiplier.max),
 });
 
+const resultSchema = z.object({
+  at: z.string(),
+  fingerprint: z.string(),
+  edited: z.boolean().optional(),
+  status: z.enum(["optimal", "time_limit", "infeasible", "error"]),
+  placements: z.array(
+    z.object({
+      email: z.string(),
+      projectKey: z.string(),
+      team: z.number().int(),
+      priority: z.number().int().nullable(),
+    })
+  ),
+  unplaced: z.array(
+    z.object({
+      email: z.string(),
+      reason: z.enum(["no_eligible_project", "pinned_to_dropped_project"]),
+    })
+  ),
+  gap: z.number().nullable(),
+  objective: z.number().nullable(),
+  message: z.string().optional(),
+  diagnostics: z.object({
+    pinnedProjectsBelowMin: z.array(z.string()),
+    pinOverflow: z.array(
+      z.object({
+        projectKey: z.string(),
+        pinned: z.number(),
+        seats: z.number(),
+      })
+    ),
+    projectsBelowMin: z.array(z.string()),
+    requiredSeatShortfall: z
+      .object({ required: z.number(), students: z.number() })
+      .nullable(),
+    seatShortfall: z
+      .object({ students: z.number(), seats: z.number() })
+      .nullable(),
+  }),
+});
+
 const workspaceSchema = z
   .object({
     version: z.literal(1),
@@ -109,6 +167,8 @@ const workspaceSchema = z
           .optional(),
       })
       .nullable(),
+    pins: z.record(z.string(), z.string().nullable()).optional(),
+    result: resultSchema.optional(),
     parameters: z.object({
       rankWeights: z
         .array(
@@ -283,4 +343,25 @@ export function projectsFromPortal(
       weightMultiplier: 1,
     })),
   };
+}
+
+/**
+ * What a run depended on, as a short string: the projects with their
+ * settings, the parameters and the bids file. Pins are left out on purpose,
+ * so approving a student does not mark the run it came from as stale.
+ */
+export function inputFingerprint(
+  workspace: Pick<Workspace, "bids" | "parameters" | "projects">
+): string {
+  const text = JSON.stringify([
+    workspace.projects,
+    workspace.parameters,
+    workspace.bids?.text ?? null,
+  ]);
+  // djb2 in plain arithmetic, kept below 2^32 so it stays exact.
+  let hash = 5381;
+  for (let i = 0; i < text.length; i++) {
+    hash = (hash * 33 + text.charCodeAt(i)) % 4_294_967_296;
+  }
+  return `${text.length}:${hash.toString(36)}`;
 }

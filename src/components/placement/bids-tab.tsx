@@ -1,4 +1,4 @@
-import { Download, Trash2 } from "lucide-react";
+import { Download, Trash2, TriangleAlert } from "lucide-react";
 import { useMemo } from "react";
 import {
   AdminDataTable,
@@ -50,9 +50,13 @@ export function BidsTab({
           accept=".csv,text/csv"
           inputLabel="Bids CSV file"
           onText={(text, filename) =>
+            // A new bids file starts the board over: its pins and result
+            // were about the students of the old one.
             update((w) => ({
               ...w,
               bids: bidsFromFile(text, filename, w.projects),
+              pins: undefined,
+              result: undefined,
             }))
           }
         >
@@ -77,8 +81,15 @@ export function BidsTab({
         <ConfirmDialog
           busyLabel="Removing..."
           confirmLabel="Remove"
-          description="The bids leave this workspace. Upload the file again to bring them back."
-          onConfirm={() => update((w) => ({ ...w, bids: null }))}
+          description="The bids leave this workspace, and with them any placement and the pins set on it. Upload the file again to bring the bids back."
+          onConfirm={() =>
+            update((w) => ({
+              ...w,
+              bids: null,
+              pins: undefined,
+              result: undefined,
+            }))
+          }
           title={`Remove the bids from ${workspace.bids.filename}?`}
         >
           <Button size="sm" type="button" variant="ghost">
@@ -227,8 +238,16 @@ function StudentHeader({ rows }: { rows: Row[] }) {
         {bids} {bids === 1 ? "bid" : "bids"}
       </span>
       {first.avoid && (
-        <p className="font-normal text-sm">
-          Prefers not to work with: {first.avoid}
+        <p
+          className="flex items-start gap-1 font-normal text-sm"
+          role="note"
+          style={{ color: "var(--status-warning)" }}
+        >
+          <TriangleAlert
+            aria-hidden="true"
+            className="mt-0.5 size-3.5 shrink-0"
+          />
+          <span>Prefers not to work with: {first.avoid}</span>
         </p>
       )}
     </div>

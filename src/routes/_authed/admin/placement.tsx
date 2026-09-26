@@ -8,6 +8,7 @@ import { z } from "zod";
 import { BidsTab } from "#/components/placement/bids-tab";
 import { ParametersTab } from "#/components/placement/parameters-tab";
 import { ProjectsTab } from "#/components/placement/projects-tab";
+import { ResultsTab } from "#/components/placement/results-tab";
 import { usePlacementWorkspace } from "#/components/placement/use-placement-workspace";
 import { WorkspaceActions } from "#/components/placement/workspace-actions";
 import {
@@ -24,7 +25,7 @@ import { pageTitle } from "#/lib/page-title";
 import { isStaff } from "#/lib/viewer";
 import { listPrograms } from "#/server/programs";
 
-const TABS = ["projects", "bids", "parameters"] as const;
+const TABS = ["projects", "bids", "parameters", "results"] as const;
 type Tab = (typeof TABS)[number];
 
 const searchSchema = z.object({
@@ -92,6 +93,13 @@ function PlacementPage() {
       />
       <FieldError
         message={
+          state.changedElsewhere
+            ? "The placement workspace changed in another tab or window. Reload this page before editing here, or its next save will replace those changes."
+            : null
+        }
+      />
+      <FieldError
+        message={
           state.saveFailed
             ? "This browser would not save the workspace, so it will be gone when the page closes. Export it to keep it."
             : null
@@ -115,6 +123,7 @@ function PlacementPage() {
               Bids ({bids?.students.length ?? 0})
             </TabsTrigger>
             <TabsTrigger value="parameters">Parameters</TabsTrigger>
+            <TabsTrigger value="results">Results</TabsTrigger>
           </TabsList>
           <TabsContent value="projects">
             <ProjectsTab
@@ -128,6 +137,18 @@ function PlacementPage() {
           </TabsContent>
           <TabsContent value="parameters">
             <ParametersTab state={state} workspace={workspace} />
+          </TabsContent>
+          {/*
+            Kept mounted while hidden: a run in progress lives in this
+            panel, and unmounting it on a tab switch would orphan the worker
+            and lose the running state.
+          */}
+          <TabsContent
+            className="data-[state=inactive]:hidden"
+            forceMount
+            value="results"
+          >
+            <ResultsTab state={state} workspace={workspace} />
           </TabsContent>
         </Tabs>
       )}

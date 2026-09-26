@@ -60,6 +60,15 @@ test.describe("placement workspace", () => {
     await min.fill("2");
     await expect.poll(() => stored(page)).toContain('"minStudents":2');
 
+    // A run too, so the worker and its WASM fetch are among the requests.
+    await page.getByRole("tab", { name: "Results" }).click();
+    await page.getByRole("button", { name: "Run placement" }).click();
+    await expect(page.getByText(/students placed/)).toBeVisible({
+      timeout: 20_000,
+    });
+    expect(sent.some((r) => r.includes(".wasm"))).toBe(true);
+
+    await page.getByRole("tab", { name: "Parameters" }).click();
     await page.reload();
     await waitForHydration(page);
     await expect(page.getByLabel("Min students")).toHaveValue("2");
@@ -204,6 +213,87 @@ test.describe("placement workspace", () => {
     });
     await expect(page.getByText("2 students and 3 bids")).toBeVisible();
     await expect(page.getByText("Robots, mostly")).toBeVisible();
+  });
+
+  test("staff run, approve, move, re-run and download a placement", async ({
+    page,
+  }) => {
+    await page.goto("/admin/placement");
+    await waitForHydration(page);
+    await importFiles(page);
+    await page.getByRole("tab", { name: "Parameters" }).click();
+    await page.getByLabel("Min students").fill("1");
+    // Robot Arm's own minimum is 2, which would leave pinned Ada alone and
+    // the re-run infeasible once Ben moves; this test is about the flow.
+    await page.getByRole("tab", { name: /Projects/ }).click();
+    await page.getByLabel("Min students per team, Robot Arm").fill("1");
+    await page.getByRole("tab", { name: "Results" }).click();
+    await page.getByRole("button", { name: "Run placement" }).click();
+    await expect(page.getByText("2 of 2 students placed")).toBeVisible({
+      timeout: 20_000,
+    });
+
+    await page.getByRole("button", { name: "Approve Ada Park here" }).click();
+    await expect(
+      page.getByRole("button", { name: "Unpin Ada Park" })
+    ).toBeVisible();
+    await page.reload();
+    await waitForHydration(page);
+    await expect(
+      page.getByRole("button", { name: "Unpin Ada Park" })
+    ).toBeVisible();
+
+    await page.getByRole("combobox", { name: "Move Ben Ito" }).click();
+    await page.getByRole("option", { name: "Tide Clock" }).click();
+    await expect(page.getByText(/moved by hand/)).toBeVisible();
+    await page.getByRole("button", { name: "Run placement again" }).click();
+    await expect(page.getByText(/moved by hand/)).toBeHidden({
+      timeout: 20_000,
+    });
+    await expect(
+      page
+        .getByRole("rowgroup")
+        .filter({ hasText: "Tide Clock, team" })
+        .getByText("Ben Ito")
+    ).toBeVisible();
+
+    const placement = page.waitForEvent("download");
+    await page.getByRole("button", { name: "Download placement" }).click();
+    const placed = await readFile(await (await placement).path(), "utf-8");
+    expect(placed).toContain(`ben@${DOMAIN},Ben Ito,Tide Clock,1`);
+
+    const withPins = page.waitForEvent("download");
+    await page.getByRole("button", { name: "Download bids with pins" }).click();
+    const bids = await readFile(await (await withPins).path(), "utf-8");
+    expect(bids).toContain(`ben@${DOMAIN},Ben Ito,,Tide Clock,,true,`);
+  });
+
+  test("an infeasible re-run explains itself and keeps the last placement", async ({
+    page,
+  }) => {
+    await page.goto("/admin/placement");
+    await waitForHydration(page);
+    await importFiles(page);
+    await page.getByRole("tab", { name: "Results" }).click();
+    await page.getByRole("button", { name: "Run placement" }).click();
+    await expect(page.getByText("2 of 2 students placed")).toBeVisible({
+      timeout: 20_000,
+    });
+
+    // Both students are on Robot Arm, whose minimum is 2. Pinning Ada there
+    // and Ben elsewhere leaves each pinned project short of its minimum.
+    await page.getByRole("button", { name: "Approve Ada Park here" }).click();
+    await page.getByRole("combobox", { name: "Move Ben Ito" }).click();
+    await page.getByRole("option", { name: "Tide Clock" }).click();
+    await page.getByRole("button", { name: "Run placement again" }).click();
+
+    await expect(
+      page.getByText("No placement satisfies every rule at once.")
+    ).toBeVisible({ timeout: 20_000 });
+    await expect(
+      page.getByText("The placement below is from the last run that worked.")
+    ).toBeVisible();
+    await expect(page.getByText(/2 of 2 students placed/)).toBeVisible();
   });
 
   test("clearing all data empties the stored workspace after a confirmation", async ({

@@ -5,6 +5,7 @@ import {
   EMPTY_WORKSPACE,
   isEmptyWorkspace,
   readStoredWorkspace,
+  WORKSPACE_STORAGE_KEY,
   type Workspace,
   writeStoredWorkspace,
 } from "#/lib/placement/workspace";
@@ -20,6 +21,20 @@ export function usePlacementWorkspace() {
   const [workspace, setWorkspace] = useState<Workspace | null>(null);
   const [saveFailed, setSaveFailed] = useState(false);
   const [unreadable, setUnreadable] = useState(false);
+  const [changedElsewhere, setChangedElsewhere] = useState(false);
+
+  // The storage event fires only in the other tabs, so this one learns that
+  // a second copy of the page wrote the workspace it is about to overwrite.
+  useEffect(() => {
+    const onStorage = (event: StorageEvent) => {
+      // A null key is localStorage.clear(), which takes the workspace too.
+      if (event.key === WORKSPACE_STORAGE_KEY || event.key === null) {
+        setChangedElsewhere(true);
+      }
+    };
+    window.addEventListener("storage", onStorage);
+    return () => window.removeEventListener("storage", onStorage);
+  }, []);
 
   useEffect(() => {
     const stored = readStoredWorkspace();
@@ -58,7 +73,16 @@ export function usePlacementWorkspace() {
     [bidsText, projects]
   );
 
-  return { workspace, bids, saveFailed, unreadable, update, replace, clear };
+  return {
+    workspace,
+    bids,
+    saveFailed,
+    unreadable,
+    changedElsewhere,
+    update,
+    replace,
+    clear,
+  };
 }
 
 export type PlacementWorkspace = ReturnType<typeof usePlacementWorkspace>;

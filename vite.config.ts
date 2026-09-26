@@ -9,6 +9,10 @@ import { defineConfig } from "vite";
 
 const config = defineConfig({
   resolve: { tsconfigPaths: true },
+  // The placement solver's worker imports `highs` only when a run starts, so
+  // the dev server would discover it then, re-optimize, and reload the page
+  // mid-run. Pre-bundling it at startup avoids the reload (#649).
+  optimizeDeps: { include: ["highs"] },
   plugins: [
     devtools(),
     nitro({
