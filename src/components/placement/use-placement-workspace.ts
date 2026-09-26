@@ -27,7 +27,8 @@ export function usePlacementWorkspace() {
   // a second copy of the page wrote the workspace it is about to overwrite.
   useEffect(() => {
     const onStorage = (event: StorageEvent) => {
-      if (event.key === WORKSPACE_STORAGE_KEY) {
+      // A null key is localStorage.clear(), which takes the workspace too.
+      if (event.key === WORKSPACE_STORAGE_KEY || event.key === null) {
         setChangedElsewhere(true);
       }
     };

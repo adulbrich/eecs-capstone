@@ -73,6 +73,13 @@ export function ResultsTab({
     () => new Map(workspace.projects.map((p) => [p.key, p.title])),
     [workspace.projects]
   );
+  // Hashes the whole bids text, and this panel stays mounted while other
+  // tabs are edited, so it is worked out once per change to its inputs.
+  const { projects, parameters, bids: stored } = workspace;
+  const fingerprint = useMemo(
+    () => inputFingerprint({ projects, parameters, bids: stored }),
+    [projects, parameters, stored]
+  );
   const [running, setRunning] = useState(false);
   // A failed run, and the inputs it read: it stops being shown once they
   // change, since its diagnostics may no longer hold.
@@ -93,7 +100,7 @@ export function ResultsTab({
   async function run() {
     // Taken before the await: an edit made while the solver runs must leave
     // the result marked stale, not stamped with inputs it never read.
-    const fingerprint = inputFingerprint(workspace);
+    const read = fingerprint;
     const controller = new AbortController();
     abort.current = controller;
     setRunning(true);
@@ -110,11 +117,15 @@ export function ResultsTab({
         setFailed(null);
         update((w) => ({
           ...w,
-          result: { ...result, at: new Date().toISOString(), fingerprint },
+          result: {
+            ...result,
+            at: new Date().toISOString(),
+            fingerprint: read,
+          },
         }));
       } else {
         // The previous placement stays on screen; this run explains itself.
-        setFailed({ fingerprint, result });
+        setFailed({ fingerprint: read, result });
       }
     } catch (e) {
       if (!controller.signal.aborted) {
@@ -198,7 +209,7 @@ export function ResultsTab({
       </div>
       {missing && <p className="mt-2 text-sm">{missing}</p>}
       <FieldError message={error} />
-      {failed && failed.fingerprint === inputFingerprint(workspace) && (
+      {failed && failed.fingerprint === fingerprint && (
         <RunReport
           lines={[
             ...describeRun(failed.result, titles),
@@ -213,7 +224,7 @@ export function ResultsTab({
         <Board
           result={result}
           rows={rows}
-          stale={result.fingerprint !== inputFingerprint(workspace)}
+          stale={result.fingerprint !== fingerprint}
           students={students}
           titles={titles}
           update={update}

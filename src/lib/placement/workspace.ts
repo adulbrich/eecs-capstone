@@ -350,7 +350,9 @@ export function projectsFromPortal(
  * settings, the parameters and the bids file. Pins are left out on purpose,
  * so approving a student does not mark the run it came from as stale.
  */
-export function inputFingerprint(workspace: Workspace): string {
+export function inputFingerprint(
+  workspace: Pick<Workspace, "bids" | "parameters" | "projects">
+): string {
   const text = JSON.stringify([
     workspace.projects,
     workspace.parameters,
