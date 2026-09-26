@@ -395,6 +395,33 @@ test("admin placement, a run on the results board", async ({ page }) => {
   await checkA11y(page);
 });
 
+// A title long enough to push the counts out of a table sized by its content
+// (#660). Measured at phone width, where the sheet is the whole viewport.
+test("admin placement, analytics keeps a long title inside the sheet", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 375, height: 812 });
+  await page.goto("/admin/placement");
+  await waitForHydration(page);
+  const longTitle =
+    "Autonomous Underwater Glider Telemetry Dashboard for the Marine Science Center";
+  await page.getByLabel("Projects CSV file").setInputFiles({
+    name: "projects.csv",
+    mimeType: "text/csv",
+    buffer: Buffer.from(`title\n${longTitle}\nTide Clock\n`),
+  });
+  await page.getByRole("button", { name: "Analytics" }).click();
+  const sheet = page.getByRole("dialog", { name: "Placement analytics" });
+  await expect(sheet.getByRole("cell", { name: longTitle })).toBeVisible();
+  const overflow = await sheet.evaluate(
+    (el) => el.scrollWidth - el.clientWidth
+  );
+  expect(overflow).toBeLessThanOrEqual(0);
+  await expect(
+    sheet.getByRole("columnheader", { name: "All bids" })
+  ).toBeInViewport({ ratio: 1 });
+});
+
 // The rest of this file exercises behavior that only a browser can prove:
 // static SSR checks confirm markup is present or absent, but never actually
 // click a sort header, toggle a column, resize the viewport, or scroll.
