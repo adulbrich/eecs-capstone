@@ -54,9 +54,13 @@ export function TitleMatchesPanel({
     return null;
   }
 
-  const selected = (key: string, suggested: string | undefined) =>
-    picked[key] ?? suggested ?? "";
-  const match = (entry: UnmatchedTitle, projectKey: string): TitleMatch => ({
+  // A pick whose project has since left the list falls back to the
+  // suggestion, rather than leaving the select blank.
+  const selected = (key: string, suggested: string | undefined) => {
+    const own = picked[key];
+    return own !== undefined && titles.has(own) ? own : (suggested ?? "");
+  };
+  const toMatch = (entry: UnmatchedTitle, projectKey: string): TitleMatch => ({
     projectKey,
     title: entry.title,
   });
@@ -85,7 +89,7 @@ export function TitleMatchesPanel({
                     Object.fromEntries(
                       withSuggestion.map((c) => [
                         c.entry.key,
-                        match(
+                        toMatch(
                           c.entry,
                           selected(c.entry.key, c.suggestion?.key)
                         ),
@@ -138,7 +142,7 @@ export function TitleMatchesPanel({
                       aria-label={`Match "${entry.title}"`}
                       disabled={value === ""}
                       onClick={() =>
-                        onMatch({ [entry.key]: match(entry, value) })
+                        onMatch({ [entry.key]: toMatch(entry, value) })
                       }
                       size="sm"
                       type="button"

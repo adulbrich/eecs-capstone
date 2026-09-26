@@ -211,7 +211,8 @@ function readBidRow(
   if (email === "") {
     return { error: "The row has no email." };
   }
-  if (projectTitle === "") {
+  // "..." alone normalizes to nothing, which no title match could name.
+  if (normalizeTitle(projectTitle) === "") {
     return { error: "The row has no project." };
   }
   const pinned = parseFlag(cell(raw, "override"));

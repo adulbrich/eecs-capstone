@@ -384,6 +384,22 @@ test.describe("placement workspace", () => {
     await expect(page.getByText("0 students and 0 bids")).toBeVisible();
     await expect(matched).toHaveCount(0);
     await expect.poll(() => stored(page)).not.toContain('"titleMatches"');
+
+    // The bulk action takes only the suggested title; one with no
+    // suggestion is matched by picking its project by hand.
+    await unmatched
+      .getByRole("button", { name: "Match all suggestions" })
+      .click();
+    await expect(matched).toContainText('"Tide Clok" matched to Tide Clock');
+    await expect(unmatched).toContainText("1 title matches no project");
+    await unmatched
+      .getByRole("combobox", { name: 'Project for "Moon Base"' })
+      .click();
+    await page.getByRole("option", { name: /^Robot Arm/ }).click();
+    await unmatched.getByRole("button", { name: 'Match "Moon Base"' }).click();
+    await expect(matched).toContainText('"Moon Base" matched to Robot Arm');
+    await expect(unmatched).toHaveCount(0);
+    await expect(page.getByText("2 students and 3 bids")).toBeVisible();
   });
 
   test("clearing all data empties the stored workspace after a confirmation", async ({

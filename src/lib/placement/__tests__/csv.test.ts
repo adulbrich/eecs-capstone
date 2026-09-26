@@ -74,6 +74,7 @@ describe("parseBidsCsv", () => {
     const result = bids(
       ",Nobody,1,Tide Clock,,,",
       "ada@example.edu,Ada,1,,,,",
+      "ada@example.edu,Ada,1,...,,,",
       "ada@example.edu,Ada,first,Tide Clock,,,",
       "ada@example.edu,Ada,0,Tide Clock,,,",
       "ada@example.edu,Ada,1,Moon Base,,,",
@@ -81,9 +82,9 @@ describe("parseBidsCsv", () => {
       "ada@example.edu,Ada,,Tide Clock,,,",
       "ada@example.edu,Ada,2,Robot Arm,,,"
     );
-    expect(errors(result)).toEqual([2, 3, 4, 5, 7, 8]);
+    expect(errors(result)).toEqual([2, 3, 4, 5, 6, 8, 9]);
     expect(result.unmatched).toEqual([
-      { key: "moon base", title: "Moon Base", rows: [6] },
+      { key: "moon base", title: "Moon Base", rows: [7] },
     ]);
     expect(result.students[0].bids).toEqual([
       { projectKey: "p1", priority: 2, comment: "" },
