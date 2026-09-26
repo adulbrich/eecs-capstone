@@ -296,6 +296,39 @@ test.describe("placement workspace", () => {
     await expect(page.getByText(/2 of 2 students placed/)).toBeVisible();
   });
 
+  test("the analytics Sheet downloads each of its tables", async ({ page }) => {
+    await page.goto("/admin/placement");
+    await waitForHydration(page);
+    await importFiles(page);
+    await page.getByRole("tab", { name: "Results" }).click();
+    await page.getByRole("button", { name: "Run placement" }).click();
+    await expect(page.getByText(/students placed/)).toBeVisible({
+      timeout: 20_000,
+    });
+    await page.getByRole("button", { name: "Analytics" }).click();
+    const sheet = page.getByRole("dialog", { name: "Placement analytics" });
+
+    // Both students land on Robot Arm; Tide Clock's minimum of 3 leaves it
+    // without a team, so three tables have rows and one says it has none.
+    const headers: Record<string, string> = {
+      "bids per project": "project,first_choice_bids,total_bids",
+      "priority distribution":
+        "priority,students,percent_of_placed,percent_of_all",
+      "projects with no team formed": "project",
+    };
+    for (const [table, header] of Object.entries(headers)) {
+      const download = page.waitForEvent("download");
+      await sheet
+        .getByRole("button", { name: `Download ${table} as CSV` })
+        .click();
+      const text = await readFile(await (await download).path(), "utf-8");
+      expect(text.replace(/^\uFEFF/, "").split("\r\n")[0]).toBe(header);
+    }
+    await expect(sheet.getByText("Every student is placed.")).toBeVisible();
+    await sheet.getByRole("button", { name: "Close" }).click();
+    await expect(sheet).toBeHidden();
+  });
+
   test("clearing all data empties the stored workspace after a confirmation", async ({
     page,
   }) => {

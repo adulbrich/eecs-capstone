@@ -387,6 +387,12 @@ test("admin placement, a run on the results board", async ({ page }) => {
     timeout: 20_000,
   });
   await checkA11y(page);
+
+  await page.getByRole("button", { name: "Analytics" }).click();
+  await expect(
+    page.getByRole("dialog", { name: "Placement analytics" })
+  ).toBeVisible();
+  await checkA11y(page);
 });
 
 // The rest of this file exercises behavior that only a browser can prove:
