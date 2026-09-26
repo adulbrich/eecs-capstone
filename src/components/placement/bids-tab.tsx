@@ -1,4 +1,4 @@
-import { Trash2 } from "lucide-react";
+import { Download, Trash2 } from "lucide-react";
 import { useMemo } from "react";
 import {
   AdminDataTable,
@@ -10,7 +10,9 @@ import { FilePickerButton } from "#/components/placement/file-picker-button";
 import { ImportIssues } from "#/components/placement/import-issues";
 import type { PlacementWorkspace } from "#/components/placement/use-placement-workspace";
 import { Button } from "#/components/ui/button";
+import { downloadText } from "#/lib/placement/download";
 import { BIDS_FORMAT } from "#/lib/placement/formats";
+import { convertQualtrics, isQualtricsExport } from "#/lib/placement/qualtrics";
 import type { PlacementStudent } from "#/lib/placement/types";
 import type { Workspace } from "#/lib/placement/workspace";
 import type { SortState } from "#/lib/table-state";
@@ -41,13 +43,17 @@ export function BidsTab({
     return (
       <div className="flex flex-col items-start gap-2">
         <p className="text-muted-foreground text-sm">
-          One row per bid, exported from the bidding survey.
+          One row per bid, or the bidding survey's Qualtrics export as it comes,
+          which is converted to one row per bid on upload.
         </p>
         <FilePickerButton
           accept=".csv,text/csv"
           inputLabel="Bids CSV file"
           onText={(text, filename) =>
-            update((w) => ({ ...w, bids: { filename, text } }))
+            update((w) => ({
+              ...w,
+              bids: bidsFromFile(text, filename, w.projects),
+            }))
           }
         >
           Upload bids CSV
@@ -81,6 +87,32 @@ export function BidsTab({
           </Button>
         </ConfirmDialog>
       </div>
+      {workspace.bids.convertedFrom !== undefined && (
+        <div className="mt-2 flex flex-wrap items-center gap-2 text-sm">
+          <span>
+            Converted from the Qualtrics export {workspace.bids.convertedFrom}.
+          </span>
+          <Button
+            onClick={() =>
+              downloadText(
+                workspace.bids?.filename ?? "bids.csv",
+                workspace.bids?.text ?? "",
+                "text/csv"
+              )
+            }
+            size="sm"
+            type="button"
+            variant="outline"
+          >
+            <Download aria-hidden="true" />
+            Download converted CSV
+          </Button>
+        </div>
+      )}
+      <ImportIssues
+        issues={workspace.bids.conversionIssues ?? []}
+        label="survey export"
+      />
       <ImportIssues issues={bids.issues} label="bids" />
       <StudentsTable projects={workspace.projects} students={students} />
     </div>
@@ -237,4 +269,28 @@ function StudentsTable({
       />
     </div>
   );
+}
+
+const CSV_EXTENSION = /(\.csv)?$/i;
+
+/**
+ * What the workspace keeps for an uploaded bids file: the file as it came,
+ * or, for a Qualtrics export, the long CSV it converts to plus what the
+ * conversion noticed (#656).
+ */
+function bidsFromFile(
+  text: string,
+  filename: string,
+  projects: Workspace["projects"]
+): NonNullable<Workspace["bids"]> {
+  if (!isQualtricsExport(text)) {
+    return { filename, text };
+  }
+  const converted = convertQualtrics(text, projects);
+  return {
+    filename: filename.replace(CSV_EXTENSION, " (converted).csv"),
+    text: converted.csv,
+    convertedFrom: filename,
+    conversionIssues: converted.issues,
+  };
 }
