@@ -248,6 +248,12 @@ describe("describeRun", () => {
     ]);
   });
 
+  it("says so when the gap of a time-limited run is unknown", () => {
+    expect(
+      describeRun({ ...RESULT, status: "time_limit", gap: null }, TITLES)[0]
+    ).toContain("is unknown");
+  });
+
   it("gives the gap when the time limit stopped a run with a placement", () => {
     expect(
       describeRun({ ...RESULT, status: "time_limit", gap: 0.0123 }, TITLES)[0]

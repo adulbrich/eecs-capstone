@@ -226,7 +226,7 @@ test.describe("placement workspace", () => {
     // Robot Arm's own minimum is 2, which would leave pinned Ada alone and
     // the re-run infeasible once Ben moves; this test is about the flow.
     await page.getByRole("tab", { name: /Projects/ }).click();
-    await page.getByLabel("Min students, Robot Arm").fill("1");
+    await page.getByLabel("Min students per team, Robot Arm").fill("1");
     await page.getByRole("tab", { name: "Results" }).click();
     await page.getByRole("button", { name: "Run placement" }).click();
     await expect(page.getByText("2 of 2 students placed")).toBeVisible({
@@ -266,6 +266,34 @@ test.describe("placement workspace", () => {
     await page.getByRole("button", { name: "Download bids with pins" }).click();
     const bids = await readFile(await (await withPins).path(), "utf-8");
     expect(bids).toContain(`ben@${DOMAIN},Ben Ito,,Tide Clock,,true,`);
+  });
+
+  test("an infeasible re-run explains itself and keeps the last placement", async ({
+    page,
+  }) => {
+    await page.goto("/admin/placement");
+    await waitForHydration(page);
+    await importFiles(page);
+    await page.getByRole("tab", { name: "Results" }).click();
+    await page.getByRole("button", { name: "Run placement" }).click();
+    await expect(page.getByText("2 of 2 students placed")).toBeVisible({
+      timeout: 20_000,
+    });
+
+    // Both students are on Robot Arm, whose minimum is 2. Pinning Ada there
+    // and Ben elsewhere leaves each pinned project short of its minimum.
+    await page.getByRole("button", { name: "Approve Ada Park here" }).click();
+    await page.getByRole("combobox", { name: "Move Ben Ito" }).click();
+    await page.getByRole("option", { name: "Tide Clock" }).click();
+    await page.getByRole("button", { name: "Run placement again" }).click();
+
+    await expect(
+      page.getByText("No placement satisfies every rule at once.")
+    ).toBeVisible({ timeout: 20_000 });
+    await expect(
+      page.getByText("The placement below is from the last run that worked.")
+    ).toBeVisible();
+    await expect(page.getByText(/2 of 2 students placed/)).toBeVisible();
   });
 
   test("clearing all data empties the stored workspace after a confirmation", async ({

@@ -30,7 +30,9 @@ export function ParametersTab({
   const setSize = (field: "minStudents" | "maxStudents", value: number) => {
     const next = { ...parameters, [field]: value };
     if (next.minStudents > next.maxStudents) {
-      setSizeError("Min students must not be above max students.");
+      setSizeError(
+        "Min students per team must not be above max students per team."
+      );
       return;
     }
     setSizeError(null);
@@ -45,30 +47,32 @@ export function ParametersTab({
           Defaults for every project
         </h2>
         <p className="text-muted-foreground text-sm">
-          A project's own value on the Projects tab wins over these.
+          A project's own value on the Projects tab wins over these. Team size
+          counts each team: a project allowed 2 teams of at most 4 students
+          takes up to 8.
         </p>
         <div className="mt-2 flex flex-wrap gap-4">
-          <Field label="Min students">
+          <Field label="Min students per team">
             <NumberInput
-              label="Min students"
+              label="Min students per team"
               max={PARAMETER_LIMITS.students.max}
               min={PARAMETER_LIMITS.students.min}
               onCommit={(v) => v !== undefined && setSize("minStudents", v)}
               value={parameters.minStudents}
             />
           </Field>
-          <Field label="Max students">
+          <Field label="Max students per team">
             <NumberInput
-              label="Max students"
+              label="Max students per team"
               max={PARAMETER_LIMITS.students.max}
               min={PARAMETER_LIMITS.students.min}
               onCommit={(v) => v !== undefined && setSize("maxStudents", v)}
               value={parameters.maxStudents}
             />
           </Field>
-          <Field label="Max teams">
+          <Field label="Max teams per project">
             <NumberInput
-              label="Max teams"
+              label="Max teams per project"
               max={PARAMETER_LIMITS.maxTeams.max}
               min={PARAMETER_LIMITS.maxTeams.min}
               onCommit={(v) => v !== undefined && set({ maxTeams: v })}

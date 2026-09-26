@@ -287,7 +287,7 @@ function BoundsProblems({
       message={
         problems.length === 0
           ? null
-          : `Min students is above max students for ${problems.map((p) => p.title).join(", ")}, so no team can form there.`
+          : `Min students per team is above max students per team for ${problems.map((p) => p.title).join(", ")}, so no team can form there.`
       }
     />
   );
@@ -366,13 +366,13 @@ function ProjectsTable({
       ),
       count(
         "minStudents",
-        "Min students",
+        "Min students per team",
         parameters.minStudents,
         PARAMETER_LIMITS.students
       ),
       count(
         "maxStudents",
-        "Max students",
+        "Max students per team",
         parameters.maxStudents,
         PARAMETER_LIMITS.students
       ),
@@ -406,9 +406,10 @@ function ProjectsTable({
   return (
     <div className="mt-4">
       <p className="text-muted-foreground text-sm">
-        A blank cell uses the default from the Parameters tab. Max teams 0
-        leaves a project out. Weight multiplies every bid on the project: 1
-        leaves it alone, 0.25 steers students away.
+        A blank cell uses the default from the Parameters tab. Max teams is how
+        many teams the project may form, and 0 leaves it out; min and max
+        students apply to each of those teams. Weight multiplies every bid on
+        the project: 1 leaves it alone, 0.25 steers students away.
       </p>
       <AdminDataTable
         caption="Projects in this placement"

@@ -74,7 +74,8 @@ export function boardRows(
     team: number | null
   ): BoardRow => {
     const bid = student.bids.find((b) => b.projectKey === projectKey);
-    const index = projectKey === null ? -1 : (rank.get(projectKey) ?? 9999);
+    const index =
+      projectKey === null ? -1 : (rank.get(projectKey) ?? projects.length);
     return {
       email: student.email,
       name: student.name,
@@ -91,7 +92,7 @@ export function boardRows(
       groupKey:
         projectKey === null
           ? UNPLACED_GROUP
-          : `1:${String(index).padStart(4, "0")}:${String(team).padStart(2, "0")}`,
+          : `1:${String(index).padStart(6, "0")}:${String(team).padStart(3, "0")}`,
       groupLabel:
         projectKey === null
           ? "Unplaced"
@@ -249,11 +250,7 @@ export function describeRun(
   if (result.status === "optimal") {
     lines.push("The placement is the best the solver can find.");
   } else if (result.status === "time_limit") {
-    lines.push(
-      result.placements.length > 0
-        ? `The time limit stopped the run; this placement is within ${((result.gap ?? 0) * 100).toFixed(1)}% of the best possible.`
-        : "The time limit stopped the run before any placement was found. Raise the time limit on the Parameters tab."
-    );
+    lines.push(timeLimitLine(result));
   } else if (result.status === "infeasible") {
     lines.push("No placement satisfies every rule at once.");
   } else {
@@ -295,4 +292,14 @@ const UNPLACED_REASONS: Record<BoardRow["unplacedReason"] & string, string> = {
 
 export function unplacedReason(reason: BoardRow["unplacedReason"]): string {
   return reason === null ? "" : UNPLACED_REASONS[reason];
+}
+
+function timeLimitLine(result: PlacementResult): string {
+  if (result.placements.length === 0) {
+    return "The time limit stopped the run before any placement was found. Raise the time limit on the Parameters tab.";
+  }
+  if (result.gap === null) {
+    return "The time limit stopped the run; how far this placement is from the best possible is unknown.";
+  }
+  return `The time limit stopped the run; this placement is within ${(result.gap * 100).toFixed(1)}% of the best possible.`;
 }

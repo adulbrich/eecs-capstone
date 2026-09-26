@@ -93,6 +93,13 @@ function PlacementPage() {
       />
       <FieldError
         message={
+          state.changedElsewhere
+            ? "The placement workspace changed in another tab or window. Reload this page before editing here, or its next save will replace those changes."
+            : null
+        }
+      />
+      <FieldError
+        message={
           state.saveFailed
             ? "This browser would not save the workspace, so it will be gone when the page closes. Export it to keep it."
             : null
@@ -131,7 +138,16 @@ function PlacementPage() {
           <TabsContent value="parameters">
             <ParametersTab state={state} workspace={workspace} />
           </TabsContent>
-          <TabsContent value="results">
+          {/*
+            Kept mounted while hidden: a run in progress lives in this
+            panel, and unmounting it on a tab switch would orphan the worker
+            and lose the running state.
+          */}
+          <TabsContent
+            className="data-[state=inactive]:hidden"
+            forceMount
+            value="results"
+          >
             <ResultsTab state={state} workspace={workspace} />
           </TabsContent>
         </Tabs>

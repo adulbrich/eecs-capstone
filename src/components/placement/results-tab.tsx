@@ -74,7 +74,12 @@ export function ResultsTab({
     [workspace.projects]
   );
   const [running, setRunning] = useState(false);
-  const [failed, setFailed] = useState<PlacementResult | null>(null);
+  // A failed run, and the inputs it read: it stops being shown once they
+  // change, since its diagnostics may no longer hold.
+  const [failed, setFailed] = useState<{
+    fingerprint: string;
+    result: PlacementResult;
+  } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const abort = useRef<AbortController | null>(null);
 
@@ -86,6 +91,9 @@ export function ResultsTab({
   }
 
   async function run() {
+    // Taken before the await: an edit made while the solver runs must leave
+    // the result marked stale, not stamped with inputs it never read.
+    const fingerprint = inputFingerprint(workspace);
     const controller = new AbortController();
     abort.current = controller;
     setRunning(true);
@@ -102,15 +110,11 @@ export function ResultsTab({
         setFailed(null);
         update((w) => ({
           ...w,
-          result: {
-            ...result,
-            at: new Date().toISOString(),
-            fingerprint: inputFingerprint(w),
-          },
+          result: { ...result, at: new Date().toISOString(), fingerprint },
         }));
       } else {
         // The previous placement stays on screen; this run explains itself.
-        setFailed(result);
+        setFailed({ fingerprint, result });
       }
     } catch (e) {
       if (!controller.signal.aborted) {
@@ -194,10 +198,10 @@ export function ResultsTab({
       </div>
       {missing && <p className="mt-2 text-sm">{missing}</p>}
       <FieldError message={error} />
-      {failed && (
+      {failed && failed.fingerprint === inputFingerprint(workspace) && (
         <RunReport
           lines={[
-            ...describeRun(failed, titles),
+            ...describeRun(failed.result, titles),
             ...(result
               ? ["The placement below is from the last run that worked."]
               : []),
@@ -350,6 +354,7 @@ function Board({
       {
         cell: ({ row }) => (
           <RowActions
+            defaultMaxTeams={workspace.parameters.maxTeams}
             onMove={(key) => move(row.original, key)}
             onPin={(key) => pin(row.original.email, key)}
             projects={workspace.projects}
@@ -362,7 +367,7 @@ function Board({
         id: "actions",
       },
     ]);
-  }, [students, update, workspace.projects]);
+  }, [students, update, workspace.projects, workspace.parameters.maxTeams]);
 
   const { tableProps } = useAdminTable({
     columns,
@@ -418,11 +423,13 @@ function priorityLabel(row: BoardRow): string {
 }
 
 function RowActions({
+  defaultMaxTeams,
   onMove,
   onPin,
   projects,
   row,
 }: {
+  defaultMaxTeams: number;
   onMove: (projectKey: string) => void;
   onPin: (projectKey: string | null) => void;
   projects: Workspace["projects"];
@@ -465,7 +472,10 @@ function RowActions({
         </SelectTrigger>
         <SelectContent>
           {projects
-            .filter((p) => p.key !== row.projectKey && p.maxTeams !== 0)
+            .filter(
+              (p) =>
+                p.key !== row.projectKey && (p.maxTeams ?? defaultMaxTeams) > 0
+            )
             .map((p) => (
               <SelectItem key={p.key} value={p.key}>
                 {p.title}
