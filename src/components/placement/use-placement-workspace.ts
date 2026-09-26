@@ -14,8 +14,8 @@ import {
  * The placement page's one piece of state. It is read from localStorage
  * after mount, never during render, so the server's HTML and the first
  * client render agree (null until then), and written back on every change.
- * The bids are parsed here from the stored text, so a new project list
- * re-matches them without anyone re-importing the file.
+ * The bids are parsed here from the stored text, so a new project list or
+ * a title match re-matches them without anyone re-importing the file.
  */
 export function usePlacementWorkspace() {
   const [workspace, setWorkspace] = useState<Workspace | null>(null);
@@ -65,12 +65,13 @@ export function usePlacementWorkspace() {
 
   const bidsText = workspace?.bids?.text;
   const projects = workspace?.projects;
+  const titleMatches = workspace?.titleMatches;
   const bids = useMemo(
     () =>
       bidsText === undefined || projects === undefined
         ? null
-        : parseBidsCsv(bidsText, projects),
-    [bidsText, projects]
+        : parseBidsCsv(bidsText, projects, titleMatches),
+    [bidsText, projects, titleMatches]
   );
 
   return {

@@ -211,7 +211,8 @@ function readBidRow(
   if (email === "") {
     return { error: "The row has no email." };
   }
-  if (projectTitle === "") {
+  // "..." alone normalizes to nothing, which no title match could name.
+  if (normalizeTitle(projectTitle) === "") {
     return { error: "The row has no project." };
   }
   const pinned = parseFlag(cell(raw, "override"));
@@ -306,32 +307,68 @@ function applyBidRow(
   }
 }
 
+/** A bid title that names no project, with every row that uses it. */
+export interface UnmatchedTitle {
+  /** The normalized title, which a title match is keyed by. */
+  key: string;
+  rows: number[];
+  /** As the file first spells it. */
+  title: string;
+}
+
+/**
+ * Normalized title to project key: the title matches staff made first, then
+ * the projects' own titles over them, so a real title always wins. A match
+ * to a project that is not in the list is ignored.
+ */
+function projectKeysByTitle(
+  projects: readonly Pick<WorkspaceProject, "key" | "title">[],
+  matches: Readonly<Record<string, { projectKey: string }>>
+): Map<string, string> {
+  const keys = new Set(projects.map((p) => p.key));
+  const byTitle = new Map<string, string>();
+  for (const [title, match] of Object.entries(matches)) {
+    if (keys.has(match.projectKey)) {
+      byTitle.set(title, match.projectKey);
+    }
+  }
+  for (const p of projects) {
+    byTitle.set(normalizeTitle(p.title), p.key);
+  }
+  return byTitle;
+}
+
 /**
  * `email, name, priority, project, comment, override, avoid`, one row per
  * bid. `override` true pins the student to that row's project, and may leave
  * `priority` blank for a project outside their bids. `avoid` is read from the
- * student's first row that has one.
+ * student's first row that has one. A row whose title names no project, even
+ * through `matches`, is left out and reported in `unmatched`, not `issues`,
+ * since the page offers a fix for it (#661).
  */
 export function parseBidsCsv(
   text: string,
-  projects: readonly Pick<WorkspaceProject, "key" | "title">[]
-): { issues: ImportIssue[]; students: PlacementStudent[] } {
+  projects: readonly Pick<WorkspaceProject, "key" | "title">[],
+  matches: Readonly<Record<string, { projectKey: string }>> = {}
+): {
+  issues: ImportIssue[];
+  students: PlacementStudent[];
+  unmatched: UnmatchedTitle[];
+} {
   const { fields, issues, rows } = parseRows(text);
   const missing =
     fields.length === 0 && issues.length > 0
       ? []
       : missingColumns(fields, ["email", "priority", "project"]);
   if (missing.length > 0) {
-    return { students: [], issues: [...issues, ...missing] };
+    return { students: [], issues: [...issues, ...missing], unmatched: [] };
   }
-  const keyByTitle = new Map(
-    projects.map((p) => [normalizeTitle(p.title), p.key])
-  );
+  const keyByTitle = projectKeysByTitle(projects, matches);
   const drafts = new Map<string, StudentDraft>();
   const failedRows = new Set(issues.map((i) => i.row));
   // A survey title that matches no project usually does so on every row
-  // that names it, so it is one issue listing its rows, not one per row.
-  const unknown = new Map<string, { rows: number[]; title: string }>();
+  // that names it, so it is one entry listing its rows, not one per row.
+  const unmatched = new Map<string, UnmatchedTitle>();
 
   rows.forEach((raw, index) => {
     const row = index + 2;
@@ -341,9 +378,13 @@ export function parseBidsCsv(
     const bid = readBidRow(raw, keyByTitle);
     if ("unknownTitle" in bid) {
       const key = normalizeTitle(bid.unknownTitle);
-      const entry = unknown.get(key) ?? { title: bid.unknownTitle, rows: [] };
+      const entry = unmatched.get(key) ?? {
+        key,
+        title: bid.unknownTitle,
+        rows: [],
+      };
       entry.rows.push(row);
-      unknown.set(key, entry);
+      unmatched.set(key, entry);
       return;
     }
     if ("error" in bid) {
@@ -365,16 +406,9 @@ export function parseBidsCsv(
     applyBidRow(bid, row, draft, issues);
   });
 
-  for (const { title, rows: titled } of unknown.values()) {
-    issues.push({
-      level: "error",
-      row: titled[0],
-      rows: titled,
-      message: `No project is titled "${title}" (${titled.length} ${titled.length === 1 ? "bid" : "bids"}).`,
-    });
-  }
   return {
     students: [...drafts.values()].map((d) => d.student),
     issues: issues.sort((a, b) => a.row - b.row),
+    unmatched: [...unmatched.values()],
   };
 }
