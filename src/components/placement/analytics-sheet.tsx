@@ -35,7 +35,7 @@ import {
 } from "#/lib/placement/board";
 import { downloadText } from "#/lib/placement/download";
 import type { WorkspaceProject } from "#/lib/placement/types";
-import type { Workspace } from "#/lib/placement/workspace";
+import { inputFingerprint, type Workspace } from "#/lib/placement/workspace";
 
 const percent = (share: number) => `${(share * 100).toFixed(1)}%`;
 
@@ -86,6 +86,12 @@ export function AnalyticsSheet({
     ? projectsWithoutTeam(result, projects, workspace.parameters.maxTeams)
     : [];
   const priorities = rows ? priorityDistribution(rows) : [];
+  const { bids: storedBids, parameters } = workspace;
+  const current = useMemo(
+    () => inputFingerprint({ projects, parameters, bids: storedBids }),
+    [projects, parameters, storedBids]
+  );
+  const stale = result !== undefined && result.fingerprint !== current;
 
   return (
     <Sheet>
@@ -116,6 +122,13 @@ export function AnalyticsSheet({
           </SheetClose>
         </SheetHeader>
         <div className="flex flex-col gap-8 px-4 pb-8">
+          {stale && (
+            <p className="text-sm" role="status">
+              The projects or parameters changed since the last run, so the
+              three tables after the first describe that run, not the current
+              settings. Run placement again for current figures.
+            </p>
+          )}
           <Section
             csv={() => toCsv(BIDS_COLUMNS, perProject)}
             empty={

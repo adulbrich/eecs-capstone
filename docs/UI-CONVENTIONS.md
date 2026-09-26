@@ -561,6 +561,11 @@ and drive it with the `useAdminTable` hook from `#/lib/use-admin-table`. The com
 handles sorting, column hiding, and the responsive card layout; the hook owns the
 URL-backed sort and visibility state.
 
+The one exception is a short summary inside a `Sheet`: a few fixed rows with nothing
+to sort, hide or restack, such as the tables in `/admin/placement`'s analytics
+Sheet. Those use the plain `Table` from `#/components/ui/table`, because the Columns
+menu and the card layout would only crowd a panel that narrow.
+
 Give the hook `columns`, `defaultSort` and `storageKey`, then spread what it hands back.
 Those three used to be passed twice, once to the hook and once to the table, with nothing
 checking that the two agreed: a mismatched `storageKey` writes column preferences under
