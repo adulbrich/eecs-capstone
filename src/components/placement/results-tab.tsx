@@ -21,6 +21,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "#/components/ui/select";
+import { ordinal } from "#/lib/placement/analytics";
 import {
   applyPins,
   type BoardRow,
@@ -47,15 +48,6 @@ import { useLocalTableSearch } from "#/lib/use-local-table-search";
 const DEFAULT_SORT: SortState = { desc: false, id: "student" };
 
 const WARNING_STYLE = { color: "var(--status-warning)" };
-
-const ORDINAL = new Intl.PluralRules("en-US", { type: "ordinal" });
-const SUFFIX: Record<string, string> = {
-  one: "st",
-  two: "nd",
-  few: "rd",
-  other: "th",
-};
-const ordinal = (n: number) => `${n}${SUFFIX[ORDINAL.select(n)]}`;
 
 export function ResultsTab({
   state,
