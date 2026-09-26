@@ -5,6 +5,7 @@ import {
   useNavigate,
 } from "@tanstack/react-router";
 import { z } from "zod";
+import { AnalyticsSheet } from "#/components/placement/analytics-sheet";
 import { BidsTab } from "#/components/placement/bids-tab";
 import { ParametersTab } from "#/components/placement/parameters-tab";
 import { ProjectsTab } from "#/components/placement/projects-tab";
@@ -82,7 +83,12 @@ function PlacementPage() {
             another browser.
           </p>
         </div>
-        {workspace && <WorkspaceActions state={state} workspace={workspace} />}
+        {workspace && (
+          <div className="flex flex-wrap items-start justify-end gap-2">
+            <AnalyticsSheet state={state} workspace={workspace} />
+            <WorkspaceActions state={state} workspace={workspace} />
+          </div>
+        )}
       </div>
       <FieldError
         message={

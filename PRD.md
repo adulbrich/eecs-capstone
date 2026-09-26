@@ -592,7 +592,7 @@ catalogue that decided the matrix below; #288 shipped it.
 
 ## 17. Placement
 
-- [ ] Students bid outside the app; staff place them with a tool at
+- [x] Students bid outside the app; staff place them with a tool at
   `/admin/placement` that runs entirely in their browser, so no bid or placement
   reaches the server ([ADR-0056](./docs/adr/0056-placement-runs-in-the-browser.md),
   epic #644). This replaces the in-app bidding of #33, whose unused tables are
@@ -608,7 +608,7 @@ catalogue that decided the matrix below; #288 shipped it.
   (#656).
 - [x] Staff run placement, approve, move and pin students, re-run with pins, and
   download the placement and the bids with pins as CSV (#649).
-- [ ] Analytics in a Sheet: bids per project, priority distribution, unplaced
+- [x] Analytics in a Sheet: bids per project, priority distribution, unplaced
   students, projects with no team formed (#650).
 
 ## 18. Analytics Dashboard
