@@ -3,6 +3,7 @@ import {
   applyPins,
   bidsWithPinsCsv,
   boardRows,
+  describeRun,
   moveStudent,
   placementCsv,
   projectsWithoutTeam,
@@ -217,5 +218,39 @@ describe("workspace with a result", () => {
         parameters: { ...base.parameters, minStudents: 2 },
       })
     ).not.toBe(inputFingerprint(base));
+  });
+});
+
+describe("describeRun", () => {
+  it("says what stopped a run and every diagnostic, the outcome first", () => {
+    const lines = describeRun(
+      {
+        ...RESULT,
+        status: "infeasible",
+        placements: [],
+        diagnostics: {
+          pinnedProjectsBelowMin: ["p3"],
+          pinOverflow: [{ projectKey: "p2", pinned: 5, seats: 4 }],
+          projectsBelowMin: ["p3"],
+          requiredSeatShortfall: { required: 9, students: 3 },
+          seatShortfall: { students: 3, seats: 2 },
+        },
+      },
+      TITLES
+    );
+    expect(lines).toEqual([
+      "No placement satisfies every rule at once.",
+      "3 students can be placed but the projects have 2 seats at most.",
+      "At least one team per project needs 9 students, and there are 3. Turn that rule off, or drop some projects.",
+      "Students are pinned to Garden Planner, which cannot reach the minimum team size.",
+      "5 students are pinned to Robot Arm, which seats 4.",
+      "Too few students may join Garden Planner to form a team.",
+    ]);
+  });
+
+  it("gives the gap when the time limit stopped a run with a placement", () => {
+    expect(
+      describeRun({ ...RESULT, status: "time_limit", gap: 0.0123 }, TITLES)[0]
+    ).toContain("within 1.2%");
   });
 });

@@ -606,7 +606,7 @@ catalogue that decided the matrix below; #288 shipped it.
 - [x] The bids import also takes the bidding survey's Qualtrics export as it
   comes, converts it to one row per bid, and pins a pre-assigned student
   (#656).
-- [ ] Staff run placement, approve, move and pin students, re-run with pins, and
+- [x] Staff run placement, approve, move and pin students, re-run with pins, and
   download the placement and the bids with pins as CSV (#649).
 - [ ] Analytics in a Sheet: bids per project, priority distribution, unplaced
   students, projects with no team formed (#650).

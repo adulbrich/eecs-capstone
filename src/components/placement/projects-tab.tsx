@@ -59,7 +59,15 @@ export function ProjectsTab({
   const setProjects = (
     projects: WorkspaceProject[],
     projectSource: Workspace["projectSource"]
-  ) => update((w) => ({ ...w, projects, projectSource }));
+  ) =>
+    // Pins and a result name project keys, so neither survives new projects.
+    update((w) => ({
+      ...w,
+      projects,
+      projectSource,
+      pins: undefined,
+      result: undefined,
+    }));
 
   const bidCounts = useMemo(() => {
     const counts = new Map<string, number>();
@@ -113,7 +121,7 @@ export function ProjectsTab({
         <ConfirmDialog
           busyLabel="Removing..."
           confirmLabel="Remove"
-          description="The projects and their settings leave this workspace. The bids stay, and are matched again by title when new projects load."
+          description="The projects and their settings leave this workspace, and with them any placement and the pins set on it. The bids stay, and are matched again by title when new projects load."
           onConfirm={() => {
             setIssues([]);
             setDuplicates([]);

@@ -1,6 +1,7 @@
 import { toCsv } from "#/lib/csv";
 import { BIDS_FORMAT } from "#/lib/placement/formats";
 import type {
+  PlacementResult,
   PlacementStudent,
   UnplacedReason,
   WorkspaceProject,
@@ -230,4 +231,68 @@ export function bidsWithPinsCsv(
     })),
     rows
   );
+}
+
+const list = (keys: readonly string[], titles: Map<string, string>) =>
+  keys.map((k) => titles.get(k) ?? k).join(", ");
+
+/**
+ * A run's outcome and every diagnostic it carries, as sentences a reader can
+ * act on, the outcome first.
+ */
+export function describeRun(
+  result: PlacementResult,
+  titles: Map<string, string>
+): string[] {
+  const d = result.diagnostics;
+  const lines: string[] = [];
+  if (result.status === "optimal") {
+    lines.push("The placement is the best the solver can find.");
+  } else if (result.status === "time_limit") {
+    lines.push(
+      result.placements.length > 0
+        ? `The time limit stopped the run; this placement is within ${((result.gap ?? 0) * 100).toFixed(1)}% of the best possible.`
+        : "The time limit stopped the run before any placement was found. Raise the time limit on the Parameters tab."
+    );
+  } else if (result.status === "infeasible") {
+    lines.push("No placement satisfies every rule at once.");
+  } else {
+    lines.push(`The solver failed: ${result.message ?? "no reason given"}.`);
+  }
+  if (d.seatShortfall) {
+    lines.push(
+      `${d.seatShortfall.students} students can be placed but the projects have ${d.seatShortfall.seats} seats at most.`
+    );
+  }
+  if (d.requiredSeatShortfall) {
+    lines.push(
+      `At least one team per project needs ${d.requiredSeatShortfall.required} students, and there are ${d.requiredSeatShortfall.students}. Turn that rule off, or drop some projects.`
+    );
+  }
+  if (d.pinnedProjectsBelowMin.length > 0) {
+    lines.push(
+      `Students are pinned to ${list(d.pinnedProjectsBelowMin, titles)}, which cannot reach the minimum team size.`
+    );
+  }
+  for (const o of d.pinOverflow) {
+    lines.push(
+      `${o.pinned} students are pinned to ${titles.get(o.projectKey) ?? o.projectKey}, which seats ${o.seats}.`
+    );
+  }
+  if (d.projectsBelowMin.length > 0) {
+    lines.push(
+      `Too few students may join ${list(d.projectsBelowMin, titles)} to form a team.`
+    );
+  }
+  return lines;
+}
+
+const UNPLACED_REASONS: Record<BoardRow["unplacedReason"] & string, string> = {
+  no_eligible_project: "Bid on no project that can take them.",
+  pinned_to_dropped_project: "Pinned to a project with no teams.",
+  not_in_run: "Not in the bids when the placement ran.",
+};
+
+export function unplacedReason(reason: BoardRow["unplacedReason"]): string {
+  return reason === null ? "" : UNPLACED_REASONS[reason];
 }
