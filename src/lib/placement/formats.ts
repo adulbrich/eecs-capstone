@@ -16,6 +16,8 @@ export interface FormatColumn {
 export interface CsvFormat {
   columns: FormatColumn[];
   filename: string;
+  /** Another shape the upload accepts, said under the column table. */
+  note?: string;
   templateRows: Record<string, string>[];
 }
 
@@ -57,6 +59,7 @@ export const PROJECTS_FORMAT: CsvFormat = {
 
 export const BIDS_FORMAT: CsvFormat = {
   filename: "placement-bids-template",
+  note: "The bidding survey's Qualtrics export also works as it comes: it is recognized by its three header rows and converted to this format on upload.",
   columns: [
     {
       name: "email",

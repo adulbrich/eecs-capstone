@@ -1,4 +1,5 @@
 import Papa from "papaparse";
+import { unguardCell } from "#/lib/csv";
 import type { PlacementStudent, WorkspaceProject } from "#/lib/placement/types";
 
 /**
@@ -13,11 +14,23 @@ export interface ImportIssue {
   message: string;
   /** Spreadsheet row: the header is row 1, the first record row 2. */
   row: number;
+  /** Every row the issue covers, when it covers more than one. */
+  rows?: number[];
 }
 
-/** How a bid names its project, and how a CSV project is keyed. */
+/**
+ * How a bid names its project, and how a CSV project is keyed: case, runs of
+ * spaces and trailing punctuation ("system:") do not tell two titles apart.
+ */
+const TRAILING_PUNCTUATION = /[\s.,:;!?]+$/;
+
 export function normalizeTitle(title: string): string {
-  return title.normalize("NFC").trim().replace(/\s+/g, " ").toLowerCase();
+  return title
+    .normalize("NFC")
+    .trim()
+    .replace(/\s+/g, " ")
+    .replace(TRAILING_PUNCTUATION, "")
+    .toLowerCase();
 }
 
 type Row = Record<string, string | undefined>;
@@ -75,7 +88,8 @@ function missingColumns(fields: string[], required: string[]): ImportIssue[] {
     }));
 }
 
-const cell = (row: Row, column: string) => (row[column] ?? "").trim();
+const cell = (row: Row, column: string) =>
+  unguardCell((row[column] ?? "").trim());
 
 /** Blank is undefined; anything but a whole number at or above `min` is invalid. */
 function parseCount(
@@ -191,7 +205,7 @@ interface BidRow {
 function readBidRow(
   raw: Row,
   keyByTitle: Map<string, string>
-): BidRow | { error: string } {
+): BidRow | { error: string } | { unknownTitle: string } {
   const email = cell(raw, "email").toLowerCase();
   const projectTitle = cell(raw, "project");
   if (email === "") {
@@ -223,7 +237,7 @@ function readBidRow(
   }
   const projectKey = keyByTitle.get(normalizeTitle(projectTitle));
   if (projectKey === undefined) {
-    return { error: `No project is titled "${projectTitle}".` };
+    return { unknownTitle: projectTitle };
   }
   return {
     email,
@@ -315,6 +329,9 @@ export function parseBidsCsv(
   );
   const drafts = new Map<string, StudentDraft>();
   const failedRows = new Set(issues.map((i) => i.row));
+  // A survey title that matches no project usually does so on every row
+  // that names it, so it is one issue listing its rows, not one per row.
+  const unknown = new Map<string, { rows: number[]; title: string }>();
 
   rows.forEach((raw, index) => {
     const row = index + 2;
@@ -322,6 +339,13 @@ export function parseBidsCsv(
       return;
     }
     const bid = readBidRow(raw, keyByTitle);
+    if ("unknownTitle" in bid) {
+      const key = normalizeTitle(bid.unknownTitle);
+      const entry = unknown.get(key) ?? { title: bid.unknownTitle, rows: [] };
+      entry.rows.push(row);
+      unknown.set(key, entry);
+      return;
+    }
     if ("error" in bid) {
       issues.push({ level: "error", row, message: bid.error });
       return;
@@ -341,6 +365,14 @@ export function parseBidsCsv(
     applyBidRow(bid, row, draft, issues);
   });
 
+  for (const { title, rows: titled } of unknown.values()) {
+    issues.push({
+      level: "error",
+      row: titled[0],
+      rows: titled,
+      message: `No project is titled "${title}" (${titled.length} ${titled.length === 1 ? "bid" : "bids"}).`,
+    });
+  }
   return {
     students: [...drafts.values()].map((d) => d.student),
     issues: issues.sort((a, b) => a.row - b.row),

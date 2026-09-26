@@ -71,15 +71,25 @@ const NEEDS_QUOTING = /["\r\n,]/;
  * as `pandas.read_csv` or Python's `csv.reader`, sees as a literal leading
  * character that was never in the data.
  *
- * The tradeoff is accepted rather than narrowed because nothing in this app
- * re-imports its own CSV exports: there is no round-trip for the extra
- * apostrophe to corrupt, only a cosmetic wrinkle for a reader who opens the
- * file outside a spreadsheet. Weighed against an admin opening a project
+ * The tradeoff is accepted rather than narrowed because the one place this
+ * app reads its own CSV back, placement (#656), strips the apostrophe again
+ * through `unguardCell`, so the round trip is exact; elsewhere it is only a
+ * cosmetic wrinkle for a reader who opens the file outside a spreadsheet. Weighed against an admin opening a project
  * export in Excel and having a formula execute from data another user
  * typed, the guard stays unconditional for every listed lead character,
  * `-` included.
  */
 const FORMULA_LEAD = /^[=+\-@\t\r]/;
+
+/**
+ * Reverses the guard on a cell read back from one of this app's own files:
+ * an apostrophe followed by a formula lead-in is the guard, not the data.
+ */
+export function unguardCell(text: string): string {
+  return text.startsWith("'") && FORMULA_LEAD.test(text.slice(1))
+    ? text.slice(1)
+    : text;
+}
 
 function serialize(value: unknown): string {
   if (value === null || value === undefined) {

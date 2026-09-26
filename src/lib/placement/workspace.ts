@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { normalizeTitle } from "#/lib/placement/csv";
+import { type ImportIssue, normalizeTitle } from "#/lib/placement/csv";
 import {
   DEFAULT_PLACEMENT_PARAMETERS,
   type PlacementInput,
@@ -27,7 +27,14 @@ export type ProjectSource =
   | { kind: "csv"; filename: string };
 
 export interface Workspace {
-  bids: { filename: string; text: string } | null;
+  bids: {
+    /** What the conversion from a survey export noticed, kept with it. */
+    conversionIssues?: ImportIssue[];
+    /** The survey export's own filename, when `text` was converted from it. */
+    convertedFrom?: string;
+    filename: string;
+    text: string;
+  } | null;
   parameters: WorkspaceParameters;
   projectSource: ProjectSource | null;
   projects: WorkspaceProject[];
@@ -85,7 +92,23 @@ const workspaceSchema = z
       ])
       .nullable(),
     projects: z.array(projectSchema),
-    bids: z.object({ filename: z.string(), text: z.string() }).nullable(),
+    bids: z
+      .object({
+        filename: z.string(),
+        text: z.string(),
+        convertedFrom: z.string().optional(),
+        conversionIssues: z
+          .array(
+            z.object({
+              level: z.enum(["error", "warning"]),
+              message: z.string(),
+              row: z.number().int(),
+              rows: z.array(z.number().int()).optional(),
+            })
+          )
+          .optional(),
+      })
+      .nullable(),
     parameters: z.object({
       rankWeights: z
         .array(

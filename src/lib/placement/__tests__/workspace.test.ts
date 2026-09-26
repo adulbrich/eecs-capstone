@@ -37,6 +37,22 @@ describe("parseWorkspace", () => {
     expect(parsed).toEqual({ ok: true, workspace: WORKSPACE });
   });
 
+  it("keeps a converted file's origin and conversion issues", () => {
+    const converted: Workspace = {
+      ...WORKSPACE,
+      bids: {
+        filename: "survey (converted).csv",
+        text: "email,priority,project",
+        convertedFrom: "survey.csv",
+        conversionIssues: [{ level: "warning", row: 4, message: "Preview." }],
+      },
+    };
+    expect(parseWorkspace(serializeWorkspace(converted))).toEqual({
+      ok: true,
+      workspace: converted,
+    });
+  });
+
   it("refuses text that is not JSON", () => {
     expect(parseWorkspace("{nope")).toEqual({
       ok: false,
