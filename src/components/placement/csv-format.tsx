@@ -55,6 +55,7 @@ export function CsvFormatHelp({
           ))}
         </tbody>
       </table>
+      {format.note && <p className="mt-2">{format.note}</p>}
       <Button
         className="mt-2"
         onClick={() =>

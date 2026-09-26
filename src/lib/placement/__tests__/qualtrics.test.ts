@@ -244,6 +244,54 @@ describe("convertQualtrics", () => {
     expect(bid?.comment).toBe("- bullet reason");
   });
 
+  it("warns about a pre-assigned student who named no project", () => {
+    const { issues } = convertQualtrics(
+      exportOf([{ ...ADA, preAssigned: "Yes", preAssignedProject: "" }]),
+      PROJECTS
+    );
+    expect(issues).toEqual([
+      expect.objectContaining({ level: "warning", row: 4 }),
+    ]);
+  });
+
+  it("warns about a reason for a choice the student did not rank", () => {
+    const { issues } = convertQualtrics(
+      exportOf([{ ...ADA, reasons: ["a", "b", "c", "Nobody got rank 4."] }]),
+      PROJECTS
+    );
+    expect(issues).toEqual([
+      expect.objectContaining({ level: "warning", row: 4 }),
+    ]);
+  });
+
+  it("uses only the first ranking question, and says so", () => {
+    const text = exportOf([ADA]).replace(
+      "Rank your top 6 choices. - Weather Buoy",
+      "Rank your backup choices. - Weather Buoy"
+    );
+    const { csv, issues } = convertQualtrics(text, PROJECTS);
+    // Ada's rank 3 was on the ignored question, so her third reason has no
+    // project left to attach to, and that is reported too.
+    expect(issues.map((i) => [i.row, i.level])).toEqual([
+      [1, "warning"],
+      [4, "warning"],
+    ]);
+    const [ada] = parseBidsCsv(csv, PROJECTS).students;
+    expect(ada.bids.map((b) => b.projectKey)).toEqual(["p1", "p2"]);
+  });
+
+  it("warns when the questions it finds by wording are missing", () => {
+    const text = exportOf([ADA])
+      .replace("prefer not to work with", "rather not team with")
+      .replace("What is the name of your project?", "Which one?");
+    expect(
+      convertQualtrics(text, PROJECTS).issues.map((i) => [i.row, i.level])
+    ).toEqual([
+      [1, "warning"],
+      [1, "warning"],
+    ]);
+  });
+
   it("refuses an export with no email column", () => {
     const text = exportOf([ADA]).replace("recipientEmail", "somethingElse");
     expect(convertQualtrics(text, PROJECTS).issues[0]).toMatchObject({

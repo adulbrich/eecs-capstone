@@ -64,7 +64,9 @@ const AVOID_QUESTION = /prefer not to work with/i;
 const PRE_ASSIGNED_QUESTION = /pre-?assigned/i;
 const PROJECT_NAME_QUESTION = /name of your project/i;
 
-function findColumns(grid: Grid): Columns | string {
+function findColumns(
+  grid: Grid
+): { columns: Columns; notes: string[] } | string {
   const ids = (grid[2] ?? []).map(importId);
   const text = grid[1] ?? [];
   const byId = (id: string) => {
@@ -85,6 +87,10 @@ function findColumns(grid: Grid): Columns | string {
     ranks: [],
     reasons: new Map(),
   };
+  // The first ranking question is the one; a survey with a second (backup
+  // choices, say) would otherwise merge two sets of ranks into one.
+  let rankStem: string | undefined;
+  const ignoredStems = new Set<string>();
   text.forEach((question, column) => {
     const dash = question.indexOf(" - ");
     const stem = dash === -1 ? question : question.slice(0, dash);
@@ -92,7 +98,12 @@ function findColumns(grid: Grid): Columns | string {
     if (reason) {
       columns.reasons.set(Number(reason[1]), column);
     } else if (dash !== -1 && RANK_QUESTION.test(stem)) {
-      columns.ranks.push({ column, title: question.slice(dash + 3).trim() });
+      rankStem ??= stem;
+      if (stem === rankStem) {
+        columns.ranks.push({ column, title: question.slice(dash + 3).trim() });
+      } else {
+        ignoredStems.add(stem);
+      }
     } else if (AVOID_QUESTION.test(question)) {
       columns.avoid = column;
     } else if (PRE_ASSIGNED_QUESTION.test(question)) {
@@ -104,7 +115,25 @@ function findColumns(grid: Grid): Columns | string {
   if (columns.ranks.length === 0) {
     return "The export has no ranking question (one whose text mentions ranking, with a column per project).";
   }
-  return columns;
+  // Columns found by their wording: say so when one is missing, rather than
+  // dropping it without a word after the survey is reworded.
+  const notes = [...ignoredStems].map(
+    (stem) => `Only the first ranking question is used; "${stem}" is ignored.`
+  );
+  if (columns.avoid === undefined) {
+    notes.push(
+      'No "prefer not to work with" question was found, so no answers to it are shown.'
+    );
+  }
+  if (
+    columns.preAssigned === undefined ||
+    columns.preAssignedProject === undefined
+  ) {
+    notes.push(
+      "No pre-assigned project question was found, so nobody is pinned from the survey."
+    );
+  }
+  return { columns, notes };
 }
 
 const YES = new Set(["yes", "1", "true"]);
@@ -126,15 +155,20 @@ export function convertQualtrics(
   projects: readonly Pick<WorkspaceProject, "title">[]
 ): { csv: string; issues: ImportIssue[] } {
   const grid = Papa.parse<string[]>(text, { skipEmptyLines: "greedy" }).data;
-  const columns = findColumns(grid);
-  if (typeof columns === "string") {
+  const found = findColumns(grid);
+  if (typeof found === "string") {
     return {
       csv: "",
-      issues: [{ level: "error", row: 1, message: columns }],
+      issues: [{ level: "error", row: 1, message: found }],
     };
   }
+  const { columns } = found;
   const known = new Set(projects.map((p) => normalizeTitle(p.title)));
-  const issues: ImportIssue[] = [];
+  const issues: ImportIssue[] = found.notes.map((message) => ({
+    level: "warning",
+    row: 1,
+    message,
+  }));
 
   // The latest response per email wins; earlier ones are reported.
   const latest = new Map<string, { recorded: string; row: number }>();
@@ -224,8 +258,27 @@ function responseRows(
       override: "",
     }));
 
+  const ranked = new Set(bids.map((b) => Number(b.priority)));
+  for (const [choice, column] of columns.reasons) {
+    if (!ranked.has(choice) && at(values, column) !== "") {
+      issues.push({
+        level: "warning",
+        row,
+        message: `${email} gave a reason for choice ${choice} but ranked no project ${choice}; the reason is not used.`,
+      });
+    }
+  }
+
   const typed = at(values, columns.preAssignedProject);
-  if (!YES.has(at(values, columns.preAssigned).toLowerCase()) || typed === "") {
+  if (!YES.has(at(values, columns.preAssigned).toLowerCase())) {
+    return bids;
+  }
+  if (typed === "") {
+    issues.push({
+      level: "warning",
+      row,
+      message: `${email} says they were pre-assigned but named no project; nothing is pinned.`,
+    });
     return bids;
   }
   if (!known.has(normalizeTitle(typed))) {
@@ -236,11 +289,11 @@ function responseRows(
     });
     return bids;
   }
-  const ranked = bids.find(
+  const pinnedBid = bids.find(
     (b) => normalizeTitle(b.project) === normalizeTitle(typed)
   );
-  if (ranked) {
-    ranked.override = "true";
+  if (pinnedBid) {
+    pinnedBid.override = "true";
     return bids;
   }
   return [
