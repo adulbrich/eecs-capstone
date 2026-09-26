@@ -26,6 +26,7 @@ import type { WorkspaceProject } from "#/lib/placement/types";
 import {
   PARAMETER_LIMITS,
   projectsFromPortal,
+  pruneTitleMatches,
   type Workspace,
 } from "#/lib/placement/workspace";
 import type { SortState } from "#/lib/table-state";
@@ -61,12 +62,18 @@ export function ProjectsTab({
     projectSource: Workspace["projectSource"]
   ) =>
     // Pins and a result name project keys, so neither survives new projects.
+    // A title match does when its project is still there. Removing the
+    // projects keeps them all, so reloading the same list loses none.
     update((w) => ({
       ...w,
       projects,
       projectSource,
       pins: undefined,
       result: undefined,
+      titleMatches:
+        projects.length === 0
+          ? w.titleMatches
+          : pruneTitleMatches(w.titleMatches, projects),
     }));
 
   const bidCounts = useMemo(() => {
