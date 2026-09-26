@@ -7,6 +7,7 @@ import {
   FolderKanban,
   Handshake,
   Package,
+  Shuffle,
   Tag,
   Users,
 } from "lucide-react";
@@ -174,6 +175,12 @@ function AdminHome() {
             icon={BookOpen}
             label="Programs"
             to="/admin/programs"
+          />
+          <NavCard
+            description="Place students on project teams from their bids"
+            icon={Shuffle}
+            label="Placement"
+            to="/admin/placement"
           />
           <NavCard
             description="Add items, review requests, manage checkouts"

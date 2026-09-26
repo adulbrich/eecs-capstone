@@ -785,6 +785,11 @@ const filtered = q !== "" || status !== null || categories.length > 0;
 stays directly unit-testable. Every admin route goes through `useAdminTable`; reach past
 it to the core only if you are driving a table from somewhere that has no `navigate`.
 
+A page with more than one table cannot keep them all in the URL, because they would share
+`sort` and `cols`. Pass each one `useLocalTableSearch()` from `#/lib/use-local-table-search`
+as its `search` and `navigate`: the same hook and the same column seed from localStorage,
+with the state held in the component. `/admin/placement` does this for its two tables.
+
 Responsive behavior is automatic: the component applies `className="admin-table"` and
 derives each body cell's `data-label` from its column header. Below 768px the
 `.admin-table` rules in `styles.css` hide the `<thead>`, turn each `<tr>` into a card,

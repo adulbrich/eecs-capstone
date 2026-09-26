@@ -12,6 +12,7 @@ import { Route as adminHome } from "#/routes/_authed/admin/index";
 import { Route as inventory } from "#/routes/_authed/admin/inventory/index";
 import { Route as requests } from "#/routes/_authed/admin/inventory/requests";
 import { Route as mentors } from "#/routes/_authed/admin/mentors/index";
+import { Route as placement } from "#/routes/_authed/admin/placement";
 import { Route as programEdit } from "#/routes/_authed/admin/programs/$programId";
 import { Route as programs } from "#/routes/_authed/admin/programs/index";
 import { Route as projects } from "#/routes/_authed/admin/projects/index";
@@ -56,6 +57,7 @@ const STAFF_GATED = {
   "/_authed/admin/inventory/": inventory,
   "/_authed/admin/inventory/requests": requests,
   "/_authed/admin/mentors/": mentors,
+  "/_authed/admin/placement": placement,
   "/_authed/admin/programs/": programs,
   "/_authed/admin/programs/$programId": programEdit,
   "/_authed/admin/projects/": projects,
