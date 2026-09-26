@@ -89,7 +89,7 @@ function findColumns(
   };
   // The first ranking question is the one; a survey with a second (backup
   // choices, say) would otherwise merge two sets of ranks into one.
-  let rankStem: string | undefined;
+  let rankQuestion: string | undefined;
   const ignoredStems = new Set<string>();
   text.forEach((question, column) => {
     const dash = question.indexOf(" - ");
@@ -98,8 +98,11 @@ function findColumns(
     if (reason) {
       columns.reasons.set(Number(reason[1]), column);
     } else if (dash !== -1 && RANK_QUESTION.test(stem)) {
-      rankStem ??= stem;
-      if (stem === rankStem) {
+      // Keyed on the QID group as well as the wording, so a second question
+      // pasted with the same wording is still told apart.
+      const group = `${ids[column]?.split("_")[0] ?? ""} ${stem}`;
+      rankQuestion ??= group;
+      if (group === rankQuestion) {
         columns.ranks.push({ column, title: question.slice(dash + 3).trim() });
       } else {
         ignoredStems.add(stem);

@@ -20,14 +20,17 @@ export function ImportIssues({
   return (
     <section
       aria-label={`Problems in the ${label} file`}
-      className="mt-4 rounded-md border border-destructive/40 px-3 py-2 text-sm"
+      className={`mt-4 rounded-md border px-3 py-2 text-sm ${errors.length > 0 ? "border-destructive/40" : ""}`}
     >
       <p className="font-medium">
         {errors.length > 0 &&
           `${rowsLeftOut} ${rowsLeftOut === 1 ? "row" : "rows"} left out`}
         {errors.length > 0 && warnings.length > 0 && ", "}
         {warnings.length > 0 &&
-          `${warnings.length} ${warnings.length === 1 ? "warning" : "warnings"}`}
+          `${warnings.length} ${warnings.length === 1 ? "warning" : "warnings"}`}{" "}
+        <span className="font-normal text-muted-foreground">
+          in the {label} file
+        </span>
       </p>
       <ul className="mt-1 max-h-60 space-y-0.5 overflow-y-auto">
         {[...errors, ...warnings].map((issue) => (

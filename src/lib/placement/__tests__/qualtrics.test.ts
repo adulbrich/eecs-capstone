@@ -280,6 +280,15 @@ describe("convertQualtrics", () => {
     expect(ada.bids.map((b) => b.projectKey)).toEqual(["p1", "p2"]);
   });
 
+  it("tells apart two ranking questions with the same wording by their QID", () => {
+    const text = exportOf([ADA]).replace("QID30_4", "QID31_1");
+    const { issues } = convertQualtrics(text, PROJECTS);
+    expect(issues.map((i) => [i.row, i.level])).toEqual([
+      [1, "warning"],
+      [4, "warning"],
+    ]);
+  });
+
   it("warns when the questions it finds by wording are missing", () => {
     const text = exportOf([ADA])
       .replace("prefer not to work with", "rather not team with")
