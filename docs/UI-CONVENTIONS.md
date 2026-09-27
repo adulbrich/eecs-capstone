@@ -564,7 +564,11 @@ URL-backed sort and visibility state.
 The one exception is a short summary inside a `Sheet`: a few fixed rows with nothing
 to sort, hide or restack, such as the tables in `/admin/placement`'s analytics
 Sheet. Those use the plain `Table` from `#/components/ui/table`, because the Columns
-menu and the card layout would only crowd a panel that narrow.
+menu and the card layout would only crowd a panel that narrow. A title column there
+does not follow "A free-text column is bounded and clamped", which is written for
+the card layout: the table is `table-fixed`, each count column has a set width, and
+the title cell is `truncate whitespace-nowrap` at every width with the full text in
+a native `title` attribute, so the counts stay in the Sheet at any width (#660).
 
 Give the hook `columns`, `defaultSort` and `storageKey`, then spread what it hands back.
 Those three used to be passed twice, once to the hook and once to the table, with nothing

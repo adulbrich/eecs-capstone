@@ -142,18 +142,29 @@ export function AnalyticsSheet({
             <p className="text-muted-foreground text-sm">
               Fewest bids first, so a project nobody picked is at the top.
             </p>
-            <Table>
+            {/*
+              Fixed layout, so a long title cannot widen its column and push
+              the counts out of the sheet. The ellipsis is CSS only: the cell
+              keeps the full title for a screen reader, and `title` shows it
+              on hover.
+            */}
+            <Table className="table-fixed">
               <TableHeader>
                 <TableRow>
                   <TableHead>Project</TableHead>
-                  <TableHead className="text-right">First choice</TableHead>
-                  <TableHead className="text-right">All bids</TableHead>
+                  <TableHead className="w-24 text-right">
+                    First choice
+                  </TableHead>
+                  <TableHead className="w-24 text-right">All bids</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {perProject.map((p) => (
                   <TableRow key={p.key}>
-                    <TableCell className="whitespace-normal">
+                    <TableCell
+                      className="truncate whitespace-nowrap"
+                      title={p.title}
+                    >
                       {p.title}
                     </TableCell>
                     <TableCell className="text-right tabular-nums">
