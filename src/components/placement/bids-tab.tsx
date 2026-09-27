@@ -179,7 +179,7 @@ export function BidsTab({
       <ViewSwitch onView={onView} view={view} />
       <p className="mt-2 text-muted-foreground text-sm">
         {view === "project"
-          ? "Pin here does what Approve does on the Results tab: every run keeps the student on that project until you unpin them, over any pin from the bids file or the roster. Unpin frees them from all of these."
+          ? "Pin here does what Approve does on the Results tab: every run keeps the student on that project until you unpin them, over any pin from the bids file or the roster. Unpin frees them from all of these. A pin changes the next run; the Results tab shows the last run until then."
           : "Pinned rows show every pin in effect: the bids file's, the roster's, and those set here or on the Results tab, which win over the other two."}
       </p>
       {view === "project" ? (
@@ -350,9 +350,8 @@ function StudentHeader({ rows }: { rows: Row[] }) {
       {first.preApprovalOverridden && (
         <p className="font-normal text-sm" role="note" style={WARNING_STYLE}>
           Pre-approved for {first.preApprovalOverridden} on the roster, but a
-          pin set on the Results tab or here replaces it. Unpin the student to
-          leave them free; pin them to {first.preApprovalOverridden} to restore
-          it.
+          pin set on the Results tab or here replaces it. Unpin leaves them
+          free; a pin to {first.preApprovalOverridden} puts them back there.
         </p>
       )}
       {first.avoid && (
