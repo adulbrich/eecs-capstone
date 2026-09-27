@@ -218,16 +218,16 @@ describe("convertQualtrics", () => {
       exportOf([ADA, { ...ADA, email: "ben@example.edu" }]),
       PROJECTS.filter((p) => p.key !== "p1")
     );
-    const { issues } = parseBidsCsv(
+    const { issues, unmatched } = parseBidsCsv(
       csv,
       PROJECTS.filter((p) => p.key !== "p1")
     );
-    expect(issues).toEqual([
+    expect(issues).toEqual([]);
+    expect(unmatched).toEqual([
       {
-        level: "error",
-        row: 2,
+        key: "tide clock - version 2",
+        title: "Tide Clock - Version 2",
         rows: [2, 5],
-        message: 'No project is titled "Tide Clock - Version 2" (2 bids).',
       },
     ]);
   });

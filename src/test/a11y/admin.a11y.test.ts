@@ -359,7 +359,9 @@ test("@smoke admin placement, projects and bids loaded", async ({ page }) => {
     mimeType: "text/csv",
     buffer: Buffer.from(PLACEMENT_BIDS_CSV),
   });
-  await expect(page.getByText("1 row left out")).toBeVisible();
+  await expect(
+    page.getByRole("region", { name: "Unmatched titles" })
+  ).toContainText("1 title matches no project");
   await checkA11y(page);
 
   await page.getByRole("tab", { name: "Parameters" }).click();

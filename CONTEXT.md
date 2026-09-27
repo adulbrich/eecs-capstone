@@ -281,6 +281,14 @@ How many teams placement may form for a project, starting from its teams support
 A ceiling, not a target, and 0 leaves the project out of placement.
 _Avoid_: team count (that is the mentor's number), slots, capacity
 
+**Title match**:
+Staff's word that a bid's project title, as the survey spells it, means one of the
+projects. Bids name projects by title, and a survey may cut a title short or spell it
+differently; a title match puts those bids on the project without changing the file.
+It pairs a title with a project, never a student with a team, so it is not a
+placement.
+_Avoid_: alias, mapping, title fix
+
 ## Both domains
 
 **Visibility**:

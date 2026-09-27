@@ -46,7 +46,21 @@ export interface Workspace {
   projects: WorkspaceProject[];
   /** The last run that produced a placement. */
   result?: StoredResult;
+  /**
+   * Bid titles staff matched to a project by hand (#661), keyed by the
+   * normalized bid title. Applied when the bids are parsed, so the file
+   * itself is never rewritten.
+   */
+  titleMatches?: TitleMatches;
   version: 1;
+}
+
+export type TitleMatches = Record<string, TitleMatch>;
+
+export interface TitleMatch {
+  projectKey: string;
+  /** The bid title as the file spells it, for the list of matches. */
+  title: string;
 }
 
 export type StoredResult = PlacementResult & {
@@ -169,6 +183,12 @@ const workspaceSchema = z
       .nullable(),
     pins: z.record(z.string(), z.string().nullable()).optional(),
     result: resultSchema.optional(),
+    titleMatches: z
+      .record(
+        z.string(),
+        z.object({ projectKey: z.string(), title: z.string() })
+      )
+      .optional(),
     parameters: z.object({
       rankWeights: z
         .array(
@@ -347,16 +367,24 @@ export function projectsFromPortal(
 
 /**
  * What a run depended on, as a short string: the projects with their
- * settings, the parameters and the bids file. Pins are left out on purpose,
- * so approving a student does not mark the run it came from as stale.
+ * settings, the parameters, the bids file and the title matches. Pins are
+ * left out on purpose, so approving a student does not mark the run it came
+ * from as stale. `titleMatches` is required, even as undefined, so a caller
+ * cannot forget it and hash a different input from every other caller.
  */
 export function inputFingerprint(
-  workspace: Pick<Workspace, "bids" | "parameters" | "projects">
+  workspace: Pick<Workspace, "bids" | "parameters" | "projects"> & {
+    titleMatches: Workspace["titleMatches"];
+  }
 ): string {
+  const matches = workspace.titleMatches ?? {};
   const text = JSON.stringify([
     workspace.projects,
     workspace.parameters,
     workspace.bids?.text ?? null,
+    // Only when there are some, so a run stored before matches existed
+    // keeps its fingerprint.
+    ...(Object.keys(matches).length > 0 ? [matches] : []),
   ]);
   // djb2 in plain arithmetic, kept below 2^32 so it stays exact.
   let hash = 5381;
@@ -364,4 +392,23 @@ export function inputFingerprint(
     hash = (hash * 33 + text.charCodeAt(i)) % 4_294_967_296;
   }
   return `${text.length}:${hash.toString(36)}`;
+}
+
+/**
+ * The title matches that still name a project, for when a new project list
+ * loads: a match to a project that left falls away, and its title shows as
+ * unmatched again.
+ */
+export function pruneTitleMatches(
+  matches: TitleMatches | undefined,
+  projects: readonly Pick<WorkspaceProject, "key">[]
+): TitleMatches | undefined {
+  if (matches === undefined) {
+    return;
+  }
+  const keys = new Set(projects.map((p) => p.key));
+  const kept = Object.entries(matches).filter(([, m]) =>
+    keys.has(m.projectKey)
+  );
+  return kept.length > 0 ? Object.fromEntries(kept) : undefined;
 }

@@ -1,9 +1,11 @@
 import { describe, expect, it } from "vitest";
 import {
   EMPTY_WORKSPACE,
+  inputFingerprint,
   isEmptyWorkspace,
   parseWorkspace,
   projectsFromPortal,
+  pruneTitleMatches,
   serializeWorkspace,
   toPlacementInput,
   type Workspace,
@@ -126,5 +128,41 @@ describe("projectsFromPortal", () => {
       ["c", 1],
     ]);
     expect(result.duplicates).toEqual(["tide  clock"]);
+  });
+});
+
+describe("title matches", () => {
+  const matches = {
+    "robot arm contoller": {
+      projectKey: "robot arm",
+      title: "Robot Arm Contoller",
+    },
+    "moon base": { projectKey: "gone", title: "Moon Base" },
+  };
+
+  it("round-trip through a file", () => {
+    const workspace = { ...WORKSPACE, titleMatches: matches };
+    expect(parseWorkspace(serializeWorkspace(workspace))).toEqual({
+      ok: true,
+      workspace,
+    });
+  });
+
+  it("keep the matches whose project is still there", () => {
+    expect(pruneTitleMatches(matches, WORKSPACE.projects)).toEqual({
+      "robot arm contoller": matches["robot arm contoller"],
+    });
+    expect(pruneTitleMatches(matches, [{ key: "other" }])).toBe(undefined);
+    expect(pruneTitleMatches(undefined, WORKSPACE.projects)).toBe(undefined);
+  });
+
+  it("change the fingerprint, and none or an empty set leave it alone", () => {
+    const base = { ...WORKSPACE, titleMatches: undefined };
+    expect(inputFingerprint({ ...base, titleMatches: {} })).toBe(
+      inputFingerprint(base)
+    );
+    expect(inputFingerprint({ ...base, titleMatches: matches })).not.toBe(
+      inputFingerprint(base)
+    );
   });
 });

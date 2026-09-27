@@ -874,7 +874,7 @@ Radix fires `onOpenChange` for the closes it initiates (Escape, the overlay, a `
 | `docs/adr/*.md` | One paragraph per decision that is hard to reverse, surprising without context, and the result of a trade-off. |
 | `src/lib/*.ts` | Pure modules, client-safe wrappers. |
 | `src/lib/_internal/*.ts` | Server-only helpers (auth-guards). |
-| `src/lib/placement/` | Placement (ADR-0056): the solver, the CSV parsers and the workspace. Browser and Node only, never the server; its tests sit in its own `__tests__/`. |
+| `src/lib/placement/` | Placement (ADR-0056): the solver, the CSV parsers, title matching and the workspace. Browser and Node only, never the server; its tests sit in its own `__tests__/`. |
 | `src/lib/__tests__/*.test.ts` | Pure-module unit tests, plus two integration suites (`auth`, `role-gate`) that need a database, plus two suites that also read source off disk (`env-contract`, which reads `src`, `scripts`, `.env.example` and `infra/`, and `image-upload-policy`, whose other cases import the module normally). |
 | `src/nitro/*.ts` | Nitro runtime plugins, named in `vite.config.ts`; the only code that runs at boot. |
 | `src/server/*.ts` | createServerFn wrappers (Zod schemas + dynamic-import handlers). Client-importable. |

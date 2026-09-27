@@ -208,8 +208,12 @@ describe("workspace with a result", () => {
   });
 
   it("fingerprints the inputs a run reads, and not the pins", () => {
-    const base: Workspace = { ...EMPTY_WORKSPACE, projects: PROJECTS };
-    const pinned: Workspace = { ...base, pins: { a: "p1" } };
+    const base = {
+      ...EMPTY_WORKSPACE,
+      projects: PROJECTS,
+      titleMatches: undefined,
+    };
+    const pinned = { ...base, pins: { a: "p1" } };
     expect(inputFingerprint(pinned)).toBe(inputFingerprint(base));
     expect(
       inputFingerprint({
