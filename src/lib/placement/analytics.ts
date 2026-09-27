@@ -81,19 +81,23 @@ export function priorityDistribution(rows: readonly BoardRow[]): PriorityRow[] {
     ofPlaced: share(count, placed.length),
     ofAll: share(count, rows.length),
   });
-  const last = Math.max(0, ...placed.map((r) => r.priority ?? 0));
+  // A pre-approved student counts there whatever their bids said (#670).
+  const preApproved = placed.filter((r) => r.preApproved).length;
+  const ranked = placed.filter((r) => !r.preApproved);
+  const last = Math.max(0, ...ranked.map((r) => r.priority ?? 0));
   const byPriority = Array.from({ length: last }, (_, i) =>
     row(
       `${ordinal(i + 1)} choice`,
-      placed.filter((r) => r.priority === i + 1).length
+      ranked.filter((r) => r.priority === i + 1).length
     )
   );
-  const outside = placed.filter((r) => r.priority === null);
+  const outside = ranked.filter((r) => r.priority === null);
   const pinned = outside.filter((r) => r.pinned).length;
   const rosterOnly = outside.filter((r) => !r.pinned && r.rosterOnly).length;
   const unranked = outside.length - pinned - rosterOnly;
   return [
     ...byPriority,
+    ...(preApproved > 0 ? [row("Pre-approved", preApproved)] : []),
     ...(pinned > 0 ? [row("Pinned outside their bids", pinned)] : []),
     ...(rosterOnly > 0
       ? [row("Placed without bids (not in the survey)", rosterOnly)]

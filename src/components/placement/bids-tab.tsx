@@ -15,6 +15,7 @@ import { Button } from "#/components/ui/button";
 import { downloadText } from "#/lib/placement/download";
 import { BIDS_FORMAT } from "#/lib/placement/formats";
 import { convertQualtrics, isQualtricsExport } from "#/lib/placement/qualtrics";
+import { repointRosterPins } from "#/lib/placement/roster";
 import type { PlacementStudent } from "#/lib/placement/types";
 import type { Workspace } from "#/lib/placement/workspace";
 import type { SortState } from "#/lib/table-state";
@@ -138,6 +139,7 @@ export function BidsTab({
           update((w) => ({
             ...w,
             titleMatches: { ...w.titleMatches, ...added },
+            pins: repointRosterPins(w.pins, added),
           }))
         }
         onUndo={(key) =>
@@ -154,7 +156,7 @@ export function BidsTab({
       />
       <ImportIssues issues={bids.issues} label="bids" />
       <RosterSection state={state} workspace={workspace} />
-      <StudentsTable projects={workspace.projects} students={students} />
+      <StudentsTable projects={state.placementProjects} students={students} />
     </div>
   );
 }
@@ -171,6 +173,8 @@ interface Row {
   id: string;
   name: string;
   pinned: boolean;
+  /** The project the roster pre-approves the student for, by title. */
+  preApprovedFor: string | null;
   priority: number | null;
   project: string;
   /** The one row of a roster student who did not answer the survey. */
@@ -194,7 +198,13 @@ function bidRows(
 ): Row[] {
   return [...students].sort(byName).flatMap((s) => {
     const title = (key: string) => titles.get(key) ?? key;
-    const student = { email: s.email, name: s.name, avoid: s.avoid };
+    const student = {
+      email: s.email,
+      name: s.name,
+      avoid: s.avoid,
+      preApprovedFor:
+        s.preApproved && s.pin !== undefined ? title(s.pin) : null,
+    };
     const rows: Row[] = [...s.bids]
       .sort((a, b) => a.priority - b.priority)
       .map((bid) => ({
@@ -294,6 +304,11 @@ function StudentHeader({ rows }: { rows: Row[] }) {
           ? "on the roster, not in the survey"
           : `${bids} ${bids === 1 ? "bid" : "bids"}`}
       </span>
+      {first.preApprovedFor && (
+        <span className="ml-2 font-normal text-xs">
+          pre-approved for {first.preApprovedFor}
+        </span>
+      )}
       {first.avoid && (
         <p
           className="flex items-start gap-1 font-normal text-sm"

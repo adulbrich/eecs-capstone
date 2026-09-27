@@ -72,7 +72,9 @@ export function AnalyticsSheet({
   workspace: Workspace;
 }) {
   const bids = state.bids?.students ?? [];
-  const { projects, pins, result } = workspace;
+  const { pins, result } = workspace;
+  // Listed projects plus any the roster adds (#670).
+  const { placementProjects: projects } = state;
   const perProject = useMemo(
     () => bidsPerProject(bids, projects),
     [bids, projects]
@@ -90,13 +92,15 @@ export function AnalyticsSheet({
   const current = useMemo(
     () =>
       inputFingerprint({
-        projects,
+        // The stored list, as the Results tab hashes it; the roster's own
+        // projects follow from the roster text, which is hashed too.
+        projects: workspace.projects,
         parameters,
         bids: storedBids,
         titleMatches,
         roster,
       }),
-    [projects, parameters, storedBids, titleMatches, roster]
+    [workspace.projects, parameters, storedBids, titleMatches, roster]
   );
   const stale = result !== undefined && result.fingerprint !== current;
 

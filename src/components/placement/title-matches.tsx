@@ -162,6 +162,10 @@ export function TitleMatchesPanel({
           className="rounded-md border px-3 py-2 text-sm"
         >
           <p className="font-medium">Matched by hand</p>
+          <p className="text-muted-foreground">
+            Undo makes the title unmatched again. A pin set on the project since
+            stays until you unpin the student.
+          </p>
           <ul className="mt-1 flex flex-col gap-1">
             {made.map(([key, m]) => (
               <li

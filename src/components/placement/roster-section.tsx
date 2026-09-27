@@ -27,7 +27,7 @@ export function RosterSection({
   state: PlacementWorkspace;
   workspace: Workspace;
 }) {
-  const { bids, roster, update } = state;
+  const { assignments, bids, roster, update } = state;
   const stored = workspace.roster;
   // Adding a roster leaves the last run on the board, marked stale by the
   // fingerprint. Removing one takes its students out of the run, so the run
@@ -96,6 +96,10 @@ export function RosterSection({
     stored.source.kind === "csv" ? stored.source.filename : "a pasted list";
   const notInSurvey = bids?.students.filter((s) => s.rosterOnly).length ?? 0;
   const notOnRoster = bids?.notOnRoster ?? [];
+  const preApproved = assignments?.pins.size ?? 0;
+  const conflicts = bids?.conflicts ?? [];
+  const titles = new Map(state.placementProjects.map((p) => [p.key, p.title]));
+  const title = (key: string) => titles.get(key) ?? key;
   return (
     <section
       aria-labelledby="placement-roster-heading"
@@ -122,6 +126,31 @@ export function RosterSection({
         </ConfirmDialog>
       </div>
       <p className="mt-1">{rosterSummary(bids === null, notInSurvey)}</p>
+      {preApproved > 0 && (
+        <p className="mt-1">
+          {preApproved === 1
+            ? "1 student is pre-approved for a project and placed there on every run."
+            : `${preApproved} students are pre-approved for a project and placed there on every run.`}{" "}
+          A pre-approval wins over a pin in the bids file. A pin set on the
+          Results tab wins over a pre-approval, and Unpin there leaves the
+          student free until the next pin.
+        </p>
+      )}
+      {conflicts.length > 0 && (
+        <ul
+          aria-label="Pre-approvals over a pin from the bids"
+          className="mt-1"
+          role="note"
+          style={{ color: "var(--status-warning)" }}
+        >
+          {conflicts.map((c) => (
+            <li key={c.email}>
+              {c.email} is pre-approved for {title(c.fromRoster)}, over the bids
+              file's pin to {title(c.fromBids)}.
+            </li>
+          ))}
+        </ul>
+      )}
       {notOnRoster.length > 0 && (
         <p
           className="mt-1"
@@ -149,5 +178,5 @@ function rosterSummary(noBids: boolean, notInSurvey: number): string {
   if (notInSurvey === 0) {
     return "Everyone on the roster answered the survey.";
   }
-  return `${plural(notInSurvey, "student on the roster did", "students on the roster did")} not answer the survey; they are on the board with no bids.`;
+  return `${plural(notInSurvey, "student on the roster did", "students on the roster did")} not answer the survey; they are on the board with no bids. A run places them where a team needs people to reach its minimum, and otherwise on the projects with the fewest bids, never in a seat a bidder would have had. They never make a project form a team on their own under "At least one team per project".`;
 }

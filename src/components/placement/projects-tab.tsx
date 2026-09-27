@@ -10,6 +10,7 @@ import { FilePickerButton } from "#/components/placement/file-picker-button";
 import { ImportIssues } from "#/components/placement/import-issues";
 import { NumberInput } from "#/components/placement/number-input";
 import { PasteList } from "#/components/placement/paste-list";
+import { RosterProjects } from "#/components/placement/roster-projects";
 import type { PlacementWorkspace } from "#/components/placement/use-placement-workspace";
 import { Button } from "#/components/ui/button";
 import { FieldError } from "#/components/ui/field";
@@ -174,6 +175,7 @@ export function ProjectsTab({
         rows={rows}
         update={update}
       />
+      <RosterProjects state={state} />
     </div>
   );
 }

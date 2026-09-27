@@ -498,6 +498,83 @@ test.describe("placement workspace", () => {
     await expect.poll(() => stored(page)).not.toContain(`kim@${DOMAIN}`);
   });
 
+  test("roster pre-approvals pin students, and add a project the list lacks", async ({
+    page,
+  }) => {
+    await page.goto("/admin/placement");
+    await waitForHydration(page);
+    await importFiles(page);
+    await page.getByLabel("Roster CSV file").setInputFiles({
+      name: "roster.csv",
+      mimeType: "text/csv",
+      buffer: Buffer.from(
+        [
+          "email,name,project",
+          `ada@${DOMAIN},Ada Park,Robot Arm`,
+          `ben@${DOMAIN},Ben Ito,Tide Clock`,
+          `kim@${DOMAIN},Kim Lee,Sponsor Lab`,
+          `lou@${DOMAIN},Lou Ma,Tide Clok`,
+        ].join("\n")
+      ),
+    });
+    const roster = page.getByRole("region", { name: /Class roster/ });
+    await expect(roster).toContainText("4 students are pre-approved");
+    // The bids file pins Ben to Robot Arm; the roster wins, and says so.
+    await expect(
+      page.getByRole("note", { name: "Pre-approvals over a pin from the bids" })
+    ).toContainText(
+      `ben@${DOMAIN} is pre-approved for Tide Clock, over the bids file's pin to Robot Arm.`
+    );
+    await expect(
+      page.getByRole("rowheader", {
+        name: /Ada Park.*pre-approved for Robot Arm/,
+      })
+    ).toBeVisible();
+
+    await page.getByRole("tab", { name: /Projects/ }).click();
+    const added = page.getByRole("region", { name: "Added from the roster" });
+    await expect(added).toContainText("Sponsor Lab");
+    await expect(added).toContainText("Tide Clok");
+    await added
+      .getByRole("button", { name: "Match to Tide Clock instead" })
+      .click();
+    await expect(added).not.toContainText("Tide Clok");
+    const parameters = page.getByRole("tab", { name: "Parameters" });
+    await parameters.click();
+    await expect(parameters).toHaveAttribute("aria-selected", "true");
+    await page.getByLabel("Min students").fill("1");
+    await page.getByRole("tab", { name: /Projects/ }).click();
+    await page.getByLabel("Min students per team, Robot Arm").fill("1");
+
+    await page.getByRole("tab", { name: "Results" }).click();
+    await page.getByRole("button", { name: "Run placement" }).click();
+    await expect(page.getByText("4 of 4 students placed")).toBeVisible({
+      timeout: 20_000,
+    });
+    const group = (label: string) =>
+      page.getByRole("rowgroup").filter({ hasText: label });
+    await expect(
+      group("Robot Arm, team").getByRole("row", {
+        name: /Ada Park.*Pre-approved/,
+      })
+    ).toBeVisible();
+    await expect(
+      group("Sponsor Lab, team 1").getByRole("row", {
+        name: /Kim Lee.*Pre-approved/,
+      })
+    ).toBeVisible();
+    await expect(
+      group("Tide Clock, team").getByRole("row", {
+        name: /Lou Ma.*Pre-approved/,
+      })
+    ).toBeVisible();
+    await expect(
+      group("Tide Clock, team").getByRole("row", {
+        name: /Ben Ito.*Pre-approved/,
+      })
+    ).toBeVisible();
+  });
+
   test("clearing all data empties the stored workspace after a confirmation", async ({
     page,
   }) => {

@@ -3,6 +3,9 @@ import {
   mergeRoster,
   parseRosterCsv,
   parseRosterList,
+  repointRosterPins,
+  resolveRosterProjects,
+  rosterProjectKey,
 } from "#/lib/placement/roster";
 
 // Invented names and emails only (#648).
@@ -128,6 +131,149 @@ describe("mergeRoster", () => {
       survey,
       survey.map((s) => ({ email: s.email, name: "" }))
     );
-    expect(merged).toEqual({ students: survey, notOnRoster: [] });
+    expect(merged).toEqual({
+      students: survey,
+      notOnRoster: [],
+      conflicts: [],
+    });
+  });
+});
+
+describe("pre-approvals on the roster (#670)", () => {
+  const projects = [
+    { key: "p1", title: "Tide Clock", weightMultiplier: 1 },
+    { key: "p2", title: "Robot Arm Controller", weightMultiplier: 1 },
+  ];
+
+  it("reads a project column, leaving it off a row that has none", () => {
+    expect(
+      parseRosterCsv(
+        "email,project\nada@example.edu,Tide Clock\nben@example.edu,\n"
+      ).entries
+    ).toEqual([
+      { email: "ada@example.edu", name: "", project: "Tide Clock" },
+      { email: "ben@example.edu", name: "" },
+    ]);
+  });
+
+  it("resolves a listed title, a matched title, and adds an unlisted one", () => {
+    const resolved = resolveRosterProjects(
+      [
+        { email: "ada@example.edu", name: "", project: "tide clock." },
+        { email: "ben@example.edu", name: "", project: "Robo Arm" },
+        { email: "cy@example.edu", name: "", project: "Sponsor Lab" },
+        { email: "dee@example.edu", name: "", project: "sponsor lab" },
+        { email: "eve@example.edu", name: "" },
+      ],
+      projects,
+      { "robo arm": { projectKey: "p2" } }
+    );
+    const sponsor = rosterProjectKey("sponsor lab");
+    expect(Object.fromEntries(resolved.pins)).toEqual({
+      "ada@example.edu": "p1",
+      "ben@example.edu": "p2",
+      "cy@example.edu": sponsor,
+      "dee@example.edu": sponsor,
+    });
+    expect(resolved.added).toEqual([
+      {
+        key: sponsor,
+        title: "Sponsor Lab",
+        maxTeams: 1,
+        minStudents: 1,
+        maxStudents: 2,
+        weightMultiplier: 1,
+        fromRoster: true,
+      },
+    ]);
+    expect(resolved.nearMisses).toEqual([]);
+  });
+
+  it("flags an added title close to a listed project", () => {
+    const resolved = resolveRosterProjects(
+      [{ email: "ada@example.edu", name: "", project: "Robot Arm Contoller" }],
+      projects
+    );
+    expect(resolved.nearMisses).toEqual([
+      {
+        key: "robot arm contoller",
+        title: "Robot Arm Contoller",
+        suggestion: expect.objectContaining({ key: "p2" }),
+      },
+    ]);
+  });
+
+  it("pins survey and roster students, over a bids file pin, and lists the conflict", () => {
+    const merged = mergeRoster(
+      [
+        { email: "ada@example.edu", name: "Ada", bids: [], pin: "p2" },
+        { email: "ben@example.edu", name: "Ben", bids: [] },
+      ],
+      [
+        { email: "ada@example.edu", name: "", project: "Tide Clock" },
+        { email: "ben@example.edu", name: "" },
+        { email: "kim@example.edu", name: "Kim", project: "Tide Clock" },
+      ],
+      new Map([
+        ["ada@example.edu", "p1"],
+        ["kim@example.edu", "p1"],
+      ])
+    );
+    expect(merged.students).toEqual([
+      {
+        email: "ada@example.edu",
+        name: "Ada",
+        bids: [],
+        pin: "p1",
+        preApproved: true,
+      },
+      { email: "ben@example.edu", name: "Ben", bids: [] },
+      {
+        email: "kim@example.edu",
+        name: "Kim",
+        bids: [],
+        rosterOnly: true,
+        pin: "p1",
+        preApproved: true,
+      },
+    ]);
+    expect(merged.conflicts).toEqual([
+      { email: "ada@example.edu", fromBids: "p2", fromRoster: "p1" },
+    ]);
+  });
+});
+
+describe("pre-approval edge cases (#670)", () => {
+  it("warns about a project cell that names nothing", () => {
+    const parsed = parseRosterCsv("email,project\nada@example.edu,...\n");
+    expect(parsed.entries).toEqual([
+      { email: "ada@example.edu", name: "", project: "..." },
+    ]);
+    expect(parsed.issues).toEqual([
+      {
+        level: "warning",
+        row: 2,
+        message:
+          '"..." names no project, so ada@example.edu is not pre-approved.',
+      },
+    ]);
+  });
+
+  it("moves board pins off a roster project a new match makes listed", () => {
+    expect(
+      repointRosterPins(
+        {
+          "ada@example.edu": rosterProjectKey("robot arm contoller"),
+          "ben@example.edu": "p1",
+          "cy@example.edu": null,
+        },
+        { "robot arm contoller": { projectKey: "p2" } }
+      )
+    ).toEqual({
+      "ada@example.edu": "p2",
+      "ben@example.edu": "p1",
+      "cy@example.edu": null,
+    });
+    expect(repointRosterPins(undefined, {})).toBeUndefined();
   });
 });

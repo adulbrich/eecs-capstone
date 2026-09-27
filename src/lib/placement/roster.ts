@@ -2,10 +2,17 @@ import {
   cell,
   type ImportIssue,
   missingColumns,
+  normalizeTitle,
   parseRows,
   pastedLines,
+  projectKeysByTitle,
 } from "#/lib/placement/csv";
-import type { PlacementStudent } from "#/lib/placement/types";
+import {
+  type ProjectCandidate,
+  rankProjects,
+  suggestProject,
+} from "#/lib/placement/match";
+import type { PlacementStudent, WorkspaceProject } from "#/lib/placement/types";
 
 /**
  * The class roster (#665): every student in the class, so the ones who never
@@ -17,6 +24,8 @@ export interface RosterEntry {
   /** Lowercased and trimmed; the key the merge uses. */
   email: string;
   name: string;
+  /** The title of the project the student is pre-approved for (#670). */
+  project?: string;
 }
 
 export interface ParsedRoster {
@@ -81,7 +90,21 @@ function collect(
   entries.push(entry);
 }
 
-/** `email, name`, one row per student; only `email` is required. */
+const projectCell = (raw: Parameters<typeof cell>[0]) => {
+  const project = cell(raw, "project");
+  return project === "" ? {} : { project };
+};
+
+/** A project cell that normalizes to nothing: "..." pre-approves nobody. */
+const unreadableProject = (raw: Parameters<typeof cell>[0]) => {
+  const project = cell(raw, "project");
+  return project !== "" && normalizeTitle(project) === "" ? project : null;
+};
+
+/**
+ * `email, name, project`, one row per student; only `email` is required.
+ * `project` pre-approves the student for that project.
+ */
 export function parseRosterCsv(text: string): ParsedRoster {
   const { fields, issues, rows } = parseRows(text);
   const missing =
@@ -111,12 +134,20 @@ export function parseRosterCsv(text: string): ParsedRoster {
       });
       return;
     }
+    const unreadable = unreadableProject(raw);
+    if (unreadable !== null) {
+      issues.push({
+        level: "warning",
+        row,
+        message: `"${unreadable}" names no project, so ${email} is not pre-approved.`,
+      });
+    }
     collect(
       entries,
       seen,
       issues,
       row,
-      { email, name: cell(raw, "name") },
+      { email, name: cell(raw, "name"), ...projectCell(raw) },
       "row"
     );
   });
@@ -178,25 +209,154 @@ export function parseRosterList(text: string): ParsedRoster {
   return { entries, issues };
 }
 
+/** What the roster's pre-approvals come to against the project list. */
+export interface RosterAssignments {
+  /**
+   * Projects the roster names that the list lacks, one team of exactly
+   * their pre-approved students, so nobody else is placed there.
+   */
+  added: WorkspaceProject[];
+  /** An added project whose title is close to a listed one: likely a typo. */
+  nearMisses: {
+    /** The normalized title, which a title match is keyed by. */
+    key: string;
+    suggestion: ProjectCandidate;
+    title: string;
+  }[];
+  /** Email to the project key the student is pre-approved for. */
+  pins: Map<string, string>;
+}
+
+/** The key of a project added from the roster; never a listed project's. */
+export const rosterProjectKey = (normalized: string) => `roster:${normalized}`;
+
+/**
+ * Resolves each pre-approval's title as a bid's is, by normalized title and
+ * then by the title matches staff made. A title that names no listed
+ * project becomes a project of its own (#670).
+ */
+export function resolveRosterProjects(
+  roster: readonly RosterEntry[],
+  projects: readonly WorkspaceProject[],
+  matches: Readonly<Record<string, { projectKey: string }>> = {}
+): RosterAssignments {
+  const keyByTitle = projectKeysByTitle(projects, matches);
+  const pins = new Map<string, string>();
+  const unlisted = new Map<string, { count: number; title: string }>();
+  for (const entry of roster) {
+    if (entry.project === undefined) {
+      continue;
+    }
+    const normalized = normalizeTitle(entry.project);
+    if (normalized === "") {
+      continue;
+    }
+    const listed = keyByTitle.get(normalized);
+    if (listed !== undefined) {
+      pins.set(entry.email, listed);
+      continue;
+    }
+    const seen = unlisted.get(normalized) ?? { count: 0, title: entry.project };
+    seen.count += 1;
+    unlisted.set(normalized, seen);
+    pins.set(entry.email, rosterProjectKey(normalized));
+  }
+  const added: WorkspaceProject[] = [];
+  const nearMisses: RosterAssignments["nearMisses"] = [];
+  for (const [normalized, { count, title }] of unlisted) {
+    added.push({
+      key: rosterProjectKey(normalized),
+      title,
+      maxTeams: 1,
+      minStudents: 1,
+      maxStudents: count,
+      weightMultiplier: 1,
+      fromRoster: true,
+    });
+    const suggestion = suggestProject(rankProjects(title, projects));
+    if (suggestion !== undefined) {
+      nearMisses.push({ key: normalized, title, suggestion });
+    }
+  }
+  return { added, nearMisses, pins };
+}
+
+/**
+ * Board pins moved along when new title matches turn a roster project into a
+ * listed one: a pin set on `roster:<title>` would otherwise name a project
+ * that no longer exists.
+ */
+export function repointRosterPins(
+  pins: Readonly<Record<string, string | null>> | undefined,
+  added: Readonly<Record<string, { projectKey: string }>>
+): Record<string, string | null> | undefined {
+  if (pins === undefined) {
+    return pins;
+  }
+  const moved = new Map(
+    Object.entries(added).map(([title, m]) => [
+      rosterProjectKey(title),
+      m.projectKey,
+    ])
+  );
+  return Object.fromEntries(
+    Object.entries(pins).map(([email, key]) => [
+      email,
+      key === null ? null : (moved.get(key) ?? key),
+    ])
+  );
+}
+
+/** A student the bids file pinned elsewhere than the roster pre-approves. */
+export interface PinConflict {
+  email: string;
+  /** The project key the bids file pinned. */
+  fromBids: string;
+  /** The project key the roster pre-approves, which wins. */
+  fromRoster: string;
+}
+
 /**
  * The survey's students plus a student with no bids for every roster email
  * the survey lacks, merged on email. A survey student keeps the survey's
  * name. `notOnRoster` lists the survey students the roster lacks, who stay
- * in the run.
+ * in the run. A pre-approval pins its student, over a pin from the bids
+ * file, and each such override is listed in `conflicts`.
  */
 export function mergeRoster(
   students: readonly PlacementStudent[],
-  roster: readonly RosterEntry[]
-): { notOnRoster: string[]; students: PlacementStudent[] } {
+  roster: readonly RosterEntry[],
+  pins: ReadonlyMap<string, string> = new Map()
+): {
+  conflicts: PinConflict[];
+  notOnRoster: string[];
+  students: PlacementStudent[];
+} {
   const onRoster = new Set(roster.map((r) => r.email));
   const inSurvey = new Set(students.map((s) => s.email));
+  const conflicts: PinConflict[] = [];
+  const preApprove = (student: PlacementStudent): PlacementStudent => {
+    const pin = pins.get(student.email);
+    if (pin === undefined) {
+      return student;
+    }
+    if (student.pin !== undefined && student.pin !== pin) {
+      conflicts.push({
+        email: student.email,
+        fromBids: student.pin,
+        fromRoster: pin,
+      });
+    }
+    return { ...student, pin, preApproved: true };
+  };
   const added: PlacementStudent[] = roster
     .filter((r) => !inSurvey.has(r.email))
     .map((r) => ({ email: r.email, name: r.name, bids: [], rosterOnly: true }));
   return {
-    students: [...students, ...added],
+    students: [...students, ...added].map(preApprove),
     notOnRoster: students
       .filter((s) => !onRoster.has(s.email))
       .map((s) => s.email),
+    conflicts,
   };
 }

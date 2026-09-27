@@ -329,7 +329,9 @@ function eligibleProjects(
   // A roster student has no bids to narrow by, and is placed where a team
   // needs people whatever `allowUnranked` says (#666).
   if (allowUnranked || student.rosterOnly) {
-    return active;
+    // A project the roster added holds exactly its pre-approved students,
+    // who reach it through their pins above (#670).
+    return active.filter((p) => !p.fromRoster);
   }
   const bidOn = new Set(student.bids.map((b) => b.projectKey));
   return active.filter((p) => bidOn.has(p.key));

@@ -50,7 +50,8 @@ const row = (
   projectKey: string | null,
   priority: number | null,
   pinned = false,
-  rosterOnly = false
+  rosterOnly = false,
+  preApproved = false
 ): BoardRow => ({
   email,
   name: email,
@@ -59,6 +60,7 @@ const row = (
   groupKey: "",
   groupLabel: "",
   pinned,
+  preApproved,
   priority,
   projectKey,
   rosterOnly,
@@ -130,6 +132,20 @@ describe("priorityDistribution with roster students (#666)", () => {
       ["Pinned outside their bids", 1],
       ["Placed without bids (not in the survey)", 1],
       ["Placed outside their bids", 1],
+    ]);
+  });
+});
+
+describe("priorityDistribution with pre-approvals (#670)", () => {
+  it("counts a pre-approved student once, apart from their bids", () => {
+    const rows = [
+      row("a", "p1", 1),
+      row("b", "p2", 1, true, false, true),
+      row("k", "p3", null, true, true, true),
+    ];
+    expect(priorityDistribution(rows).map((r) => [r.label, r.count])).toEqual([
+      ["1st choice", 1],
+      ["Pre-approved", 2],
     ]);
   });
 });
