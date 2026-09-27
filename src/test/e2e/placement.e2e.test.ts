@@ -402,6 +402,53 @@ test.describe("placement workspace", () => {
     await expect(page.getByText("2 students and 3 bids")).toBeVisible();
   });
 
+  test("a class roster adds the students who did not answer the survey", async ({
+    page,
+  }) => {
+    await page.goto("/admin/placement");
+    await waitForHydration(page);
+    await importFiles(page);
+
+    await page.getByLabel("Roster CSV file").setInputFiles({
+      name: "roster.csv",
+      mimeType: "text/csv",
+      buffer: Buffer.from(
+        `email,name\nADA@${DOMAIN},Ada Park\nkim@${DOMAIN},Kim Lee\n`
+      ),
+    });
+    const roster = page.getByRole("region", { name: /Class roster/ });
+    await expect(roster).toContainText("2 students from roster.csv");
+    await expect(roster).toContainText(
+      "1 student on the roster did not answer the survey"
+    );
+    // Ben answered the survey but is not on this roster.
+    await expect(roster).toContainText(`ben@${DOMAIN}`);
+    await expect(
+      page.getByText("and 1 more from the roster with no bids")
+    ).toBeVisible();
+    await expect(
+      page.getByRole("rowheader", { name: /Kim Lee.*not in the survey/ })
+    ).toBeVisible();
+    await expect.poll(() => stored(page)).toContain('"roster"');
+
+    await roster.getByRole("button", { name: "Remove roster" }).click();
+    await page.getByRole("button", { name: "Remove", exact: true }).click();
+    await expect(page.getByText("Kim Lee")).toHaveCount(0);
+
+    await page
+      .getByLabel("Roster emails")
+      .fill(`ada@${DOMAIN}, ben@${DOMAIN}\nKim Lee <kim@${DOMAIN}>\nnobody`);
+    await page.getByRole("button", { name: "Use these emails" }).click();
+    await expect(roster).toContainText("3 students from a pasted list");
+    await expect(
+      page.getByRole("region", { name: "Problems in the pasted roster" })
+    ).toContainText('Line 3: "nobody" is not an email.');
+    await expect(roster).not.toContainText("not on the roster");
+    await expect(
+      page.getByRole("rowheader", { name: /Kim Lee.*not in the survey/ })
+    ).toBeVisible();
+  });
+
   test("clearing all data empties the stored workspace after a confirmation", async ({
     page,
   }) => {

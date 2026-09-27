@@ -1,6 +1,11 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { parseBidsCsv } from "#/lib/placement/csv";
 import {
+  mergeRoster,
+  parseRosterCsv,
+  parseRosterList,
+} from "#/lib/placement/roster";
+import {
   clearStoredWorkspace,
   EMPTY_WORKSPACE,
   isEmptyWorkspace,
@@ -66,17 +71,32 @@ export function usePlacementWorkspace() {
   const bidsText = workspace?.bids?.text;
   const projects = workspace?.projects;
   const titleMatches = workspace?.titleMatches;
-  const bids = useMemo(
-    () =>
-      bidsText === undefined || projects === undefined
-        ? null
-        : parseBidsCsv(bidsText, projects, titleMatches),
-    [bidsText, projects, titleMatches]
-  );
+  const storedRoster = workspace?.roster;
+  const roster = useMemo(() => {
+    if (storedRoster === undefined) {
+      return null;
+    }
+    return storedRoster.source.kind === "csv"
+      ? parseRosterCsv(storedRoster.text)
+      : parseRosterList(storedRoster.text);
+  }, [storedRoster]);
+  const bids = useMemo(() => {
+    if (bidsText === undefined || projects === undefined) {
+      return null;
+    }
+    const parsed = parseBidsCsv(bidsText, projects, titleMatches);
+    if (roster === null) {
+      return { ...parsed, notOnRoster: [] };
+    }
+    // The roster's students join the survey's, so every tab and the run
+    // see one list (#665).
+    return { ...parsed, ...mergeRoster(parsed.students, roster.entries) };
+  }, [bidsText, projects, titleMatches, roster]);
 
   return {
     workspace,
     bids,
+    roster,
     saveFailed,
     unreadable,
     changedElsewhere,

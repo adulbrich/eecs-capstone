@@ -44,6 +44,8 @@ export interface PlacementStudent {
   name: string;
   /** The project key this student is pinned to, if any. */
   pin?: string;
+  /** On the class roster but not in the survey, so no bids (#665). */
+  rosterOnly?: boolean;
 }
 
 export interface PlacementParameters {

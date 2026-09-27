@@ -281,6 +281,13 @@ How many teams placement may form for a project, starting from its teams support
 A ceiling, not a target, and 0 leaves the project out of placement.
 _Avoid_: team count (that is the mentor's number), slots, capacity
 
+**Roster**:
+Every student in the class, as staff bring it to placement, so a student who never
+answered the bidding survey is placed too. It lines up with the bids by email. A
+student on the roster with no bids is placed where a team needs people; a bidder
+missing from the roster is still placed.
+_Avoid_: class list, enrollment, student list
+
 **Title match**:
 Staff's word that a bid's project title, as the survey spells it, means one of the
 projects. Bids name projects by title, and a survey may cut a title short or spell it

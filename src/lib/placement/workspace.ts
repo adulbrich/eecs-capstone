@@ -48,6 +48,11 @@ export interface Workspace {
   /** The last run that produced a placement. */
   result?: StoredResult;
   /**
+   * The class roster (#665), as the file or the pasted text it came as,
+   * parsed on read like the bids.
+   */
+  roster?: StoredRoster;
+  /**
    * Bid titles staff matched to a project by hand (#661), keyed by the
    * normalized bid title. Applied when the bids are parsed, so the file
    * itself is never rewritten.
@@ -57,6 +62,11 @@ export interface Workspace {
 }
 
 export type TitleMatches = Record<string, TitleMatch>;
+
+export interface StoredRoster {
+  source: { kind: "csv"; filename: string } | { kind: "pasted" };
+  text: string;
+}
 
 export interface TitleMatch {
   projectKey: string;
@@ -185,6 +195,15 @@ const workspaceSchema = z
       .nullable(),
     pins: z.record(z.string(), z.string().nullable()).optional(),
     result: resultSchema.optional(),
+    roster: z
+      .object({
+        source: z.discriminatedUnion("kind", [
+          z.object({ kind: z.literal("csv"), filename: z.string() }),
+          z.object({ kind: z.literal("pasted") }),
+        ]),
+        text: z.string(),
+      })
+      .optional(),
     titleMatches: z
       .record(
         z.string(),
@@ -316,6 +335,7 @@ export function isEmptyWorkspace(workspace: Workspace): boolean {
   return (
     workspace.projects.length === 0 &&
     workspace.bids === null &&
+    workspace.roster === undefined &&
     Object.entries(DEFAULT_WORKSPACE_PARAMETERS).every(
       ([key, value]) =>
         JSON.stringify(parameters[key]) === JSON.stringify(value)
@@ -369,13 +389,15 @@ export function projectsFromPortal(
 
 /**
  * What a run depended on, as a short string: the projects with their
- * settings, the parameters, the bids file and the title matches. Pins are
- * left out on purpose, so approving a student does not mark the run it came
- * from as stale. `titleMatches` is required, even as undefined, so a caller
- * cannot forget it and hash a different input from every other caller.
+ * settings, the parameters, the bids file, the title matches and the
+ * roster. Pins are left out on purpose, so approving a student does not
+ * mark the run it came from as stale. `titleMatches` and `roster` are
+ * required, even as undefined, so a caller cannot forget one and hash a
+ * different input from every other caller.
  */
 export function inputFingerprint(
   workspace: Pick<Workspace, "bids" | "parameters" | "projects"> & {
+    roster: Workspace["roster"];
     titleMatches: Workspace["titleMatches"];
   }
 ): string {
@@ -384,9 +406,12 @@ export function inputFingerprint(
     workspace.projects,
     workspace.parameters,
     workspace.bids?.text ?? null,
-    // Only when there are some, so a run stored before matches existed
-    // keeps its fingerprint.
+    // Each only when present, so a run stored before it existed keeps its
+    // fingerprint.
     ...(Object.keys(matches).length > 0 ? [matches] : []),
+    ...(workspace.roster === undefined
+      ? []
+      : [{ roster: workspace.roster.text }]),
   ]);
   // djb2 in plain arithmetic, kept below 2^32 so it stays exact.
   let hash = 5381;

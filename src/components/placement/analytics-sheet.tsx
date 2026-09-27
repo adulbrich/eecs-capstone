@@ -86,7 +86,7 @@ export function AnalyticsSheet({
     ? projectsWithoutTeam(result, projects, workspace.parameters.maxTeams)
     : [];
   const priorities = rows ? priorityDistribution(rows) : [];
-  const { bids: storedBids, parameters, titleMatches } = workspace;
+  const { bids: storedBids, parameters, titleMatches, roster } = workspace;
   const current = useMemo(
     () =>
       inputFingerprint({
@@ -94,8 +94,9 @@ export function AnalyticsSheet({
         parameters,
         bids: storedBids,
         titleMatches,
+        roster,
       }),
-    [projects, parameters, storedBids, titleMatches]
+    [projects, parameters, storedBids, titleMatches, roster]
   );
   const stale = result !== undefined && result.fingerprint !== current;
 

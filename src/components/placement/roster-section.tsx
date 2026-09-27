@@ -1,0 +1,153 @@
+import { Trash2 } from "lucide-react";
+import { ConfirmDialog } from "#/components/confirm-dialog";
+import { CsvFormatHelp } from "#/components/placement/csv-format";
+import { FilePickerButton } from "#/components/placement/file-picker-button";
+import { ImportIssues } from "#/components/placement/import-issues";
+import { PasteList } from "#/components/placement/paste-list";
+import type { PlacementWorkspace } from "#/components/placement/use-placement-workspace";
+import { Button } from "#/components/ui/button";
+import { ROSTER_FORMAT } from "#/lib/placement/formats";
+import type { Workspace } from "#/lib/placement/workspace";
+
+const plural = (n: number, one: string, many: string) =>
+  `${n} ${n === 1 ? one : many}`;
+
+/** How many emails a warning names before it says how many more. */
+const SHOWN = 10;
+
+/**
+ * The class roster on the Bids tab (#665): the whole class, so the students
+ * who never answered the survey join the board and the run. It merges with
+ * the bids on email and is kept when the bids are removed.
+ */
+export function RosterSection({
+  state,
+  workspace,
+}: {
+  state: PlacementWorkspace;
+  workspace: Workspace;
+}) {
+  const { bids, roster, update } = state;
+  const stored = workspace.roster;
+  // Adding a roster leaves the last run on the board, marked stale by the
+  // fingerprint. Removing one takes its students out of the run, so the run
+  // goes too, as a new bids file's does, along with the pins on students the
+  // survey never had: otherwise a placed roster student would silently drop
+  // off the results board.
+  const setRoster = (next: Workspace["roster"]) =>
+    update((w) => ({ ...w, roster: next }));
+  const removeRoster = () => {
+    const surveyed = new Set(
+      (bids?.students ?? []).filter((s) => !s.rosterOnly).map((s) => s.email)
+    );
+    update((w) => {
+      const pins = Object.entries(w.pins ?? {}).filter(([email]) =>
+        surveyed.has(email)
+      );
+      return {
+        ...w,
+        roster: undefined,
+        result: undefined,
+        pins: pins.length > 0 ? Object.fromEntries(pins) : undefined,
+      };
+    });
+  };
+
+  if (stored === undefined || roster === null) {
+    return (
+      <section
+        aria-labelledby="placement-roster-heading"
+        className="mt-6 flex flex-col gap-3"
+      >
+        <div>
+          <h2 className="font-medium" id="placement-roster-heading">
+            Class roster
+          </h2>
+          <p className="text-muted-foreground text-sm">
+            Every student in the class, so the ones who did not answer the
+            survey are placed too. Matched to the bids by email.
+          </p>
+        </div>
+        <div className="flex flex-col items-start gap-2">
+          <FilePickerButton
+            accept=".csv,text/csv"
+            inputLabel="Roster CSV file"
+            onText={(text, filename) =>
+              setRoster({ source: { kind: "csv", filename }, text })
+            }
+          >
+            Upload roster CSV
+          </FilePickerButton>
+          <CsvFormatHelp format={ROSTER_FORMAT} label="roster" />
+        </div>
+        <PasteList
+          buttonLabel="Use these emails"
+          hint="One per line, or separated by commas, semicolons or spaces. Name <email> works too."
+          label="Roster emails"
+          onUse={(text) => setRoster({ source: { kind: "pasted" }, text })}
+          placeholder={"ada@example.edu\nKim Lee <kim@example.edu>"}
+        />
+      </section>
+    );
+  }
+
+  const unit = stored.source.kind === "csv" ? "row" : "line";
+  const from =
+    stored.source.kind === "csv" ? stored.source.filename : "a pasted list";
+  const notInSurvey = bids?.students.filter((s) => s.rosterOnly).length ?? 0;
+  const notOnRoster = bids?.notOnRoster ?? [];
+  return (
+    <section
+      aria-labelledby="placement-roster-heading"
+      className="mt-6 rounded-md border px-3 py-2 text-sm"
+    >
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <h2 className="font-medium" id="placement-roster-heading">
+          Class roster{" "}
+          <span className="font-normal text-muted-foreground">
+            {plural(roster.entries.length, "student", "students")} from {from}
+          </span>
+        </h2>
+        <ConfirmDialog
+          busyLabel="Removing..."
+          confirmLabel="Remove"
+          description="The students who did not answer the survey leave the board and the run, and so does the last placement. The bids stay."
+          onConfirm={removeRoster}
+          title="Remove the class roster?"
+        >
+          <Button size="sm" type="button" variant="ghost">
+            <Trash2 aria-hidden="true" />
+            Remove roster
+          </Button>
+        </ConfirmDialog>
+      </div>
+      <p className="mt-1">{rosterSummary(bids === null, notInSurvey)}</p>
+      {notOnRoster.length > 0 && (
+        <p
+          className="mt-1"
+          role="note"
+          style={{ color: "var(--status-warning)" }}
+        >
+          {notOnRoster.length === 1
+            ? "1 student who answered the survey is not on the roster, and stays in the run:"
+            : `${notOnRoster.length} students who answered the survey are not on the roster, and stay in the run:`}{" "}
+          {notOnRoster.slice(0, SHOWN).join(", ")}
+          {notOnRoster.length > SHOWN &&
+            `, and ${notOnRoster.length - SHOWN} more`}
+          .
+        </p>
+      )}
+      <ImportIssues issues={roster.issues} label="roster" unit={unit} />
+    </section>
+  );
+}
+
+function rosterSummary(noBids: boolean, notInSurvey: number): string {
+  if (noBids) {
+    return "Upload the bids to match the roster against them.";
+  }
+  if (notInSurvey === 0) {
+    return "Everyone on the roster answered the survey.";
+  }
+  return `${plural(notInSurvey, "student on the roster did", "students on the roster did")} not answer the survey; they are on the board with no bids.`;
+}

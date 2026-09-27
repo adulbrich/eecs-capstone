@@ -67,11 +67,23 @@ export function ResultsTab({
   );
   // Hashes the whole bids text, and this panel stays mounted while other
   // tabs are edited, so it is worked out once per change to its inputs.
-  const { projects, parameters, bids: stored, titleMatches } = workspace;
+  const {
+    projects,
+    parameters,
+    bids: stored,
+    titleMatches,
+    roster,
+  } = workspace;
   const fingerprint = useMemo(
     () =>
-      inputFingerprint({ projects, parameters, bids: stored, titleMatches }),
-    [projects, parameters, stored, titleMatches]
+      inputFingerprint({
+        projects,
+        parameters,
+        bids: stored,
+        titleMatches,
+        roster,
+      }),
+    [projects, parameters, stored, titleMatches, roster]
   );
   const [running, setRunning] = useState(false);
   // A failed run, and the inputs it read: it stops being shown once they

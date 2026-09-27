@@ -212,6 +212,7 @@ describe("workspace with a result", () => {
       ...EMPTY_WORKSPACE,
       projects: PROJECTS,
       titleMatches: undefined,
+      roster: undefined,
     };
     const pinned = { ...base, pins: { a: "p1" } };
     expect(inputFingerprint(pinned)).toBe(inputFingerprint(base));

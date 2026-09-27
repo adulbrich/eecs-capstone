@@ -8,6 +8,7 @@ import { ConfirmDialog } from "#/components/confirm-dialog";
 import { CsvFormatHelp } from "#/components/placement/csv-format";
 import { FilePickerButton } from "#/components/placement/file-picker-button";
 import { ImportIssues } from "#/components/placement/import-issues";
+import { RosterSection } from "#/components/placement/roster-section";
 import { TitleMatchesPanel } from "#/components/placement/title-matches";
 import type { PlacementWorkspace } from "#/components/placement/use-placement-workspace";
 import { Button } from "#/components/ui/button";
@@ -64,6 +65,7 @@ export function BidsTab({
           Upload bids CSV
         </FilePickerButton>
         <CsvFormatHelp format={BIDS_FORMAT} label="bids" />
+        <RosterSection state={state} workspace={workspace} />
       </div>
     );
   }
@@ -71,13 +73,17 @@ export function BidsTab({
   const { students } = bids;
   const bidCount = students.reduce((sum, s) => sum + s.bids.length, 0);
   const pinned = students.filter((s) => s.pin !== undefined).length;
+  const rosterOnly = students.filter((s) => s.rosterOnly).length;
   return (
     <div>
       <div className="flex flex-wrap items-center justify-between gap-2">
         <p className="text-sm">
-          {students.length} students and {bidCount} bids from{" "}
+          {students.length - rosterOnly} students and {bidCount} bids from{" "}
           {workspace.bids.filename}
-          {pinned > 0 && `, ${pinned} pinned`}.
+          {pinned > 0 && `, ${pinned} pinned`}
+          {rosterOnly > 0 &&
+            `, and ${rosterOnly} more from the roster with no bids`}
+          .
         </p>
         <ConfirmDialog
           busyLabel="Removing..."
@@ -147,6 +153,7 @@ export function BidsTab({
         unmatched={bids.unmatched}
       />
       <ImportIssues issues={bids.issues} label="bids" />
+      <RosterSection state={state} workspace={workspace} />
       <StudentsTable projects={workspace.projects} students={students} />
     </div>
   );
@@ -166,13 +173,21 @@ interface Row {
   pinned: boolean;
   priority: number | null;
   project: string;
+  /** The one row of a roster student who did not answer the survey. */
+  rosterOnly: boolean;
 }
 
+// The survey's students first, then the roster's, each in name order.
 const byName = (a: PlacementStudent, b: PlacementStudent) =>
+  Number(a.rosterOnly ?? false) - Number(b.rosterOnly ?? false) ||
   (a.name || a.email).localeCompare(b.name || b.email) ||
   a.email.localeCompare(b.email);
 
-/** Every student's bids, first choice first, students in name order. */
+/**
+ * Every student's bids, first choice first, students in name order. A
+ * roster student who did not answer the survey gets one row saying so, since
+ * a group needs a row to show.
+ */
 function bidRows(
   students: PlacementStudent[],
   titles: Map<string, string>
@@ -189,6 +204,7 @@ function bidRows(
         project: title(bid.projectKey),
         comment: bid.comment,
         pinned: bid.projectKey === s.pin,
+        rosterOnly: false,
       }));
     if (s.pin !== undefined && !s.bids.some((b) => b.projectKey === s.pin)) {
       rows.push({
@@ -198,6 +214,18 @@ function bidRows(
         project: title(s.pin),
         comment: "",
         pinned: true,
+        rosterOnly: false,
+      });
+    }
+    if (rows.length === 0 && s.rosterOnly) {
+      rows.push({
+        ...student,
+        id: `${s.email}:roster`,
+        priority: null,
+        project: "No bids",
+        comment: "",
+        pinned: false,
+        rosterOnly: true,
       });
     }
     return rows;
@@ -210,7 +238,12 @@ function bidRows(
 const COLUMNS = defineAdminColumns<Row>()([
   {
     accessorFn: (row) => (row.priority === null ? "Pin" : String(row.priority)),
-    cell: ({ row }) => row.original.priority ?? "Pinned",
+    cell: ({ row }) => {
+      if (row.original.priority !== null) {
+        return row.original.priority;
+      }
+      return row.original.pinned ? "Pinned" : "-";
+    },
     enableHiding: false,
     enableSorting: false,
     header: "Priority",
@@ -257,7 +290,9 @@ function StudentHeader({ rows }: { rows: Row[] }) {
         </span>
       )}
       <span className="ml-2 font-normal text-muted-foreground text-xs">
-        {bids} {bids === 1 ? "bid" : "bids"}
+        {first.rosterOnly
+          ? "on the roster, not in the survey"
+          : `${bids} ${bids === 1 ? "bid" : "bids"}`}
       </span>
       {first.avoid && (
         <p
