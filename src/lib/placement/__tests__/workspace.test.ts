@@ -39,6 +39,17 @@ describe("parseWorkspace", () => {
     expect(parsed).toEqual({ ok: true, workspace: WORKSPACE });
   });
 
+  it("keeps a pasted project source", () => {
+    const workspace: Workspace = {
+      ...WORKSPACE,
+      projectSource: { kind: "pasted" },
+    };
+    expect(parseWorkspace(serializeWorkspace(workspace))).toEqual({
+      ok: true,
+      workspace,
+    });
+  });
+
   it("keeps a converted file's origin and conversion issues", () => {
     const converted: Workspace = {
       ...WORKSPACE,

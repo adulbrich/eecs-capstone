@@ -342,6 +342,20 @@ test("admin placement, empty", async ({ page }) => {
   await checkA11y(page);
 });
 
+test("admin placement, projects from a pasted list", async ({ page }) => {
+  await page.goto("/admin/placement");
+  await waitForHydration(page);
+  await page
+    .getByLabel("Project titles")
+    .fill("Tide Clock\nRobot Arm\ntide clock");
+  await page.getByRole("button", { name: "Use these titles" }).click();
+  await expect(page.getByText("2 projects from a pasted list")).toBeVisible();
+  await expect(
+    page.getByRole("region", { name: "Problems in the pasted project titles" })
+  ).toContainText("Line 3");
+  await checkA11y(page);
+});
+
 test("@smoke admin placement, projects and bids loaded", async ({ page }) => {
   await page.goto("/admin/placement");
   await waitForHydration(page);

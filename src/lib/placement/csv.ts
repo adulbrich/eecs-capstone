@@ -184,6 +184,54 @@ export function parseProjectsCsv(text: string): {
   return { projects, issues };
 }
 
+/** Lines of pasted text, 1-based, without the blank ones. */
+export function pastedLines(text: string): { line: number; text: string }[] {
+  return text
+    .split(LINE_BREAK)
+    .map((raw, index) => ({ line: index + 1, text: raw.trim() }))
+    .filter((l) => l.text !== "");
+}
+
+const LINE_BREAK = /\r\n|\r|\n/;
+
+/**
+ * A pasted column of project titles, one per line (#664): the projects a CSV
+ * with only a `title` column would give, keyed the same way. An issue's
+ * `row` is the line number, blank lines counted.
+ */
+export function parseProjectTitles(text: string): {
+  issues: ImportIssue[];
+  projects: WorkspaceProject[];
+} {
+  const projects: WorkspaceProject[] = [];
+  const issues: ImportIssue[] = [];
+  const firstLine = new Map<string, number>();
+  for (const { line, text: raw } of pastedLines(text)) {
+    const title = raw.replace(/\s+/g, " ");
+    const key = normalizeTitle(title);
+    if (key === "") {
+      issues.push({
+        level: "error",
+        row: line,
+        message: "The line has no title.",
+      });
+      continue;
+    }
+    const earlier = firstLine.get(key);
+    if (earlier !== undefined) {
+      issues.push({
+        level: "error",
+        row: line,
+        message: `The same title as line ${earlier}.`,
+      });
+      continue;
+    }
+    firstLine.set(key, line);
+    projects.push({ key, title, weightMultiplier: 1 });
+  }
+  return { projects, issues };
+}
+
 interface StudentDraft {
   pinRow?: number;
   priorities: Map<number, number>;

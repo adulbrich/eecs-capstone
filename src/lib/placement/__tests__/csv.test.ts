@@ -3,6 +3,7 @@ import {
   normalizeTitle,
   parseBidsCsv,
   parseProjectsCsv,
+  parseProjectTitles,
 } from "#/lib/placement/csv";
 
 // Every name, email and title here is invented (#648).
@@ -290,5 +291,30 @@ describe("parseBidsCsv with title matches", () => {
     expect(result.students[0].bids).toEqual([
       { projectKey: "p1", priority: 2, comment: "" },
     ]);
+  });
+});
+
+describe("parseProjectTitles", () => {
+  it("builds a project per line with the defaults, keyed like a CSV project", () => {
+    const pasted = parseProjectTitles(
+      "Tide Clock\r\n\n  Robot   Arm \nGarden Planner\n"
+    );
+    expect(pasted.issues).toEqual([]);
+    expect(pasted.projects).toEqual(
+      parseProjectsCsv("title\nTide Clock\nRobot Arm\nGarden Planner").projects
+    );
+  });
+
+  it("reports a repeated title and a line of punctuation by line number", () => {
+    const pasted = parseProjectTitles("Tide Clock\n\n...\ntide clock:");
+    expect(pasted.projects.map((p) => p.title)).toEqual(["Tide Clock"]);
+    expect(pasted.issues).toEqual([
+      { level: "error", row: 3, message: "The line has no title." },
+      { level: "error", row: 4, message: "The same title as line 1." },
+    ]);
+  });
+
+  it("gives nothing for blank text", () => {
+    expect(parseProjectTitles(" \n\t\n")).toEqual({ projects: [], issues: [] });
   });
 });

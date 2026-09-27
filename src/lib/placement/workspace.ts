@@ -25,7 +25,8 @@ export interface WorkspaceParameters extends PlacementParameters {
 
 export type ProjectSource =
   | { kind: "portal"; programId: string; programLabel: string }
-  | { kind: "csv"; filename: string };
+  | { kind: "csv"; filename: string }
+  | { kind: "pasted" };
 
 export interface Workspace {
   bids: {
@@ -161,6 +162,7 @@ const workspaceSchema = z
           programLabel: z.string(),
         }),
         z.object({ kind: z.literal("csv"), filename: z.string() }),
+        z.object({ kind: z.literal("pasted") }),
       ])
       .nullable(),
     projects: z.array(projectSchema),
