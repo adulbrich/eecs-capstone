@@ -33,9 +33,9 @@ export function normalizeTitle(title: string): string {
     .toLowerCase();
 }
 
-type Row = Record<string, string | undefined>;
+export type Row = Record<string, string | undefined>;
 
-function parseRows(text: string): {
+export function parseRows(text: string): {
   fields: string[];
   issues: ImportIssue[];
   rows: Row[];
@@ -78,7 +78,10 @@ function parseRows(text: string): {
   return { fields: parsed.meta.fields ?? [], issues, rows: parsed.data };
 }
 
-function missingColumns(fields: string[], required: string[]): ImportIssue[] {
+export function missingColumns(
+  fields: string[],
+  required: string[]
+): ImportIssue[] {
   return required
     .filter((column) => !fields.includes(column))
     .map((column) => ({
@@ -88,7 +91,7 @@ function missingColumns(fields: string[], required: string[]): ImportIssue[] {
     }));
 }
 
-const cell = (row: Row, column: string) =>
+export const cell = (row: Row, column: string) =>
   unguardCell((row[column] ?? "").trim());
 
 /** Blank is undefined; anything but a whole number at or above `min` is invalid. */

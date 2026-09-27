@@ -168,12 +168,38 @@ describe("title matches", () => {
   });
 
   it("change the fingerprint, and none or an empty set leave it alone", () => {
-    const base = { ...WORKSPACE, titleMatches: undefined };
+    const base = { ...WORKSPACE, titleMatches: undefined, roster: undefined };
     expect(inputFingerprint({ ...base, titleMatches: {} })).toBe(
       inputFingerprint(base)
     );
     expect(inputFingerprint({ ...base, titleMatches: matches })).not.toBe(
       inputFingerprint(base)
     );
+  });
+});
+
+describe("the roster", () => {
+  const roster = {
+    source: { kind: "pasted" as const },
+    text: "ada@example.edu\nkim@example.edu",
+  };
+
+  it("round-trips through a file", () => {
+    const workspace = { ...WORKSPACE, roster };
+    expect(parseWorkspace(serializeWorkspace(workspace))).toEqual({
+      ok: true,
+      workspace,
+    });
+  });
+
+  it("changes the fingerprint, and none leaves it as before", () => {
+    const base = { ...WORKSPACE, titleMatches: undefined, roster: undefined };
+    expect(inputFingerprint({ ...base, roster })).not.toBe(
+      inputFingerprint(base)
+    );
+  });
+
+  it("keeps a workspace that holds only a roster from counting as empty", () => {
+    expect(isEmptyWorkspace({ ...EMPTY_WORKSPACE, roster })).toBe(false);
   });
 });

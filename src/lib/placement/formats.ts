@@ -138,3 +138,28 @@ export function formatTemplate(format: CsvFormat): string {
     format.templateRows
   );
 }
+
+export const ROSTER_FORMAT: CsvFormat = {
+  filename: "placement-roster-template",
+  note: "Or paste the emails in the box instead: one per line, or separated by commas, semicolons or spaces.",
+  columns: [
+    {
+      name: "email",
+      required: true,
+      meaning:
+        "The student's email, as the survey has it. One row per student.",
+      example: "ada@example.edu",
+    },
+    {
+      name: "name",
+      required: false,
+      meaning:
+        "The student's name, for a student who did not answer the survey.",
+      example: "Ada Park",
+    },
+  ],
+  templateRows: [
+    { email: "ada@example.edu", name: "Ada Park" },
+    { email: "kim@example.edu", name: "Kim Lee" },
+  ],
+};
