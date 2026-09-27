@@ -15,6 +15,7 @@ import { Button } from "#/components/ui/button";
 import { downloadText } from "#/lib/placement/download";
 import { BIDS_FORMAT } from "#/lib/placement/formats";
 import { convertQualtrics, isQualtricsExport } from "#/lib/placement/qualtrics";
+import { repointRosterPins } from "#/lib/placement/roster";
 import type { PlacementStudent } from "#/lib/placement/types";
 import type { Workspace } from "#/lib/placement/workspace";
 import type { SortState } from "#/lib/table-state";
@@ -138,6 +139,7 @@ export function BidsTab({
           update((w) => ({
             ...w,
             titleMatches: { ...w.titleMatches, ...added },
+            pins: repointRosterPins(w.pins, added),
           }))
         }
         onUndo={(key) =>
@@ -154,7 +156,7 @@ export function BidsTab({
       />
       <ImportIssues issues={bids.issues} label="bids" />
       <RosterSection state={state} workspace={workspace} />
-      <StudentsTable projects={state.projects} students={students} />
+      <StudentsTable projects={state.placementProjects} students={students} />
     </div>
   );
 }

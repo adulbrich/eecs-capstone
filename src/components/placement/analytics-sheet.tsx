@@ -74,7 +74,7 @@ export function AnalyticsSheet({
   const bids = state.bids?.students ?? [];
   const { pins, result } = workspace;
   // Listed projects plus any the roster adds (#670).
-  const { projects } = state;
+  const { placementProjects: projects } = state;
   const perProject = useMemo(
     () => bidsPerProject(bids, projects),
     [bids, projects]

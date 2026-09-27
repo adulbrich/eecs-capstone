@@ -119,8 +119,11 @@ export function usePlacementWorkspace() {
     bids,
     roster,
     assignments,
-    /** Every project a run places students on: listed, then from the roster. */
-    projects: allProjects,
+    /**
+     * Every project a run places students on: the stored list, then any the
+     * roster adds (#670). `workspace.projects` is the stored list alone.
+     */
+    placementProjects: allProjects,
     saveFailed,
     unreadable,
     changedElsewhere,

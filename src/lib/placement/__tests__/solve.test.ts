@@ -376,6 +376,36 @@ describe("solvePlacement", () => {
     });
   });
 
+  it("seats nobody unpinned on a roster project, even with unranked placement on (#670)", () => {
+    // Its one pre-approved student was pinned elsewhere on the board, so the
+    // project is empty; the at-least-one rule must not fill it with others.
+    const fixture = input(
+      [
+        project("A", { maxStudents: 5 }),
+        project("roster:lab", {
+          maxTeams: 1,
+          minStudents: 1,
+          maxStudents: 1,
+          fromRoster: true,
+        }),
+      ],
+      [
+        student("a1@example.edu", ["A"]),
+        student("a2@example.edu", ["A"]),
+        rosterStudent("kim@example.edu"),
+      ],
+      {
+        minStudents: 1,
+        maxStudents: 5,
+        allowUnranked: true,
+        requireOneTeamPerProject: true,
+      }
+    );
+    const result = solvePlacement(highs, fixture);
+    expect(result.status).toBe("optimal");
+    expect(result.placements.every((p) => p.projectKey === "A")).toBe(true);
+  });
+
   it("fills a project added from the roster with its pre-approved students only (#670)", () => {
     const fixture = input(
       [

@@ -511,14 +511,20 @@ test.describe("placement workspace", () => {
         [
           "email,name,project",
           `ada@${DOMAIN},Ada Park,Robot Arm`,
-          `ben@${DOMAIN},Ben Ito,`,
+          `ben@${DOMAIN},Ben Ito,Tide Clock`,
           `kim@${DOMAIN},Kim Lee,Sponsor Lab`,
           `lou@${DOMAIN},Lou Ma,Tide Clok`,
         ].join("\n")
       ),
     });
     const roster = page.getByRole("region", { name: /Class roster/ });
-    await expect(roster).toContainText("3 students are pre-approved");
+    await expect(roster).toContainText("4 students are pre-approved");
+    // The bids file pins Ben to Robot Arm; the roster wins, and says so.
+    await expect(
+      page.getByRole("note", { name: "Pre-approvals over a pin from the bids" })
+    ).toContainText(
+      `ben@${DOMAIN} is pre-approved for Tide Clock, over the bids file's pin to Robot Arm.`
+    );
     await expect(
       page.getByRole("rowheader", {
         name: /Ada Park.*pre-approved for Robot Arm/,
@@ -560,6 +566,11 @@ test.describe("placement workspace", () => {
     await expect(
       group("Tide Clock, team").getByRole("row", {
         name: /Lou Ma.*Pre-approved/,
+      })
+    ).toBeVisible();
+    await expect(
+      group("Tide Clock, team").getByRole("row", {
+        name: /Ben Ito.*Pre-approved/,
       })
     ).toBeVisible();
   });

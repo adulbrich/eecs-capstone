@@ -1,5 +1,6 @@
 import type { PlacementWorkspace } from "#/components/placement/use-placement-workspace";
 import { Button } from "#/components/ui/button";
+import { repointRosterPins } from "#/lib/placement/roster";
 
 /**
  * The projects the roster pre-approves students for that the list lacks
@@ -63,6 +64,9 @@ export function RosterProjects({ state }: { state: PlacementWorkspace }) {
                             title: miss.title,
                           },
                         },
+                        pins: repointRosterPins(w.pins, {
+                          [miss.key]: { projectKey: miss.suggestion.key },
+                        }),
                       }))
                     }
                     size="sm"

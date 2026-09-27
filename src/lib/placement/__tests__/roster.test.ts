@@ -3,6 +3,7 @@ import {
   mergeRoster,
   parseRosterCsv,
   parseRosterList,
+  repointRosterPins,
   resolveRosterProjects,
   rosterProjectKey,
 } from "#/lib/placement/roster";
@@ -239,5 +240,40 @@ describe("pre-approvals on the roster (#670)", () => {
     expect(merged.conflicts).toEqual([
       { email: "ada@example.edu", fromBids: "p2", fromRoster: "p1" },
     ]);
+  });
+});
+
+describe("pre-approval edge cases (#670)", () => {
+  it("warns about a project cell that names nothing", () => {
+    const parsed = parseRosterCsv("email,project\nada@example.edu,...\n");
+    expect(parsed.entries).toEqual([
+      { email: "ada@example.edu", name: "", project: "..." },
+    ]);
+    expect(parsed.issues).toEqual([
+      {
+        level: "warning",
+        row: 2,
+        message:
+          '"..." names no project, so ada@example.edu is not pre-approved.',
+      },
+    ]);
+  });
+
+  it("moves board pins off a roster project a new match makes listed", () => {
+    expect(
+      repointRosterPins(
+        {
+          "ada@example.edu": rosterProjectKey("robot arm contoller"),
+          "ben@example.edu": "p1",
+          "cy@example.edu": null,
+        },
+        { "robot arm contoller": { projectKey: "p2" } }
+      )
+    ).toEqual({
+      "ada@example.edu": "p2",
+      "ben@example.edu": "p1",
+      "cy@example.edu": null,
+    });
+    expect(repointRosterPins(undefined, {})).toBeUndefined();
   });
 });

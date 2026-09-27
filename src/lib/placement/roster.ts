@@ -95,6 +95,12 @@ const projectCell = (raw: Parameters<typeof cell>[0]) => {
   return project === "" ? {} : { project };
 };
 
+/** A project cell that normalizes to nothing: "..." pre-approves nobody. */
+const unreadableProject = (raw: Parameters<typeof cell>[0]) => {
+  const project = cell(raw, "project");
+  return project !== "" && normalizeTitle(project) === "" ? project : null;
+};
+
 /**
  * `email, name, project`, one row per student; only `email` is required.
  * `project` pre-approves the student for that project.
@@ -127,6 +133,14 @@ export function parseRosterCsv(text: string): ParsedRoster {
             : `"${email}" is not an email.`,
       });
       return;
+    }
+    const unreadable = unreadableProject(raw);
+    if (unreadable !== null) {
+      issues.push({
+        level: "warning",
+        row,
+        message: `"${unreadable}" names no project, so ${email} is not pre-approved.`,
+      });
     }
     collect(
       entries,
@@ -265,6 +279,32 @@ export function resolveRosterProjects(
     }
   }
   return { added, nearMisses, pins };
+}
+
+/**
+ * Board pins moved along when new title matches turn a roster project into a
+ * listed one: a pin set on `roster:<title>` would otherwise name a project
+ * that no longer exists.
+ */
+export function repointRosterPins(
+  pins: Readonly<Record<string, string | null>> | undefined,
+  added: Readonly<Record<string, { projectKey: string }>>
+): Record<string, string | null> | undefined {
+  if (pins === undefined) {
+    return pins;
+  }
+  const moved = new Map(
+    Object.entries(added).map(([title, m]) => [
+      rosterProjectKey(title),
+      m.projectKey,
+    ])
+  );
+  return Object.fromEntries(
+    Object.entries(pins).map(([email, key]) => [
+      email,
+      key === null ? null : (moved.get(key) ?? key),
+    ])
+  );
 }
 
 /** A student the bids file pinned elsewhere than the roster pre-approves. */

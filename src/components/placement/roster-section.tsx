@@ -98,7 +98,7 @@ export function RosterSection({
   const notOnRoster = bids?.notOnRoster ?? [];
   const preApproved = assignments?.pins.size ?? 0;
   const conflicts = bids?.conflicts ?? [];
-  const titles = new Map(state.projects.map((p) => [p.key, p.title]));
+  const titles = new Map(state.placementProjects.map((p) => [p.key, p.title]));
   const title = (key: string) => titles.get(key) ?? key;
   return (
     <section

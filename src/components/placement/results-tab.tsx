@@ -62,7 +62,7 @@ export function ResultsTab({
 }) {
   const { bids, update } = state;
   // Listed projects plus any the roster adds (#670).
-  const allProjects = state.projects;
+  const allProjects = state.placementProjects;
   const students = useMemo(
     () => applyPins(bids?.students ?? [], workspace.pins),
     [bids, workspace.pins]
@@ -505,7 +505,10 @@ function RowActions({
           {projects
             .filter(
               (p) =>
-                p.key !== row.projectKey && (p.maxTeams ?? defaultMaxTeams) > 0
+                p.key !== row.projectKey &&
+                (p.maxTeams ?? defaultMaxTeams) > 0 &&
+                // A roster project holds exactly its pre-approved students.
+                !p.fromRoster
             )
             .map((p) => (
               <SelectItem key={p.key} value={p.key}>
