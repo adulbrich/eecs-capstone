@@ -305,8 +305,45 @@ describe("the Canvas roster and groups export (#674)", () => {
       ).entries
     );
     expect(canvas.issues).toEqual([
-      { level: "error", row: 4, message: "The row has no login_id." },
+      {
+        level: "warning",
+        row: 4,
+        message: "Canvas's Test Student has no login_id, and is left out.",
+      },
       { level: "error", row: 5, message: '"lmau" is not an email.' },
+    ]);
+  });
+
+  it("takes a later group when the first row has none, and names a second group it ignores", () => {
+    const canvas = parseRosterCsv(
+      [
+        HEADER,
+        "Ada Park,101,9001,ada@example.edu,CS 461,,,",
+        "Ada Park,101,9001,ada@example.edu,CS 461 lab,Tide Clock,55,7",
+        "Kim Lee,102,9002,kim@example.edu,CS 461,Sponsor Lab,56,8",
+        "Kim Lee,102,9002,kim@example.edu,CS 461 lab,Robot Arm,57,9",
+        "Lou Ma,103,,,CS 461,,,",
+      ].join("\n")
+    );
+    expect(canvas.entries).toEqual([
+      { email: "ada@example.edu", name: "Ada Park", project: "Tide Clock" },
+      { email: "kim@example.edu", name: "Kim Lee", project: "Sponsor Lab" },
+    ]);
+    expect(canvas.issues).toEqual([
+      {
+        level: "warning",
+        row: 3,
+        message:
+          'ada@example.edu is already on row 2, with no project; taking "Tide Clock" from this row.',
+      },
+      {
+        level: "warning",
+        row: 5,
+        message:
+          'kim@example.edu is already on row 4 for "Sponsor Lab"; "Robot Arm" here is ignored.',
+      },
+      // Only Canvas's own Test Student gets the gentler message.
+      { level: "error", row: 6, message: "The row has no login_id." },
     ]);
   });
 

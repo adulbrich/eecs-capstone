@@ -80,16 +80,30 @@ function collect(
   unit: "line" | "row"
 ) {
   const earlier = seen.get(entry.email);
-  if (earlier !== undefined) {
-    issues.push({
-      level: "warning",
-      row,
-      message: `${entry.email} is already on ${unit} ${earlier}; keeping the first.`,
-    });
+  if (earlier === undefined) {
+    seen.set(entry.email, row);
+    entries.push(entry);
     return;
   }
-  seen.set(entry.email, row);
-  entries.push(entry);
+  // Canvas lists a student once per group or section, so a repeat may carry
+  // the project the first row lacked, or a second one that has to lose.
+  const first = entries.find((e) => e.email === entry.email);
+  const warn = (message: string) =>
+    issues.push({ level: "warning", row, message });
+  if (first === undefined || entry.project === undefined) {
+    warn(`${entry.email} is already on ${unit} ${earlier}; keeping the first.`);
+  } else if (first.project === undefined) {
+    first.project = entry.project;
+    warn(
+      `${entry.email} is already on ${unit} ${earlier}, with no project; taking "${entry.project}" from this ${unit}.`
+    );
+  } else if (normalizeTitle(first.project) === normalizeTitle(entry.project)) {
+    warn(`${entry.email} is already on ${unit} ${earlier}; keeping the first.`);
+  } else {
+    warn(
+      `${entry.email} is already on ${unit} ${earlier} for "${first.project}"; "${entry.project}" here is ignored.`
+    );
+  }
 }
 
 /**
@@ -100,6 +114,7 @@ function collect(
 interface RosterColumns {
   email: string;
   format: RosterFormat;
+  name: string;
   project: string;
 }
 
@@ -108,11 +123,13 @@ export type RosterFormat = "canvas" | "roster";
 const ROSTER_COLUMNS: RosterColumns = {
   format: "roster",
   email: "email",
+  name: "name",
   project: "project",
 };
 const CANVAS_COLUMNS: RosterColumns = {
   format: "canvas",
   email: "login_id",
+  name: "name",
   project: "group_name",
 };
 
@@ -163,6 +180,19 @@ export function parseRosterCsv(text: string): ParsedRoster {
       return;
     }
     const email = cell(raw, columns.email).toLowerCase();
+    // Canvas adds a Test Student to every course, with no login_id.
+    if (
+      email === "" &&
+      columns.format === "canvas" &&
+      cell(raw, columns.name).toLowerCase() === "test student"
+    ) {
+      issues.push({
+        level: "warning",
+        row,
+        message: "Canvas's Test Student has no login_id, and is left out.",
+      });
+      return;
+    }
     if (!isEmail(email)) {
       issues.push({
         level: "error",
@@ -187,7 +217,11 @@ export function parseRosterCsv(text: string): ParsedRoster {
       seen,
       issues,
       row,
-      { email, name: cell(raw, "name"), ...projectCell(raw, columns.project) },
+      {
+        email,
+        name: cell(raw, columns.name),
+        ...projectCell(raw, columns.project),
+      },
       "row"
     );
   });
