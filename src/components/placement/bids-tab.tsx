@@ -402,7 +402,12 @@ function bidsFromFile(
   };
 }
 
-/** Per student or per project; the choice lives in the URL. */
+/**
+ * Per student or per project; the choice lives in the URL. Built as
+ * `ViewToggle` is: a segmented group whose pressed fill comes from
+ * `aria-pressed` in the Button base class (UI-CONVENTIONS, "`className` on a
+ * Button never restyles it").
+ */
 function ViewSwitch({
   onView,
   view,
@@ -415,8 +420,12 @@ function ViewSwitch({
     { value: "project", label: "Per project" },
   ];
   return (
-    <fieldset className="mt-6 flex flex-wrap items-center gap-2">
-      <legend className="sr-only">Show the bids</legend>
+    // biome-ignore lint/a11y/useSemanticElements: aria role=group with label is the right pattern for paired toggle buttons
+    <div
+      aria-label="Show the bids"
+      className="mt-6 flex [&>*+*]:-ml-px [&>*:not(:first-child)]:rounded-l-none [&>*:not(:last-child)]:rounded-r-none"
+      role="group"
+    >
       {options.map((option) => (
         <Button
           aria-pressed={view === option.value}
@@ -424,11 +433,11 @@ function ViewSwitch({
           onClick={() => onView(option.value)}
           size="sm"
           type="button"
-          variant={view === option.value ? "default" : "outline"}
+          variant="outline"
         >
           {option.label}
         </Button>
       ))}
-    </fieldset>
+    </div>
   );
 }
