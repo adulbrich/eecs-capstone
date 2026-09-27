@@ -449,6 +449,40 @@ test.describe("placement workspace", () => {
     ).toBeVisible();
   });
 
+  test("a run places a roster student who did not answer the survey", async ({
+    page,
+  }) => {
+    await page.goto("/admin/placement");
+    await waitForHydration(page);
+    await importFiles(page);
+    await page
+      .getByLabel("Roster emails")
+      .fill(`ada@${DOMAIN}\nben@${DOMAIN}\nKim Lee <kim@${DOMAIN}>`);
+    await page.getByRole("button", { name: "Use these emails" }).click();
+    await page.getByRole("tab", { name: "Parameters" }).click();
+    await page.getByLabel("Min students").fill("1");
+    await page.getByRole("tab", { name: /Projects/ }).click();
+    await page.getByLabel("Min students per team, Robot Arm").fill("1");
+
+    await page.getByRole("tab", { name: "Results" }).click();
+    await page.getByRole("button", { name: "Run placement" }).click();
+    await expect(page.getByText("3 of 3 students placed")).toBeVisible({
+      timeout: 20_000,
+    });
+    await expect(
+      page.getByRole("row", { name: /Kim Lee.*Not in the survey/ })
+    ).toBeVisible();
+
+    const placement = page.waitForEvent("download");
+    await page.getByRole("button", { name: "Download placement" }).click();
+    const placed = await readFile(await (await placement).path(), "utf-8");
+    expect(placed).toMatch(
+      new RegExp(
+        `kim@${DOMAIN.replaceAll(".", "\\.")},Kim Lee,[^,]+,\\d,not in the survey`
+      )
+    );
+  });
+
   test("clearing all data empties the stored workspace after a confirmation", async ({
     page,
   }) => {

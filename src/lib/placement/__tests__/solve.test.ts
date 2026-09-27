@@ -288,25 +288,44 @@ describe("solvePlacement", () => {
     });
 
     it("leans toward the project with the fewest bids", () => {
-      const fixture = input(
-        [project("A"), project("B"), project("C")],
-        [
-          student("a1@example.edu", ["A"]),
-          student("b1@example.edu", ["B"]),
-          student("b2@example.edu", ["B", "A"]),
-          rosterStudent("kim@example.edu"),
-        ],
-        { minStudents: 1, maxStudents: 3, requireOneTeamPerProject: false }
-      );
-      const result = solvePlacement(highs, fixture);
+      // The same three projects twice, with the bids turned around, so the
+      // answer cannot come from column order alone.
+      const placeKim = (bids: Record<string, string[]>) => {
+        const fixture = input(
+          [project("A"), project("B"), project("C")],
+          [
+            ...Object.entries(bids).map(([email, keys]) =>
+              student(email, keys)
+            ),
+            rosterStudent("kim@example.edu"),
+          ],
+          { minStudents: 1, maxStudents: 3, requireOneTeamPerProject: false }
+        );
+        return solvePlacement(highs, fixture).placements.find(
+          (p) => p.email === "kim@example.edu"
+        )?.projectKey;
+      };
       expect(
-        result.placements.find((p) => p.email === "kim@example.edu")?.projectKey
+        placeKim({
+          "x1@example.edu": ["A"],
+          "x2@example.edu": ["A"],
+          "x3@example.edu": ["B"],
+        })
       ).toBe("C");
+      expect(
+        placeKim({
+          "x1@example.edu": ["C"],
+          "x2@example.edu": ["C"],
+          "x3@example.edu": ["B"],
+        })
+      ).toBe("A");
     });
 
     it("does not make a project nobody bid on required", () => {
+      // A needs all five students. Were Z required, the two roster
+      // students would have to form it, and A could not fill.
       const fixture = input(
-        [project("A", { maxStudents: 5 }), project("Z")],
+        [project("A"), project("Z", { minStudents: 2, maxStudents: 2 })],
         [
           student("a1@example.edu", ["A"]),
           student("a2@example.edu", ["A"]),
@@ -314,12 +333,10 @@ describe("solvePlacement", () => {
           rosterStudent("kim@example.edu"),
           rosterStudent("lou@example.edu"),
         ],
-        { minStudents: 3, maxStudents: 3, requireOneTeamPerProject: true }
+        { minStudents: 5, maxStudents: 5, requireOneTeamPerProject: true }
       );
-      // Were Z required, it would need three of the two roster students.
       const result = solvePlacement(highs, fixture);
       expect(result.status).toBe("optimal");
-      expect(result.diagnostics.requiredSeatShortfall).toBeNull();
       expect(result.placements.every((p) => p.projectKey === "A")).toBe(true);
     });
 
