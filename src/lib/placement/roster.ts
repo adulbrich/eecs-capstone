@@ -30,6 +30,8 @@ export interface RosterEntry {
 
 export interface ParsedRoster {
   entries: RosterEntry[];
+  /** How a CSV was read; a pasted list is always "roster". */
+  format: RosterFormat;
   issues: ImportIssue[];
 }
 
@@ -69,72 +71,151 @@ function splitItems(line: string): string[] {
 }
 
 /** Adds an entry, or a warning when the email is already on the roster. */
+/** Per email, the first row it is on and the row its project came from. */
+type Seen = Map<string, { projectRow?: number; row: number }>;
+
 function collect(
   entries: RosterEntry[],
-  seen: Map<string, number>,
+  seen: Seen,
   issues: ImportIssue[],
   row: number,
   entry: RosterEntry,
   unit: "line" | "row"
 ) {
   const earlier = seen.get(entry.email);
-  if (earlier !== undefined) {
-    issues.push({
-      level: "warning",
+  if (earlier === undefined) {
+    seen.set(entry.email, {
       row,
-      message: `${entry.email} is already on ${unit} ${earlier}; keeping the first.`,
+      projectRow: entry.project === undefined ? undefined : row,
     });
+    entries.push(entry);
     return;
   }
-  seen.set(entry.email, row);
-  entries.push(entry);
+  // Canvas lists a student once per group or section, so a repeat may carry
+  // the project the first row lacked, or a second one that has to lose.
+  const first = entries.find((e) => e.email === entry.email);
+  const warn = (message: string) =>
+    issues.push({ level: "warning", row, message });
+  if (first === undefined || entry.project === undefined) {
+    warn(
+      `${entry.email} is already on ${unit} ${earlier.row}; keeping the first.`
+    );
+  } else if (first.project === undefined) {
+    first.project = entry.project;
+    earlier.projectRow = row;
+    warn(
+      `${entry.email} is already on ${unit} ${earlier.row}, with no project; taking "${entry.project}" from this ${unit}.`
+    );
+  } else if (normalizeTitle(first.project) === normalizeTitle(entry.project)) {
+    warn(
+      `${entry.email} is already on ${unit} ${earlier.row}; keeping the first.`
+    );
+  } else {
+    warn(
+      `${entry.email} already has "${first.project}" from ${unit} ${earlier.projectRow ?? earlier.row}; "${entry.project}" here is ignored.`
+    );
+  }
 }
 
-const projectCell = (raw: Parameters<typeof cell>[0]) => {
-  const project = cell(raw, "project");
+/**
+ * Which column holds what. The roster's own format, or Canvas's roster and
+ * groups export (#674), whose `login_id` is the email and whose `group_name`
+ * is the team, read as the pre-approved project.
+ */
+interface RosterColumns {
+  email: string;
+  format: RosterFormat;
+  name: string;
+  project: string;
+}
+
+export type RosterFormat = "canvas" | "roster";
+
+const ROSTER_COLUMNS: RosterColumns = {
+  format: "roster",
+  email: "email",
+  name: "name",
+  project: "project",
+};
+const CANVAS_COLUMNS: RosterColumns = {
+  format: "canvas",
+  email: "login_id",
+  name: "name",
+  project: "group_name",
+};
+
+/** A Canvas export has `login_id` and no `email`; `email` wins if both. */
+const columnsFor = (fields: readonly string[]): RosterColumns =>
+  fields.includes("login_id") && !fields.includes("email")
+    ? CANVAS_COLUMNS
+    : ROSTER_COLUMNS;
+
+type RawRow = Parameters<typeof cell>[0];
+
+const projectCell = (raw: RawRow, column: string) => {
+  const project = cell(raw, column);
   return project === "" ? {} : { project };
 };
 
 /** A project cell that normalizes to nothing: "..." pre-approves nobody. */
-const unreadableProject = (raw: Parameters<typeof cell>[0]) => {
-  const project = cell(raw, "project");
+const unreadableProject = (raw: RawRow, column: string) => {
+  const project = cell(raw, column);
   return project !== "" && normalizeTitle(project) === "" ? project : null;
 };
 
 /**
  * `email, name, project`, one row per student; only `email` is required.
- * `project` pre-approves the student for that project.
+ * `project` pre-approves the student for that project. A Canvas roster and
+ * groups export reads as it comes: see `RosterColumns`.
  */
 export function parseRosterCsv(text: string): ParsedRoster {
   const { fields, issues, rows } = parseRows(text);
+  const columns = columnsFor(fields);
   const missing =
     fields.length === 0 && issues.length > 0
       ? []
-      : missingColumns(fields, ["email"]);
+      : missingColumns(fields, [columns.email]);
   if (missing.length > 0) {
-    return { entries: [], issues: [...issues, ...missing] };
+    return {
+      entries: [],
+      issues: [...issues, ...missing],
+      format: columns.format,
+    };
   }
   const entries: RosterEntry[] = [];
-  const seen = new Map<string, number>();
+  const seen: Seen = new Map();
   const failedRows = new Set(issues.map((i) => i.row));
   rows.forEach((raw, index) => {
     const row = index + 2;
     if (failedRows.has(row)) {
       return;
     }
-    const email = cell(raw, "email").toLowerCase();
+    const email = cell(raw, columns.email).toLowerCase();
+    // Canvas adds a Test Student to every course, with no login_id.
+    if (
+      email === "" &&
+      columns.format === "canvas" &&
+      cell(raw, columns.name).toLowerCase() === "test student"
+    ) {
+      issues.push({
+        level: "warning",
+        row,
+        message: "Canvas's Test Student has no login_id, and is left out.",
+      });
+      return;
+    }
     if (!isEmail(email)) {
       issues.push({
         level: "error",
         row,
         message:
           email === ""
-            ? "The row has no email."
+            ? `The row has no ${columns.email}.`
             : `"${email}" is not an email.`,
       });
       return;
     }
-    const unreadable = unreadableProject(raw);
+    const unreadable = unreadableProject(raw, columns.project);
     if (unreadable !== null) {
       issues.push({
         level: "warning",
@@ -147,11 +228,19 @@ export function parseRosterCsv(text: string): ParsedRoster {
       seen,
       issues,
       row,
-      { email, name: cell(raw, "name"), ...projectCell(raw) },
+      {
+        email,
+        name: cell(raw, columns.name),
+        ...projectCell(raw, columns.project),
+      },
       "row"
     );
   });
-  return { entries, issues: issues.sort((a, b) => a.row - b.row) };
+  return {
+    entries,
+    issues: issues.sort((a, b) => a.row - b.row),
+    format: columns.format,
+  };
 }
 
 /**
@@ -189,7 +278,7 @@ function readItem(item: string): RosterEntry[] | { error: string } {
 export function parseRosterList(text: string): ParsedRoster {
   const entries: RosterEntry[] = [];
   const issues: ImportIssue[] = [];
-  const seen = new Map<string, number>();
+  const seen: Seen = new Map();
   for (const { line, text: content } of pastedLines(text)) {
     for (const raw of splitItems(content)) {
       const item = raw.trim();
@@ -206,7 +295,7 @@ export function parseRosterList(text: string): ParsedRoster {
       }
     }
   }
-  return { entries, issues };
+  return { entries, issues, format: "roster" };
 }
 
 /** What the roster's pre-approvals come to against the project list. */

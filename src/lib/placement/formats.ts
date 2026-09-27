@@ -141,7 +141,7 @@ export function formatTemplate(format: CsvFormat): string {
 
 export const ROSTER_FORMAT: CsvFormat = {
   filename: "placement-roster-template",
-  note: "Or paste the emails in the box instead: one per line, or separated by commas, semicolons or spaces. Pre-approvals come only from the file's project column.",
+  note: "Canvas's roster and groups export also works as it comes: login_id is read as the email and group_name as the project. A file with an email column is read as the format above, even if it also has login_id. Or paste the emails in the box instead: one per line, or separated by commas, semicolons or spaces. Pre-approvals come only from a file.",
   columns: [
     {
       name: "email",

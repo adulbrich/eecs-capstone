@@ -638,6 +638,54 @@ test.describe("placement workspace", () => {
     await expect.poll(() => stored(page)).toContain(`"ada@${DOMAIN}":"`);
   });
 
+  test("a Canvas roster and groups export reads as a roster with pre-approvals", async ({
+    page,
+  }) => {
+    await page.goto("/admin/placement");
+    await waitForHydration(page);
+    await importFiles(page);
+    await page.getByLabel("Roster CSV file").setInputFiles({
+      name: "canvas-groups.csv",
+      mimeType: "text/csv",
+      buffer: Buffer.from(
+        [
+          "name,canvas_user_id,user_id,login_id,sections,group_name,canvas_group_id,group_id",
+          `Ada Park,101,9001,ada@${DOMAIN},CS 461,Tide Clock,55,7`,
+          `Ben Ito,102,9002,ben@${DOMAIN},CS 461,,,`,
+          `Kim Lee,103,9003,kim@${DOMAIN},CS 461,Team 3,56,8`,
+        ].join("\n")
+      ),
+    });
+    const roster = page.getByRole("region", { name: /Class roster/ });
+    await expect(roster).toContainText(
+      "Read as a Canvas roster and groups export"
+    );
+    await expect(roster).toContainText("2 students are pre-approved");
+    await page.getByRole("tab", { name: /Projects/ }).click();
+    await expect(
+      page.getByRole("region", { name: "Added from the roster" })
+    ).toContainText("Team 3");
+
+    const parameters = page.getByRole("tab", { name: "Parameters" });
+    await parameters.click();
+    await expect(parameters).toHaveAttribute("aria-selected", "true");
+    await page.getByLabel("Min students").fill("1");
+    // The bids file pins Ben alone to Robot Arm, whose own minimum is 2.
+    await page.getByRole("tab", { name: /Projects/ }).click();
+    await page.getByLabel("Min students per team, Robot Arm").fill("1");
+    await page.getByRole("tab", { name: "Results" }).click();
+    await page.getByRole("button", { name: "Run placement" }).click();
+    await expect(page.getByText("3 of 3 students placed")).toBeVisible({
+      timeout: 20_000,
+    });
+    await expect(
+      page
+        .getByRole("rowgroup")
+        .filter({ hasText: "Team 3, team 1" })
+        .getByRole("row", { name: /Kim Lee.*Pre-approved/ })
+    ).toBeVisible();
+  });
+
   test("clearing all data empties the stored workspace after a confirmation", async ({
     page,
   }) => {
