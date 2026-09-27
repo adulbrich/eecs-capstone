@@ -109,12 +109,9 @@ export function RosterSection({
           role="note"
           style={{ color: "var(--status-warning)" }}
         >
-          {plural(
-            notOnRoster.length,
-            "student who answered the survey is",
-            "students who answered the survey are"
-          )}{" "}
-          not on the roster, and stay in the run:{" "}
+          {notOnRoster.length === 1
+            ? "1 student who answered the survey is not on the roster, and stays in the run:"
+            : `${notOnRoster.length} students who answered the survey are not on the roster, and stay in the run:`}{" "}
           {notOnRoster.slice(0, SHOWN).join(", ")}
           {notOnRoster.length > SHOWN &&
             `, and ${notOnRoster.length - SHOWN} more`}
