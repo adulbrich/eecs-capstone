@@ -28,9 +28,12 @@ import { listPrograms } from "#/server/programs";
 
 const TABS = ["projects", "bids", "parameters", "results"] as const;
 type Tab = (typeof TABS)[number];
+const BIDS_VIEWS = ["student", "project"] as const;
 
 const searchSchema = z.object({
   tab: z.enum(TABS).default("projects"),
+  /** How the Bids tab lists the bids (#671). */
+  view: z.enum(BIDS_VIEWS).default("student"),
 });
 
 export const Route = createFileRoute("/_authed/admin/placement")({
@@ -50,7 +53,7 @@ export const Route = createFileRoute("/_authed/admin/placement")({
 
 function PlacementPage() {
   const { rows } = Route.useLoaderData();
-  const { tab } = Route.useSearch();
+  const { tab, view } = Route.useSearch();
   const navigate = useNavigate({ from: "/admin/placement" });
   const state = usePlacementWorkspace();
   const { workspace, bids } = state;
@@ -118,7 +121,9 @@ function PlacementPage() {
         <Tabs
           activationMode="manual"
           className="mt-4"
-          onValueChange={(next) => navigate({ search: { tab: next as Tab } })}
+          onValueChange={(next) =>
+            navigate({ search: (prev) => ({ ...prev, tab: next as Tab }) })
+          }
           value={tab}
         >
           <TabsList>
@@ -139,7 +144,14 @@ function PlacementPage() {
             />
           </TabsContent>
           <TabsContent value="bids">
-            <BidsTab state={state} workspace={workspace} />
+            <BidsTab
+              onView={(next) =>
+                navigate({ search: (prev) => ({ ...prev, view: next }) })
+              }
+              state={state}
+              view={view}
+              workspace={workspace}
+            />
           </TabsContent>
           <TabsContent value="parameters">
             <ParametersTab state={state} workspace={workspace} />

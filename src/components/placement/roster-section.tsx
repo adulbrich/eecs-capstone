@@ -132,8 +132,8 @@ export function RosterSection({
             ? "1 student is pre-approved for a project and placed there on every run."
             : `${preApproved} students are pre-approved for a project and placed there on every run.`}{" "}
           A pre-approval wins over a pin in the bids file. A pin set on the
-          Results tab wins over a pre-approval, and Unpin there leaves the
-          student free until the next pin.
+          Results tab or the Bids tab wins over a pre-approval, and Unpin there
+          leaves the student free until the next pin.
         </p>
       )}
       {conflicts.length > 0 && (

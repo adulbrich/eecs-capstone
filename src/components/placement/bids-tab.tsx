@@ -5,6 +5,7 @@ import {
   defineAdminColumns,
 } from "#/components/admin-data-table";
 import { ConfirmDialog } from "#/components/confirm-dialog";
+import { BidsByProject } from "#/components/placement/bids-by-project";
 import { CsvFormatHelp } from "#/components/placement/csv-format";
 import { FilePickerButton } from "#/components/placement/file-picker-button";
 import { ImportIssues } from "#/components/placement/import-issues";
@@ -12,6 +13,7 @@ import { RosterSection } from "#/components/placement/roster-section";
 import { TitleMatchesPanel } from "#/components/placement/title-matches";
 import type { PlacementWorkspace } from "#/components/placement/use-placement-workspace";
 import { Button } from "#/components/ui/button";
+import { applyPins } from "#/lib/placement/board";
 import { downloadText } from "#/lib/placement/download";
 import { BIDS_FORMAT } from "#/lib/placement/formats";
 import { convertQualtrics, isQualtricsExport } from "#/lib/placement/qualtrics";
@@ -23,12 +25,19 @@ import { useAdminTable } from "#/lib/use-admin-table";
 import { useLocalTableSearch } from "#/lib/use-local-table-search";
 
 const DEFAULT_SORT: SortState = { desc: false, id: "priority" };
+const WARNING_STYLE = { color: "var(--status-warning)" };
+
+export type BidsView = "project" | "student";
 
 export function BidsTab({
+  onView,
   state,
+  view,
   workspace,
 }: {
+  onView: (view: BidsView) => void;
   state: PlacementWorkspace;
+  view: BidsView;
   workspace: Workspace;
 }) {
   const { bids, update } = state;
@@ -73,7 +82,18 @@ export function BidsTab({
 
   const { students } = bids;
   const bidCount = students.reduce((sum, s) => sum + s.bids.length, 0);
-  const pinned = students.filter((s) => s.pin !== undefined).length;
+  // Both views and the count show every pin in effect, the board's
+  // included, so a pin set here or on the Results tab shows the same
+  // everywhere (#671).
+  const pinned = applyPins(students, workspace.pins);
+  // What the roster pre-approved, before board pins, so a pre-approval a
+  // board pin overrode can say so rather than vanish.
+  const preApprovals = new Map(
+    students.flatMap((s) =>
+      s.preApproved && s.pin !== undefined ? [[s.email, s.pin] as const] : []
+    )
+  );
+  const pinnedCount = pinned.filter((s) => s.pin !== undefined).length;
   const rosterOnly = students.filter((s) => s.rosterOnly).length;
   return (
     <div>
@@ -81,7 +101,7 @@ export function BidsTab({
         <p className="text-sm">
           {students.length - rosterOnly} students and {bidCount} bids from{" "}
           {workspace.bids.filename}
-          {pinned > 0 && `, ${pinned} pinned`}
+          {pinnedCount > 0 && `, ${pinnedCount} pinned`}
           {rosterOnly > 0 &&
             `, and ${rosterOnly} more from the roster with no bids`}
           .
@@ -156,7 +176,21 @@ export function BidsTab({
       />
       <ImportIssues issues={bids.issues} label="bids" />
       <RosterSection state={state} workspace={workspace} />
-      <StudentsTable projects={state.placementProjects} students={students} />
+      <ViewSwitch onView={onView} view={view} />
+      <p className="mt-2 text-muted-foreground text-sm">
+        {view === "project"
+          ? "Pin here does what Approve does on the Results tab: every run keeps the student on that project until you unpin them, over any pin from the bids file or the roster. Unpin frees them from all of these. A pin changes the next run; the Results tab shows the last run until then."
+          : "Pinned rows show every pin in effect: the bids file's, the roster's, and those set here or on the Results tab, which win over the other two."}
+      </p>
+      {view === "project" ? (
+        <BidsByProject state={state} students={pinned} />
+      ) : (
+        <StudentsTable
+          preApprovals={preApprovals}
+          projects={state.placementProjects}
+          students={pinned}
+        />
+      )}
     </div>
   );
 }
@@ -173,6 +207,8 @@ interface Row {
   id: string;
   name: string;
   pinned: boolean;
+  /** A pre-approval a pin set on the board overrides, by title. */
+  preApprovalOverridden: string | null;
   /** The project the roster pre-approves the student for, by title. */
   preApprovedFor: string | null;
   priority: number | null;
@@ -194,7 +230,8 @@ const byName = (a: PlacementStudent, b: PlacementStudent) =>
  */
 function bidRows(
   students: PlacementStudent[],
-  titles: Map<string, string>
+  titles: Map<string, string>,
+  preApprovals: ReadonlyMap<string, string> = new Map()
 ): Row[] {
   return [...students].sort(byName).flatMap((s) => {
     const title = (key: string) => titles.get(key) ?? key;
@@ -204,6 +241,7 @@ function bidRows(
       avoid: s.avoid,
       preApprovedFor:
         s.preApproved && s.pin !== undefined ? title(s.pin) : null,
+      preApprovalOverridden: overriddenPreApproval(s, preApprovals, title),
     };
     const rows: Row[] = [...s.bids]
       .sort((a, b) => a.priority - b.priority)
@@ -309,6 +347,13 @@ function StudentHeader({ rows }: { rows: Row[] }) {
           pre-approved for {first.preApprovedFor}
         </span>
       )}
+      {first.preApprovalOverridden && (
+        <p className="font-normal text-sm" role="note" style={WARNING_STYLE}>
+          Pre-approved for {first.preApprovalOverridden} on the roster, but a
+          pin set on the Results tab or here replaces it. Unpin leaves them
+          free; a pin to {first.preApprovalOverridden} puts them back there.
+        </p>
+      )}
       {first.avoid && (
         <p
           className="flex items-start gap-1 font-normal text-sm"
@@ -326,17 +371,37 @@ function StudentHeader({ rows }: { rows: Row[] }) {
   );
 }
 
+/**
+ * The title of the project the roster pre-approved the student for, when a
+ * pin set on the board has since replaced that pre-approval.
+ */
+function overriddenPreApproval(
+  student: PlacementStudent,
+  preApprovals: ReadonlyMap<string, string>,
+  title: (key: string) => string
+): string | null {
+  const key = preApprovals.get(student.email);
+  return key !== undefined && !student.preApproved ? title(key) : null;
+}
+
 function StudentsTable({
+  preApprovals,
   projects,
   students,
 }: {
+  preApprovals: ReadonlyMap<string, string>;
   projects: Workspace["projects"];
   students: PlacementStudent[];
 }) {
   const { navigate, search } = useLocalTableSearch();
   const rows = useMemo(
-    () => bidRows(students, new Map(projects.map((p) => [p.key, p.title]))),
-    [projects, students]
+    () =>
+      bidRows(
+        students,
+        new Map(projects.map((p) => [p.key, p.title])),
+        preApprovals
+      ),
+    [projects, students, preApprovals]
   );
   const { tableProps } = useAdminTable({
     columns: COLUMNS,
@@ -384,4 +449,44 @@ function bidsFromFile(
     convertedFrom: filename,
     conversionIssues: converted.issues,
   };
+}
+
+/**
+ * Per student or per project; the choice lives in the URL. Built as
+ * `ViewToggle` is: a segmented group whose pressed fill comes from
+ * `aria-pressed` in the Button base class (UI-CONVENTIONS, "`className` on a
+ * Button never restyles it").
+ */
+function ViewSwitch({
+  onView,
+  view,
+}: {
+  onView: (view: BidsView) => void;
+  view: BidsView;
+}) {
+  const options: { label: string; value: BidsView }[] = [
+    { value: "student", label: "Per student" },
+    { value: "project", label: "Per project" },
+  ];
+  return (
+    // biome-ignore lint/a11y/useSemanticElements: aria role=group with label is the right pattern for paired toggle buttons
+    <div
+      aria-label="Show the bids"
+      className="mt-6 flex [&>*+*]:-ml-px [&>*:not(:first-child)]:rounded-l-none [&>*:not(:last-child)]:rounded-r-none"
+      role="group"
+    >
+      {options.map((option) => (
+        <Button
+          aria-pressed={view === option.value}
+          key={option.value}
+          onClick={() => onView(option.value)}
+          size="sm"
+          type="button"
+          variant="outline"
+        >
+          {option.label}
+        </Button>
+      ))}
+    </div>
+  );
 }

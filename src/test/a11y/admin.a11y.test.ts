@@ -378,6 +378,13 @@ test("@smoke admin placement, projects and bids loaded", async ({ page }) => {
   ).toContainText("1 title matches no project");
   await checkA11y(page);
 
+  await page.getByRole("button", { name: "Per project" }).click();
+  await expect(
+    page.getByRole("button", { name: /^Pin .* to / }).first()
+  ).toBeVisible();
+  await checkA11y(page);
+  await page.getByRole("button", { name: "Per student" }).click();
+
   await page
     .getByLabel("Roster emails")
     .fill("ada@example.edu\nkim@example.edu");
