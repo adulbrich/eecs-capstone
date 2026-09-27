@@ -23,6 +23,11 @@ export function project(
   };
 }
 
+/** A roster student who did not answer the survey (#666). */
+export function rosterStudent(email: string): PlacementStudent {
+  return { email, name: email.split("@")[0], bids: [], rosterOnly: true };
+}
+
 /** A student who bid on `keys` in order, first choice first. */
 export function student(
   email: string,
@@ -130,7 +135,7 @@ export function assertValidPlacement(
       throw new Error(`${p.email} is off their pin`);
     }
     const bid = s.bids.some((b) => b.projectKey === p.projectKey);
-    if (!(bid || s.pin || parameters.allowUnranked)) {
+    if (!(bid || s.pin || s.rosterOnly || parameters.allowUnranked)) {
       throw new Error(`${p.email} is on a project they did not bid on`);
     }
     if (p.team > proj.maxTeams) {

@@ -18,8 +18,11 @@ import type {
  * - every placeable student is on exactly one team;
  * - a formed team holds min to max students, an unformed one none;
  * - a project's teams form in order, which removes symmetric solutions;
- * - with the at-least-one rule on, a project that enough students may join
- *   forms at least one team.
+ * - with the at-least-one rule on, a project that enough of its bidders may
+ *   join forms at least one team;
+ * - a roster student with no bids (#666) may join any project at weight 0,
+ *   plus a tie-break toward the projects with the fewest bids that is scaled
+ *   so it never outweighs a single bid point.
  */
 
 export interface TeamSlot {
@@ -58,6 +61,12 @@ export interface ModelRow {
 export interface PlacementModel {
   columns: ModelColumn[];
   diagnostics: PlacementDiagnostics;
+  /**
+   * What every bid weight is multiplied by, so the roster tie-break stays
+   * below one bid point in total: the objective divided by this, rounded
+   * down, is the bids' own score. 1 when no roster student is in the run.
+   */
+  objectiveScale: number;
   rows: ModelRow[];
   slots: TeamSlot[];
   /** The students the model places, in column order. */
@@ -76,6 +85,11 @@ export function buildPlacementModel(input: PlacementInput): PlacementModel {
     input,
     active
   );
+  const leaning = rosterLeaning(input.students, active);
+  const rosterCount = students.filter(
+    (s) => s.rosterOnly && s.pin === undefined
+  ).length;
+  const objectiveScale = rosterCount * ROSTER_LEAN_MAX + 1;
 
   const slots: TeamSlot[] = [];
   const slotsByProject = new Map<string, number[]>();
@@ -102,7 +116,12 @@ export function buildPlacementModel(input: PlacementInput): PlacementModel {
       const bid = student.bids.find((b) => b.projectKey === project.key);
       const weight =
         bid === undefined ? 0 : (parameters.rankWeights[bid.priority - 1] ?? 0);
-      const cost = Math.round(weight * project.weightMultiplier);
+      const lean =
+        student.rosterOnly && student.pin === undefined
+          ? (leaning.get(project.key) ?? 0)
+          : 0;
+      const cost =
+        Math.round(weight * project.weightMultiplier) * objectiveScale + lean;
       for (const slot of slotsByProject.get(project.key) ?? []) {
         const column = columns.length;
         columns.push({
@@ -147,10 +166,16 @@ export function buildPlacementModel(input: PlacementInput): PlacementModel {
   }
 
   const eligibleCount = new Map<string, number>();
+  // The at-least-one-team rule counts only the students who chose the
+  // project, so roster students fill teams but never make one required.
+  const choosingCount = new Map<string, number>();
   const pinnedCount = new Map<string, number>();
   eligibleByStudent.forEach((eligible, s) => {
     for (const p of eligible) {
       increment(eligibleCount, p.key);
+      if (!students[s].rosterOnly || students[s].pin !== undefined) {
+        increment(choosingCount, p.key);
+      }
     }
     const pin = students[s].pin;
     if (pin !== undefined) {
@@ -169,7 +194,10 @@ export function buildPlacementModel(input: PlacementInput): PlacementModel {
     const pinned = pinnedCount.get(project.key) ?? 0;
     if ((eligibleCount.get(project.key) ?? 0) < min) {
       projectsBelowMin.push(project.key);
-    } else if (parameters.requireOneTeamPerProject) {
+    } else if (
+      parameters.requireOneTeamPerProject &&
+      (choosingCount.get(project.key) ?? 0) >= min
+    ) {
       requiredSeats += min;
       rows.push({
         entries: (slotsByProject.get(project.key) ?? []).map((k) => [k, 1]),
@@ -188,6 +216,7 @@ export function buildPlacementModel(input: PlacementInput): PlacementModel {
 
   return {
     columns,
+    objectiveScale,
     rows,
     slots,
     students,
@@ -210,6 +239,35 @@ export function buildPlacementModel(input: PlacementInput): PlacementModel {
 
 function increment(counts: Map<string, number>, key: string) {
   counts.set(key, (counts.get(key) ?? 0) + 1);
+}
+
+/** The tie-break a roster student gets on the project with no bids. */
+const ROSTER_LEAN_MAX = 10;
+
+/**
+ * Per project, how much a roster student leans toward it: `ROSTER_LEAN_MAX`
+ * for a project with no bids, 0 for the one with the most, and in between
+ * by share. A whole number, so the objective stays exact.
+ */
+function rosterLeaning(
+  students: readonly PlacementStudent[],
+  active: readonly PlacementProject[]
+): Map<string, number> {
+  const bids = new Map<string, number>();
+  for (const student of students) {
+    for (const bid of student.bids) {
+      increment(bids, bid.projectKey);
+    }
+  }
+  const most = Math.max(0, ...active.map((p) => bids.get(p.key) ?? 0));
+  return new Map(
+    active.map((p) => [
+      p.key,
+      most === 0
+        ? ROSTER_LEAN_MAX
+        : Math.round(ROSTER_LEAN_MAX * (1 - (bids.get(p.key) ?? 0) / most)),
+    ])
+  );
 }
 
 /**
@@ -263,7 +321,9 @@ function eligibleProjects(
     const pinned = activeByKey.get(student.pin);
     return pinned === undefined ? [] : [pinned];
   }
-  if (allowUnranked) {
+  // A roster student has no bids to narrow by, and is placed where a team
+  // needs people whatever `allowUnranked` says (#666).
+  if (allowUnranked || student.rosterOnly) {
     return active;
   }
   const bidOn = new Set(student.bids.map((b) => b.projectKey));

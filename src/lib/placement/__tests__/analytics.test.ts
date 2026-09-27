@@ -49,7 +49,8 @@ const row = (
   email: string,
   projectKey: string | null,
   priority: number | null,
-  pinned = false
+  pinned = false,
+  rosterOnly = false
 ): BoardRow => ({
   email,
   name: email,
@@ -60,6 +61,7 @@ const row = (
   pinned,
   priority,
   projectKey,
+  rosterOnly,
   team: projectKey === null ? null : 1,
   unplacedReason: projectKey === null ? "no_eligible_project" : null,
 });
@@ -112,5 +114,22 @@ describe("ordinal", () => {
     [22, "22nd"],
   ])("writes %i as %s", (n, text) => {
     expect(ordinal(n)).toBe(text);
+  });
+});
+
+describe("priorityDistribution with roster students (#666)", () => {
+  it("counts roster students placed without bids apart from the rest", () => {
+    const rows = [
+      row("a", "p1", 1),
+      row("k", "p2", null, false, true),
+      row("l", "p2", null, true, true),
+      row("e", "p3", null),
+    ];
+    expect(priorityDistribution(rows).map((r) => [r.label, r.count])).toEqual([
+      ["1st choice", 1],
+      ["Pinned outside their bids", 1],
+      ["Placed without bids (not in the survey)", 1],
+      ["Placed outside their bids", 1],
+    ]);
   });
 });

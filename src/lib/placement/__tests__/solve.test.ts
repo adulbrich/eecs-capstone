@@ -4,6 +4,7 @@ import {
   assertValidPlacement,
   input,
   project,
+  rosterStudent,
   student,
   termFixture,
 } from "#/lib/placement/__tests__/fixtures";
@@ -238,6 +239,124 @@ describe("solvePlacement", () => {
     expect(solvePlacement(highs, fixture(true)).placements).toEqual([
       { email: "pat@example.edu", projectKey: "A", team: 1, priority: null },
     ]);
+  });
+
+  describe("roster students who did not answer the survey (#666)", () => {
+    it("places one with unranked placement off", () => {
+      const result = solvePlacement(
+        highs,
+        input([project("A")], [rosterStudent("kim@example.edu")], {
+          ...small,
+          allowUnranked: false,
+        })
+      );
+      expect(result.unplaced).toEqual([]);
+      expect(result.placements).toEqual([
+        { email: "kim@example.edu", projectKey: "A", team: 1, priority: null },
+      ]);
+    });
+
+    it("forms a team two bidders could not reach the minimum of alone", () => {
+      const students = [
+        student("b1@example.edu", ["A", "B"]),
+        student("b2@example.edu", ["A", "B"]),
+        student("b3@example.edu", ["B"]),
+        student("b4@example.edu", ["B"]),
+        student("b5@example.edu", ["B"]),
+      ];
+      const projects = [project("A"), project("B", { maxStudents: 5 })];
+      const parameters = { minStudents: 3, maxStudents: 4 };
+      const without = solvePlacement(
+        highs,
+        input(projects, students, parameters)
+      );
+      expect(without.placements.every((p) => p.projectKey === "B")).toBe(true);
+
+      const fixture = input(
+        projects,
+        [...students, rosterStudent("kim@example.edu")],
+        parameters
+      );
+      const result = solvePlacement(highs, fixture);
+      assertValidPlacement(fixture, result.placements);
+      expect(
+        result.placements
+          .filter((p) => p.projectKey === "A")
+          .map((p) => p.email)
+          .sort()
+      ).toEqual(["b1@example.edu", "b2@example.edu", "kim@example.edu"]);
+    });
+
+    it("leans toward the project with the fewest bids", () => {
+      const fixture = input(
+        [project("A"), project("B"), project("C")],
+        [
+          student("a1@example.edu", ["A"]),
+          student("b1@example.edu", ["B"]),
+          student("b2@example.edu", ["B", "A"]),
+          rosterStudent("kim@example.edu"),
+        ],
+        { minStudents: 1, maxStudents: 3, requireOneTeamPerProject: false }
+      );
+      const result = solvePlacement(highs, fixture);
+      expect(
+        result.placements.find((p) => p.email === "kim@example.edu")?.projectKey
+      ).toBe("C");
+    });
+
+    it("does not make a project nobody bid on required", () => {
+      const fixture = input(
+        [project("A", { maxStudents: 5 }), project("Z")],
+        [
+          student("a1@example.edu", ["A"]),
+          student("a2@example.edu", ["A"]),
+          student("a3@example.edu", ["A"]),
+          rosterStudent("kim@example.edu"),
+          rosterStudent("lou@example.edu"),
+        ],
+        { minStudents: 3, maxStudents: 3, requireOneTeamPerProject: true }
+      );
+      // Were Z required, it would need three of the two roster students.
+      const result = solvePlacement(highs, fixture);
+      expect(result.status).toBe("optimal");
+      expect(result.diagnostics.requiredSeatShortfall).toBeNull();
+      expect(result.placements.every((p) => p.projectKey === "A")).toBe(true);
+    });
+
+    it("never costs a bidder a point, and reports the bids' own score", () => {
+      const term = termFixture({
+        studentCount: 20,
+        projectCount: 8,
+        twoTeamProjects: 2,
+        bidsPerStudent: 3,
+      });
+      // Room to spare, so the roster students displace nobody.
+      const fixture: PlacementInput = {
+        ...term,
+        parameters: {
+          ...term.parameters,
+          minStudents: 1,
+          maxStudents: 4,
+          requireOneTeamPerProject: false,
+        },
+      };
+      const base = solvePlacement(highs, fixture);
+      const withRoster: PlacementInput = {
+        ...fixture,
+        students: [
+          ...fixture.students,
+          rosterStudent("kim@example.edu"),
+          rosterStudent("lou@example.edu"),
+          rosterStudent("max@example.edu"),
+        ],
+      };
+      const result = solvePlacement(highs, withRoster);
+      expect(base.status).toBe("optimal");
+      expect(result.status).toBe("optimal");
+      assertValidPlacement(withRoster, result.placements);
+      expect(result.placements).toHaveLength(23);
+      expect(result.objective).toBe(base.objective);
+    });
   });
 
   it("reports a run the time limit stopped before any placement was found", () => {
