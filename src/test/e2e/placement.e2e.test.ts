@@ -573,6 +573,16 @@ test.describe("placement workspace", () => {
         name: /Ben Ito.*Pre-approved/,
       })
     ).toBeVisible();
+
+    // Unpinning a pre-approved student on the board overrides the roster,
+    // and the Bids tab says so rather than dropping the pre-approval quietly.
+    await page.getByRole("button", { name: "Unpin Ada Park" }).click();
+    await page.getByRole("tab", { name: /Bids/ }).click();
+    await expect(
+      page.getByRole("note").filter({
+        hasText: "Pre-approved for Robot Arm on the roster, but a pin set",
+      })
+    ).toBeVisible();
   });
 
   test("staff read the bids per project and pin a student from there", async ({

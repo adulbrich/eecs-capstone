@@ -197,6 +197,12 @@ function ProjectHeader({ rows }: { rows: ProjectBidRow[] }) {
         first {firstChoice === 1 ? "choice" : "choices"}
         {pinned > 0 && `, ${pinned} pinned`}
       </span>
+      {first.fixed && (
+        <p className="font-normal text-muted-foreground text-xs">
+          Added from the roster: it holds only its pre-approved students, so it
+          offers no Pin here.
+        </p>
+      )}
     </div>
   );
 }

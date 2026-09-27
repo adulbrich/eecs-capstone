@@ -25,6 +25,7 @@ import { useAdminTable } from "#/lib/use-admin-table";
 import { useLocalTableSearch } from "#/lib/use-local-table-search";
 
 const DEFAULT_SORT: SortState = { desc: false, id: "priority" };
+const WARNING_STYLE = { color: "var(--status-warning)" };
 
 export type BidsView = "project" | "student";
 
@@ -85,6 +86,13 @@ export function BidsTab({
   // included, so a pin set here or on the Results tab shows the same
   // everywhere (#671).
   const pinned = applyPins(students, workspace.pins);
+  // What the roster pre-approved, before board pins, so a pre-approval a
+  // board pin overrode can say so rather than vanish.
+  const preApprovals = new Map(
+    students.flatMap((s) =>
+      s.preApproved && s.pin !== undefined ? [[s.email, s.pin] as const] : []
+    )
+  );
   const pinnedCount = pinned.filter((s) => s.pin !== undefined).length;
   const rosterOnly = students.filter((s) => s.rosterOnly).length;
   return (
@@ -169,10 +177,19 @@ export function BidsTab({
       <ImportIssues issues={bids.issues} label="bids" />
       <RosterSection state={state} workspace={workspace} />
       <ViewSwitch onView={onView} view={view} />
+      <p className="mt-2 text-muted-foreground text-sm">
+        {view === "project"
+          ? "Pin here does what Approve does on the Results tab: every run keeps the student on that project until you unpin them, over any pin from the bids file or the roster. Unpin frees them from all of these."
+          : "Pinned rows show every pin in effect: the bids file's, the roster's, and those set here or on the Results tab, which win over the other two."}
+      </p>
       {view === "project" ? (
         <BidsByProject state={state} students={pinned} />
       ) : (
-        <StudentsTable projects={state.placementProjects} students={pinned} />
+        <StudentsTable
+          preApprovals={preApprovals}
+          projects={state.placementProjects}
+          students={pinned}
+        />
       )}
     </div>
   );
@@ -190,6 +207,8 @@ interface Row {
   id: string;
   name: string;
   pinned: boolean;
+  /** A pre-approval a pin set on the board overrides, by title. */
+  preApprovalOverridden: string | null;
   /** The project the roster pre-approves the student for, by title. */
   preApprovedFor: string | null;
   priority: number | null;
@@ -211,7 +230,8 @@ const byName = (a: PlacementStudent, b: PlacementStudent) =>
  */
 function bidRows(
   students: PlacementStudent[],
-  titles: Map<string, string>
+  titles: Map<string, string>,
+  preApprovals: ReadonlyMap<string, string> = new Map()
 ): Row[] {
   return [...students].sort(byName).flatMap((s) => {
     const title = (key: string) => titles.get(key) ?? key;
@@ -221,6 +241,7 @@ function bidRows(
       avoid: s.avoid,
       preApprovedFor:
         s.preApproved && s.pin !== undefined ? title(s.pin) : null,
+      preApprovalOverridden: overriddenPreApproval(s, preApprovals, title),
     };
     const rows: Row[] = [...s.bids]
       .sort((a, b) => a.priority - b.priority)
@@ -326,6 +347,14 @@ function StudentHeader({ rows }: { rows: Row[] }) {
           pre-approved for {first.preApprovedFor}
         </span>
       )}
+      {first.preApprovalOverridden && (
+        <p className="font-normal text-sm" role="note" style={WARNING_STYLE}>
+          Pre-approved for {first.preApprovalOverridden} on the roster, but a
+          pin set on the Results tab or here replaces it. Unpin the student to
+          leave them free; pin them to {first.preApprovalOverridden} to restore
+          it.
+        </p>
+      )}
       {first.avoid && (
         <p
           className="flex items-start gap-1 font-normal text-sm"
@@ -343,17 +372,37 @@ function StudentHeader({ rows }: { rows: Row[] }) {
   );
 }
 
+/**
+ * The title of the project the roster pre-approved the student for, when a
+ * pin set on the board has since replaced that pre-approval.
+ */
+function overriddenPreApproval(
+  student: PlacementStudent,
+  preApprovals: ReadonlyMap<string, string>,
+  title: (key: string) => string
+): string | null {
+  const key = preApprovals.get(student.email);
+  return key !== undefined && !student.preApproved ? title(key) : null;
+}
+
 function StudentsTable({
+  preApprovals,
   projects,
   students,
 }: {
+  preApprovals: ReadonlyMap<string, string>;
   projects: Workspace["projects"];
   students: PlacementStudent[];
 }) {
   const { navigate, search } = useLocalTableSearch();
   const rows = useMemo(
-    () => bidRows(students, new Map(projects.map((p) => [p.key, p.title]))),
-    [projects, students]
+    () =>
+      bidRows(
+        students,
+        new Map(projects.map((p) => [p.key, p.title])),
+        preApprovals
+      ),
+    [projects, students, preApprovals]
   );
   const { tableProps } = useAdminTable({
     columns: COLUMNS,
