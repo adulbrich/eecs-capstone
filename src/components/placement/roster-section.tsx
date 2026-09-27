@@ -130,7 +130,10 @@ export function RosterSection({
         <p className="mt-1">
           {preApproved === 1
             ? "1 student is pre-approved for a project and placed there on every run."
-            : `${preApproved} students are pre-approved for a project and placed there on every run.`}
+            : `${preApproved} students are pre-approved for a project and placed there on every run.`}{" "}
+          A pre-approval wins over a pin in the bids file. A pin set on the
+          Results tab wins over a pre-approval, and Unpin there leaves the
+          student free until the next pin.
         </p>
       )}
       {conflicts.length > 0 && (
@@ -175,5 +178,5 @@ function rosterSummary(noBids: boolean, notInSurvey: number): string {
   if (notInSurvey === 0) {
     return "Everyone on the roster answered the survey.";
   }
-  return `${plural(notInSurvey, "student on the roster did", "students on the roster did")} not answer the survey; they are on the board with no bids.`;
+  return `${plural(notInSurvey, "student on the roster did", "students on the roster did")} not answer the survey; they are on the board with no bids. A run places them where a team needs people to reach its minimum, and otherwise on the projects with the fewest bids, never in a seat a bidder would have had. They never make a project form a team on their own under "At least one team per project".`;
 }

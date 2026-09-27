@@ -153,7 +153,7 @@ export function ParametersTab({
           />
           <Toggle
             checked={parameters.allowUnranked}
-            description="Lets the solver place a student on a project they did not bid on, at weight 0, rather than leave them unplaced."
+            description="Lets the solver place a student on a project they did not bid on, at weight 0, rather than leave them unplaced. Students on the roster who did not answer the survey are placed this way whatever this says, and never on a project added from the roster."
             label="Allow projects a student did not bid on"
             onChange={(v) => set({ allowUnranked: v })}
           />

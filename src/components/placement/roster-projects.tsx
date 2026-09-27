@@ -31,7 +31,10 @@ export function RosterProjects({ state }: { state: PlacementWorkspace }) {
       </h2>
       <p className="text-muted-foreground">
         The roster pre-approves students for these projects, which are not in
-        the list. Each forms one team of exactly those students.
+        the list. Each forms one team of exactly those students: nobody else is
+        placed there, it is not offered by Move, and its settings are fixed. It
+        goes away with the roster. Matching one to a listed project moves its
+        students, and any pin set on it, to that project.
         {withoutBids && " They join the run once the bids are uploaded."}
       </p>
       <ul className="mt-2 flex flex-col gap-2">
