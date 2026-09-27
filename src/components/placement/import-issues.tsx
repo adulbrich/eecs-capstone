@@ -7,9 +7,12 @@ import type { ImportIssue } from "#/lib/placement/csv";
 export function ImportIssues({
   issues,
   label,
+  unit = "row",
 }: {
   issues: readonly ImportIssue[];
   label: string;
+  /** "line" for pasted text, which has no header row. */
+  unit?: "line" | "row";
 }) {
   if (issues.length === 0) {
     return null;
@@ -17,20 +20,19 @@ export function ImportIssues({
   const errors = issues.filter((i) => i.level === "error");
   const rowsLeftOut = errors.reduce((n, i) => n + (i.rows?.length ?? 1), 0);
   const warnings = issues.filter((i) => i.level === "warning");
+  const where = unit === "line" ? `the pasted ${label}` : `the ${label} file`;
   return (
     <section
-      aria-label={`Problems in the ${label} file`}
+      aria-label={`Problems in ${where}`}
       className={`mt-4 rounded-md border px-3 py-2 text-sm ${errors.length > 0 ? "border-destructive/40" : ""}`}
     >
       <p className="font-medium">
         {errors.length > 0 &&
-          `${rowsLeftOut} ${rowsLeftOut === 1 ? "row" : "rows"} left out`}
+          `${rowsLeftOut} ${unit}${rowsLeftOut === 1 ? "" : "s"} left out`}
         {errors.length > 0 && warnings.length > 0 && ", "}
         {warnings.length > 0 &&
           `${warnings.length} ${warnings.length === 1 ? "warning" : "warnings"}`}{" "}
-        <span className="font-normal text-muted-foreground">
-          in the {label} file
-        </span>
+        <span className="font-normal text-muted-foreground">in {where}</span>
       </p>
       <ul className="mt-1 max-h-60 space-y-0.5 overflow-y-auto">
         {[...errors, ...warnings].map((issue) => (
@@ -42,7 +44,7 @@ export function ImportIssues({
                   : "text-muted-foreground"
               }
             >
-              {issueRows(issue)}
+              {unit === "line" ? issueLines(issue) : issueRows(issue)}
               {issue.level === "warning" ? " (warning)" : ""}:
             </span>{" "}
             {issue.message}
@@ -51,6 +53,10 @@ export function ImportIssues({
       </ul>
     </section>
   );
+}
+
+function issueLines(issue: ImportIssue): string {
+  return `Line ${issue.row}`;
 }
 
 function issueRows(issue: ImportIssue): string {

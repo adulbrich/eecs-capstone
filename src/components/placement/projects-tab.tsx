@@ -9,6 +9,7 @@ import { CsvFormatHelp } from "#/components/placement/csv-format";
 import { FilePickerButton } from "#/components/placement/file-picker-button";
 import { ImportIssues } from "#/components/placement/import-issues";
 import { NumberInput } from "#/components/placement/number-input";
+import { PasteList } from "#/components/placement/paste-list";
 import type { PlacementWorkspace } from "#/components/placement/use-placement-workspace";
 import { Button } from "#/components/ui/button";
 import { FieldError } from "#/components/ui/field";
@@ -20,7 +21,11 @@ import {
   SelectTrigger,
   SelectValue,
 } from "#/components/ui/select";
-import { type ImportIssue, parseProjectsCsv } from "#/lib/placement/csv";
+import {
+  type ImportIssue,
+  parseProjectsCsv,
+  parseProjectTitles,
+} from "#/lib/placement/csv";
 import { PROJECTS_FORMAT } from "#/lib/placement/formats";
 import type { WorkspaceProject } from "#/lib/placement/types";
 import {
@@ -55,6 +60,8 @@ export function ProjectsTab({
 }) {
   const { bids, update } = state;
   const [issues, setIssues] = useState<ImportIssue[]>([]);
+  // Kept apart from the file's issues: a pasted list numbers lines, not rows.
+  const [pasteIssues, setPasteIssues] = useState<ImportIssue[]>([]);
   const [duplicates, setDuplicates] = useState<string[]>([]);
 
   const setProjects = (
@@ -96,8 +103,18 @@ export function ProjectsTab({
       <ProjectsImport
         duplicates={duplicates}
         issues={issues}
+        onPaste={(text) => {
+          const parsed = parseProjectTitles(text);
+          setDuplicates([]);
+          setIssues([]);
+          setPasteIssues(parsed.issues);
+          if (parsed.projects.length > 0) {
+            setProjects(parsed.projects, { kind: "pasted" });
+          }
+        }}
         onPortal={(projects, projectSource, dupes) => {
           setIssues([]);
+          setPasteIssues([]);
           setDuplicates(dupes);
           setProjects(projects, projectSource);
         }}
@@ -105,10 +122,12 @@ export function ProjectsTab({
           const parsed = parseProjectsCsv(text);
           setDuplicates([]);
           setIssues(parsed.issues);
+          setPasteIssues([]);
           if (parsed.projects.length > 0) {
             setProjects(parsed.projects, { kind: "csv", filename });
           }
         }}
+        pasteIssues={pasteIssues}
         programs={programs}
       />
     );
@@ -122,7 +141,7 @@ export function ProjectsTab({
           {workspace.projects.length} projects from{" "}
           {source?.kind === "portal"
             ? `the published projects in ${source.programLabel}`
-            : (source?.filename ?? "a file")}
+            : projectSourceLabel(source)}
           .
         </p>
         <ConfirmDialog
@@ -131,6 +150,7 @@ export function ProjectsTab({
           description="The projects and their settings leave this workspace, and with them any placement and the pins set on it. The bids stay, and are matched again by title when new projects load."
           onConfirm={() => {
             setIssues([]);
+            setPasteIssues([]);
             setDuplicates([]);
             setProjects([], null);
           }}
@@ -144,6 +164,7 @@ export function ProjectsTab({
       </div>
       <DuplicateTitles titles={duplicates} />
       <ImportIssues issues={issues} label="projects" />
+      <ImportIssues issues={pasteIssues} label="project titles" unit="line" />
       <BoundsProblems
         parameters={workspace.parameters}
         projects={workspace.projects}
@@ -160,18 +181,22 @@ export function ProjectsTab({
 function ProjectsImport({
   duplicates,
   issues,
+  onPaste,
   onPortal,
   onText,
+  pasteIssues,
   programs,
 }: {
   duplicates: string[];
   issues: ImportIssue[];
+  onPaste: (text: string) => void;
   onPortal: (
     projects: WorkspaceProject[],
     source: Workspace["projectSource"],
     duplicates: string[]
   ) => void;
   onText: (text: string, filename: string) => void;
+  pasteIssues: ImportIssue[];
   programs: ProgramOption[];
 }) {
   const [programId, setProgramId] = useState("");
@@ -260,8 +285,34 @@ function ProjectsImport({
         <DuplicateTitles titles={duplicates} />
         <ImportIssues issues={issues} label="projects" />
       </section>
+      <section aria-labelledby="placement-projects-paste-heading">
+        <h2 className="font-medium" id="placement-projects-paste-heading">
+          From a list
+        </h2>
+        <p className="text-muted-foreground text-sm">
+          A column of titles copied from a spreadsheet or an email. Each project
+          takes the defaults on the Parameters tab.
+        </p>
+        <div className="mt-2">
+          <PasteList
+            buttonLabel="Use these titles"
+            hint="One title per line. Blank lines are skipped."
+            label="Project titles"
+            onUse={onPaste}
+            placeholder={"Tide Clock\nRobot Arm Controller"}
+          />
+        </div>
+        <ImportIssues issues={pasteIssues} label="project titles" unit="line" />
+      </section>
     </div>
   );
+}
+
+function projectSourceLabel(source: Workspace["projectSource"]): string {
+  if (source?.kind === "csv") {
+    return source.filename;
+  }
+  return source?.kind === "pasted" ? "a pasted list" : "a file";
 }
 
 function DuplicateTitles({ titles }: { titles: string[] }) {
