@@ -71,9 +71,12 @@ function splitItems(line: string): string[] {
 }
 
 /** Adds an entry, or a warning when the email is already on the roster. */
+/** Per email, the first row it is on and the row its project came from. */
+type Seen = Map<string, { projectRow?: number; row: number }>;
+
 function collect(
   entries: RosterEntry[],
-  seen: Map<string, number>,
+  seen: Seen,
   issues: ImportIssue[],
   row: number,
   entry: RosterEntry,
@@ -81,7 +84,10 @@ function collect(
 ) {
   const earlier = seen.get(entry.email);
   if (earlier === undefined) {
-    seen.set(entry.email, row);
+    seen.set(entry.email, {
+      row,
+      projectRow: entry.project === undefined ? undefined : row,
+    });
     entries.push(entry);
     return;
   }
@@ -91,17 +97,22 @@ function collect(
   const warn = (message: string) =>
     issues.push({ level: "warning", row, message });
   if (first === undefined || entry.project === undefined) {
-    warn(`${entry.email} is already on ${unit} ${earlier}; keeping the first.`);
+    warn(
+      `${entry.email} is already on ${unit} ${earlier.row}; keeping the first.`
+    );
   } else if (first.project === undefined) {
     first.project = entry.project;
+    earlier.projectRow = row;
     warn(
-      `${entry.email} is already on ${unit} ${earlier}, with no project; taking "${entry.project}" from this ${unit}.`
+      `${entry.email} is already on ${unit} ${earlier.row}, with no project; taking "${entry.project}" from this ${unit}.`
     );
   } else if (normalizeTitle(first.project) === normalizeTitle(entry.project)) {
-    warn(`${entry.email} is already on ${unit} ${earlier}; keeping the first.`);
+    warn(
+      `${entry.email} is already on ${unit} ${earlier.row}; keeping the first.`
+    );
   } else {
     warn(
-      `${entry.email} is already on ${unit} ${earlier} for "${first.project}"; "${entry.project}" here is ignored.`
+      `${entry.email} already has "${first.project}" from ${unit} ${earlier.projectRow ?? earlier.row}; "${entry.project}" here is ignored.`
     );
   }
 }
@@ -172,7 +183,7 @@ export function parseRosterCsv(text: string): ParsedRoster {
     };
   }
   const entries: RosterEntry[] = [];
-  const seen = new Map<string, number>();
+  const seen: Seen = new Map();
   const failedRows = new Set(issues.map((i) => i.row));
   rows.forEach((raw, index) => {
     const row = index + 2;
@@ -267,7 +278,7 @@ function readItem(item: string): RosterEntry[] | { error: string } {
 export function parseRosterList(text: string): ParsedRoster {
   const entries: RosterEntry[] = [];
   const issues: ImportIssue[] = [];
-  const seen = new Map<string, number>();
+  const seen: Seen = new Map();
   for (const { line, text: content } of pastedLines(text)) {
     for (const raw of splitItems(content)) {
       const item = raw.trim();

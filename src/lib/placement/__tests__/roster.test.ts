@@ -314,6 +314,23 @@ describe("the Canvas roster and groups export (#674)", () => {
     ]);
   });
 
+  it("credits a group to the row it came from when a student is listed three times", () => {
+    const canvas = parseRosterCsv(
+      [
+        HEADER,
+        "Ada Park,101,9001,ada@example.edu,CS 461,,,",
+        "Ada Park,101,9001,ada@example.edu,Lab 1,Team A,55,7",
+        "Ada Park,101,9001,ada@example.edu,Lab 2,Team B,56,8",
+      ].join("\n")
+    );
+    expect(canvas.entries).toEqual([
+      { email: "ada@example.edu", name: "Ada Park", project: "Team A" },
+    ]);
+    expect(canvas.issues.at(-1)?.message).toBe(
+      'ada@example.edu already has "Team A" from row 3; "Team B" here is ignored.'
+    );
+  });
+
   it("takes a later group when the first row has none, and names a second group it ignores", () => {
     const canvas = parseRosterCsv(
       [
@@ -340,7 +357,7 @@ describe("the Canvas roster and groups export (#674)", () => {
         level: "warning",
         row: 5,
         message:
-          'kim@example.edu is already on row 4 for "Sponsor Lab"; "Robot Arm" here is ignored.',
+          'kim@example.edu already has "Sponsor Lab" from row 4; "Robot Arm" here is ignored.',
       },
       // Only Canvas's own Test Student gets the gentler message.
       { level: "error", row: 6, message: "The row has no login_id." },
