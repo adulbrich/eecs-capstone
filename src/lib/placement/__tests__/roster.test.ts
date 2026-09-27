@@ -20,6 +20,7 @@ describe("parseRosterCsv", () => {
         { email: "kim@example.edu", name: "" },
       ],
       issues: [],
+      format: "roster",
     });
   });
 
@@ -94,6 +95,7 @@ describe("parseRosterList", () => {
         { email: "ben@example.edu", name: "" },
       ],
       issues: [],
+      format: "roster",
     });
   });
 
@@ -104,7 +106,11 @@ describe("parseRosterList", () => {
   });
 
   it("gives nothing for blank text", () => {
-    expect(parseRosterList(" \n ,; \n")).toEqual({ entries: [], issues: [] });
+    expect(parseRosterList(" \n ,; \n")).toEqual({
+      entries: [],
+      issues: [],
+      format: "roster",
+    });
   });
 });
 
@@ -275,5 +281,49 @@ describe("pre-approval edge cases (#670)", () => {
       "cy@example.edu": null,
     });
     expect(repointRosterPins(undefined, {})).toBeUndefined();
+  });
+});
+
+describe("the Canvas roster and groups export (#674)", () => {
+  const HEADER =
+    "name,canvas_user_id,user_id,login_id,sections,group_name,canvas_group_id,group_id";
+
+  it("reads login_id as the email and group_name as the project", () => {
+    const canvas = parseRosterCsv(
+      [
+        HEADER,
+        "Ada Park,101,9001,Ada@Example.edu,CS 461,Tide Clock,55,7",
+        "Kim Lee,102,9002,kim@example.edu,CS 461,,,",
+        "Test Student,103,,,CS 461,,,",
+        "Lou Ma,104,9004,lmau,CS 461,Team 3,56,8",
+      ].join("\n")
+    );
+    expect(canvas.format).toBe("canvas");
+    expect(canvas.entries).toEqual(
+      parseRosterCsv(
+        "email,name,project\nada@example.edu,Ada Park,Tide Clock\nkim@example.edu,Kim Lee,\n"
+      ).entries
+    );
+    expect(canvas.issues).toEqual([
+      { level: "error", row: 4, message: "The row has no login_id." },
+      { level: "error", row: 5, message: '"lmau" is not an email.' },
+    ]);
+  });
+
+  it("reads a header with login_id as Canvas, and asks for email when neither is there", () => {
+    expect(parseRosterCsv("name,login_id\n").format).toBe("canvas");
+    expect(parseRosterCsv("name,group_name\nAda,Team 1").issues).toEqual([
+      { level: "error", row: 1, message: 'The file has no "email" column.' },
+    ]);
+  });
+
+  it("reads email, not login_id, when a file has both", () => {
+    const both = parseRosterCsv(
+      "email,login_id,project\nada@example.edu,other@example.edu,Tide Clock"
+    );
+    expect(both.format).toBe("roster");
+    expect(both.entries).toEqual([
+      { email: "ada@example.edu", name: "", project: "Tide Clock" },
+    ]);
   });
 });

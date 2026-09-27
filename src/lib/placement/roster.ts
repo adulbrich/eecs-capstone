@@ -30,6 +30,8 @@ export interface RosterEntry {
 
 export interface ParsedRoster {
   entries: RosterEntry[];
+  /** How a CSV was read; a pasted list is always "roster". */
+  format: RosterFormat;
   issues: ImportIssue[];
 }
 
@@ -90,29 +92,67 @@ function collect(
   entries.push(entry);
 }
 
-const projectCell = (raw: Parameters<typeof cell>[0]) => {
-  const project = cell(raw, "project");
+/**
+ * Which column holds what. The roster's own format, or Canvas's roster and
+ * groups export (#674), whose `login_id` is the email and whose `group_name`
+ * is the team, read as the pre-approved project.
+ */
+interface RosterColumns {
+  email: string;
+  format: RosterFormat;
+  project: string;
+}
+
+export type RosterFormat = "canvas" | "roster";
+
+const ROSTER_COLUMNS: RosterColumns = {
+  format: "roster",
+  email: "email",
+  project: "project",
+};
+const CANVAS_COLUMNS: RosterColumns = {
+  format: "canvas",
+  email: "login_id",
+  project: "group_name",
+};
+
+/** A Canvas export has `login_id` and no `email`; `email` wins if both. */
+const columnsFor = (fields: readonly string[]): RosterColumns =>
+  fields.includes("login_id") && !fields.includes("email")
+    ? CANVAS_COLUMNS
+    : ROSTER_COLUMNS;
+
+type RawRow = Parameters<typeof cell>[0];
+
+const projectCell = (raw: RawRow, column: string) => {
+  const project = cell(raw, column);
   return project === "" ? {} : { project };
 };
 
 /** A project cell that normalizes to nothing: "..." pre-approves nobody. */
-const unreadableProject = (raw: Parameters<typeof cell>[0]) => {
-  const project = cell(raw, "project");
+const unreadableProject = (raw: RawRow, column: string) => {
+  const project = cell(raw, column);
   return project !== "" && normalizeTitle(project) === "" ? project : null;
 };
 
 /**
  * `email, name, project`, one row per student; only `email` is required.
- * `project` pre-approves the student for that project.
+ * `project` pre-approves the student for that project. A Canvas roster and
+ * groups export reads as it comes: see `RosterColumns`.
  */
 export function parseRosterCsv(text: string): ParsedRoster {
   const { fields, issues, rows } = parseRows(text);
+  const columns = columnsFor(fields);
   const missing =
     fields.length === 0 && issues.length > 0
       ? []
-      : missingColumns(fields, ["email"]);
+      : missingColumns(fields, [columns.email]);
   if (missing.length > 0) {
-    return { entries: [], issues: [...issues, ...missing] };
+    return {
+      entries: [],
+      issues: [...issues, ...missing],
+      format: columns.format,
+    };
   }
   const entries: RosterEntry[] = [];
   const seen = new Map<string, number>();
@@ -122,19 +162,19 @@ export function parseRosterCsv(text: string): ParsedRoster {
     if (failedRows.has(row)) {
       return;
     }
-    const email = cell(raw, "email").toLowerCase();
+    const email = cell(raw, columns.email).toLowerCase();
     if (!isEmail(email)) {
       issues.push({
         level: "error",
         row,
         message:
           email === ""
-            ? "The row has no email."
+            ? `The row has no ${columns.email}.`
             : `"${email}" is not an email.`,
       });
       return;
     }
-    const unreadable = unreadableProject(raw);
+    const unreadable = unreadableProject(raw, columns.project);
     if (unreadable !== null) {
       issues.push({
         level: "warning",
@@ -147,11 +187,15 @@ export function parseRosterCsv(text: string): ParsedRoster {
       seen,
       issues,
       row,
-      { email, name: cell(raw, "name"), ...projectCell(raw) },
+      { email, name: cell(raw, "name"), ...projectCell(raw, columns.project) },
       "row"
     );
   });
-  return { entries, issues: issues.sort((a, b) => a.row - b.row) };
+  return {
+    entries,
+    issues: issues.sort((a, b) => a.row - b.row),
+    format: columns.format,
+  };
 }
 
 /**
@@ -206,7 +250,7 @@ export function parseRosterList(text: string): ParsedRoster {
       }
     }
   }
-  return { entries, issues };
+  return { entries, issues, format: "roster" };
 }
 
 /** What the roster's pre-approvals come to against the project list. */
