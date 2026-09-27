@@ -81,10 +81,11 @@ export function BidsTab({
 
   const { students } = bids;
   const bidCount = students.reduce((sum, s) => sum + s.bids.length, 0);
-  const pinnedCount = students.filter((s) => s.pin !== undefined).length;
-  // Both views show every pin in effect, the board's included, so a pin set
-  // here or on the Results tab shows the same everywhere (#671).
+  // Both views and the count show every pin in effect, the board's
+  // included, so a pin set here or on the Results tab shows the same
+  // everywhere (#671).
   const pinned = applyPins(students, workspace.pins);
+  const pinnedCount = pinned.filter((s) => s.pin !== undefined).length;
   const rosterOnly = students.filter((s) => s.rosterOnly).length;
   return (
     <div>

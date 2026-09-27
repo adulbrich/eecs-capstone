@@ -12,6 +12,11 @@ export interface ProjectBidRow {
   email: string;
   /** The one row of a project nobody bid on or is pinned to. */
   empty: boolean;
+  /**
+   * The project was added from the roster and holds exactly its
+   * pre-approved students, so nobody else may be pinned there (#670).
+   */
+  fixed: boolean;
   /** Unique within the view: a project and a student, or an empty project. */
   id: string;
   name: string;
@@ -39,6 +44,7 @@ export function projectBidRows(
   projects: readonly WorkspaceProject[]
 ): ProjectBidRow[] {
   const titles = new Map(projects.map((p) => [p.key, p.title]));
+  const fixed = new Set(projects.filter((p) => p.fromRoster).map((p) => p.key));
   const byProject = new Map<string, ProjectBidRow[]>(
     projects.map((p) => [p.key, []])
   );
@@ -69,6 +75,7 @@ export function projectBidRows(
           : (titles.get(student.pin) ?? student.pin),
       preApproved: pinnedHere && student.preApproved === true,
       empty: false,
+      fixed: fixed.has(projectKey),
     });
   };
   for (const student of students) {
@@ -101,6 +108,7 @@ export function projectBidRows(
             pinnedElsewhere: null,
             preApproved: false,
             empty: true,
+            fixed: fixed.has(project.key),
           },
         ];
       }

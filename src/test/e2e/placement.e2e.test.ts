@@ -600,8 +600,26 @@ test.describe("placement workspace", () => {
         .getByText("Pinned to Tide Clock")
     ).toBeVisible();
 
+    // Ben is pinned by the bids file; Ada now by the board.
+    await expect(page.getByText(/2 pinned\./)).toBeVisible();
+
+    // The pin holds through a run, as an Approve on the board would.
+    await page.getByRole("tab", { name: "Parameters" }).click();
+    await page.getByLabel("Min students").fill("1");
+    await page.getByRole("tab", { name: /Projects/ }).click();
+    await page.getByLabel("Min students per team, Robot Arm").fill("1");
     await page.getByRole("tab", { name: "Results" }).click();
     await expect(page).toHaveURL(/view=project/);
+    await page.getByRole("button", { name: "Run placement" }).click();
+    await expect(page.getByText(/students placed/)).toBeVisible({
+      timeout: 20_000,
+    });
+    await expect(
+      page
+        .getByRole("rowgroup")
+        .filter({ hasText: "Tide Clock, team" })
+        .getByRole("button", { name: "Unpin Ada Park" })
+    ).toBeVisible();
     await page.getByRole("tab", { name: /Bids/ }).click();
     await page.getByRole("button", { name: "Per student" }).click();
     await expect(

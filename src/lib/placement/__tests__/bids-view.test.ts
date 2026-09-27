@@ -85,3 +85,31 @@ describe("projectBidRows", () => {
     expect(rows.every((r) => r.empty)).toBe(true);
   });
 });
+
+describe("projectBidRows and roster projects (#670)", () => {
+  it("marks a project added from the roster as fixed", () => {
+    const rows = projectBidRows(
+      [
+        {
+          email: "kim@example.edu",
+          name: "Kim Lee",
+          bids: [],
+          pin: "roster:lab",
+          preApproved: true,
+        },
+      ],
+      [
+        ...PROJECTS,
+        {
+          key: "roster:lab",
+          title: "Sponsor Lab",
+          maxTeams: 1,
+          weightMultiplier: 1,
+          fromRoster: true,
+        },
+      ]
+    );
+    expect(rows.find((r) => r.projectKey === "roster:lab")?.fixed).toBe(true);
+    expect(rows.find((r) => r.projectKey === "p1")?.fixed).toBe(false);
+  });
+});

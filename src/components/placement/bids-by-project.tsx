@@ -130,16 +130,18 @@ export function BidsByProject({
                   Unpin
                 </Button>
               ) : (
-                <Button
-                  aria-label={`Pin ${who} to ${r.projectTitle}`}
-                  onClick={() => pin(r.email, r.projectKey)}
-                  size="sm"
-                  type="button"
-                  variant="outline"
-                >
-                  <Pin aria-hidden="true" />
-                  Pin here
-                </Button>
+                !r.fixed && (
+                  <Button
+                    aria-label={`Pin ${who} to ${r.projectTitle}`}
+                    onClick={() => pin(r.email, r.projectKey)}
+                    size="sm"
+                    type="button"
+                    variant="outline"
+                  >
+                    <Pin aria-hidden="true" />
+                    Pin here
+                  </Button>
+                )
               )}
               {r.pinnedElsewhere && (
                 <span className="text-muted-foreground text-xs">
