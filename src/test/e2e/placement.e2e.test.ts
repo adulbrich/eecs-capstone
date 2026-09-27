@@ -449,6 +449,55 @@ test.describe("placement workspace", () => {
     ).toBeVisible();
   });
 
+  test("a run places a roster student who did not answer the survey", async ({
+    page,
+  }) => {
+    await page.goto("/admin/placement");
+    await waitForHydration(page);
+    await importFiles(page);
+    await page
+      .getByLabel("Roster emails")
+      .fill(`ada@${DOMAIN}\nben@${DOMAIN}\nKim Lee <kim@${DOMAIN}>`);
+    await page.getByRole("button", { name: "Use these emails" }).click();
+    await page.getByRole("tab", { name: "Parameters" }).click();
+    await page.getByLabel("Min students").fill("1");
+    await page.getByRole("tab", { name: /Projects/ }).click();
+    await page.getByLabel("Min students per team, Robot Arm").fill("1");
+
+    await page.getByRole("tab", { name: "Results" }).click();
+    await page.getByRole("button", { name: "Run placement" }).click();
+    await expect(page.getByText("3 of 3 students placed")).toBeVisible({
+      timeout: 20_000,
+    });
+    await expect(
+      page.getByRole("row", { name: /Kim Lee.*Not in the survey/ })
+    ).toBeVisible();
+    await page.getByRole("button", { name: "Approve Kim Lee here" }).click();
+    await expect(
+      page.getByRole("row", { name: /Kim Lee.*Pinned, not in the survey/ })
+    ).toBeVisible();
+
+    const placement = page.waitForEvent("download");
+    await page.getByRole("button", { name: "Download placement" }).click();
+    const placed = await readFile(await (await placement).path(), "utf-8");
+    expect(placed).toMatch(
+      new RegExp(
+        `kim@${DOMAIN.replaceAll(".", "\\.")},Kim Lee,[^,]+,\\d,not in the survey`
+      )
+    );
+
+    // Removing the roster takes Kim out of the run, so the run goes too
+    // rather than leaving Kim's placement to vanish from the board.
+    await page.getByRole("tab", { name: /Bids/ }).click();
+    await page.getByRole("button", { name: "Remove roster" }).click();
+    await page.getByRole("button", { name: "Remove", exact: true }).click();
+    await page.getByRole("tab", { name: "Results" }).click();
+    await expect(
+      page.getByRole("button", { name: "Run placement", exact: true })
+    ).toBeVisible();
+    await expect.poll(() => stored(page)).not.toContain(`kim@${DOMAIN}`);
+  });
+
   test("clearing all data empties the stored workspace after a confirmation", async ({
     page,
   }) => {

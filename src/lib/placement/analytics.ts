@@ -90,11 +90,14 @@ export function priorityDistribution(rows: readonly BoardRow[]): PriorityRow[] {
   );
   const outside = placed.filter((r) => r.priority === null);
   const pinned = outside.filter((r) => r.pinned).length;
+  const rosterOnly = outside.filter((r) => !r.pinned && r.rosterOnly).length;
+  const unranked = outside.length - pinned - rosterOnly;
   return [
     ...byPriority,
     ...(pinned > 0 ? [row("Pinned outside their bids", pinned)] : []),
-    ...(outside.length - pinned > 0
-      ? [row("Placed outside their bids", outside.length - pinned)]
+    ...(rosterOnly > 0
+      ? [row("Placed without bids (not in the survey)", rosterOnly)]
       : []),
+    ...(unranked > 0 ? [row("Placed outside their bids", unranked)] : []),
   ];
 }

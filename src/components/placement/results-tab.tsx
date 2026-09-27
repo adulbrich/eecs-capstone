@@ -435,6 +435,9 @@ function priorityLabel(row: BoardRow): string {
       ? `${ordinal(row.priority)}, pinned`
       : ordinal(row.priority);
   }
+  if (row.rosterOnly) {
+    return row.pinned ? "Pinned, not in the survey" : "Not in the survey";
+  }
   return row.pinned ? "Pinned, not in their bids" : "Not in their bids";
 }
 

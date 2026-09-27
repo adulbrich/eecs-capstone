@@ -79,7 +79,10 @@ function runModel(
       ...base,
       status,
       placements: readPlacements(model, m.getSolution().colValue),
-      objective: m.getObjectiveValue(),
+      // The bids' own score, without the roster tie-break under it.
+      objective: Math.floor(
+        (m.getObjectiveValue() + 0.5) / model.objectiveScale
+      ),
       gap: status === "time_limit" ? Number(m.info.get("mip_gap")) : null,
     };
   });

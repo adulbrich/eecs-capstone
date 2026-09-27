@@ -42,6 +42,8 @@ export interface BoardRow {
   /** The priority they gave the project they are on, or null. */
   priority: number | null;
   projectKey: string | null;
+  /** On the roster but not in the survey, so placed without bids (#666). */
+  rosterOnly: boolean;
   team: number | null;
   unplacedReason: UnplacedReason | "not_in_run" | null;
 }
@@ -85,6 +87,7 @@ export function boardRows(
       priority: bid?.priority ?? null,
       comment: bid?.comment ?? "",
       pinned: projectKey !== null && student.pin === projectKey,
+      rosterOnly: student.rosterOnly ?? false,
       unplacedReason:
         projectKey === null
           ? (reasons.get(student.email) ?? "not_in_run")
@@ -185,7 +188,7 @@ export function placementCsv(
       project:
         r.projectKey === null ? "" : (titles.get(r.projectKey) ?? r.projectKey),
       team: r.team,
-      priority: r.priority,
+      priority: r.rosterOnly ? "not in the survey" : r.priority,
       comment: r.comment,
       avoid: r.avoid ?? "",
     }))

@@ -186,6 +186,29 @@ describe("placementCsv", () => {
       `ada@example.edu,Ada Park,Tide Clock,1,1,"'- tides, mostly",Sam from lab`
     );
   });
+
+  it("says a roster student was not in the survey where a priority would be", () => {
+    const kim = {
+      email: "kim@example.edu",
+      name: "Kim Lee",
+      bids: [],
+      rosterOnly: true,
+    };
+    const result = {
+      ...RESULT,
+      placements: [
+        ...RESULT.placements,
+        { email: kim.email, projectKey: "p1", team: 1, priority: null },
+      ],
+    };
+    const lines = placementCsv(
+      boardRows(result, [...STUDENTS, kim], PROJECTS),
+      TITLES
+    ).split("\r\n");
+    expect(lines).toContain(
+      `kim@example.edu,Kim Lee,${TITLES.get("p1")},1,not in the survey,,`
+    );
+  });
 });
 
 describe("workspace with a result", () => {
