@@ -407,9 +407,10 @@ function Board({
       <RunReport lines={notes} problem={false} />
       <p className="mt-2 text-muted-foreground text-sm">
         Approve pins a student to the project they are on for every later run,
-        over any pin from the bids file or the roster. Unpin frees the student
-        from all of these until they are pinned again. Move changes this
-        placement only, and the next run may move the student back.
+        over any pin from the bids file or the roster. Move puts the student on
+        another project now and pins them there, so later runs keep them there.
+        Unpin frees the student from every pin, and the next run places them by
+        their bids. A pin changes the next run, not the placement shown here.
       </p>
       {empty.length > 0 && (
         <p className="mt-2 text-sm">
