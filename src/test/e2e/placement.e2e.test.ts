@@ -472,6 +472,10 @@ test.describe("placement workspace", () => {
     await expect(
       page.getByRole("row", { name: /Kim Lee.*Not in the survey/ })
     ).toBeVisible();
+    await page.getByRole("button", { name: "Approve Kim Lee here" }).click();
+    await expect(
+      page.getByRole("row", { name: /Kim Lee.*Pinned, not in the survey/ })
+    ).toBeVisible();
 
     const placement = page.waitForEvent("download");
     await page.getByRole("button", { name: "Download placement" }).click();
@@ -481,6 +485,17 @@ test.describe("placement workspace", () => {
         `kim@${DOMAIN.replaceAll(".", "\\.")},Kim Lee,[^,]+,\\d,not in the survey`
       )
     );
+
+    // Removing the roster takes Kim out of the run, so the run goes too
+    // rather than leaving Kim's placement to vanish from the board.
+    await page.getByRole("tab", { name: /Bids/ }).click();
+    await page.getByRole("button", { name: "Remove roster" }).click();
+    await page.getByRole("button", { name: "Remove", exact: true }).click();
+    await page.getByRole("tab", { name: "Results" }).click();
+    await expect(
+      page.getByRole("button", { name: "Run placement", exact: true })
+    ).toBeVisible();
+    await expect.poll(() => stored(page)).not.toContain(`kim@${DOMAIN}`);
   });
 
   test("clearing all data empties the stored workspace after a confirmation", async ({

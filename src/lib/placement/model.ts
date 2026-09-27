@@ -86,9 +86,7 @@ export function buildPlacementModel(input: PlacementInput): PlacementModel {
     active
   );
   const leaning = rosterLeaning(input.students, active);
-  const rosterCount = students.filter(
-    (s) => s.rosterOnly && s.pin === undefined
-  ).length;
+  const rosterCount = students.filter(isFreeRosterStudent).length;
   const objectiveScale = rosterCount * ROSTER_LEAN_MAX + 1;
 
   const slots: TeamSlot[] = [];
@@ -116,10 +114,9 @@ export function buildPlacementModel(input: PlacementInput): PlacementModel {
       const bid = student.bids.find((b) => b.projectKey === project.key);
       const weight =
         bid === undefined ? 0 : (parameters.rankWeights[bid.priority - 1] ?? 0);
-      const lean =
-        student.rosterOnly && student.pin === undefined
-          ? (leaning.get(project.key) ?? 0)
-          : 0;
+      const lean = isFreeRosterStudent(student)
+        ? (leaning.get(project.key) ?? 0)
+        : 0;
       const cost =
         Math.round(weight * project.weightMultiplier) * objectiveScale + lean;
       for (const slot of slotsByProject.get(project.key) ?? []) {
@@ -173,7 +170,7 @@ export function buildPlacementModel(input: PlacementInput): PlacementModel {
   eligibleByStudent.forEach((eligible, s) => {
     for (const p of eligible) {
       increment(eligibleCount, p.key);
-      if (!students[s].rosterOnly || students[s].pin !== undefined) {
+      if (!isFreeRosterStudent(students[s])) {
         increment(choosingCount, p.key);
       }
     }
@@ -240,6 +237,14 @@ export function buildPlacementModel(input: PlacementInput): PlacementModel {
 function increment(counts: Map<string, number>, key: string) {
   counts.set(key, (counts.get(key) ?? 0) + 1);
 }
+
+/**
+ * A roster student with no bids and no pin: the solver chooses their project
+ * by the tie-break alone, and they never make a project required. A pin
+ * makes one an ordinary pinned student.
+ */
+const isFreeRosterStudent = (student: PlacementStudent) =>
+  student.rosterOnly === true && student.pin === undefined;
 
 /** The tie-break a roster student gets on the project with no bids. */
 const ROSTER_LEAN_MAX = 10;
