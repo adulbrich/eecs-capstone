@@ -5,6 +5,7 @@ import {
   defineAdminColumns,
 } from "#/components/admin-data-table";
 import { ConfirmDialog } from "#/components/confirm-dialog";
+import { BidsByProject } from "#/components/placement/bids-by-project";
 import { CsvFormatHelp } from "#/components/placement/csv-format";
 import { FilePickerButton } from "#/components/placement/file-picker-button";
 import { ImportIssues } from "#/components/placement/import-issues";
@@ -12,6 +13,7 @@ import { RosterSection } from "#/components/placement/roster-section";
 import { TitleMatchesPanel } from "#/components/placement/title-matches";
 import type { PlacementWorkspace } from "#/components/placement/use-placement-workspace";
 import { Button } from "#/components/ui/button";
+import { applyPins } from "#/lib/placement/board";
 import { downloadText } from "#/lib/placement/download";
 import { BIDS_FORMAT } from "#/lib/placement/formats";
 import { convertQualtrics, isQualtricsExport } from "#/lib/placement/qualtrics";
@@ -24,11 +26,17 @@ import { useLocalTableSearch } from "#/lib/use-local-table-search";
 
 const DEFAULT_SORT: SortState = { desc: false, id: "priority" };
 
+export type BidsView = "project" | "student";
+
 export function BidsTab({
+  onView,
   state,
+  view,
   workspace,
 }: {
+  onView: (view: BidsView) => void;
   state: PlacementWorkspace;
+  view: BidsView;
   workspace: Workspace;
 }) {
   const { bids, update } = state;
@@ -73,7 +81,10 @@ export function BidsTab({
 
   const { students } = bids;
   const bidCount = students.reduce((sum, s) => sum + s.bids.length, 0);
-  const pinned = students.filter((s) => s.pin !== undefined).length;
+  const pinnedCount = students.filter((s) => s.pin !== undefined).length;
+  // Both views show every pin in effect, the board's included, so a pin set
+  // here or on the Results tab shows the same everywhere (#671).
+  const pinned = applyPins(students, workspace.pins);
   const rosterOnly = students.filter((s) => s.rosterOnly).length;
   return (
     <div>
@@ -81,7 +92,7 @@ export function BidsTab({
         <p className="text-sm">
           {students.length - rosterOnly} students and {bidCount} bids from{" "}
           {workspace.bids.filename}
-          {pinned > 0 && `, ${pinned} pinned`}
+          {pinnedCount > 0 && `, ${pinnedCount} pinned`}
           {rosterOnly > 0 &&
             `, and ${rosterOnly} more from the roster with no bids`}
           .
@@ -156,7 +167,12 @@ export function BidsTab({
       />
       <ImportIssues issues={bids.issues} label="bids" />
       <RosterSection state={state} workspace={workspace} />
-      <StudentsTable projects={state.placementProjects} students={students} />
+      <ViewSwitch onView={onView} view={view} />
+      {view === "project" ? (
+        <BidsByProject state={state} students={pinned} />
+      ) : (
+        <StudentsTable projects={state.placementProjects} students={pinned} />
+      )}
     </div>
   );
 }
@@ -384,4 +400,35 @@ function bidsFromFile(
     convertedFrom: filename,
     conversionIssues: converted.issues,
   };
+}
+
+/** Per student or per project; the choice lives in the URL. */
+function ViewSwitch({
+  onView,
+  view,
+}: {
+  onView: (view: BidsView) => void;
+  view: BidsView;
+}) {
+  const options: { label: string; value: BidsView }[] = [
+    { value: "student", label: "Per student" },
+    { value: "project", label: "Per project" },
+  ];
+  return (
+    <fieldset className="mt-6 flex flex-wrap items-center gap-2">
+      <legend className="sr-only">Show the bids</legend>
+      {options.map((option) => (
+        <Button
+          aria-pressed={view === option.value}
+          key={option.value}
+          onClick={() => onView(option.value)}
+          size="sm"
+          type="button"
+          variant={view === option.value ? "default" : "outline"}
+        >
+          {option.label}
+        </Button>
+      ))}
+    </fieldset>
+  );
 }

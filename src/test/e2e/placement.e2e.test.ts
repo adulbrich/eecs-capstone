@@ -575,6 +575,41 @@ test.describe("placement workspace", () => {
     ).toBeVisible();
   });
 
+  test("staff read the bids per project and pin a student from there", async ({
+    page,
+  }) => {
+    await page.goto("/admin/placement");
+    await waitForHydration(page);
+    await importFiles(page);
+    await page.getByRole("button", { name: "Per project" }).click();
+    await expect(page).toHaveURL(/view=project/);
+    const tide = page.getByRole("rowgroup").filter({ hasText: "Tide Clock" });
+    await expect(tide).toContainText("1 bid, 1 first choice");
+    await expect(tide).toContainText("Tides, and");
+
+    await tide
+      .getByRole("button", { name: "Pin Ada Park to Tide Clock" })
+      .click();
+    await expect(
+      tide.getByRole("button", { name: "Unpin Ada Park" })
+    ).toBeVisible();
+    await expect(
+      page
+        .getByRole("rowgroup")
+        .filter({ hasText: "Robot Arm" })
+        .getByText("Pinned to Tide Clock")
+    ).toBeVisible();
+
+    await page.getByRole("tab", { name: "Results" }).click();
+    await expect(page).toHaveURL(/view=project/);
+    await page.getByRole("tab", { name: /Bids/ }).click();
+    await page.getByRole("button", { name: "Per student" }).click();
+    await expect(
+      page.getByRole("row", { name: /Tide Clock.*pinned/ }).first()
+    ).toBeVisible();
+    await expect.poll(() => stored(page)).toContain(`"ada@${DOMAIN}":"`);
+  });
+
   test("clearing all data empties the stored workspace after a confirmation", async ({
     page,
   }) => {
