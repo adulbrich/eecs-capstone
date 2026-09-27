@@ -120,7 +120,7 @@ describe("isEmptyWorkspace", () => {
 
 describe("toPlacementInput", () => {
   it("gives a project with no max teams of its own the page default", () => {
-    const input = toPlacementInput(WORKSPACE, []);
+    const input = toPlacementInput(WORKSPACE, [], WORKSPACE.projects);
     expect(input.projects.map((p) => p.maxTeams)).toEqual([3, 2]);
     expect(input.parameters).not.toHaveProperty("maxTeams");
   });

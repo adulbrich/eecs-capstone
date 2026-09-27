@@ -288,6 +288,13 @@ student on the roster with no bids is placed where a team needs people; a bidder
 missing from the roster is still placed.
 _Avoid_: class list, enrollment, student list
 
+**Pre-approval**:
+A roster's word that a student already has a project, from before bidding: a
+sponsor's pick or a continuing team. It is a pin that comes with the roster. A
+pre-approved project missing from the list joins placement holding just its
+pre-approved students.
+_Avoid_: pre-assignment, reservation, override
+
 **Title match**:
 Staff's word that a bid's project title, as the survey spells it, means one of the
 projects. Bids name projects by title, and a survey may cut a title short or spell it

@@ -27,7 +27,7 @@ export function RosterSection({
   state: PlacementWorkspace;
   workspace: Workspace;
 }) {
-  const { bids, roster, update } = state;
+  const { assignments, bids, roster, update } = state;
   const stored = workspace.roster;
   // Adding a roster leaves the last run on the board, marked stale by the
   // fingerprint. Removing one takes its students out of the run, so the run
@@ -96,6 +96,10 @@ export function RosterSection({
     stored.source.kind === "csv" ? stored.source.filename : "a pasted list";
   const notInSurvey = bids?.students.filter((s) => s.rosterOnly).length ?? 0;
   const notOnRoster = bids?.notOnRoster ?? [];
+  const preApproved = assignments?.pins.size ?? 0;
+  const conflicts = bids?.conflicts ?? [];
+  const titles = new Map(state.projects.map((p) => [p.key, p.title]));
+  const title = (key: string) => titles.get(key) ?? key;
   return (
     <section
       aria-labelledby="placement-roster-heading"
@@ -122,6 +126,28 @@ export function RosterSection({
         </ConfirmDialog>
       </div>
       <p className="mt-1">{rosterSummary(bids === null, notInSurvey)}</p>
+      {preApproved > 0 && (
+        <p className="mt-1">
+          {preApproved === 1
+            ? "1 student is pre-approved for a project and placed there on every run."
+            : `${preApproved} students are pre-approved for a project and placed there on every run.`}
+        </p>
+      )}
+      {conflicts.length > 0 && (
+        <ul
+          aria-label="Pre-approvals over a pin from the bids"
+          className="mt-1"
+          role="note"
+          style={{ color: "var(--status-warning)" }}
+        >
+          {conflicts.map((c) => (
+            <li key={c.email}>
+              {c.email} is pre-approved for {title(c.fromRoster)}, over the bids
+              file's pin to {title(c.fromBids)}.
+            </li>
+          ))}
+        </ul>
+      )}
       {notOnRoster.length > 0 && (
         <p
           className="mt-1"

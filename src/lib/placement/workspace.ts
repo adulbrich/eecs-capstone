@@ -346,11 +346,12 @@ export function isEmptyWorkspace(workspace: Workspace): boolean {
 /** What a run hands the solver: page defaults filled into every project. */
 export function toPlacementInput(
   workspace: Workspace,
-  students: PlacementStudent[]
+  students: PlacementStudent[],
+  projects: readonly WorkspaceProject[]
 ): PlacementInput {
   const { maxTeams, ...parameters } = workspace.parameters;
   return {
-    projects: workspace.projects.map((p) => ({
+    projects: projects.map((p) => ({
       ...p,
       maxTeams: p.maxTeams ?? maxTeams,
     })),

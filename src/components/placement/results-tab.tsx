@@ -35,7 +35,11 @@ import {
 } from "#/lib/placement/board";
 import { downloadText } from "#/lib/placement/download";
 import { runPlacement } from "#/lib/placement/run-placement";
-import type { PlacementResult, PlacementStudent } from "#/lib/placement/types";
+import type {
+  PlacementResult,
+  PlacementStudent,
+  WorkspaceProject,
+} from "#/lib/placement/types";
 import {
   inputFingerprint,
   toPlacementInput,
@@ -57,13 +61,15 @@ export function ResultsTab({
   workspace: Workspace;
 }) {
   const { bids, update } = state;
+  // Listed projects plus any the roster adds (#670).
+  const allProjects = state.projects;
   const students = useMemo(
     () => applyPins(bids?.students ?? [], workspace.pins),
     [bids, workspace.pins]
   );
   const titles = useMemo(
-    () => new Map(workspace.projects.map((p) => [p.key, p.title])),
-    [workspace.projects]
+    () => new Map(allProjects.map((p) => [p.key, p.title])),
+    [allProjects]
   );
   // Hashes the whole bids text, and this panel stays mounted while other
   // tabs are edited, so it is worked out once per change to its inputs.
@@ -112,7 +118,7 @@ export function ResultsTab({
     setError(null);
     try {
       const result = await runPlacement(
-        toPlacementInput(workspace, students),
+        toPlacementInput(workspace, students, allProjects),
         controller.signal
       );
       const usable =
@@ -144,8 +150,8 @@ export function ResultsTab({
 
   const result = workspace.result;
   const rows = useMemo(
-    () => (result ? boardRows(result, students, workspace.projects) : []),
-    [result, students, workspace.projects]
+    () => (result ? boardRows(result, students, allProjects) : []),
+    [result, students, allProjects]
   );
 
   return (
@@ -227,6 +233,7 @@ export function ResultsTab({
       )}
       {result && (
         <Board
+          projects={allProjects}
           result={result}
           rows={rows}
           stale={result.fingerprint !== fingerprint}
@@ -256,6 +263,7 @@ function RunReport({ lines, problem }: { lines: string[]; problem: boolean }) {
 }
 
 function Board({
+  projects,
   result,
   rows,
   stale,
@@ -264,6 +272,7 @@ function Board({
   update,
   workspace,
 }: {
+  projects: WorkspaceProject[];
   result: NonNullable<Workspace["result"]>;
   rows: BoardRow[];
   stale: boolean;
@@ -277,7 +286,7 @@ function Board({
   const first = placed.filter((r) => r.priority === 1).length;
   const empty = projectsWithoutTeam(
     result,
-    workspace.projects,
+    projects,
     workspace.parameters.maxTeams
   );
   const notes = [
@@ -373,7 +382,7 @@ function Board({
             defaultMaxTeams={workspace.parameters.maxTeams}
             onMove={(key) => move(row.original, key)}
             onPin={(key) => pin(row.original.email, key)}
-            projects={workspace.projects}
+            projects={projects}
             row={row.original}
           />
         ),
@@ -383,7 +392,7 @@ function Board({
         id: "actions",
       },
     ]);
-  }, [students, update, workspace.projects, workspace.parameters.maxTeams]);
+  }, [students, update, projects, workspace.parameters.maxTeams]);
 
   const { tableProps } = useAdminTable({
     columns,
@@ -429,6 +438,9 @@ function Board({
 function priorityLabel(row: BoardRow): string {
   if (row.projectKey === null) {
     return "-";
+  }
+  if (row.preApproved) {
+    return "Pre-approved";
   }
   if (row.priority !== null) {
     return row.pinned

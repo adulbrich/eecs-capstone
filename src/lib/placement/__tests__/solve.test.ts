@@ -376,6 +376,43 @@ describe("solvePlacement", () => {
     });
   });
 
+  it("fills a project added from the roster with its pre-approved students only (#670)", () => {
+    const fixture = input(
+      [
+        project("A", { maxStudents: 5 }),
+        project("roster:lab", {
+          maxTeams: 1,
+          minStudents: 1,
+          maxStudents: 2,
+          fromRoster: true,
+        }),
+      ],
+      [
+        student("a1@example.edu", ["A"]),
+        student("a2@example.edu", ["A"]),
+        student("cy@example.edu", ["A"], {
+          pin: "roster:lab",
+          preApproved: true,
+        }),
+        {
+          ...rosterStudent("kim@example.edu"),
+          pin: "roster:lab",
+          preApproved: true,
+        },
+        rosterStudent("lou@example.edu"),
+      ],
+      { minStudents: 1, maxStudents: 4, allowUnranked: true }
+    );
+    const result = solvePlacement(highs, fixture);
+    expect(result.status).toBe("optimal");
+    expect(
+      result.placements
+        .filter((p) => p.projectKey === "roster:lab")
+        .map((p) => p.email)
+        .sort()
+    ).toEqual(["cy@example.edu", "kim@example.edu"]);
+  });
+
   it("reports a run the time limit stopped before any placement was found", () => {
     const fixture = termFixture();
     const result = solvePlacement(highs, {

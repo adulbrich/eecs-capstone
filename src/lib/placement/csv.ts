@@ -372,7 +372,7 @@ export interface UnmatchedTitle {
  * the projects' own titles over them, so a real title always wins. A match
  * to a project that is not in the list is ignored.
  */
-function projectKeysByTitle(
+export function projectKeysByTitle(
   projects: readonly Pick<WorkspaceProject, "key" | "title">[],
   matches: Readonly<Record<string, { projectKey: string }>>
 ): Map<string, string> {

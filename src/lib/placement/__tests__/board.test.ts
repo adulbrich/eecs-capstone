@@ -187,6 +187,28 @@ describe("placementCsv", () => {
     );
   });
 
+  it("says pre-approved where a priority would be (#670)", () => {
+    const ada = STUDENTS.find((x) => x.email === "ada@example.edu");
+    if (ada === undefined) {
+      throw new Error("the fixture lost Ada");
+    }
+    const pinnedAda = { ...ada, pin: "p1", preApproved: true };
+    const rows = boardRows(
+      RESULT,
+      [pinnedAda, ...STUDENTS.filter((x) => x !== ada)],
+      PROJECTS
+    );
+    const row = rows.find((r) => r.email === "ada@example.edu");
+    expect(row?.preApproved).toBe(true);
+    expect(placementCsv(rows, TITLES)).toContain(
+      "ada@example.edu,Ada Park,Tide Clock,1,pre-approved,"
+    );
+    // A pin set on the board replaces the pre-approval.
+    const [moved] = applyPins([pinnedAda], { "ada@example.edu": "p2" });
+    expect(moved.preApproved).toBeUndefined();
+    expect(moved.pin).toBe("p2");
+  });
+
   it("says a roster student was not in the survey where a priority would be", () => {
     const kim = {
       email: "kim@example.edu",

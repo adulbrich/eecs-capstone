@@ -4,6 +4,7 @@ import {
   mergeRoster,
   parseRosterCsv,
   parseRosterList,
+  resolveRosterProjects,
 } from "#/lib/placement/roster";
 import {
   clearStoredWorkspace,
@@ -80,23 +81,46 @@ export function usePlacementWorkspace() {
       ? parseRosterCsv(storedRoster.text)
       : parseRosterList(storedRoster.text);
   }, [storedRoster]);
+  const assignments = useMemo(
+    () =>
+      roster === null || projects === undefined
+        ? null
+        : resolveRosterProjects(roster.entries, projects, titleMatches),
+    [roster, projects, titleMatches]
+  );
+  // The listed projects plus any the roster pre-approves students for that
+  // the list lacks (#670). Bids match the listed ones only: an added project
+  // holds exactly its pre-approved students.
+  const allProjects = useMemo(
+    () =>
+      assignments === null || assignments.added.length === 0
+        ? (projects ?? [])
+        : [...(projects ?? []), ...assignments.added],
+    [projects, assignments]
+  );
   const bids = useMemo(() => {
     if (bidsText === undefined || projects === undefined) {
       return null;
     }
     const parsed = parseBidsCsv(bidsText, projects, titleMatches);
     if (roster === null) {
-      return { ...parsed, notOnRoster: [] };
+      return { ...parsed, notOnRoster: [], conflicts: [] };
     }
     // The roster's students join the survey's, so every tab and the run
-    // see one list (#665).
-    return { ...parsed, ...mergeRoster(parsed.students, roster.entries) };
-  }, [bidsText, projects, titleMatches, roster]);
+    // see one list (#665), with its pre-approvals pinned (#670).
+    return {
+      ...parsed,
+      ...mergeRoster(parsed.students, roster.entries, assignments?.pins),
+    };
+  }, [bidsText, projects, titleMatches, roster, assignments]);
 
   return {
     workspace,
     bids,
     roster,
+    assignments,
+    /** Every project a run places students on: listed, then from the roster. */
+    projects: allProjects,
     saveFailed,
     unreadable,
     changedElsewhere,

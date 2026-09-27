@@ -5,6 +5,11 @@
  */
 
 export interface PlacementProject {
+  /**
+   * Added because the roster pre-approves students for a project the list
+   * lacks (#670): never stored, and its settings are fixed.
+   */
+  fromRoster?: boolean;
   /** Stable within one workspace: a project id from the portal, or the
    * normalized title for a project from a CSV. */
   key: string;
@@ -44,6 +49,8 @@ export interface PlacementStudent {
   name: string;
   /** The project key this student is pinned to, if any. */
   pin?: string;
+  /** The pin came from a pre-approval on the roster (#670). */
+  preApproved?: boolean;
   /** On the class roster but not in the survey, so no bids (#665). */
   rosterOnly?: boolean;
 }

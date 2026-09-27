@@ -141,7 +141,7 @@ export function formatTemplate(format: CsvFormat): string {
 
 export const ROSTER_FORMAT: CsvFormat = {
   filename: "placement-roster-template",
-  note: "Or paste the emails in the box instead: one per line, or separated by commas, semicolons or spaces.",
+  note: "Or paste the emails in the box instead: one per line, or separated by commas, semicolons or spaces. Pre-approvals come only from the file's project column.",
   columns: [
     {
       name: "email",
@@ -157,9 +157,16 @@ export const ROSTER_FORMAT: CsvFormat = {
         "The student's name, for a student who did not answer the survey.",
       example: "Ada Park",
     },
+    {
+      name: "project",
+      required: false,
+      meaning:
+        "A project the student is pre-approved for: they are placed there on every run. A title not on the Projects tab adds that project, holding just its pre-approved students.",
+      example: "Tide Clock",
+    },
   ],
   templateRows: [
-    { email: "ada@example.edu", name: "Ada Park" },
-    { email: "kim@example.edu", name: "Kim Lee" },
+    { email: "ada@example.edu", name: "Ada Park", project: "" },
+    { email: "kim@example.edu", name: "Kim Lee", project: "Tide Clock" },
   ],
 };

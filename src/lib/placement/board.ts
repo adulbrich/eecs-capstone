@@ -24,7 +24,8 @@ export function applyPins(
       return student;
     }
     const pin = pins[student.email];
-    const { pin: _fromFile, ...rest } = student;
+    // A board pin replaces a pre-approval as it replaces a file's pin.
+    const { pin: _fromFile, preApproved: _fromRoster, ...rest } = student;
     return pin === null ? rest : { ...rest, pin };
   });
 }
@@ -39,6 +40,8 @@ export interface BoardRow {
   groupLabel: string;
   name: string;
   pinned: boolean;
+  /** On the project the roster pre-approved them for (#670). */
+  preApproved: boolean;
   /** The priority they gave the project they are on, or null. */
   priority: number | null;
   projectKey: string | null;
@@ -87,6 +90,10 @@ export function boardRows(
       priority: bid?.priority ?? null,
       comment: bid?.comment ?? "",
       pinned: projectKey !== null && student.pin === projectKey,
+      preApproved:
+        projectKey !== null &&
+        student.pin === projectKey &&
+        student.preApproved === true,
       rosterOnly: student.rosterOnly ?? false,
       unplacedReason:
         projectKey === null
@@ -167,6 +174,14 @@ export function moveStudent(
 
 type Row = Record<string, string | number | null>;
 
+/** The CSV's priority cell: the number, or why there is none. */
+function csvPriority(row: BoardRow): string | number | null {
+  if (row.preApproved) {
+    return "pre-approved";
+  }
+  return row.rosterOnly ? "not in the survey" : row.priority;
+}
+
 /** One row per student, unplaced ones with a blank project and team. */
 export function placementCsv(
   rows: readonly BoardRow[],
@@ -188,7 +203,7 @@ export function placementCsv(
       project:
         r.projectKey === null ? "" : (titles.get(r.projectKey) ?? r.projectKey),
       team: r.team,
-      priority: r.rosterOnly ? "not in the survey" : r.priority,
+      priority: csvPriority(r),
       comment: r.comment,
       avoid: r.avoid ?? "",
     }))
