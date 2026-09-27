@@ -82,6 +82,18 @@ describe("parseRosterList", () => {
     ]);
   });
 
+  it("keeps a comma inside a quoted name as part of the name", () => {
+    expect(
+      parseRosterList('"Park, Ada" <ada@example.edu>; ben@example.edu')
+    ).toEqual({
+      entries: [
+        { email: "ada@example.edu", name: "Park, Ada" },
+        { email: "ben@example.edu", name: "" },
+      ],
+      issues: [],
+    });
+  });
+
   it("gives the same students as a CSV of the same emails", () => {
     expect(parseRosterList("ada@example.edu\nkim@example.edu").entries).toEqual(
       parseRosterCsv("email\nada@example.edu\nkim@example.edu").entries

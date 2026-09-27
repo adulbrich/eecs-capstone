@@ -26,11 +26,38 @@ export interface ParsedRoster {
 
 const EMAIL = /^[^\s@<>,;"]+@[^\s@<>,;"]+\.[^\s@<>,;"]+$/;
 const NAMED = /^(.*)<([^<>]+)>$/;
-const ITEM_SEPARATOR = /[,;]/;
 const WHITESPACE = /\s+/;
 const QUOTES = /^["']|["']$/g;
 
 export const isEmail = (text: string) => EMAIL.test(text);
+
+/**
+ * A pasted line cut at each comma or semicolon outside double quotes and
+ * angle brackets, so `"Park, Ada" <ada@example.edu>` stays one item.
+ */
+function splitItems(line: string): string[] {
+  const items: string[] = [];
+  let current = "";
+  let quoted = false;
+  let bracketed = false;
+  for (const char of line) {
+    if (char === '"') {
+      quoted = !quoted;
+    } else if (char === "<") {
+      bracketed = true;
+    } else if (char === ">") {
+      bracketed = false;
+    }
+    if ((char === "," || char === ";") && !quoted && !bracketed) {
+      items.push(current);
+      current = "";
+    } else {
+      current += char;
+    }
+  }
+  items.push(current);
+  return items;
+}
 
 /** Adds an entry, or a warning when the email is already on the roster. */
 function collect(
@@ -133,7 +160,7 @@ export function parseRosterList(text: string): ParsedRoster {
   const issues: ImportIssue[] = [];
   const seen = new Map<string, number>();
   for (const { line, text: content } of pastedLines(text)) {
-    for (const raw of content.split(ITEM_SEPARATOR)) {
+    for (const raw of splitItems(content)) {
       const item = raw.trim();
       if (item === "") {
         continue;

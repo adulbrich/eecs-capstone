@@ -29,10 +29,29 @@ export function RosterSection({
 }) {
   const { bids, roster, update } = state;
   const stored = workspace.roster;
-  // A new roster changes who is in the run, so the last run no longer
-  // describes it; pins stay, since they name students by email.
+  // Adding a roster leaves the last run on the board, marked stale by the
+  // fingerprint. Removing one takes its students out of the run, so the run
+  // goes too, as a new bids file's does, along with the pins on students the
+  // survey never had: otherwise a placed roster student would silently drop
+  // off the results board.
   const setRoster = (next: Workspace["roster"]) =>
     update((w) => ({ ...w, roster: next }));
+  const removeRoster = () => {
+    const surveyed = new Set(
+      (bids?.students ?? []).filter((s) => !s.rosterOnly).map((s) => s.email)
+    );
+    update((w) => {
+      const pins = Object.entries(w.pins ?? {}).filter(([email]) =>
+        surveyed.has(email)
+      );
+      return {
+        ...w,
+        roster: undefined,
+        result: undefined,
+        pins: pins.length > 0 ? Object.fromEntries(pins) : undefined,
+      };
+    });
+  };
 
   if (stored === undefined || roster === null) {
     return (
@@ -92,8 +111,8 @@ export function RosterSection({
         <ConfirmDialog
           busyLabel="Removing..."
           confirmLabel="Remove"
-          description="The students who did not answer the survey leave the board and the run. The bids stay."
-          onConfirm={() => setRoster(undefined)}
+          description="The students who did not answer the survey leave the board and the run, and so does the last placement. The bids stay."
+          onConfirm={removeRoster}
           title="Remove the class roster?"
         >
           <Button size="sm" type="button" variant="ghost">

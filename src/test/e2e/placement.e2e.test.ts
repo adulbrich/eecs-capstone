@@ -437,9 +437,12 @@ test.describe("placement workspace", () => {
 
     await page
       .getByLabel("Roster emails")
-      .fill(`ada@${DOMAIN}, ben@${DOMAIN}\nKim Lee <kim@${DOMAIN}>`);
+      .fill(`ada@${DOMAIN}, ben@${DOMAIN}\nKim Lee <kim@${DOMAIN}>\nnobody`);
     await page.getByRole("button", { name: "Use these emails" }).click();
     await expect(roster).toContainText("3 students from a pasted list");
+    await expect(
+      page.getByRole("region", { name: "Problems in the pasted roster" })
+    ).toContainText('Line 3: "nobody" is not an email.');
     await expect(roster).not.toContainText("not on the roster");
     await expect(
       page.getByRole("rowheader", { name: /Kim Lee.*not in the survey/ })
