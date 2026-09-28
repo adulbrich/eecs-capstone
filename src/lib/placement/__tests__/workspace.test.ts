@@ -290,6 +290,13 @@ describe("removed students", () => {
     ]);
   });
 
+  it("are read in lowercase from a hand-edited file, as the parsers write emails", () => {
+    const parsed = parseWorkspace(
+      JSON.stringify({ ...WORKSPACE, removed: ["Ada@Example.edu"] })
+    );
+    expect(parsed.ok && parsed.workspace.removed).toEqual(["ada@example.edu"]);
+  });
+
   it("round-trip through a file and keep a workspace from counting as empty", () => {
     const workspace = { ...WORKSPACE, removed: ["ada@example.edu"] };
     expect(parseWorkspace(serializeWorkspace(workspace))).toEqual({

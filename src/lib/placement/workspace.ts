@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { removeFromResult } from "#/lib/placement/board";
 import { type ImportIssue, normalizeTitle } from "#/lib/placement/csv";
 import {
   DEFAULT_PLACEMENT_PARAMETERS,
@@ -200,7 +201,9 @@ const workspaceSchema = z
       })
       .nullable(),
     pins: z.record(z.string(), z.string().nullable()).optional(),
-    removed: z.array(z.string()).optional(),
+    // Lowercase, as every parser writes an email, so a hand-edited file
+    // still removes the student it names.
+    removed: z.array(z.string().toLowerCase()).optional(),
     result: resultSchema.optional(),
     roster: z
       .object({
@@ -452,7 +455,7 @@ export function pruneTitleMatches(
 /**
  * The workspace with `emails` taken out of placement (#679). A placement
  * shown on the board loses them at once, as a Move edits it, and is marked
- * edited; their pins stay, so a restore brings them back as they were.
+ * edited; their pins stay, so a restore brings them back with them.
  */
 export function removeStudents(
   workspace: Workspace,
@@ -503,20 +506,4 @@ export function setAsideRemoved(
 export function restoreStudent(workspace: Workspace, email: string): Workspace {
   const removed = (workspace.removed ?? []).filter((e) => e !== email);
   return { ...workspace, removed: removed.length > 0 ? removed : undefined };
-}
-
-function removeFromResult(
-  result: StoredResult,
-  emails: readonly string[]
-): StoredResult {
-  const gone = new Set(emails);
-  const placements = result.placements.filter((p) => !gone.has(p.email));
-  const unplaced = result.unplaced.filter((u) => !gone.has(u.email));
-  if (
-    placements.length === result.placements.length &&
-    unplaced.length === result.unplaced.length
-  ) {
-    return result;
-  }
-  return { ...result, edited: true, placements, unplaced };
 }

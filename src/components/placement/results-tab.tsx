@@ -41,6 +41,7 @@ import {
   moveTargets,
   placementCsv,
   projectsWithoutTeam,
+  removeFromResult,
   unplacedReason,
 } from "#/lib/placement/board";
 import { downloadText } from "#/lib/placement/download";
@@ -136,13 +137,14 @@ export function ResultsTab({
         result.placements.length > 0;
       if (usable) {
         setFailed(null);
+        // A student removed while the solver ran was in its input; the
+        // result drops them as a removal before the run would have (#679).
         update((w) => ({
           ...w,
-          result: {
-            ...result,
-            at: new Date().toISOString(),
-            fingerprint: read,
-          },
+          result: removeFromResult(
+            { ...result, at: new Date().toISOString(), fingerprint: read },
+            w.removed ?? []
+          ),
         }));
       } else {
         // The previous placement stays on screen; this run explains itself.

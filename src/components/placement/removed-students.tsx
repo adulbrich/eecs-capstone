@@ -70,8 +70,7 @@ export function RemovedStudents({
               {s.name ? `${s.name} (${s.email})` : s.email}
               {!s.listed && (
                 <span className="text-muted-foreground">
-                  {" "}
-                  - not in the bids or the roster now
+                  , not in the bids or the roster now
                 </span>
               )}
             </span>
