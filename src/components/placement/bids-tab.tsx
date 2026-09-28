@@ -9,6 +9,10 @@ import { BidsByProject } from "#/components/placement/bids-by-project";
 import { CsvFormatHelp } from "#/components/placement/csv-format";
 import { FilePickerButton } from "#/components/placement/file-picker-button";
 import { ImportIssues } from "#/components/placement/import-issues";
+import {
+  RemovedStudents,
+  RemoveStudentButton,
+} from "#/components/placement/removed-students";
 import { RosterSection } from "#/components/placement/roster-section";
 import { TitleMatchesPanel } from "#/components/placement/title-matches";
 import type { PlacementWorkspace } from "#/components/placement/use-placement-workspace";
@@ -176,11 +180,14 @@ export function BidsTab({
       />
       <ImportIssues issues={bids.issues} label="bids" />
       <RosterSection state={state} workspace={workspace} />
+      <RemovedStudents removed={bids.removed} update={update} />
       <ViewSwitch onView={onView} view={view} />
       <p className="mt-2 text-muted-foreground text-sm">
         {view === "project"
           ? "Pin here does what Approve does on the Results tab: every run keeps the student on that project until you unpin them, over any pin from the bids file or the roster. Unpin frees them from all of these. A pin changes the next run; the Results tab shows the last run until then."
-          : "Pinned rows show every pin in effect: the bids file's, the roster's, and those set here or on the Results tab, which win over the other two."}
+          : "Pinned rows show every pin in effect: the bids file's, the roster's, and those set here or on the Results tab, which win over the other two."}{" "}
+        Remove takes a student out of placement, and off the board at once,
+        until you restore them from the removed list above.
       </p>
       {view === "project" ? (
         <BidsByProject state={state} students={pinned} />
@@ -189,6 +196,7 @@ export function BidsTab({
           preApprovals={preApprovals}
           projects={state.placementProjects}
           students={pinned}
+          update={update}
         />
       )}
     </div>
@@ -326,11 +334,24 @@ const COLUMNS = defineAdminColumns<Row>()([
   },
 ]);
 
-function StudentHeader({ rows }: { rows: Row[] }) {
+function StudentHeader({
+  rows,
+  update,
+}: {
+  rows: Row[];
+  update: PlacementWorkspace["update"];
+}) {
   const [first] = rows;
   const bids = rows.filter((r) => r.priority !== null).length;
   return (
     <div>
+      <span className="float-right font-normal">
+        <RemoveStudentButton
+          email={first.email}
+          name={first.name}
+          update={update}
+        />
+      </span>
       <span className="font-medium">{first.name || first.email}</span>
       {first.name && (
         <span className="ml-2 font-normal text-muted-foreground text-xs">
@@ -388,10 +409,12 @@ function StudentsTable({
   preApprovals,
   projects,
   students,
+  update,
 }: {
   preApprovals: ReadonlyMap<string, string>;
   projects: Workspace["projects"];
   students: PlacementStudent[];
+  update: PlacementWorkspace["update"];
 }) {
   const { navigate, search } = useLocalTableSearch();
   const rows = useMemo(
@@ -418,7 +441,9 @@ function StudentsTable({
         emptyMessage="No rows in the file could be used."
         getRowId={(row) => row.id}
         group={{
-          header: (groupRows) => <StudentHeader rows={groupRows} />,
+          header: (groupRows) => (
+            <StudentHeader rows={groupRows} update={update} />
+          ),
           key: (row) => row.email,
         }}
         {...tableProps}

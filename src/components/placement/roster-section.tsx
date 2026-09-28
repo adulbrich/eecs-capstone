@@ -1,4 +1,4 @@
-import { Trash2 } from "lucide-react";
+import { Trash2, UserMinus } from "lucide-react";
 import { ConfirmDialog } from "#/components/confirm-dialog";
 import { CsvFormatHelp } from "#/components/placement/csv-format";
 import { FilePickerButton } from "#/components/placement/file-picker-button";
@@ -7,7 +7,7 @@ import { PasteList } from "#/components/placement/paste-list";
 import type { PlacementWorkspace } from "#/components/placement/use-placement-workspace";
 import { Button } from "#/components/ui/button";
 import { ROSTER_FORMAT } from "#/lib/placement/formats";
-import type { Workspace } from "#/lib/placement/workspace";
+import { removeStudents, type Workspace } from "#/lib/placement/workspace";
 
 const plural = (n: number, one: string, many: string) =>
   `${n} ${n === 1 ? one : many}`;
@@ -174,8 +174,23 @@ export function RosterSection({
           {notOnRoster.slice(0, SHOWN).join(", ")}
           {notOnRoster.length > SHOWN &&
             `, and ${notOnRoster.length - SHOWN} more`}
-          .
+          . A student who transferred out of the class is usually one of them.
         </p>
+      )}
+      {notOnRoster.length > 0 && (
+        <div className="mt-1">
+          <Button
+            onClick={() => update((w) => removeStudents(w, notOnRoster))}
+            size="sm"
+            type="button"
+            variant="outline"
+          >
+            <UserMinus aria-hidden="true" />
+            {notOnRoster.length === 1
+              ? "Remove this student"
+              : `Remove these ${notOnRoster.length} students`}
+          </Button>
+        </div>
       )}
       <ImportIssues issues={roster.issues} label="roster" unit={unit} />
     </section>

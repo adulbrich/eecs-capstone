@@ -45,6 +45,12 @@ export interface Workspace {
   pins?: Record<string, string | null>;
   projectSource: ProjectSource | null;
   projects: WorkspaceProject[];
+  /**
+   * Emails of the students staff took out of placement by hand (#679), such
+   * as one who transferred sections. Kept by email like `pins`, so a removal
+   * outlasts new bids or a new roster.
+   */
+  removed?: string[];
   /** The last run that produced a placement. */
   result?: StoredResult;
   /**
@@ -194,6 +200,7 @@ const workspaceSchema = z
       })
       .nullable(),
     pins: z.record(z.string(), z.string().nullable()).optional(),
+    removed: z.array(z.string()).optional(),
     result: resultSchema.optional(),
     roster: z
       .object({
@@ -336,6 +343,7 @@ export function isEmptyWorkspace(workspace: Workspace): boolean {
     workspace.projects.length === 0 &&
     workspace.bids === null &&
     workspace.roster === undefined &&
+    (workspace.removed ?? []).length === 0 &&
     Object.entries(DEFAULT_WORKSPACE_PARAMETERS).every(
       ([key, value]) =>
         JSON.stringify(parameters[key]) === JSON.stringify(value)
@@ -439,4 +447,76 @@ export function pruneTitleMatches(
     keys.has(m.projectKey)
   );
   return kept.length > 0 ? Object.fromEntries(kept) : undefined;
+}
+
+/**
+ * The workspace with `emails` taken out of placement (#679). A placement
+ * shown on the board loses them at once, as a Move edits it, and is marked
+ * edited; their pins stay, so a restore brings them back as they were.
+ */
+export function removeStudents(
+  workspace: Workspace,
+  emails: readonly string[]
+): Workspace {
+  const removed = new Set([...(workspace.removed ?? []), ...emails]);
+  return {
+    ...workspace,
+    removed: [...removed].sort(),
+    result: workspace.result && removeFromResult(workspace.result, emails),
+  };
+}
+
+export interface RemovedStudent {
+  email: string;
+  /** False when neither the bids nor the roster lists the email any more. */
+  listed: boolean;
+  name: string;
+}
+
+/**
+ * The students still in placement, and every removed email with the name
+ * the bids or the roster give it.
+ */
+export function setAsideRemoved(
+  students: readonly PlacementStudent[],
+  removed: readonly string[] | undefined
+): { kept: PlacementStudent[]; removed: RemovedStudent[] } {
+  if (removed === undefined || removed.length === 0) {
+    return { kept: [...students], removed: [] };
+  }
+  const gone = new Set(removed);
+  const byEmail = new Map(students.map((s) => [s.email, s]));
+  return {
+    kept: students.filter((s) => !gone.has(s.email)),
+    removed: removed.map((email) => {
+      const student = byEmail.get(email);
+      return {
+        email,
+        name: student?.name ?? "",
+        listed: student !== undefined,
+      };
+    }),
+  };
+}
+
+/** The workspace with `email` back in placement, for the next run. */
+export function restoreStudent(workspace: Workspace, email: string): Workspace {
+  const removed = (workspace.removed ?? []).filter((e) => e !== email);
+  return { ...workspace, removed: removed.length > 0 ? removed : undefined };
+}
+
+function removeFromResult(
+  result: StoredResult,
+  emails: readonly string[]
+): StoredResult {
+  const gone = new Set(emails);
+  const placements = result.placements.filter((p) => !gone.has(p.email));
+  const unplaced = result.unplaced.filter((u) => !gone.has(u.email));
+  if (
+    placements.length === result.placements.length &&
+    unplaced.length === result.unplaced.length
+  ) {
+    return result;
+  }
+  return { ...result, edited: true, placements, unplaced };
 }

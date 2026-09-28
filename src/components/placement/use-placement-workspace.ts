@@ -11,6 +11,7 @@ import {
   EMPTY_WORKSPACE,
   isEmptyWorkspace,
   readStoredWorkspace,
+  setAsideRemoved,
   WORKSPACE_STORAGE_KEY,
   type Workspace,
   writeStoredWorkspace,
@@ -73,6 +74,7 @@ export function usePlacementWorkspace() {
   const projects = workspace?.projects;
   const titleMatches = workspace?.titleMatches;
   const storedRoster = workspace?.roster;
+  const removed = workspace?.removed;
   const roster = useMemo(() => {
     if (storedRoster === undefined) {
       return null;
@@ -81,12 +83,18 @@ export function usePlacementWorkspace() {
       ? parseRosterCsv(storedRoster.text)
       : parseRosterList(storedRoster.text);
   }, [storedRoster]);
+  // A removed student's pre-approval goes with them (#679), so a project
+  // the roster adds shrinks, or disappears, without them.
   const assignments = useMemo(
     () =>
       roster === null || projects === undefined
         ? null
-        : resolveRosterProjects(roster.entries, projects, titleMatches),
-    [roster, projects, titleMatches]
+        : resolveRosterProjects(
+            roster.entries.filter((e) => !removed?.includes(e.email)),
+            projects,
+            titleMatches
+          ),
+    [roster, projects, titleMatches, removed]
   );
   // The listed projects plus any the roster pre-approves students for that
   // the list lacks (#670). Bids match the listed ones only: an added project
@@ -103,16 +111,25 @@ export function usePlacementWorkspace() {
       return null;
     }
     const parsed = parseBidsCsv(bidsText, projects, titleMatches);
-    if (roster === null) {
-      return { ...parsed, notOnRoster: [], conflicts: [] };
-    }
     // The roster's students join the survey's, so every tab and the run
     // see one list (#665), with its pre-approvals pinned (#670).
+    const merged =
+      roster === null
+        ? { ...parsed, notOnRoster: [], conflicts: [] }
+        : {
+            ...parsed,
+            ...mergeRoster(parsed.students, roster.entries, assignments?.pins),
+          };
+    // Students removed by hand leave that list, and so every tab, the run
+    // and the downloads (#679).
+    const aside = setAsideRemoved(merged.students, removed);
     return {
-      ...parsed,
-      ...mergeRoster(parsed.students, roster.entries, assignments?.pins),
+      ...merged,
+      students: aside.kept,
+      removed: aside.removed,
+      notOnRoster: merged.notOnRoster.filter((e) => !removed?.includes(e)),
     };
-  }, [bidsText, projects, titleMatches, roster, assignments]);
+  }, [bidsText, projects, titleMatches, roster, assignments, removed]);
 
   return {
     workspace,
