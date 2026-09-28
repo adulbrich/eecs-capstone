@@ -38,6 +38,9 @@ import { createHash } from "node:crypto";
  */
 export const EMBEDDING_SOURCE_LIMIT = 20_000;
 
+/** A high surrogate with nothing after it: half a character, cut at the limit. */
+const LONE_TRAILING_SURROGATE = /[\uD800-\uDBFF]$/;
+
 export interface EmbeddableProject {
   description: string | null;
   licenseRestrictions: string | null;
@@ -70,6 +73,11 @@ function section(label: string, value: string | null): string | null {
  * comparison an `.mjs` cannot match. Explain above the function, the way this
  * does. `section` and `embeddingHash` are under the same rule; the parity
  * test's `it` names are the inventory, not this comment.
+ *
+ * The `replace` after the cut drops a high surrogate left by an emoji that
+ * straddles the limit, as `buildSocialSummarySource` does (#622). Without it
+ * the source ends on half a character, which `JSON.stringify` sends to Titan
+ * as a lone escape.
  */
 export function buildProjectEmbeddingSource(
   project: EmbeddableProject
@@ -83,7 +91,10 @@ export function buildProjectEmbeddingSource(
     section("Preferred qualifications", project.prefQualifications),
     section("License", project.licenseRestrictions),
   ].filter((part) => part !== null);
-  return parts.join("\n\n").slice(0, EMBEDDING_SOURCE_LIMIT);
+  return parts
+    .join("\n\n")
+    .slice(0, EMBEDDING_SOURCE_LIMIT)
+    .replace(LONE_TRAILING_SURROGATE, "");
 }
 
 export function buildInterestsEmbeddingSource(interestsText: string): string {

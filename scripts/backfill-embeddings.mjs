@@ -69,6 +69,9 @@ const DELAY_MS = 200;
 /** MUST match `EMBEDDING_SOURCE_LIMIT` in `src/lib/embedding-source.ts`. */
 const EMBEDDING_SOURCE_LIMIT = 20_000;
 
+/** MUST match `LONE_TRAILING_SURROGATE` in `src/lib/embedding-source.ts`. */
+const LONE_TRAILING_SURROGATE = /[\uD800-\uDBFF]$/;
+
 /** MUST match `DEFAULT_REGION` in `src/lib/_internal/bedrock.ts`. */
 const DEFAULT_REGION = "us-east-1";
 
@@ -89,7 +92,10 @@ function buildProjectEmbeddingSource(project) {
     section("Preferred qualifications", project.prefQualifications),
     section("License", project.licenseRestrictions),
   ].filter((part) => part !== null);
-  return parts.join("\n\n").slice(0, EMBEDDING_SOURCE_LIMIT);
+  return parts
+    .join("\n\n")
+    .slice(0, EMBEDDING_SOURCE_LIMIT)
+    .replace(LONE_TRAILING_SURROGATE, "");
 }
 
 /** MUST match `embeddingHash` in `src/lib/embedding-source.ts`. */
