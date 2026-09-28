@@ -155,8 +155,18 @@ describe("parseBidsCsv", () => {
         row: 1,
         message:
           'The header has "priority" more than once; each column must appear once.',
+        wholeFile: true,
       },
     ]);
+  });
+
+  it("ignores columns with no name, as a survey export's trailing ones (#681)", () => {
+    const result = parseBidsCsv(
+      "email,priority,project,, ,\nada@example.edu,1,Tide Clock,x,y,z",
+      PROJECTS
+    );
+    expect(result.issues).toEqual([]);
+    expect(result.students).toHaveLength(1);
   });
 
   it("returns nothing for an empty file", () => {
@@ -219,7 +229,12 @@ describe("parseProjectsCsv", () => {
 
   it("needs a title column", () => {
     expect(parseProjectsCsv("name\nRobot Arm").issues).toEqual([
-      { level: "error", row: 1, message: 'The file has no "title" column.' },
+      {
+        level: "error",
+        row: 1,
+        message: 'The file has no "title" column.',
+        wholeFile: true,
+      },
     ]);
   });
 });

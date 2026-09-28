@@ -26,7 +26,12 @@ describe("parseRosterCsv", () => {
 
   it("reports a missing email column, a bad email and a repeat", () => {
     expect(parseRosterCsv("name\nAda").issues).toEqual([
-      { level: "error", row: 1, message: 'The file has no "email" column.' },
+      {
+        level: "error",
+        row: 1,
+        message: 'The file has no "email" column.',
+        wholeFile: true,
+      },
     ]);
     const parsed = parseRosterCsv(
       "email\nada@example.edu\nnot an email\n\nADA@example.edu"
@@ -367,7 +372,12 @@ describe("the Canvas roster and groups export (#674)", () => {
   it("reads a header with login_id as Canvas, and asks for email when neither is there", () => {
     expect(parseRosterCsv("name,login_id\n").format).toBe("canvas");
     expect(parseRosterCsv("name,group_name\nAda,Team 1").issues).toEqual([
-      { level: "error", row: 1, message: 'The file has no "email" column.' },
+      {
+        level: "error",
+        row: 1,
+        message: 'The file has no "email" column.',
+        wholeFile: true,
+      },
     ]);
   });
 

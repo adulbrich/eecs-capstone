@@ -316,6 +316,82 @@ test.describe("placement workspace", () => {
     await expect(page.getByText(/2 of 2 students placed/)).toBeVisible();
   });
 
+  test("an export that lost its ImportId row still converts, and one with no email says why it cannot", async ({
+    page,
+  }) => {
+    const quote = (cells: string[]) =>
+      cells.map((c) => `"${c.replaceAll('"', '""')}"`).join(",");
+    // Two header rows, as a hand-edited export has (#681), with the trailing
+    // unnamed columns Qualtrics writes.
+    const header = (withEmail: boolean) => [
+      quote([
+        "RecipientLastName",
+        ...(withEmail ? ["RecipientEmail"] : []),
+        " _1",
+        " _2",
+        "",
+        " ",
+      ]),
+      quote([
+        "Recipient Last Name",
+        ...(withEmail ? ["Recipient Email"] : []),
+        "Rank your top 6 choices. - Tide Clock",
+        "Rank your top 6 choices. - Robot Arm",
+        "",
+        "",
+      ]),
+    ];
+    const edited = [
+      ...header(true),
+      quote(["Park", `ada@${DOMAIN}`, "1", "2", "", ""]),
+      quote(["Ito", `ben@${DOMAIN}`, "", "1", "", ""]),
+    ].join("\n");
+
+    await page.goto("/admin/placement");
+    await waitForHydration(page);
+    await page.getByLabel("Projects CSV file").setInputFiles({
+      name: "projects.csv",
+      mimeType: "text/csv",
+      buffer: Buffer.from(PROJECTS_CSV),
+    });
+    await page.getByRole("tab", { name: /Bids/ }).click();
+    await page.getByLabel("Bids CSV file").setInputFiles({
+      name: "edited.csv",
+      mimeType: "text/csv",
+      buffer: Buffer.from(edited),
+    });
+    await expect(
+      page.getByText("Converted from the Qualtrics export edited.csv.")
+    ).toBeVisible();
+    await expect(page.getByText("2 students and 3 bids")).toBeVisible();
+    await expect(
+      page.getByText(/The export has no ImportId row/)
+    ).toBeVisible();
+
+    await page.getByRole("button", { name: "Remove bids" }).click();
+    await page
+      .getByRole("alertdialog")
+      .getByRole("button", { name: "Remove" })
+      .click();
+    await page.getByLabel("Bids CSV file").setInputFiles({
+      name: "no-email.csv",
+      mimeType: "text/csv",
+      buffer: Buffer.from(
+        [...header(false), quote(["Park", "1", "2", "", ""])].join("\n")
+      ),
+    });
+    const problems = page.getByRole("region", {
+      name: "Problems in the survey export file",
+    });
+    await expect(problems).toContainText("The survey export file was not read");
+    await expect(problems).toContainText(
+      "The export has no Recipient Email column"
+    );
+    await expect(
+      page.getByRole("region", { name: "Problems in the bids file" })
+    ).toHaveCount(0);
+  });
+
   test("the analytics Sheet downloads each of its tables", async ({ page }) => {
     await page.goto("/admin/placement");
     await waitForHydration(page);

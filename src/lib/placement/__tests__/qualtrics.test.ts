@@ -67,7 +67,14 @@ interface Response {
   status?: string;
 }
 
-function exportOf(responses: Response[]): string {
+/**
+ * `importIds: false` leaves out the ImportId row, as an export someone
+ * edited by hand can (#681).
+ */
+function exportOf(
+  responses: Response[],
+  { importIds = true, columns = COLUMNS } = {}
+): string {
   const cells = (r: Response) => [
     r.status ?? "IP Address",
     r.finished ?? "True",
@@ -84,11 +91,15 @@ function exportOf(responses: Response[]): string {
   ];
   // Papa rather than the app's toCsv: Qualtrics adds no formula guard, and
   // the fixture has to be what Qualtrics writes.
+  const keep = columns.map((c) => COLUMNS.indexOf(c));
+  const pick = (row: string[]) => keep.map((i) => row[i]);
   return Papa.unparse([
-    COLUMNS.map((c) => c[0]),
-    COLUMNS.map((c) => c[1]),
-    COLUMNS.map((c) => JSON.stringify({ ImportId: c[2] })),
-    ...responses.map(cells),
+    columns.map((c) => c[0]),
+    columns.map((c) => c[1]),
+    ...(importIds
+      ? [columns.map((c) => JSON.stringify({ ImportId: c[2] }))]
+      : []),
+    ...responses.map((r) => pick(cells(r))),
   ]);
 }
 
@@ -106,6 +117,8 @@ const ADA: Response = {
 describe("isQualtricsExport", () => {
   it("recognizes the ImportId row and nothing else", () => {
     expect(isQualtricsExport(exportOf([ADA]))).toBe(true);
+    // Without its ImportId row, by the ranking question in row 2 (#681).
+    expect(isQualtricsExport(exportOf([ADA], { importIds: false }))).toBe(true);
     expect(
       isQualtricsExport("email,priority,project\na@b.c,1,Tide Clock")
     ).toBe(false);
@@ -307,5 +320,63 @@ describe("convertQualtrics", () => {
       level: "error",
       row: 1,
     });
+  });
+});
+
+describe("an export without its ImportId row (#681)", () => {
+  const BEN: Response = {
+    email: "ben@example.edu",
+    first: "Ben",
+    last: "Ito",
+    recorded: "2026-09-28 11:00:00",
+    ranks: [1, "", 2, ""],
+    status: "Survey Preview",
+  };
+
+  it("converts to the same bids, with row numbers from the file uploaded", () => {
+    const full = convertQualtrics(exportOf([ADA, BEN]), PROJECTS);
+    const edited = convertQualtrics(
+      exportOf([ADA, BEN], { importIds: false }),
+      PROJECTS
+    );
+    expect(edited.csv).toBe(full.csv);
+    const [note, ...rest] = edited.issues;
+    expect(note).toEqual({
+      level: "warning",
+      row: 1,
+      message:
+        "The export has no ImportId row (Qualtrics' third header row), so its columns were found by their names and its responses read from row 3.",
+    });
+    // Ben's preview is row 5 of the full export and row 4 of this one.
+    expect(rest).toEqual(
+      full.issues.map((i) => (i.row > 1 ? { ...i, row: i.row - 1 } : i))
+    );
+  });
+
+  it("finds the email by its label when row 1's short names are not Qualtrics' own", () => {
+    const text = exportOf([ADA], { importIds: false }).replace(
+      "RecipientEmail",
+      "Q7"
+    );
+    expect(
+      parseBidsCsv(convertQualtrics(text, PROJECTS).csv, PROJECTS).students
+    ).toHaveLength(1);
+  });
+
+  it("says plainly that a survey with no email column cannot be read", () => {
+    const text = exportOf([ADA], {
+      importIds: false,
+      columns: COLUMNS.filter((c) => c[2] !== "recipientEmail"),
+    });
+    expect(isQualtricsExport(text)).toBe(true);
+    expect(convertQualtrics(text, PROJECTS).issues).toEqual([
+      {
+        level: "error",
+        row: 1,
+        message:
+          "The export has no Recipient Email column, so its responses cannot be told apart.",
+        wholeFile: true,
+      },
+    ]);
   });
 });

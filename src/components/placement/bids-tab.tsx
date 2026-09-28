@@ -178,7 +178,11 @@ export function BidsTab({
         projects={workspace.projects}
         unmatched={bids.unmatched}
       />
-      <ImportIssues issues={bids.issues} label="bids" />
+      {/* A survey export that could not be converted leaves an empty file,
+          whose missing columns would only repeat that (#681). */}
+      {!workspace.bids.conversionIssues?.some((i) => i.wholeFile) && (
+        <ImportIssues issues={bids.issues} label="bids" />
+      )}
       <RosterSection state={state} workspace={workspace} />
       <RemovedStudents removed={bids.removed} update={update} />
       <ViewSwitch onView={onView} view={view} />

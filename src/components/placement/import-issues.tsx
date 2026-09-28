@@ -21,19 +21,27 @@ export function ImportIssues({
   const rowsLeftOut = errors.reduce((n, i) => n + (i.rows?.length ?? 1), 0);
   const warnings = issues.filter((i) => i.level === "warning");
   const where = unit === "line" ? `the pasted ${label}` : `the ${label} file`;
+  // A problem with the header or the file's shape stops every row, so
+  // counting rows left out would say one when none was read (#681).
+  const unread = errors.some((i) => i.wholeFile);
   return (
     <section
       aria-label={`Problems in ${where}`}
       className={`mt-4 rounded-md border px-3 py-2 text-sm ${errors.length > 0 ? "border-destructive/40" : ""}`}
     >
-      <p className="font-medium">
-        {errors.length > 0 &&
-          `${rowsLeftOut} ${unit}${rowsLeftOut === 1 ? "" : "s"} left out`}
-        {errors.length > 0 && warnings.length > 0 && ", "}
-        {warnings.length > 0 &&
-          `${warnings.length} ${warnings.length === 1 ? "warning" : "warnings"}`}{" "}
-        <span className="font-normal text-muted-foreground">in {where}</span>
-      </p>
+      {unread ? (
+        // Only a file has a header to refuse; a pasted list never does.
+        <p className="font-medium">The {label} file was not read</p>
+      ) : (
+        <p className="font-medium">
+          {errors.length > 0 &&
+            `${rowsLeftOut} ${unit}${rowsLeftOut === 1 ? "" : "s"} left out`}
+          {errors.length > 0 && warnings.length > 0 && ", "}
+          {warnings.length > 0 &&
+            `${warnings.length} ${warnings.length === 1 ? "warning" : "warnings"}`}{" "}
+          <span className="font-normal text-muted-foreground">in {where}</span>
+        </p>
+      )}
       <ul className="mt-1 max-h-60 space-y-0.5 overflow-y-auto">
         {[...errors, ...warnings].map((issue) => (
           <li key={`${issue.level}-${issue.row}-${issue.message}`}>
