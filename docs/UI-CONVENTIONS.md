@@ -739,9 +739,9 @@ extension after `group`; add a third only for a need neither covers.
 
 Reading or acting on one request line opens a `Sheet` beside the table, not a
 row's `detail` under it: a line is read and acted on alone, not against its
-neighbours (see "A row's detail under it"). `LineSheet` in `#/components/line-sheet` is the shell:
-a title, a description, a definition list of fields, the timeline, and an
-actions slot in the footer. `LineTimeline` draws the `TimelineEvent[]` that
+neighbours (see "A row's detail under it"). `LineSheet` in
+`#/components/line-sheet` is the shell: a title, a description, a definition list
+of fields, the timeline, and an actions slot in the footer. `LineTimeline` draws the `TimelineEvent[]` that
 `lineTimeline` in `#/lib/inventory-timeline` builds from the line's own columns,
 so the staff queue and `/my/items` cannot disagree about what happened to a line.
 A row opens it through a `Details` button in its Actions cell; the sheet closes
@@ -1142,8 +1142,8 @@ under the search; #366 and #367 moved them into the search row through
 listings render the controls only in table view, from a `useAdminTable` call that
 lives in the route at every view with `seedColumns: view === "table"`, so card
 view's URL never picks up a stored column layout. Growing the table with a filters
-slot was the alternative and was declined, because the grouping mode is meant to
-be that component's one extension.
+slot was the alternative and was declined, because the table's extensions are
+meant to stay few: grouping, and since #687 a row's detail.
 
 ### Floating panel
 
