@@ -185,7 +185,7 @@ The gotcha it leaves behind outlives that decision: a `useState` initializer doe
 
 ### A redirect thrown from a `queryFn` navigates the tab
 
-`setupRouterSsrQueryIntegration` in `src/router.tsx` leaves `handleRedirects` on, so it installs a query cache `onError` that calls `router.navigate` for any TanStack redirect a query throws. `requireUser` refuses with `redirect({ to: "/sign-in" })`, so once the server ends a session (expiry, a ban) without the tab hearing, the next refetch of a query over a `requireUser` server function carries the tab to `/sign-in` from whatever page it is on, unsaved edits included. `notification-bell.tsx` polls every 60 seconds from every page, so its `queryFn` returns an empty result on `isRedirect` instead (#634). `bookmarks-button.tsx`, `borrow-list-button.tsx` and `add-to-cart-button.tsx` still navigate, on a focus refetch. A new query that polls, or runs on a page with a form, catches the redirect the same way.
+`setupRouterSsrQueryIntegration` in `src/router.tsx` leaves `handleRedirects` on, so it installs a query cache `onError` that calls `router.navigate` for any TanStack redirect a query throws. `requireUser` refuses with `redirect({ to: "/sign-in" })`, so once the server ends a session (expiry, a ban) without the tab hearing, the next refetch of a query over a `requireUser` server function carries the tab to `/sign-in` from whatever page it is on, unsaved edits included. `notification-bell.tsx` polls every 60 seconds from every page, so its `queryFn` returns an empty result on `isRedirect` instead (#634). The bookmark and borrow list reads do the same (#642), since a focus refetch would otherwise carry a visitor on a public listing to `/sign-in`. A new query over a `requireUser` server function catches the redirect the same way.
 
 ### `Route.useSearch()` lags `navigate()` by the loader round trip
 
@@ -824,7 +824,7 @@ bind every turn, so they live in [`../AGENTS.md`](../AGENTS.md) instead of here.
 
 ### A TanStack Query key for the viewer's own data carries their user id
 
-The query cache outlives the component and the session that filled it. Signing out reloads the page (`src/lib/sign-out.ts`), but a session can also end without one (another tab, expiry, a ban), and signing in navigates on the client (`email-code-form.tsx`), so a key like `["notifications"]` shows the next user the previous user's cached rows until their own read answers. Key per-viewer reads on `session.user.id`, as `notification-bell.tsx` does (#634). `bookmarks-button.tsx` and the borrow list buttons (`borrow-list-button.tsx`, `add-to-cart-button.tsx`) predate this and still use bare keys.
+The query cache outlives the component and the session that filled it. Signing out reloads the page (`src/lib/sign-out.ts`), but a session can also end without one (another tab, expiry, a ban), and signing in navigates on the client (`email-code-form.tsx`), so a key like `["notifications"]` shows the next user the previous user's cached rows until their own read answers. Key per-viewer reads on the id from `useSignedInUserId` (`src/lib/use-signed-in.ts`), with `enabled: userId !== undefined`, as `notification-bell.tsx`, `bookmarks-button.tsx` and the borrow list's `cartQuery` in `add-to-cart-button.tsx` do (#634, #642). A writer still invalidates the bare prefix, `["cart"]` or `["bookmarks"]`: `invalidateQueries` matches by prefix, so it reaches every viewer's entry.
 
 ### Every search field is `searchQuerySchema`, and it clamps rather than rejects
 

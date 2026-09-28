@@ -1,11 +1,45 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import {
+  queryOptions,
+  useMutation,
+  useQuery,
+  useQueryClient,
+} from "@tanstack/react-query";
+import { isRedirect } from "@tanstack/react-router";
 import { ClipboardCheck, ClipboardPlus } from "lucide-react";
 import { toast } from "sonner";
 import { authClient } from "#/lib/auth-client";
 import { errorMessage } from "#/lib/error-message";
 import { useHasMounted } from "#/lib/use-has-mounted";
+import { useSignedInUserId } from "#/lib/use-signed-in";
 import { addToCart, getCart } from "#/server/inventory";
 import { Button } from "./ui/button";
+
+/**
+ * The viewer's borrow list, one definition for the two readers that share its
+ * key: this button and `BorrowListButton`. The key carries the user id
+ * (docs/QUIRKS.md, "A TanStack Query key for the viewer's own data carries
+ * their user id"), and every writer invalidates the `["cart"]` prefix, which
+ * reaches it. Disabled until the id is known.
+ */
+export function cartQuery(userId: string | undefined) {
+  return queryOptions({
+    queryKey: ["cart", userId],
+    queryFn: async () => {
+      try {
+        return await getCart();
+      } catch (error) {
+        // The server ended the session before this tab heard, and a redirect
+        // a query throws navigates the tab (docs/QUIRKS.md, "A redirect
+        // thrown from a `queryFn` navigates the tab").
+        if (isRedirect(error)) {
+          return [];
+        }
+        throw error;
+      }
+    },
+    enabled: userId !== undefined,
+  });
+}
 
 interface Props {
   className?: string;
@@ -46,10 +80,7 @@ export function AddToCartButton({
   variant = "outline",
 }: Props) {
   const qc = useQueryClient();
-  const { data: cart } = useQuery({
-    queryKey: ["cart"],
-    queryFn: () => getCart(),
-  });
+  const { data: cart } = useQuery(cartQuery(useSignedInUserId()));
   const { mutate, isPending, isSuccess, isError } = useMutation({
     mutationFn: () => addToCart({ data: { itemId } }),
     // Only the cart. The previous call sites invalidated every query, but
