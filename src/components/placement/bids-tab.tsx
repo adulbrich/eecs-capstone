@@ -393,7 +393,8 @@ function StudentHeader({
   const [first] = rows;
   const bids = rows.filter((r) => r.priority !== null).length;
   return (
-    <div>
+    // A long email breaks rather than running past a 375px screen.
+    <div className="wrap-anywhere">
       <span className="font-medium">{first.name || first.email}</span>
       {first.name && (
         <span className="ml-2 font-normal text-muted-foreground text-xs">
