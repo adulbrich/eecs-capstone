@@ -87,6 +87,42 @@ describe("mantleResponses", () => {
   });
 });
 
+describe("a Mantle error body", () => {
+  afterEach(() => {
+    vi.unstubAllEnvs();
+    vi.unstubAllGlobals();
+  });
+
+  it.each([
+    ["a canonical request", "x-amz-security-token:TOK\nhost:h"],
+    ["a query string", "X-Amz-Security-Token=TOK&X-Amz-Date=d"],
+    [
+      "JSON",
+      '{"headers":{"x-amz-security-token":"TOK","Authorization":"AWS4 Credential=TOK"}}',
+    ],
+    [
+      "JSON with an escaped slash",
+      '{"m":"x-amz-security-token:TOK\\/SECOND\\nhost:h"}',
+    ],
+  ])(
+    "keeps no signed value from %s in the thrown message",
+    async (_shape, body) => {
+      vi.stubEnv("BEDROCK_ACCESS_KEY", "AKIDEXAMPLE");
+      vi.stubEnv("BEDROCK_SECRET_KEY", "secret");
+      vi.stubGlobal("fetch", () =>
+        Promise.resolve(new Response(body, { status: 403 }))
+      );
+      const thrown = await mantleResponses({ model: "m" }).catch(
+        (error: Error) => error.message
+      );
+      expect(thrown).toMatch(/^Bedrock Mantle returned 403: /);
+      expect(thrown).toContain("[redacted]");
+      // `SECOND` is the half of a base64 token after an escaped slash.
+      expect(thrown).not.toMatch(/TOK|SECOND|\n/);
+    }
+  );
+});
+
 describe("fetchFailureReason", () => {
   it("names the undici code a bare 'fetch failed' hides on its cause", () => {
     const cause = Object.assign(new Error("getaddrinfo ENOTFOUND host"), {

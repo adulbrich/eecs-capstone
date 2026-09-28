@@ -151,12 +151,14 @@ const MANTLE_TIMEOUT_MS = 60_000;
 const ERROR_BODY_LIMIT = 500;
 
 /**
- * A signed header's value as a signature-mismatch body can echo it back in the
- * canonical request. The value runs to the end of its line, or to a quote or
- * backslash when the body is JSON carrying the request as an escaped string.
+ * A signed header's value as an error body can echo it: `name:value` in a
+ * canonical request, `name=value` in a query string, or `"name":"value"` in
+ * JSON. The value runs to the end of its line, a quote or an `&`. A backslash ends
+ * it too, since JSON escapes a line break as `\n`, except in `\/`, which is
+ * how some encoders write the `/` a base64 token carries.
  */
 const SIGNED_SECRET =
-  /(x-amz-security-token|authorization)(\s*[:=]\s*)[^\r\n"\\]*/gi;
+  /(x-amz-security-token|authorization)(["']?\s*[:=]\s*["']?)(?:\\\/|[^\r\n"'&\\])*/gi;
 
 const LINE_BREAKS = /[\r\n]+/g;
 
