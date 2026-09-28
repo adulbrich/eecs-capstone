@@ -23,30 +23,42 @@ export interface ProjectBidRow {
   /** Unique within the view: a project and a student, or an empty project. */
   id: string;
   name: string;
-  /** The title of the project the student is pinned to, when it is not
-   * this one. */
-  pinnedElsewhere: string | null;
+  /**
+   * Pinned to another project. Not named: that project's header lists
+   * them, and a title on every such row buried a search for a project's
+   * name under its other bidders.
+   */
+  pinnedElsewhere: boolean;
   pinnedHere: boolean;
+  /** The team the last run placed the student on here, or null (#693). */
+  placedTeam: number | null;
   /** Pinned here by a pre-approval on the roster (#670). */
   preApproved: boolean;
   /** Null for a student pinned here without bidding on it. */
   priority: number | null;
   projectKey: string;
   projectTitle: string;
+  /** On the roster but not in the survey, so no bids (#665). */
+  rosterOnly: boolean;
 }
 
 /**
  * One row per bid, plus one per student pinned to a project they did not
- * bid on, grouped by project title and ordered by priority within a
- * project, with any pin-only rows last. A project with neither gets one
+ * bid on, and one per student the last run placed on a project outside
+ * their bids (#693), grouped by project title and ordered by priority
+ * within a project, with those rows last. A project with none gets one
  * empty row, so it shows rather than going missing. `students` should carry
  * the pins in effect: the file's, the roster's and the board's.
  */
 export function projectBidRows(
   students: readonly PlacementStudent[],
-  projects: readonly WorkspaceProject[]
+  projects: readonly WorkspaceProject[],
+  result?: StoredResult
 ): ProjectBidRow[] {
   const titles = new Map(projects.map((p) => [p.key, p.title]));
+  const placements = new Map(
+    (result?.placements ?? []).map((p) => [p.email, p])
+  );
   const fixed = new Set(projects.filter((p) => p.fromRoster).map((p) => p.key));
   const byProject = new Map<string, ProjectBidRow[]>(
     projects.map((p) => [p.key, []])
@@ -62,6 +74,7 @@ export function projectBidRows(
       return;
     }
     const pinnedHere = student.pin === projectKey;
+    const placement = placements.get(student.email);
     rows.push({
       id: `${projectKey}:${student.email}`,
       projectKey,
@@ -72,11 +85,16 @@ export function projectBidRows(
       priority,
       comment,
       pinnedHere,
-      pinnedElsewhere:
-        student.pin === undefined || pinnedHere
-          ? null
-          : (titles.get(student.pin) ?? student.pin),
+      pinnedElsewhere: student.pin !== undefined && !pinnedHere,
       preApproved: pinnedHere && student.preApproved === true,
+      // A student pinned elsewhere shows their pin, never where the last
+      // run put them, as their header does per student (#689).
+      placedTeam:
+        placement?.projectKey === projectKey &&
+        (student.pin === undefined || pinnedHere)
+          ? placement.team
+          : null,
+      rosterOnly: student.rosterOnly ?? false,
       empty: false,
       fixed: fixed.has(projectKey),
     });
@@ -85,9 +103,15 @@ export function projectBidRows(
     for (const bid of student.bids) {
       add(student, bid.projectKey, bid.priority, bid.comment);
     }
+    const listed = (key: string) =>
+      student.bids.some((b) => b.projectKey === key);
     const { pin } = student;
-    if (pin !== undefined && !student.bids.some((b) => b.projectKey === pin)) {
+    if (pin !== undefined && !listed(pin)) {
       add(student, pin, null, "");
+    }
+    const placed = placements.get(student.email)?.projectKey;
+    if (placed !== undefined && pin === undefined && !listed(placed)) {
+      add(student, placed, null, "");
     }
   }
   const byName = (a: ProjectBidRow, b: ProjectBidRow) =>
@@ -123,8 +147,10 @@ function emptyRow(
     priority: null,
     comment: "",
     pinnedHere: false,
-    pinnedElsewhere: null,
+    pinnedElsewhere: false,
     preApproved: false,
+    placedTeam: null,
+    rosterOnly: false,
     empty: true,
     fixed,
   };
@@ -161,12 +187,36 @@ export function groupByProject(
   return byProject;
 }
 
+/**
+ * What the last run put on a project, as its header says it (#693): every
+ * row of the project, whatever the table shows. Null with no run.
+ */
+export function placedSummary(
+  rows: readonly ProjectBidRow[],
+  ran: boolean,
+  stale: boolean
+): string | null {
+  if (!ran) {
+    return null;
+  }
+  const before = stale ? " (before your changes)" : "";
+  const placed = rows.filter((r) => r.placedTeam !== null);
+  if (placed.length === 0) {
+    return `No team in the last run${before}`;
+  }
+  const first = placed.filter((r) => r.priority === 1).length;
+  return `Placed: ${placed.length} ${placed.length === 1 ? "student" : "students"}, ${first} on their first choice${before}`;
+}
+
 /** How a student came to be pinned to a project, as its header lists them. */
 export function pinSource(row: ProjectBidRow): string {
   if (row.preApproved) {
     return "pre-approved";
   }
-  return row.priority === null ? "not in their bids" : ordinal(row.priority);
+  if (row.priority !== null) {
+    return ordinal(row.priority);
+  }
+  return row.rosterOnly ? "not in the survey" : "not in their bids";
 }
 
 /**

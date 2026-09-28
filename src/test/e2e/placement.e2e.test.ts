@@ -771,7 +771,9 @@ test.describe("placement workspace", () => {
       tide.getByRole("button", { name: "Unpin Ada Park" })
     ).toBeVisible();
     const robot = page.getByRole("rowgroup").filter({ hasText: /^Robot Arm/ });
-    await expect(robot.getByText("Pinned to Tide Clock")).toBeVisible();
+    await expect(robot.getByText("Pinned elsewhere")).toBeVisible();
+    // Only Tide Clock's own group names it, so a search lands there.
+    await expect(robot).not.toContainText("Tide Clock");
 
     // Ben is pinned by the bids file; Ada now by the board.
     await expect(page.getByText(/2 pinned\./)).toBeVisible();
@@ -782,7 +784,7 @@ test.describe("placement workspace", () => {
     // Pinned only leaves each project's pins, and survives a reload.
     await page.getByRole("switch", { name: "Pinned only" }).click();
     await expect(page).toHaveURL(/pinnedOnly=true/);
-    await expect(robot.getByText("Pinned to Tide Clock")).toHaveCount(0);
+    await expect(robot.getByText("Pinned elsewhere")).toHaveCount(0);
     await expect(robot.getByText("Ben Ito", { exact: true })).toBeVisible();
     await page.reload();
     await waitForHydration(page);
@@ -790,9 +792,9 @@ test.describe("placement workspace", () => {
       page.getByRole("switch", { name: "Pinned only" })
     ).toBeChecked();
     await expect(robot.getByText("Ben Ito", { exact: true })).toBeVisible();
-    await expect(robot.getByText("Pinned to Tide Clock")).toHaveCount(0);
+    await expect(robot.getByText("Pinned elsewhere")).toHaveCount(0);
     await page.getByRole("switch", { name: "Pinned only" }).click();
-    await expect(robot.getByText("Pinned to Tide Clock")).toBeVisible();
+    await expect(robot.getByText("Pinned elsewhere")).toBeVisible();
 
     // The pin holds through a run, as an Approve on the board would.
     await page.getByRole("tab", { name: "Parameters" }).click();
@@ -812,6 +814,19 @@ test.describe("placement workspace", () => {
         .getByRole("button", { name: "Unpin Ada Park" })
     ).toBeVisible();
     await page.getByRole("tab", { name: /Bids/ }).click();
+    // Who the run placed on each project, and on which team (#693).
+    await expect(tide).toContainText(
+      "Placed: 1 student, 1 on their first choice"
+    );
+    await expect(
+      tide.getByRole("row", { name: /Ada Park.*Placed here, team 1/ })
+    ).toBeVisible();
+    await expect(robot).toContainText(
+      "Placed: 1 student, 1 on their first choice"
+    );
+    await expect(
+      robot.getByRole("row", { name: /Ada Park/ })
+    ).not.toContainText("Placed here");
     await page.getByRole("button", { name: "Per student" }).click();
     await expect(
       page.getByRole("row", { name: /Tide Clock.*pinned/ }).first()

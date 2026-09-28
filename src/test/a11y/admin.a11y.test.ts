@@ -493,6 +493,10 @@ test("admin placement, a run on the results board", async ({ page }) => {
     page.getByText(/^(Placed|Pinned to|Unplaced)/).first()
   ).toBeVisible();
   await checkA11y(page);
+  // Who the run placed on each project (#693).
+  await page.getByRole("button", { name: "Per project" }).click();
+  await expect(page.getByText(/^Placed here, team /).first()).toBeVisible();
+  await checkA11y(page);
 
   await page.getByRole("button", { name: "Analytics" }).click();
   await expect(
