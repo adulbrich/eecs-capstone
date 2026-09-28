@@ -5,6 +5,7 @@ import {
   mantleRegion,
   mantleResponses,
   RESPONSES_PATH,
+  redactSignedValues,
 } from "../_internal/bedrock-mantle";
 
 describe("mantleRegion", () => {
@@ -83,6 +84,76 @@ describe("mantleResponses", () => {
     vi.stubGlobal("fetch", () => Promise.resolve(errorCutOff));
     await expect(mantleResponses({ model: "m" })).rejects.toThrow(
       "Bedrock Mantle response failed: terminated (UND_ERR_SOCKET: other side closed)"
+    );
+  });
+});
+
+/**
+ * A token carrying all three characters base64 adds to the alphabet, so each
+ * escaping below has something to change.
+ */
+const TOKEN = "IQoJb3JpZ2luX2VjE/abc+def/ghi==";
+const AUTH =
+  "AWS4-HMAC-SHA256 Credential=ASIAEXAMPLE/20260928/us-east-1/bedrock-mantle/aws4_request, SignedHeaders=host;x-amz-security-token, Signature=0f0f";
+const SIGNED = {
+  authorization: AUTH,
+  host: "bedrock-mantle.us-east-1.api.aws",
+  "x-amz-security-token": TOKEN,
+};
+
+describe("redactSignedValues", () => {
+  const escapedSlash = (value: string) => value.replaceAll("/", "\\/");
+  it.each([
+    [
+      "a canonical request",
+      `POST\r\n/openai/v1/responses\r\nhost:h\r\nx-amz-security-token:${TOKEN}\r\n`,
+    ],
+    [
+      "a query string",
+      `X-Amz-Security-Token=${encodeURIComponent(TOKEN)}&X-Amz-Date=d`,
+    ],
+    [
+      "a lower-case percent-encoding",
+      `t=${encodeURIComponent(TOKEN).replace(/%[0-9A-F]{2}/g, (e) => e.toLowerCase())}`,
+    ],
+    [
+      "JSON",
+      JSON.stringify({ "x-amz-security-token": TOKEN, Authorization: AUTH }),
+    ],
+    [
+      "JSON inside a JSON string",
+      JSON.stringify({
+        message: JSON.stringify({ "x-amz-security-token": TOKEN }),
+      }),
+    ],
+    ["JSON with `/` as `\\/`", `{"t":"${escapedSlash(TOKEN)}"}`],
+    [
+      "JSON with `/` as `\\u002f`",
+      `{"t":"${TOKEN.replaceAll("/", "\\u002f")}"}`,
+    ],
+    ["a Python repr", `{'x-amz-security-token': '${TOKEN}'}`],
+  ])("leaves no piece of either value in %s", (_framing, body) => {
+    const redacted = redactSignedValues(body, SIGNED);
+    expect(redacted).toContain("[redacted]");
+    for (const piece of [
+      "IQoJb3JpZ2luX2VjE",
+      "abc+def",
+      "ghi==",
+      "ASIAEXAMPLE",
+      "Signature=0f0f",
+    ]) {
+      expect(redacted).not.toContain(piece);
+    }
+  });
+
+  it("leaves the rest of the body alone, including the host it signed", () => {
+    expect(
+      redactSignedValues(
+        "The security token included is invalid. host:bedrock-mantle.us-east-1.api.aws",
+        SIGNED
+      )
+    ).toBe(
+      "The security token included is invalid. host:bedrock-mantle.us-east-1.api.aws"
     );
   });
 });

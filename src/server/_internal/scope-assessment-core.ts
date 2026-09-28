@@ -5,6 +5,7 @@ import {
   mantleResponses,
   type ResponsesFn,
 } from "#/lib/_internal/bedrock-mantle";
+import { redactQueryError } from "#/lib/_internal/redact-query-error";
 import type { ReviewOutcome } from "#/lib/ai-review-limits";
 import { errorMessage } from "#/lib/error-message";
 import { PROPOSAL_SCOPE_RULE, TERM_CALIBRATION } from "#/lib/proposal-guidance";
@@ -179,10 +180,13 @@ export async function runScopeAssessment(
       store: false,
     });
   } catch (error) {
+    // The thrown text is Mantle's error body or the transport detail of a
+    // failed fetch, which belongs in the log and never in a browser (#619).
+    console.error("Scope assessment call failed", redactQueryError(error));
     return {
       ...base,
       outcome: "failed",
-      error: errorMessage(error, "Scope assessment failed"),
+      error: FAILED,
       result: null,
     };
   }

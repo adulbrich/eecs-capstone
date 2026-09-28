@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import type {
   MantleResponse,
   ResponsesFn,
@@ -106,11 +106,15 @@ describe("runSocialSummary", () => {
   });
 
   it("reports a transport failure as failed and does not throw", async () => {
+    const logged = vi.spyOn(console, "error").mockImplementation(() => {
+      // mantle-error-boundary.test.ts asserts the line.
+    });
     const run = await runSocialSummary("<Title>\nRover\n</Title>", () =>
       Promise.reject(new Error("Bedrock is down"))
     );
     expect(run.outcome).toBe("failed");
-    expect(run.error).toContain("Bedrock is down");
+    expect(run.error).toBe("Couldn't write the summary, please try again.");
+    logged.mockRestore();
   });
 
   it("sends the tool spec and the source, and stores nothing", async () => {

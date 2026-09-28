@@ -242,11 +242,15 @@ describe("runProjectReview", () => {
   });
 
   it("reports a transport failure as called, since the call was attempted", async () => {
+    const logged = vi.spyOn(console, "error").mockImplementation(() => {
+      // mantle-error-boundary.test.ts asserts the line.
+    });
     const invoke = vi.fn().mockRejectedValue(new Error("Bedrock Mantle 503"));
     const run = await runProjectReview({ title: "old title" }, invoke);
     expect(run.called).toBe(true);
     expect(run.outcome).toBe("failed");
-    expect(run.error).toBe("Bedrock Mantle 503");
+    expect(run.error).toBe("Couldn't generate suggestions, please try again.");
+    logged.mockRestore();
   });
 
   it("carries the token counts through on success", async () => {

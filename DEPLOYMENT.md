@@ -1347,11 +1347,13 @@ rows and what went wrong:
 
 ```bash
 aws --profile aws-capstone1 logs tail /ecs/eecs-capstone --since 3h --region us-west-2 \
-  --filter-pattern '?"embedding failed, social summary" ?"social summary failed" ?"Embedding failed for user interests" ?"Embedding failed for project" ?"Social summary failed for project"'
+  --filter-pattern '?"embedding failed, social summary" ?"social summary failed" ?"Embedding failed for user interests" ?"Embedding failed for project" ?"Social summary failed for project" ?"Social summary call failed"'
 ```
 
-The pattern adds the two capitalised error lines the alarm leaves out, because
-they carry the error text the refresh line does not. Every failure it shows
+The pattern adds the capitalised error lines the alarm leaves out, because
+they carry the error text the refresh line does not. A failed Mantle call
+writes its status and the head of the response body on the `Social summary
+call failed` line just before, and nowhere else (#619). Every failure it shows
 followed a save that succeeded, and the row kept its previous vector or
 summary. A project's next save or a backfill sweep puts it right; no sweep
 covers interest embeddings, so a user's is put right only by their next save
