@@ -13,9 +13,11 @@ import {
   type ProjectBidRow,
   pinnedRows,
   pinSource,
+  placedSummary,
   projectBidRows,
 } from "#/lib/placement/bids-view";
 import type { PlacementStudent } from "#/lib/placement/types";
+import type { StoredResult } from "#/lib/placement/workspace";
 import type { SortState } from "#/lib/table-state";
 import { useAdminTable } from "#/lib/use-admin-table";
 import { useLocalTableSearch } from "#/lib/use-local-table-search";
@@ -28,7 +30,11 @@ function priorityLabel(row: ProjectBidRow): string {
     return "Pre-approved";
   }
   if (row.priority === null) {
-    return "Pinned, not in their bids";
+    // Here by a pin, or by the last run's placement (#693).
+    const outside = row.rosterOnly ? "not in the survey" : "not in their bids";
+    return row.pinnedHere
+      ? `Pinned, ${outside}`
+      : `${outside[0].toUpperCase()}${outside.slice(1)}`;
   }
   return row.pinnedHere
     ? `${ordinal(row.priority)}, pinned`
@@ -42,11 +48,17 @@ function priorityLabel(row: ProjectBidRow): string {
  */
 export function BidsByProject({
   pinnedOnly,
+  result,
+  stale,
   state,
   students,
 }: {
   /** Each project's pinned students alone (#688). */
   pinnedOnly: boolean;
+  /** The last run, for who it placed on each project (#693). */
+  result: StoredResult | undefined;
+  /** The projects, parameters or bids changed since that run. */
+  stale: boolean;
   state: PlacementWorkspace;
   /** The students with every pin in effect applied. */
   students: PlacementStudent[];
@@ -54,8 +66,8 @@ export function BidsByProject({
   const { update } = state;
   const { navigate, search } = useLocalTableSearch();
   const allRows = useMemo(
-    () => projectBidRows(students, state.placementProjects),
-    [students, state.placementProjects]
+    () => projectBidRows(students, state.placementProjects, result),
+    [students, state.placementProjects, result]
   );
   const rows = useMemo(
     () => (pinnedOnly ? pinnedRows(allRows) : allRows),
@@ -82,6 +94,11 @@ export function BidsByProject({
               {row.original.name && (
                 <div className="text-muted-foreground text-xs">
                   {row.original.email}
+                </div>
+              )}
+              {row.original.placedTeam !== null && (
+                <div className="mt-1 font-medium text-xs">
+                  Placed here, team {row.original.placedTeam}
                 </div>
               )}
               {row.original.avoid && (
@@ -201,7 +218,9 @@ export function BidsByProject({
         group={{
           header: (groupRows) => (
             <ProjectHeader
+              ran={result !== undefined}
               rows={byProject.get(groupRows[0].projectKey) ?? groupRows}
+              stale={stale}
             />
           ),
           key: (row) => row.projectKey,
@@ -213,8 +232,17 @@ export function BidsByProject({
 }
 
 /** `rows` is every row of the project, whatever the table shows. */
-function ProjectHeader({ rows }: { rows: ProjectBidRow[] }) {
+function ProjectHeader({
+  ran,
+  rows,
+  stale,
+}: {
+  ran: boolean;
+  rows: ProjectBidRow[];
+  stale: boolean;
+}) {
   const [first] = rows;
+  const placed = placedSummary(rows, ran, stale);
   const bidders = rows.filter((r) => !r.empty && r.priority !== null);
   const firstChoice = bidders.filter((r) => r.priority === 1).length;
   const pinned = rows.filter((r) => r.pinnedHere);
@@ -233,6 +261,7 @@ function ProjectHeader({ rows }: { rows: ProjectBidRow[] }) {
             .join(", ")}
         </p>
       )}
+      {placed && <p className="font-normal text-sm">{placed}</p>}
       {first.fixed && (
         <p className="font-normal text-muted-foreground text-xs">
           Added from the roster: it holds only its pre-approved students, so it

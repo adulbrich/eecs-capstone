@@ -812,6 +812,19 @@ test.describe("placement workspace", () => {
         .getByRole("button", { name: "Unpin Ada Park" })
     ).toBeVisible();
     await page.getByRole("tab", { name: /Bids/ }).click();
+    // Who the run placed on each project, and on which team (#693).
+    await expect(tide).toContainText(
+      "Placed: 1 student, 1 on their first choice"
+    );
+    await expect(
+      tide.getByRole("row", { name: /Ada Park.*Placed here, team 1/ })
+    ).toBeVisible();
+    await expect(robot).toContainText(
+      "Placed: 1 student, 1 on their first choice"
+    );
+    await expect(
+      robot.getByRole("row", { name: /Ada Park/ })
+    ).not.toContainText("Placed here");
     await page.getByRole("button", { name: "Per student" }).click();
     await expect(
       page.getByRole("row", { name: /Tide Clock.*pinned/ }).first()

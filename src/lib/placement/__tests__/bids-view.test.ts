@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   pinnedRows,
   pinSource,
+  placedSummary,
   projectBidRows,
   standingText,
   studentStanding,
@@ -235,5 +236,81 @@ describe("studentStanding and standingText (#689)", () => {
       "Not in the last run"
     );
     expect(text(ada, undefined)).toBe("No run yet");
+  });
+});
+
+describe("projectBidRows with a run, and placedSummary (#693)", () => {
+  const students: PlacementStudent[] = [
+    {
+      email: "ada@example.edu",
+      name: "Ada Park",
+      bids: [bid("p1", 1), bid("p2", 2)],
+    },
+    { email: "ben@example.edu", name: "Ben Ito", bids: [bid("p1", 2)] },
+    {
+      email: "kim@example.edu",
+      name: "Kim Lee",
+      bids: [],
+      rosterOnly: true,
+    },
+    // Pinned to Garden Planner and placed there: one row, not two.
+    {
+      email: "cal@example.edu",
+      name: "Cal Diaz",
+      bids: [bid("p1", 1)],
+      pin: "p3",
+    },
+  ];
+  const result = {
+    placements: [
+      { email: "ada@example.edu", projectKey: "p1", team: 2, priority: 1 },
+      { email: "ben@example.edu", projectKey: "p3", team: 1, priority: null },
+      { email: "kim@example.edu", projectKey: "p3", team: 1, priority: null },
+      { email: "cal@example.edu", projectKey: "p3", team: 1, priority: null },
+    ],
+  } as unknown as StoredResult;
+  const rows = projectBidRows(students, PROJECTS, result);
+  const of = (title: string) => rows.filter((r) => r.projectTitle === title);
+
+  it("marks the team a student was placed on, and adds a row for a placement outside their bids", () => {
+    expect(of("Tide Clock").map((r) => [r.email, r.placedTeam])).toEqual([
+      ["ada@example.edu", 2],
+      ["cal@example.edu", null],
+      ["ben@example.edu", null],
+    ]);
+    expect(
+      of("Garden Planner").map((r) => [
+        r.email,
+        r.priority,
+        r.placedTeam,
+        r.pinnedHere,
+        r.rosterOnly,
+      ])
+    ).toEqual([
+      ["ben@example.edu", null, 1, false, false],
+      ["cal@example.edu", null, 1, true, false],
+      ["kim@example.edu", null, 1, false, true],
+    ]);
+    expect(of("Robot Arm").map((r) => r.placedTeam)).toEqual([null]);
+  });
+
+  it("marks nothing without a run", () => {
+    expect(
+      projectBidRows(students, PROJECTS).some((r) => r.placedTeam !== null)
+    ).toBe(false);
+  });
+
+  it("counts the placed students and first choices, with the stale note", () => {
+    expect(placedSummary(of("Tide Clock"), true, false)).toBe(
+      "Placed: 1 student, 1 on their first choice"
+    );
+    expect(placedSummary(of("Garden Planner"), true, true)).toBe(
+      "Placed: 3 students, 0 on their first choice (before your changes)"
+    );
+    expect(placedSummary(of("Robot Arm"), true, false)).toBe(
+      "No team in the last run"
+    );
+    expect(placedSummary(of("Tide Clock"), false, false)).toBeNull();
+    expect(placedSummary([], true, false)).toBe("No team in the last run");
   });
 });
