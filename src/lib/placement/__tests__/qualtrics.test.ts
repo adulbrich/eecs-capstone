@@ -123,6 +123,22 @@ describe("isQualtricsExport", () => {
       isQualtricsExport("email,priority,project\na@b.c,1,Tide Clock")
     ).toBe(false);
     expect(isQualtricsExport("")).toBe(false);
+    // A bid whose comment reads like a ranking question is still a bid.
+    expect(
+      isQualtricsExport(
+        'email,priority,project,comment\nada@example.edu,1,Tide Clock,"I rank this - first"'
+      )
+    ).toBe(false);
+    expect(
+      isQualtricsExport(
+        'student,choice,title,note\nada@example.edu,1,"Rank - Tide Clock",x'
+      )
+    ).toBe(false);
+    expect(
+      isQualtricsExport(
+        "email,priority,project,comment\nada@example.edu,1,Rank - Tide Clock,Rank - first"
+      )
+    ).toBe(false);
   });
 });
 

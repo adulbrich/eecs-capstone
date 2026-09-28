@@ -57,13 +57,26 @@ const hasImportIds = (grid: Grid) =>
 
 /**
  * A ranking question with a column per project in the second row, which is
- * what an export still looks like once its ImportId row is gone.
+ * what an export still looks like once its ImportId row is gone. At least
+ * two columns of one question, and never a file with the bids format's own
+ * header, whose second row is a bid: one comment reading "I rank this - first"
+ * must not turn a bids file into a survey.
  */
-const isSurveyShaped = (grid: Grid) =>
-  (grid[1] ?? []).some((question) => {
+const isSurveyShaped = (grid: Grid) => {
+  const header = new Set((grid[0] ?? []).map((c) => c.trim().toLowerCase()));
+  if (["email", "priority", "project"].every((c) => header.has(c))) {
+    return false;
+  }
+  const columns = new Map<string, number>();
+  for (const question of grid[1] ?? []) {
     const dash = question.indexOf(" - ");
-    return dash !== -1 && RANK_QUESTION.test(question.slice(0, dash));
-  });
+    const stem = dash === -1 ? "" : question.slice(0, dash);
+    if (stem !== "" && RANK_QUESTION.test(stem)) {
+      columns.set(stem, (columns.get(stem) ?? 0) + 1);
+    }
+  }
+  return [...columns.values()].some((n) => n >= 2);
+};
 
 /**
  * True for a Qualtrics export: its third row carries the ImportId JSON, or,
