@@ -71,11 +71,11 @@ describe("projectBidRows", () => {
       rows.find((r) => r.projectKey === key && r.email === email);
     expect(find("p1", "ada@example.edu")).toMatchObject({
       pinnedHere: false,
-      pinnedElsewhere: "Robot Arm",
+      pinnedElsewhere: true,
     });
     expect(find("p2", "ada@example.edu")).toMatchObject({
       pinnedHere: true,
-      pinnedElsewhere: null,
+      pinnedElsewhere: false,
       preApproved: false,
     });
     expect(find("p3", "kim@example.edu")).toMatchObject({
@@ -312,5 +312,62 @@ describe("projectBidRows with a run, and placedSummary (#693)", () => {
     );
     expect(placedSummary(of("Tide Clock"), false, false)).toBeNull();
     expect(placedSummary([], true, false)).toBe("No team in the last run");
+  });
+});
+
+describe("projectBidRows for a student pinned since the run (#693)", () => {
+  it("shows the pin, not the old placement, on or off their bids", () => {
+    const students: PlacementStudent[] = [
+      // Placed on Tide Clock, then pinned to Garden Planner.
+      {
+        email: "ada@example.edu",
+        name: "Ada Park",
+        bids: [bid("p1", 1)],
+        pin: "p3",
+      },
+      // Placed on Robot Arm outside their bids, then pinned to Tide Clock.
+      {
+        email: "ben@example.edu",
+        name: "Ben Ito",
+        bids: [bid("p1", 2)],
+        pin: "p1",
+      },
+      // A roster student pre-approved for Garden Planner and placed there.
+      {
+        email: "kim@example.edu",
+        name: "Kim Lee",
+        bids: [],
+        pin: "p3",
+        preApproved: true,
+        rosterOnly: true,
+      },
+      // A roster student pinned by hand, not pre-approved.
+      {
+        email: "lou@example.edu",
+        name: "Lou Tan",
+        bids: [],
+        pin: "p2",
+        rosterOnly: true,
+      },
+    ];
+    const result = {
+      placements: [
+        { email: "ada@example.edu", projectKey: "p1", team: 1, priority: 1 },
+        { email: "ben@example.edu", projectKey: "p2", team: 1, priority: null },
+        { email: "kim@example.edu", projectKey: "p3", team: 1, priority: null },
+      ],
+    } as unknown as StoredResult;
+    const rows = projectBidRows(students, PROJECTS, result);
+    expect(
+      rows
+        .filter((r) => !r.empty)
+        .map((r) => [r.projectTitle, r.email, r.placedTeam, pinSource(r)])
+    ).toEqual([
+      ["Garden Planner", "ada@example.edu", null, "not in their bids"],
+      ["Garden Planner", "kim@example.edu", 1, "pre-approved"],
+      ["Robot Arm", "lou@example.edu", null, "not in the survey"],
+      ["Tide Clock", "ada@example.edu", null, "1st"],
+      ["Tide Clock", "ben@example.edu", null, "2nd"],
+    ]);
   });
 });

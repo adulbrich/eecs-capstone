@@ -31,10 +31,12 @@ function priorityLabel(row: ProjectBidRow): string {
   }
   if (row.priority === null) {
     // Here by a pin, or by the last run's placement (#693).
-    const outside = row.rosterOnly ? "not in the survey" : "not in their bids";
-    return row.pinnedHere
-      ? `Pinned, ${outside}`
-      : `${outside[0].toUpperCase()}${outside.slice(1)}`;
+    if (row.pinnedHere) {
+      return row.rosterOnly
+        ? "Pinned, not in the survey"
+        : "Pinned, not in their bids";
+    }
+    return row.rosterOnly ? "Not in the survey" : "Not in their bids";
   }
   return row.pinnedHere
     ? `${ordinal(row.priority)}, pinned`
@@ -181,7 +183,7 @@ export function BidsByProject({
               )}
               {r.pinnedElsewhere && (
                 <span className="text-muted-foreground text-xs">
-                  Pinned to {r.pinnedElsewhere}
+                  Pinned elsewhere
                 </span>
               )}
               <RemoveStudentButton

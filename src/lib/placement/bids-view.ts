@@ -23,9 +23,12 @@ export interface ProjectBidRow {
   /** Unique within the view: a project and a student, or an empty project. */
   id: string;
   name: string;
-  /** The title of the project the student is pinned to, when it is not
-   * this one. */
-  pinnedElsewhere: string | null;
+  /**
+   * Pinned to another project. Not named: that project's header lists
+   * them, and a title on every such row buried a search for a project's
+   * name under its other bidders.
+   */
+  pinnedElsewhere: boolean;
   pinnedHere: boolean;
   /** The team the last run placed the student on here, or null (#693). */
   placedTeam: number | null;
@@ -82,12 +85,15 @@ export function projectBidRows(
       priority,
       comment,
       pinnedHere,
-      pinnedElsewhere:
-        student.pin === undefined || pinnedHere
-          ? null
-          : (titles.get(student.pin) ?? student.pin),
+      pinnedElsewhere: student.pin !== undefined && !pinnedHere,
       preApproved: pinnedHere && student.preApproved === true,
-      placedTeam: placement?.projectKey === projectKey ? placement.team : null,
+      // A student pinned elsewhere shows their pin, never where the last
+      // run put them, as their header does per student (#689).
+      placedTeam:
+        placement?.projectKey === projectKey &&
+        (student.pin === undefined || pinnedHere)
+          ? placement.team
+          : null,
       rosterOnly: student.rosterOnly ?? false,
       empty: false,
       fixed: fixed.has(projectKey),
@@ -104,7 +110,7 @@ export function projectBidRows(
       add(student, pin, null, "");
     }
     const placed = placements.get(student.email)?.projectKey;
-    if (placed !== undefined && placed !== pin && !listed(placed)) {
+    if (placed !== undefined && pin === undefined && !listed(placed)) {
       add(student, placed, null, "");
     }
   }
@@ -141,7 +147,7 @@ function emptyRow(
     priority: null,
     comment: "",
     pinnedHere: false,
-    pinnedElsewhere: null,
+    pinnedElsewhere: false,
     preApproved: false,
     placedTeam: null,
     rosterOnly: false,
@@ -207,7 +213,10 @@ export function pinSource(row: ProjectBidRow): string {
   if (row.preApproved) {
     return "pre-approved";
   }
-  return row.priority === null ? "not in their bids" : ordinal(row.priority);
+  if (row.priority !== null) {
+    return ordinal(row.priority);
+  }
+  return row.rosterOnly ? "not in the survey" : "not in their bids";
 }
 
 /**

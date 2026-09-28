@@ -209,7 +209,7 @@ export function BidsTab({
       </div>
       <p className="mt-2 text-muted-foreground text-sm">
         {view === "project"
-          ? "Pin here does what Approve does on the Results tab: every run keeps the student on that project until you unpin them, over any pin from the bids file or the roster. Unpin frees them from all of these. A pin changes the next run; the Results tab shows the last run until then. Each project lists who is pinned there and how, and after a run how many the run placed there, each marked Placed here with their team; Pinned only shows the pinned students alone."
+          ? 'Pin here does what Approve does on the Results tab: every run keeps the student on that project until you unpin them, over any pin from the bids file or the roster. Unpin frees them from all of these. A pin changes the next run; the Results tab shows the last run until then. Each project lists who is pinned there and how, and after a run how many the run placed there, each marked Placed here with their team, including anyone placed outside their bids; "(before your changes)" means the projects, parameters or bids changed since. A student pinned since the run shows their pin, not where the run put them. Pinned only shows the pinned students alone.'
           : "Pinned rows show every pin in effect: the bids file's, the roster's, and those set here or on the Results tab, which win over the other two. Each student says where they stand: a pinned student stays on their pin in every run, so only the pin shows; anyone else shows where the last run placed them, marked in their rows."}{" "}
         Remove from placement takes a student out of every run, and off the
         board at once, until you restore them from the removed list above.
