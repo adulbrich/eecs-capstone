@@ -436,6 +436,11 @@ test("admin placement, a run on the results board", async ({ page }) => {
   await bidsToggle.click();
   await expect(page.getByRole("region", { name: /^Bids of / })).toBeVisible();
   await checkA11y(page);
+  // On a phone the bids join the student's card (src/styles.css).
+  await page.setViewportSize({ width: 375, height: 812 });
+  await checkA11y(page);
+  await expectNoHorizontalOverflow(page);
+  await page.setViewportSize({ width: 1280, height: 720 });
   await bidsToggle.click();
   await expect(page.getByRole("region", { name: /^Bids of / })).toHaveCount(0);
 

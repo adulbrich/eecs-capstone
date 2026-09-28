@@ -1,6 +1,7 @@
 import { toCsv } from "#/lib/csv";
 import { BIDS_FORMAT } from "#/lib/placement/formats";
 import type {
+  PlacementBid,
   PlacementResult,
   PlacementStudent,
   UnplacedReason,
@@ -200,13 +201,13 @@ export interface BidOption {
  * `current` (null when unplaced).
  */
 export function bidOptions(
-  student: PlacementStudent,
+  bids: readonly PlacementBid[],
   current: string | null,
   projects: readonly WorkspaceProject[],
   defaultMaxTeams: number
 ): BidOption[] {
   const byKey = new Map(projects.map((p) => [p.key, p]));
-  return [...student.bids]
+  return [...bids]
     .sort((a, b) => a.priority - b.priority)
     .map((bid) => {
       const project = byKey.get(bid.projectKey);

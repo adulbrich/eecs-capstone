@@ -10,7 +10,14 @@ import {
   Square,
   TriangleAlert,
 } from "lucide-react";
-import { useCallback, useMemo, useRef, useState } from "react";
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import {
   AdminDataTable,
   defineAdminColumns,
@@ -116,6 +123,24 @@ export function ResultsTab({
   } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const abort = useRef<AbortController | null>(null);
+  // Which students show their bids (#687): here rather than in the board,
+  // which unmounts when a new file clears the result, so they stay open for
+  // as long as the page does. Never in the workspace, and by email, so a
+  // student stays open after Move here takes them to another group.
+  const [openBids, setOpenBids] = useState<ReadonlySet<string>>(
+    () => new Set()
+  );
+  const toggleBids = useCallback(
+    (email: string) =>
+      setOpenBids((prev) => {
+        const next = new Set(prev);
+        if (!next.delete(email)) {
+          next.add(email);
+        }
+        return next;
+      }),
+    []
+  );
 
   let missing: string | null = null;
   if (workspace.projects.length === 0) {
@@ -269,6 +294,7 @@ export function ResultsTab({
       {result && (
         <Board
           failed={failure !== null}
+          openBids={openBids}
           projects={allProjects}
           result={result}
           rows={rows}
@@ -277,6 +303,7 @@ export function ResultsTab({
           stale={failure === null && result.fingerprint !== fingerprint}
           students={students}
           titles={titles}
+          toggleBids={toggleBids}
           update={update}
           workspace={workspace}
         />
@@ -302,42 +329,31 @@ function RunReport({ lines }: { lines: string[] }) {
 
 function Board({
   failed,
+  openBids,
   projects,
   result,
   rows,
   stale,
   students,
   titles,
+  toggleBids,
   update,
   workspace,
 }: {
   /** The latest run failed, so this board is from an earlier one. */
   failed: boolean;
+  openBids: ReadonlySet<string>;
   projects: WorkspaceProject[];
   result: NonNullable<Workspace["result"]>;
   rows: BoardRow[];
   stale: boolean;
   students: PlacementStudent[];
   titles: Map<string, string>;
+  toggleBids: (email: string) => void;
   update: PlacementWorkspace["update"];
   workspace: Workspace;
 }) {
   const { navigate, search } = useLocalTableSearch();
-  // Which students show their bids: kept while the page is open, never in
-  // the workspace, and by email, so a student stays open after Move here
-  // takes them to another group.
-  const [open, setOpen] = useState<ReadonlySet<string>>(() => new Set());
-  const toggle = useCallback(
-    (email: string) =>
-      setOpen((prev) => {
-        const next = new Set(prev);
-        if (!next.delete(email)) {
-          next.add(email);
-        }
-        return next;
-      }),
-    []
-  );
   const byEmail = useMemo(
     () => new Map(students.map((s) => [s.email, s])),
     [students]
@@ -414,9 +430,8 @@ function Board({
             )}
             <BidsToggle
               count={byEmail.get(row.original.email)?.bids.length ?? 0}
-              expanded={open.has(row.original.email)}
-              onToggle={() => toggle(row.original.email)}
-              row={row.original}
+              email={row.original.email}
+              who={row.original.name || row.original.email}
             />
           </div>
         ),
@@ -462,15 +477,11 @@ function Board({
         id: "actions",
       },
     ]);
-  }, [
-    update,
-    move,
-    projects,
-    workspace.parameters.maxTeams,
-    open,
-    byEmail,
-    toggle,
-  ]);
+  }, [update, move, projects, workspace.parameters.maxTeams, byEmail]);
+  const bidsState = useMemo(
+    () => ({ open: openBids, toggle: toggleBids }),
+    [openBids, toggleBids]
+  );
 
   const { tableProps } = useAdminTable({
     columns,
@@ -481,66 +492,69 @@ function Board({
   });
 
   return (
-    <div className="mt-4">
-      {failed && (
-        <h2 className="font-medium">
-          Last run that worked, {new Date(result.at).toLocaleString()}
-        </h2>
-      )}
-      <RunReport lines={notes} />
-      <p className="mt-2 text-muted-foreground text-sm">
-        Approve pins a student to the project they are on for every later run,
-        over any pin from the bids file or the roster; Pin here on the Bids tab
-        does the same. Move puts the student on another project now and pins
-        them there, so later runs keep them there. Bids, under a student's name,
-        lists every project they bid on with what they wrote for it, and Move
-        here does what Move does for that project. Unpin frees the student from
-        every pin, and the next run places them by their bids. A pin changes the
-        next run, not the placement shown here. Remove from placement, in a
-        row's More menu, takes the student off this board and out of every run,
-        not only their team, until you restore them on the Bids tab.
-      </p>
-      {empty.length > 0 && (
-        <p className="mt-2 text-sm">
-          No team formed: {empty.map((p) => p.title).join(", ")}.
-        </p>
-      )}
+    <OpenBids.Provider value={bidsState}>
       <div className="mt-4">
-        <AdminDataTable
-          caption="Placement by team, unplaced students first"
-          data={rows}
-          detail={(row) =>
-            open.has(row.email) ? (
-              <BidsDetail
-                onMove={(key) => move(row, key)}
-                options={bidOptions(
-                  byEmail.get(row.email) ?? { ...row, bids: [] },
-                  row.projectKey,
-                  projects,
-                  workspace.parameters.maxTeams
-                )}
-                row={row}
-              />
-            ) : null
-          }
-          emptyMessage="Nobody to place."
-          getRowId={(row) => row.email}
-          group={{
-            header: (groupRows) => (
-              <span>
-                {groupRows[0].groupLabel}
-                <span className="ml-2 font-normal text-muted-foreground text-xs">
-                  {groupRows.length}{" "}
-                  {groupRows.length === 1 ? "student" : "students"}
+        {failed && (
+          <h2 className="font-medium">
+            Last run that worked, {new Date(result.at).toLocaleString()}
+          </h2>
+        )}
+        <RunReport lines={notes} />
+        <p className="mt-2 text-muted-foreground text-sm">
+          Approve pins a student to the project they are on for every later run,
+          over any pin from the bids file or the roster; Pin here on the Bids
+          tab does the same. Move puts the student on another project now and
+          pins them there, so later runs keep them there. Bids, under a
+          student's name, lists every project they bid on with what they wrote
+          for it, and Move here does what Move does for that project. Unpin
+          frees the student from every pin, and the next run places them by
+          their bids. A pin changes the next run, not the placement shown here.
+          Remove from placement, in a row's More menu, takes the student off
+          this board and out of every run, not only their team, until you
+          restore them on the Bids tab.
+        </p>
+        {empty.length > 0 && (
+          <p className="mt-2 text-sm">
+            No team formed: {empty.map((p) => p.title).join(", ")}.
+          </p>
+        )}
+        <div className="mt-4">
+          <AdminDataTable
+            caption="Placement by team, unplaced students first"
+            data={rows}
+            detail={(row) =>
+              openBids.has(row.email) ? (
+                <BidsDetail
+                  onMove={(key) => move(row, key)}
+                  options={bidOptions(
+                    byEmail.get(row.email)?.bids ?? [],
+                    row.projectKey,
+                    projects,
+                    workspace.parameters.maxTeams
+                  )}
+                  row={row}
+                />
+              ) : null
+            }
+            emptyMessage="Nobody to place."
+            getRowId={(row) => row.email}
+            group={{
+              header: (groupRows) => (
+                <span>
+                  {groupRows[0].groupLabel}
+                  <span className="ml-2 font-normal text-muted-foreground text-xs">
+                    {groupRows.length}{" "}
+                    {groupRows.length === 1 ? "student" : "students"}
+                  </span>
                 </span>
-              </span>
-            ),
-            key: (row) => row.groupKey,
-          }}
-          {...tableProps}
-        />
+              ),
+              key: (row) => row.groupKey,
+            }}
+            {...tableProps}
+          />
+        </div>
       </div>
-    </div>
+    </OpenBids.Provider>
   );
 }
 
@@ -563,29 +577,39 @@ function priorityLabel(row: BoardRow): string {
 }
 
 /**
+ * The students whose bids are open, read by each row's toggle through
+ * context rather than through the board's columns: columns that changed as
+ * a row opened would remount every cell, the toggle with its focus.
+ */
+const OpenBids = createContext<{
+  open: ReadonlySet<string>;
+  toggle: (email: string) => void;
+}>({ open: new Set(), toggle: () => undefined });
+
+/**
  * Opens a student's bids under their row (#687). One label at every width,
  * with the state in aria-expanded, so a reader hears which way it went. The
  * name starts with the visible text, so a voice command for it matches.
  */
 function BidsToggle({
   count,
-  expanded,
-  onToggle,
-  row,
+  email,
+  who,
 }: {
   count: number;
-  expanded: boolean;
-  onToggle: () => void;
-  row: BoardRow;
+  email: string;
+  who: string;
 }) {
+  const { open, toggle } = useContext(OpenBids);
+  const expanded = open.has(email);
   const Chevron = expanded ? ChevronDown : ChevronRight;
   return (
     <Button
-      aria-controls={expanded ? detailId(row.email) : undefined}
+      aria-controls={expanded ? detailId(email) : undefined}
       aria-expanded={expanded}
-      aria-label={`Bids (${count}) of ${row.name || row.email}`}
+      aria-label={`Bids (${count}) of ${who}`}
       className="mt-1 -ml-2 font-normal"
-      onClick={onToggle}
+      onClick={() => toggle(email)}
       size="sm"
       type="button"
       variant="ghost"
@@ -598,7 +622,7 @@ function BidsToggle({
 
 const detailId = (email: string) => `placement-bids-${email}`;
 
-const BLOCKED: Record<
+const MOVE_BLOCKED_LABEL: Record<
   Exclude<BidOption["state"], "placed" | "movable">,
   string
 > = {
@@ -670,7 +694,7 @@ function BidAction({
   if (option.state === "movable") {
     return (
       <Button
-        aria-label={`Move ${who} to ${option.title}`}
+        aria-label={`Move here: ${who} to ${option.title}`}
         onClick={() => onMove(option.projectKey)}
         size="sm"
         type="button"
@@ -681,7 +705,11 @@ function BidAction({
       </Button>
     );
   }
-  return <span className="text-muted-foreground">{BLOCKED[option.state]}</span>;
+  return (
+    <span className="text-muted-foreground">
+      {MOVE_BLOCKED_LABEL[option.state]}
+    </span>
+  );
 }
 
 function RowActions({

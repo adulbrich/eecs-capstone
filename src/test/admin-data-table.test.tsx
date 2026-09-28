@@ -6,7 +6,7 @@ import {
   screen,
   within,
 } from "@testing-library/react";
-import { useState } from "react";
+import { createContext, useContext, useState } from "react";
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import {
   type AdminColumn,
@@ -982,5 +982,55 @@ describe("detail", () => {
     expect(cells?.[0].hasAttribute("data-label")).toBe(false);
     expect(detail?.previousElementSibling?.textContent).toContain("Alpha");
     expect(detail?.textContent).toBe("Alpha's detail");
+  });
+
+  it("keeps the data row mounted as its detail opens, so focus stays on the control", () => {
+    // The columns are fixed and the control reads the open state from
+    // context, as the placement board does: columns rebuilt on every toggle
+    // would remount their cells whatever the table did.
+    const Toggle = createContext<() => void>(() => undefined);
+    function OpenButton({ name }: { name: string }) {
+      const toggle = useContext(Toggle);
+      return (
+        <button onClick={toggle} type="button">
+          Open {name}
+        </button>
+      );
+    }
+    const columns: AdminColumn<Row>[] = [
+      {
+        cell: (ctx) => <OpenButton name={ctx.row.original.name} />,
+        header: "Name",
+        id: "name",
+      },
+    ];
+    function Toggling() {
+      const [open, setOpen] = useState(false);
+      return (
+        <Toggle.Provider value={() => setOpen((o) => !o)}>
+          <AdminDataTable
+            caption="Test items"
+            columns={columns}
+            data={DATA}
+            defaultSort={DEFAULT_SORT}
+            detail={(row) => (open && row.id === "2" ? "More" : null)}
+            emptyMessage="Nothing here."
+            getRowId={(row) => row.id}
+            hidden={[]}
+            onHiddenChange={vi.fn()}
+            onSortChange={vi.fn()}
+            sort={DEFAULT_SORT}
+            storageKey="test"
+          />
+        </Toggle.Provider>
+      );
+    }
+    render(<Toggling />);
+    const button = screen.getByRole("button", { name: "Open Alpha" });
+    button.focus();
+    fireEvent.click(button);
+    expect(screen.getByText("More")).not.toBeNull();
+    expect(button.isConnected).toBe(true);
+    expect(document.activeElement).toBe(button);
   });
 });

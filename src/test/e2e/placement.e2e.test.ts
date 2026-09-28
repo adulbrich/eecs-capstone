@@ -307,7 +307,7 @@ test.describe("placement workspace", () => {
     ).toContainText("Placed here");
 
     await bids
-      .getByRole("button", { name: "Move Ada Park to Robot Arm" })
+      .getByRole("button", { name: "Move here: Ada Park to Robot Arm" })
       .click();
     await expect(page.getByText(/moved by hand/)).toBeVisible();
     await expect(
@@ -327,6 +327,13 @@ test.describe("placement workspace", () => {
         .filter({ hasText: "Robot Arm, team" })
         .getByText("Ada Park", { exact: true })
     ).toBeVisible();
+    // A project that forms no team offers no Move here, and the open list
+    // follows the Projects tab.
+    await page.getByRole("tab", { name: /Projects/ }).click();
+    await page.getByLabel("Max teams, Tide Clock").fill("0");
+    await page.getByRole("tab", { name: "Results" }).click();
+    await expect(tide).toContainText("No teams");
+    await expect(tide.getByRole("button")).toHaveCount(0);
     await toggle.click();
     await expect(bids).toHaveCount(0);
   });
@@ -629,6 +636,10 @@ test.describe("placement workspace", () => {
     await expect(
       page.getByRole("row", { name: /Kim Lee.*Pinned, not in the survey/ })
     ).toBeVisible();
+    await page.getByRole("button", { name: "Bids (0) of Kim Lee" }).click();
+    await expect(
+      page.getByRole("region", { name: "Bids of Kim Lee" })
+    ).toHaveText("Not in the survey; no bids.");
 
     const placement = page.waitForEvent("download");
     await page.getByRole("button", { name: "Download placement" }).click();

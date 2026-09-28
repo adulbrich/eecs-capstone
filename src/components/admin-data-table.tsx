@@ -730,52 +730,52 @@ export function AdminDataTable<T extends RowData>({
   const renderRow = (row: Row<AdminTableFeatures, T>) => {
     const isHighlighted = !!highlightedRowId && row.id === highlightedRowId;
     const content = detail?.(row.original) ?? null;
-    const dataRow = (
-      <TableRow
-        // The documented highlight token, not a colour of its own.
-        className={isHighlighted ? "bg-[var(--brand-primary-tint)]" : undefined}
-        data-highlighted={isHighlighted ? "" : undefined}
-        key={row.id}
-        ref={isHighlighted ? highlighted : undefined}
-      >
-        {row.getVisibleCells().map((cell) => {
-          // A card-header cell carries no data-label on purpose: the mobile
-          // field name is drawn from that attribute, and this cell is the
-          // card's title rather than one of its fields.
-          const isCardHeader = cardHeaderIds.has(cell.column.id);
-          return (
-            <TableCell
-              data-card-header={isCardHeader ? "" : undefined}
-              data-label={
-                isCardHeader ? undefined : (labels.get(cell.column.id) ?? "")
-              }
-              key={cell.id}
-            >
-              {flexRender(cell.column.columnDef.cell, cell.getContext())}
-            </TableCell>
-          );
-        })}
-      </TableRow>
-    );
-    if (content === null) {
-      return dataRow;
-    }
+    // Always a Fragment, open or not: a row that turned from a TableRow into
+    // a Fragment as its detail opened would remount, and take the focus of
+    // the control that opened it with it.
     return (
       <Fragment key={row.id}>
-        {dataRow}
+        <TableRow
+          // The documented highlight token, not a colour of its own.
+          className={
+            isHighlighted ? "bg-[var(--brand-primary-tint)]" : undefined
+          }
+          data-highlighted={isHighlighted ? "" : undefined}
+          ref={isHighlighted ? highlighted : undefined}
+        >
+          {row.getVisibleCells().map((cell) => {
+            // A card-header cell carries no data-label on purpose: the mobile
+            // field name is drawn from that attribute, and this cell is the
+            // card's title rather than one of its fields.
+            const isCardHeader = cardHeaderIds.has(cell.column.id);
+            return (
+              <TableCell
+                data-card-header={isCardHeader ? "" : undefined}
+                data-label={
+                  isCardHeader ? undefined : (labels.get(cell.column.id) ?? "")
+                }
+                key={cell.id}
+              >
+                {flexRender(cell.column.columnDef.cell, cell.getContext())}
+              </TableCell>
+            );
+          })}
+        </TableRow>
         {/*
           A bare tr, as the group header is: TableRow's hover tint is for a
           data row. `src/styles.css` joins it to the card above on mobile.
           No data-label, so no field name is drawn in front of it there.
         */}
-        <tr data-row-detail="">
-          <td
-            className="border-b p-2 md:bg-muted/50"
-            colSpan={visibleColumnCount}
-          >
-            {content}
-          </td>
-        </tr>
+        {content !== null && (
+          <tr data-row-detail="">
+            <td
+              className="border-b p-2 md:bg-muted/50"
+              colSpan={visibleColumnCount}
+            >
+              {content}
+            </td>
+          </tr>
+        )}
       </Fragment>
     );
   };

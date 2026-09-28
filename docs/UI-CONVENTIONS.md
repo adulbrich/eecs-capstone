@@ -732,12 +732,14 @@ own.
 It is for detail read against the row and its neighbours, where a Sheet would
 cover what the reader is comparing: the placement board's bids under a student,
 read beside the team they are on (#687). A record read or acted on alone still
-opens a Sheet, as the next section says.
+opens a Sheet, as the next section says. `detail` is the table's second
+extension after `group`; add a third only for a need neither covers.
 
 ### The line sheet
 
-Reading or acting on one request line opens a `Sheet` beside the table, never a
-row that expands inside it. `LineSheet` in `#/components/line-sheet` is the shell:
+Reading or acting on one request line opens a `Sheet` beside the table, not a
+row's `detail` under it: a line is read and acted on alone, not against its
+neighbours (see "A row's detail under it"). `LineSheet` in `#/components/line-sheet` is the shell:
 a title, a description, a definition list of fields, the timeline, and an
 actions slot in the footer. `LineTimeline` draws the `TimelineEvent[]` that
 `lineTimeline` in `#/lib/inventory-timeline` builds from the line's own columns,
@@ -757,11 +759,8 @@ without navigating.
 />
 ```
 
-Two things follow from choosing a sheet. `AdminDataTable` grows no expansion
-mode, which matters because the grouping mode above is already the shared
-component's one extension. And the actions get room: a fulfill flow wants more
+What choosing a sheet buys is room for the actions: a fulfill flow wants more
 than a table cell, and the sheet is where it lives rather than a seventh column.
-This is the first use of `Sheet` outside the mobile navigation drawer.
 
 ### Two empty states
 

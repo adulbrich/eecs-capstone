@@ -203,7 +203,7 @@ describe("bidOptions", () => {
     ],
   };
   const states = (current: string | null, defaultMaxTeams = 1) =>
-    bidOptions(student, current, projects, defaultMaxTeams).map((o) => [
+    bidOptions(student.bids, current, projects, defaultMaxTeams).map((o) => [
       o.title,
       o.state,
     ]);
@@ -216,7 +216,7 @@ describe("bidOptions", () => {
       ["Arm Roster", "roster_only"],
       ["gone", "not_listed"],
     ]);
-    expect(bidOptions(student, "z", projects, 1)[1]).toEqual({
+    expect(bidOptions(student.bids, "z", projects, 1)[1]).toEqual({
       projectKey: "m",
       title: "Robot Arm",
       priority: 2,
@@ -238,7 +238,7 @@ describe("bidOptions", () => {
   });
 
   it("lists nothing for a student with no bids", () => {
-    expect(bidOptions({ ...student, bids: [] }, null, projects, 1)).toEqual([]);
+    expect(bidOptions([], null, projects, 1)).toEqual([]);
   });
 });
 
