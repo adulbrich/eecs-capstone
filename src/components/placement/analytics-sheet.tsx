@@ -35,7 +35,7 @@ import {
 } from "#/lib/placement/board";
 import { downloadText } from "#/lib/placement/download";
 import type { WorkspaceProject } from "#/lib/placement/types";
-import type { Workspace } from "#/lib/placement/workspace";
+import { isStale, type Workspace } from "#/lib/placement/workspace";
 
 const percent = (share: number) => `${(share * 100).toFixed(1)}%`;
 
@@ -88,8 +88,7 @@ export function AnalyticsSheet({
     ? projectsWithoutTeam(result, projects, workspace.parameters.maxTeams)
     : [];
   const priorities = rows ? priorityDistribution(rows) : [];
-  const stale =
-    result !== undefined && result.fingerprint !== state.fingerprint;
+  const stale = isStale(result, state.fingerprint);
 
   return (
     <Sheet>

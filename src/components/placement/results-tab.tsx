@@ -63,7 +63,11 @@ import type {
   PlacementStudent,
   WorkspaceProject,
 } from "#/lib/placement/types";
-import { toPlacementInput, type Workspace } from "#/lib/placement/workspace";
+import {
+  isStale,
+  toPlacementInput,
+  type Workspace,
+} from "#/lib/placement/workspace";
 import type { SortState } from "#/lib/table-state";
 import { useAdminTable } from "#/lib/use-admin-table";
 import { useLocalTableSearch } from "#/lib/use-local-table-search";
@@ -277,7 +281,7 @@ export function ResultsTab({
           rows={rows}
           // After a failed run the alert above says what to do; "run again"
           // would tell the reader to repeat what just failed (#680).
-          stale={failure === null && result.fingerprint !== fingerprint}
+          stale={failure === null && isStale(result, fingerprint)}
           students={students}
           titles={titles}
           toggleBids={toggleBids}

@@ -9,6 +9,7 @@ import type { PlacementWorkspace } from "#/components/placement/use-placement-wo
 import { Button } from "#/components/ui/button";
 import { ordinal } from "#/lib/placement/analytics";
 import {
+  groupByProject,
   type ProjectBidRow,
   pinnedRows,
   pinSource,
@@ -62,13 +63,7 @@ export function BidsByProject({
   );
   // A header counts the project's bids and lists its pins from every row,
   // whatever the switch leaves in the table.
-  const byProject = useMemo(() => {
-    const map = new Map<string, ProjectBidRow[]>();
-    for (const row of allRows) {
-      map.set(row.projectKey, [...(map.get(row.projectKey) ?? []), row]);
-    }
-    return map;
-  }, [allRows]);
+  const byProject = useMemo(() => groupByProject(allRows), [allRows]);
 
   const columns = useMemo(() => {
     const pin = (email: string, projectKey: string | null) =>

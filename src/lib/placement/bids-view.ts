@@ -136,19 +136,29 @@ function emptyRow(
  * project still shows.
  */
 export function pinnedRows(rows: readonly ProjectBidRow[]): ProjectBidRow[] {
-  const byProject = new Map<string, ProjectBidRow[]>();
-  for (const row of rows) {
-    const group = byProject.get(row.projectKey) ?? [];
-    group.push(row);
-    byProject.set(row.projectKey, group);
-  }
-  return [...byProject.values()].flatMap((group) => {
+  return [...groupByProject(rows).values()].flatMap((group) => {
     const pinned = group.filter((r) => r.pinnedHere);
     const [first] = group;
     return pinned.length > 0
       ? pinned
       : [emptyRow(first.projectKey, first.projectTitle, first.fixed)];
   });
+}
+
+/** Each project's rows by project key, in the order they came. */
+export function groupByProject(
+  rows: readonly ProjectBidRow[]
+): Map<string, ProjectBidRow[]> {
+  const byProject = new Map<string, ProjectBidRow[]>();
+  for (const row of rows) {
+    const group = byProject.get(row.projectKey);
+    if (group) {
+      group.push(row);
+    } else {
+      byProject.set(row.projectKey, [row]);
+    }
+  }
+  return byProject;
 }
 
 /** How a student came to be pinned to a project, as its header lists them. */
@@ -237,7 +247,9 @@ export function standingText(
       return `Unplaced in the last run${before}`;
     case "not_in_run":
       return "Not in the last run";
-    default:
+    case "no_run":
       return "No run yet";
+    default:
+      return standing satisfies never;
   }
 }

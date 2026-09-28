@@ -25,7 +25,11 @@ import { BIDS_FORMAT } from "#/lib/placement/formats";
 import { convertQualtrics, isQualtricsExport } from "#/lib/placement/qualtrics";
 import { repointRosterPins } from "#/lib/placement/roster";
 import type { PlacementStudent } from "#/lib/placement/types";
-import type { StoredResult, Workspace } from "#/lib/placement/workspace";
+import {
+  isStale,
+  type StoredResult,
+  type Workspace,
+} from "#/lib/placement/workspace";
 import type { SortState } from "#/lib/table-state";
 import { useAdminTable } from "#/lib/use-admin-table";
 import { useLocalTableSearch } from "#/lib/use-local-table-search";
@@ -96,7 +100,7 @@ export function BidsTab({
   // Both views and the count show every pin in effect, the board's
   // included, so a pin set here or on the Results tab shows the same
   // everywhere (#671).
-  const pinned = applyPins(students, workspace.pins);
+  const withPins = applyPins(students, workspace.pins);
   // What the roster pre-approved, before board pins, so a pre-approval a
   // board pin overrode can say so rather than vanish.
   const preApprovals = new Map(
@@ -104,7 +108,7 @@ export function BidsTab({
       s.preApproved && s.pin !== undefined ? [[s.email, s.pin] as const] : []
     )
   );
-  const pinnedCount = pinned.filter((s) => s.pin !== undefined).length;
+  const pinnedCount = withPins.filter((s) => s.pin !== undefined).length;
   const rosterOnly = students.filter((s) => s.rosterOnly).length;
   return (
     <div>
@@ -214,18 +218,15 @@ export function BidsTab({
         <BidsByProject
           pinnedOnly={pinnedOnly}
           state={state}
-          students={pinned}
+          students={withPins}
         />
       ) : (
         <StudentsTable
           preApprovals={preApprovals}
           projects={state.placementProjects}
           result={workspace.result}
-          stale={
-            workspace.result !== undefined &&
-            workspace.result.fingerprint !== state.fingerprint
-          }
-          students={pinned}
+          stale={isStale(workspace.result, state.fingerprint)}
+          students={withPins}
           update={update}
         />
       )}

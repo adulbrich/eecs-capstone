@@ -781,7 +781,7 @@ test.describe("placement workspace", () => {
 
     // Pinned only leaves each project's pins, and survives a reload.
     await page.getByRole("switch", { name: "Pinned only" }).click();
-    await expect(page).toHaveURL(/pinned=true/);
+    await expect(page).toHaveURL(/pinnedOnly=true/);
     await expect(robot.getByText("Pinned to Tide Clock")).toHaveCount(0);
     await expect(robot.getByText("Ben Ito", { exact: true })).toBeVisible();
     await page.reload();
