@@ -16,7 +16,9 @@ import { z } from "zod";
  * path could never be given back to a page for anyone who had followed it.
  */
 export const Route = createFileRoute("/(auth)/sign-up")({
-  validateSearch: z.object({ redirect: z.string().optional() }),
+  validateSearch: z.object({
+    redirect: z.string().optional().catch(undefined),
+  }),
   beforeLoad: ({ search }) => {
     throw redirect({ to: "/sign-in", search: { redirect: search.redirect } });
   },

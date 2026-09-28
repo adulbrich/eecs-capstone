@@ -68,6 +68,7 @@ import {
   PROJECT_STATUS_DISPLAY_RANK,
   PROJECT_STATUS_LABEL,
 } from "#/lib/project-workflow";
+import { searchParamQuerySchema } from "#/lib/search-query";
 import type { SortState } from "#/lib/table-state";
 import { useAdminTable } from "#/lib/use-admin-table";
 import { useDebouncedDraft } from "#/lib/use-debounced-draft";
@@ -104,9 +105,12 @@ const SWITCH_DEFAULTS = {
 const WITHOUT_MENTOR_LABEL = "have no mentor recorded";
 
 export const searchSchema = z.object({
-  cols: z.string().optional(),
-  dir: z.enum(["asc", "desc"]).optional(),
-  includeSoftDeleted: z.boolean().default(SWITCH_DEFAULTS.includeSoftDeleted),
+  cols: z.string().optional().catch(undefined),
+  dir: z.enum(["asc", "desc"]).optional().catch(undefined),
+  includeSoftDeleted: z
+    .boolean()
+    .catch(SWITCH_DEFAULTS.includeSoftDeleted)
+    .default(SWITCH_DEFAULTS.includeSoftDeleted),
   // Three states, one field: absent is every program, "none" is the projects
   // nobody has filed yet, a UUID is that program (#458). `.catch` for the same
   // reason the four below carry one: a stale or hand-edited link degrades to
@@ -117,12 +121,12 @@ export const searchSchema = z.object({
     .default(null)
     .catch(null),
   // Better Auth user ids are text, not UUIDs.
-  proposer: z.string().max(255).nullable().default(null),
+  proposer: z.string().max(255).nullable().catch(null).default(null),
   // Uncapped on purpose, for the reason `/projects` gives at length: the
   // server clamps, and the note under the box needs the URL to still
   // carry what the reader typed (#478).
-  q: z.string().default(""),
-  sort: z.string().optional(),
+  q: searchParamQuerySchema,
+  sort: z.string().optional().catch(undefined),
   // Absent is the default set, every status but archived; any explicit
   // choice is spelled out in full. `.catch` on the four so a stale or
   // hand-edited link degrades to the default rather than a route error.
@@ -133,10 +137,22 @@ export const searchSchema = z.object({
   // Three of the public listing's four switches under the same names, so a
   // link pasted from /projects narrows this page the same way (#340); the
   // fourth, archived, is a status here. The last is this page's own.
-  acceptingOnly: z.boolean().default(SWITCH_DEFAULTS.acceptingOnly),
-  studentProposedOnly: z.boolean().default(SWITCH_DEFAULTS.studentProposedOnly),
-  requiresNdaOnly: z.boolean().default(SWITCH_DEFAULTS.requiresNdaOnly),
-  withoutMentorOnly: z.boolean().default(SWITCH_DEFAULTS.withoutMentorOnly),
+  acceptingOnly: z
+    .boolean()
+    .catch(SWITCH_DEFAULTS.acceptingOnly)
+    .default(SWITCH_DEFAULTS.acceptingOnly),
+  studentProposedOnly: z
+    .boolean()
+    .catch(SWITCH_DEFAULTS.studentProposedOnly)
+    .default(SWITCH_DEFAULTS.studentProposedOnly),
+  requiresNdaOnly: z
+    .boolean()
+    .catch(SWITCH_DEFAULTS.requiresNdaOnly)
+    .default(SWITCH_DEFAULTS.requiresNdaOnly),
+  withoutMentorOnly: z
+    .boolean()
+    .catch(SWITCH_DEFAULTS.withoutMentorOnly)
+    .default(SWITCH_DEFAULTS.withoutMentorOnly),
 });
 
 type Search = z.infer<typeof searchSchema>;

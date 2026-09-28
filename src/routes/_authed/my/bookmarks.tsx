@@ -16,8 +16,8 @@ import { listMyBookmarks } from "#/server/bookmarks";
 // `cols` either): a shortlist is small by construction and has one sensible
 // presentation.
 const searchSchema = z.object({
-  dir: z.enum(["asc", "desc"]).optional(),
-  sort: z.string().optional(),
+  dir: z.enum(["asc", "desc"]).optional().catch(undefined),
+  sort: z.string().optional().catch(undefined),
 });
 
 export const Route = createFileRoute("/_authed/my/bookmarks")({

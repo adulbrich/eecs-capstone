@@ -132,7 +132,9 @@ A `getSession()` in a `beforeLoad` is a round trip on every load, and a nested p
 ### Route search params via `validateSearch`
 
 ```ts
-const searchSchema = z.object({ page: z.number().int().min(1).default(1) });
+const searchSchema = z.object({
+  page: z.number().int().min(1).catch(1).default(1),
+});
 
 export const Route = createFileRoute("/projects/")({
   validateSearch: searchSchema,
@@ -142,6 +144,8 @@ export const Route = createFileRoute("/projects/")({
 ```
 
 Search-driven loaders need `loaderDeps` so navigation with a new search param re-runs the loader.
+
+Every field takes a `.catch` (#609). A field without one fails `validateSearch` on a bad value, which is a 500 and a `Server render failed` log line, reachable by anyone with a hand-edited link. The router JSON-parses each value before the schema sees it, so no bare type is safe: `?cols=123` is a number and `?page=abc` a string. `.catch(x).default(x)` keeps the param optional for a `Link`. A `q` field is `searchParamQuerySchema` from `src/lib/search-query.ts`, which turns `?q=2024` back into the text `"2024"` rather than dropping it. `src/test/route-search-fallbacks.test.ts` fails a field under `src/routes/` without one.
 
 ### A defaulted search param is written back to the URL as its default
 
@@ -826,7 +830,7 @@ The query cache outlives the component and the session that filled it. Signing o
 
 The `q` and `query` fields of the eight search schemas under `src/server/` are all `searchQuerySchema` from `src/lib/search-query.ts`, which trims, cuts at `SEARCH_QUERY_MAX` and never throws. They disagreed until #478: four capped at 200 and threw `too_big` out of `.parse` past it, four had no cap at all, and a 201-character paste into the public listing's box reached the framework's default error page, because no route defines an `errorComponent`. Clamping happens on the server rather than through a `maxLength` on each input, because a server function is reachable without the UI. `search-query-schemas.test.ts` reads the AST and fails a search field that goes back to a bare `z.string()`.
 
-The reader is told when their query was cut, by `searchQueryNote` in `src/components/search-hint.tsx`, and two things follow from that. The route-level `q` params stay uncapped, so the URL still carries what the reader typed; a `.max()` there would be a router error on a long link and a `.catch("")` would drop the search silently. And no search input carries a `maxLength`, which would have the browser swallow a long paste with nothing said. The note is derived on the client from the same `clampSearchQuery` the schemas use, unlike `order` on the search result, which the server has to report because it resolves against an interest vector the client cannot see.
+The reader is told when their query was cut, by `searchQueryNote` in `src/components/search-hint.tsx`, and two things follow from that. The route-level `q` params stay uncapped, so the URL still carries what the reader typed; a `.max()` there would be a router error on a long link, and a `.max()` with a `.catch("")` would drop the search silently. `searchParamQuerySchema` catches to `""` only a value that is not text at all (#609). And no search input carries a `maxLength`, which would have the browser swallow a long paste with nothing said. The note is derived on the client from the same `clampSearchQuery` the schemas use, unlike `order` on the search result, which the server has to report because it resolves against an interest vector the client cannot see.
 
 ### Every server function declares its access level
 

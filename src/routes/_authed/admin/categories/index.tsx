@@ -56,10 +56,10 @@ import {
 } from "#/server/categories";
 
 const searchSchema = z.object({
-  cols: z.string().optional(),
-  dir: z.enum(["asc", "desc"]).optional(),
-  sort: z.string().optional(),
-  tab: z.enum(["project", "inventory"]).default("project"),
+  cols: z.string().optional().catch(undefined),
+  dir: z.enum(["asc", "desc"]).optional().catch(undefined),
+  sort: z.string().optional().catch(undefined),
+  tab: z.enum(["project", "inventory"]).catch("project").default("project"),
 });
 
 export const Route = createFileRoute("/_authed/admin/categories/")({

@@ -88,13 +88,12 @@ describe("/projects order search param", () => {
   });
 
   /**
-   * Unlike `categories` and `view`, a bad `order` is a router error rather
-   * than a silent fallback. Pinned so the choice is deliberate: the value is
-   * typed into a URL by hand or not at all, and the three filters that use
-   * `.catch` do so because a stale link from a real feature could carry them.
+   * This used to be a router error, pinned as deliberate. #609 reversed it:
+   * a hand-typed value is exactly what a signed-out visitor can send, and the
+   * error page it reached was a 500 and a log line each time.
    */
-  it("refuses a value the enum does not know", () => {
-    expect(() => searchSchema.parse({ order: "alphabetical" })).toThrow();
+  it("reads a value the enum does not know as absent", () => {
+    expect(searchSchema.parse({ order: "alphabetical" }).order).toBeUndefined();
   });
 });
 

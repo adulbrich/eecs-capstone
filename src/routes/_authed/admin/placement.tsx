@@ -31,11 +31,11 @@ type Tab = (typeof TABS)[number];
 const BIDS_VIEWS = ["student", "project"] as const;
 
 const searchSchema = z.object({
-  tab: z.enum(TABS).default("projects"),
+  tab: z.enum(TABS).catch("projects").default("projects"),
   /** How the Bids tab lists the bids (#671). */
-  view: z.enum(BIDS_VIEWS).default("student"),
+  view: z.enum(BIDS_VIEWS).catch("student").default("student"),
   /** The per-project view narrowed to each project's pins (#688). */
-  pinnedOnly: z.boolean().default(false),
+  pinnedOnly: z.boolean().catch(false).default(false),
 });
 
 export const Route = createFileRoute("/_authed/admin/placement")({

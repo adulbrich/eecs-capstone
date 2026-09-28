@@ -28,6 +28,7 @@ import { Label } from "#/components/ui/label";
 import { ListCount } from "#/components/ui/pagination";
 import { defineCsvColumns, toCsv } from "#/lib/csv";
 import { pageTitle } from "#/lib/page-title";
+import { searchParamQuerySchema } from "#/lib/search-query";
 import type { SortState } from "#/lib/table-state";
 import { useAction } from "#/lib/use-action";
 import { useAdminTable } from "#/lib/use-admin-table";
@@ -43,10 +44,10 @@ import {
 const MENTOR_SEARCH_NOTE_ID = "mentor-search-note";
 
 const searchSchema = z.object({
-  cols: z.string().optional(),
-  dir: z.enum(["asc", "desc"]).optional(),
-  q: z.string().default(""),
-  sort: z.string().optional(),
+  cols: z.string().optional().catch(undefined),
+  dir: z.enum(["asc", "desc"]).optional().catch(undefined),
+  q: searchParamQuerySchema,
+  sort: z.string().optional().catch(undefined),
 });
 
 export const Route = createFileRoute("/_authed/admin/mentors/")({

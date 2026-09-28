@@ -28,6 +28,7 @@ import {
 import { ACTIVE_STATUSES, type ActiveStatus } from "#/lib/inventory-visibility";
 import { pageTitle } from "#/lib/page-title";
 import { PAGE_SIZE_DEFAULT } from "#/lib/pagination";
+import { searchParamQuerySchema } from "#/lib/search-query";
 import { NOINDEX } from "#/lib/social-meta";
 import { useAdminTable } from "#/lib/use-admin-table";
 import { useSeedViewFromStorage } from "#/lib/use-seed-view";
@@ -45,14 +46,14 @@ export const searchSchema = z.object({
   // Uncapped on purpose, for the reason `/projects` gives at length: the
   // server clamps, and the note under the box needs the URL to still
   // carry what the reader typed (#478).
-  q: z.string().default(""),
-  status: z.enum(ACTIVE_STATUSES).nullable().default(null),
+  q: searchParamQuerySchema,
+  status: z.enum(ACTIVE_STATUSES).nullable().catch(null).default(null),
   // A stale `?category=Electronics` link (pre-UUID, singular) fails
   // `.array().uuid()`; caught and treated as "no filter" rather than a
   // router error, per the brief: old links intentionally break as filters
   // but should not 500 the page.
   categories: z.array(z.string().uuid()).max(20).catch([]).default([]),
-  page: z.number().int().positive().default(1),
+  page: z.number().int().positive().catch(1).default(1),
   // The server's ordering, the listing's only one in either view (#477).
   // Optional rather than defaulted, as on `/projects`: the router writes
   // every schema default into the URL, and `listInventory` applies the
@@ -67,7 +68,7 @@ export const searchSchema = z.object({
   // left in #477, as they left `/projects` in #475: no column accepts a
   // sort, and Zod strips a key the schema does not know, so a stale
   // `?sort=status&dir=asc` renders the listing rather than an error.
-  cols: z.string().optional(),
+  cols: z.string().optional().catch(undefined),
 });
 
 export const Route = createFileRoute("/_public/inventory/")({
