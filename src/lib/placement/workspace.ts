@@ -408,17 +408,6 @@ export function projectsFromPortal(
  * required, even as undefined, so a caller cannot forget one and hash a
  * different input from every other caller.
  */
-/**
- * Whether the projects, parameters or bids changed since `result` ran,
- * given `inputFingerprint` of the workspace now. False with no result.
- */
-export function isStale(
-  result: StoredResult | undefined,
-  fingerprint: string
-): boolean {
-  return result !== undefined && result.fingerprint !== fingerprint;
-}
-
 export function inputFingerprint(
   workspace: Pick<Workspace, "bids" | "parameters" | "projects"> & {
     roster: Workspace["roster"];
@@ -443,6 +432,17 @@ export function inputFingerprint(
     hash = (hash * 33 + text.charCodeAt(i)) % 4_294_967_296;
   }
   return `${text.length}:${hash.toString(36)}`;
+}
+
+/**
+ * Whether the projects, parameters or bids changed since `result` ran,
+ * given `inputFingerprint` of the workspace now. False with no result.
+ */
+export function isStale(
+  result: StoredResult | undefined,
+  fingerprint: string
+): boolean {
+  return result !== undefined && result.fingerprint !== fingerprint;
 }
 
 /**
