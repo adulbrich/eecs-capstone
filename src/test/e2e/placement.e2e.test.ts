@@ -732,14 +732,16 @@ test.describe("placement workspace", () => {
     );
 
     // A removed pre-approval takes its roster-added project with it.
+    await page.getByRole("tab", { name: /Projects/ }).click();
+    const added = page.getByRole("region", { name: "Added from the roster" });
+    await expect(added).toContainText("Moon Base");
+    await page.getByRole("tab", { name: /Bids/ }).click();
     await page
       .getByRole("button", { name: "Remove Kim Lee from placement" })
       .click();
     await expect(removed).toContainText("2 students");
     await page.getByRole("tab", { name: /Projects/ }).click();
-    await expect(
-      page.getByRole("region", { name: "Added from the roster" })
-    ).toHaveCount(0);
+    await expect(added).toHaveCount(0);
 
     const parameters = page.getByRole("tab", { name: "Parameters" });
     await parameters.click();
