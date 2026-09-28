@@ -156,14 +156,14 @@ export function moveTargets(
   defaultMaxTeams: number,
   query: string
 ): WorkspaceProject[] {
-  const words = query.toLocaleLowerCase().split(WHITESPACE).filter(Boolean);
+  const words = query.toLowerCase().split(WHITESPACE).filter(Boolean);
   return projects
     .filter(
       (p) =>
         p.key !== current &&
         (p.maxTeams ?? defaultMaxTeams) > 0 &&
         !p.fromRoster &&
-        words.every((w) => p.title.toLocaleLowerCase().includes(w))
+        words.every((w) => p.title.toLowerCase().includes(w))
     )
     .sort((a, b) => a.title.localeCompare(b.title));
 }

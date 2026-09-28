@@ -231,6 +231,14 @@ export function ResultsTab({
       </div>
       {missing && <p className="mt-2 text-sm">{missing}</p>}
       <FieldError message={error} />
+      {failed && failure === null && result === undefined && (
+        // A run that failed after its inputs changed under it: its reasons
+        // may no longer hold, but the reader still learns it failed.
+        <p className="mt-2 text-sm">
+          The last run failed, and the projects, parameters or bids changed
+          while it ran. Run placement again.
+        </p>
+      )}
       {failure && (
         <ErrorBanner className="mt-4">
           <ul className="space-y-0.5">
