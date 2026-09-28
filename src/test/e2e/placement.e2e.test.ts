@@ -296,6 +296,8 @@ test.describe("placement workspace", () => {
     await expect(toggle).toHaveAttribute("aria-expanded", "false");
     await toggle.click();
     await expect(toggle).toHaveAttribute("aria-expanded", "true");
+    // Opening re-renders the row, not remounts it, so focus stays put.
+    await expect(toggle).toBeFocused();
     const bids = page.getByRole("region", { name: "Bids of Ada Park" });
     const tide = bids.getByRole("listitem").filter({ hasText: "Tide Clock" });
     await expect(tide).toContainText("Placed here");
