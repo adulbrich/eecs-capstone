@@ -3,9 +3,8 @@ import { isRedirect } from "@tanstack/react-router";
 import { Bell, BellRing } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
-import { authClient } from "#/lib/auth-client";
 import { useAction } from "#/lib/use-action";
-import { useHasMounted } from "#/lib/use-has-mounted";
+import { useSignedInUserId } from "#/lib/use-signed-in";
 import {
   listMyNotifications,
   markAllRead,
@@ -47,11 +46,7 @@ const NOTIFICATIONS_KEY = ["notifications"] as const;
  */
 export function NotificationBell() {
   const [open, setOpen] = useState(false);
-  // `useSignedIn`'s gate, keeping the id: false until mounted, so the first
-  // client render matches the signed-out markup the server produced.
-  const { data: session } = authClient.useSession();
-  const hasMounted = useHasMounted();
-  const userId = hasMounted ? session?.user?.id : undefined;
+  const userId = useSignedInUserId();
   const queryClient = useQueryClient();
   const queryKey = [...NOTIFICATIONS_KEY, userId];
   const { data } = useQuery({

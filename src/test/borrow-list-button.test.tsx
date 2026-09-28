@@ -1,7 +1,13 @@
 // @vitest-environment jsdom
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { cleanup, fireEvent, render } from "@testing-library/react";
+import {
+  QueryCache,
+  QueryClient,
+  QueryClientProvider,
+} from "@tanstack/react-query";
+import { redirect } from "@tanstack/react-router";
+import { act, cleanup, fireEvent, render } from "@testing-library/react";
 import type * as React from "react";
+import { cloneElement } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 let cart: { itemId: string }[] = [];
@@ -12,15 +18,17 @@ vi.mock("#/server/inventory", () => ({
     cart = [...cart, { itemId: data.itemId }];
     return Promise.resolve({ ok: true });
   },
-  getCart: () => Promise.resolve(cart),
+  getCart: vi.fn(() => Promise.resolve(cart)),
 }));
 
 vi.mock("#/lib/auth-client", () => ({
   authClient: { useSession: () => ({ data: session, isPending: false }) },
 }));
 
-// An href, so the anchor has the link role the queries below look for.
-vi.mock("@tanstack/react-router", () => ({
+// An href, so the anchor has the link role the queries below look for. The
+// rest is the real module, for `isRedirect` and `redirect`.
+vi.mock("@tanstack/react-router", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@tanstack/react-router")>()),
   Link: ({
     children,
     to,
@@ -34,19 +42,48 @@ vi.mock("@tanstack/react-router", () => ({
 
 import { AddToCartButton } from "#/components/add-to-cart-button";
 import { BorrowListButton } from "#/components/borrow-list-button";
+import { getCart } from "#/server/inventory";
+
+const mockedGetCart = vi.mocked(getCart);
 
 afterEach(() => {
   cleanup();
+  vi.clearAllMocks();
   cart = [];
   session = null;
 });
 
-function renderWith(ui: React.ReactElement, seeded?: { itemId: string }[]) {
-  const qc = new QueryClient();
+function renderWith(
+  ui: React.ReactElement,
+  seeded?: { itemId: string }[],
+  qc = new QueryClient()
+) {
   if (seeded) {
-    qc.setQueryData(["cart"], seeded);
+    qc.setQueryData(["cart", "u1"], seeded);
   }
-  return render(<QueryClientProvider client={qc}>{ui}</QueryClientProvider>);
+  const view = render(
+    <QueryClientProvider client={qc}>{ui}</QueryClientProvider>
+  );
+  return {
+    ...view,
+    // A fresh element, or React bails out of rendering the same one and the
+    // component never reads the switched session.
+    rerenderWith: () =>
+      view.rerender(
+        <QueryClientProvider client={qc}>
+          {cloneElement(ui)}
+        </QueryClientProvider>
+      ),
+  };
+}
+
+// The next viewer's read never answers, so anything shown is the last
+// viewer's cache.
+function nextViewerPending() {
+  mockedGetCart.mockImplementationOnce(
+    () => new Promise<never>(() => undefined)
+  );
+  session = { user: { id: "u2" } };
 }
 
 describe("BorrowListButton", () => {
@@ -94,6 +131,55 @@ describe("BorrowListButton", () => {
     fireEvent.click(await findByRole("button", { name: "Borrow" }));
     await findByRole("button", { name: "In borrow list" });
     expect(await findByRole("link", { name: "Borrow list 1" })).toBeTruthy();
+  });
+});
+
+describe("the borrow list query, keyed on the viewer", () => {
+  it("never shows one viewer's count to the next in the same tab", async () => {
+    session = { user: { id: "u1" } };
+    cart = [{ itemId: "x" }, { itemId: "y" }];
+    const { findByRole, rerenderWith } = renderWith(<BorrowListButton />);
+    await findByRole("link", { name: "Borrow list 2" });
+
+    nextViewerPending();
+    rerenderWith();
+
+    expect(await findByRole("link", { name: "Borrow list" })).toBeTruthy();
+    expect(mockedGetCart).toHaveBeenCalledTimes(2);
+  });
+
+  it("never marks the next viewer's item as in their list", async () => {
+    session = { user: { id: "u1" } };
+    cart = [{ itemId: "item-1" }];
+    const { findByRole, rerenderWith } = renderWith(
+      <AddToCartButton itemId="item-1" />
+    );
+    await findByRole("button", { name: "In borrow list" });
+
+    nextViewerPending();
+    rerenderWith();
+
+    expect(await findByRole("button", { name: "Borrow" })).toBeTruthy();
+  });
+
+  it("empties the count, without a redirect, when the server has ended the session", async () => {
+    // `requireUser` refuses with a redirect, and the router's query
+    // integration navigates on any redirect that reaches the query cache's
+    // `onError`, so a focus refetch would carry the tab to /sign-in.
+    const onError = vi.fn();
+    const qc = new QueryClient({ queryCache: new QueryCache({ onError }) });
+    session = { user: { id: "u1" } };
+    cart = [{ itemId: "x" }];
+    const { findByRole } = renderWith(<BorrowListButton />, undefined, qc);
+    await findByRole("link", { name: "Borrow list 1" });
+
+    mockedGetCart.mockRejectedValueOnce(redirect({ to: "/sign-in" }));
+    await act(async () => {
+      await qc.invalidateQueries({ queryKey: ["cart"] });
+    });
+
+    expect(await findByRole("link", { name: "Borrow list" })).toBeTruthy();
+    expect(onError).not.toHaveBeenCalled();
   });
 });
 

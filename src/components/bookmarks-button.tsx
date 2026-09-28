@@ -1,7 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
-import { Link } from "@tanstack/react-router";
+import { isRedirect, Link } from "@tanstack/react-router";
 import { Bookmark } from "lucide-react";
-import { useSignedIn } from "#/lib/use-signed-in";
+import { useSignedInUserId } from "#/lib/use-signed-in";
 import { listMyBookmarks } from "#/server/bookmarks";
 import { CountBadge } from "./count-badge";
 import { Button } from "./ui/button";
@@ -14,15 +14,31 @@ import { Button } from "./ui/button";
  * query, so the number here is by construction the number of rows there:
  * `listMyBookmarksAs` re-checks visibility on read, and a count that skipped
  * that check would overstate a list that got shorter.
+ *
+ * The key carries the user id (docs/QUIRKS.md, "A TanStack Query key for the
+ * viewer's own data carries their user id"); `useWriteBookmark` invalidates
+ * the `["bookmarks"]` prefix, which reaches it.
  */
 export function BookmarksButton() {
-  const signedIn = useSignedIn();
+  const userId = useSignedInUserId();
   const { data } = useQuery({
-    queryKey: ["bookmarks"],
-    queryFn: () => listMyBookmarks(),
-    enabled: signedIn,
+    queryKey: ["bookmarks", userId],
+    queryFn: async () => {
+      try {
+        return await listMyBookmarks();
+      } catch (error) {
+        // The server ended the session before this tab heard, and a redirect
+        // a query throws navigates the tab (docs/QUIRKS.md, "A redirect
+        // thrown from a `queryFn` navigates the tab").
+        if (isRedirect(error)) {
+          return { rows: [] };
+        }
+        throw error;
+      }
+    },
+    enabled: userId !== undefined,
   });
-  if (!signedIn) {
+  if (userId === undefined) {
     return null;
   }
   const count = data?.rows.length ?? 0;
