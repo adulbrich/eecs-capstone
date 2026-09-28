@@ -406,9 +406,14 @@ function Board({
         cardHeader: true,
         cell: ({ row }) => (
           <div>
-            <div>{row.original.name || row.original.email}</div>
+            <BidsToggle
+              count={byEmail.get(row.original.email)?.bids.length ?? 0}
+              email={row.original.email}
+              who={row.original.name || row.original.email}
+            />
+            {/* Under the name, past the chevron in front of it. */}
             {row.original.name && (
-              <div className="text-muted-foreground text-xs">
+              <div className="pl-5 text-muted-foreground text-xs">
                 {row.original.email}
               </div>
             )}
@@ -428,11 +433,6 @@ function Board({
                 </span>
               </p>
             )}
-            <BidsToggle
-              count={byEmail.get(row.original.email)?.bids.length ?? 0}
-              email={row.original.email}
-              who={row.original.name || row.original.email}
-            />
           </div>
         ),
         enableHiding: false,
@@ -504,14 +504,14 @@ function Board({
           Approve pins a student to the project they are on for every later run,
           over any pin from the bids file or the roster; Pin here on the Bids
           tab does the same. Move puts the student on another project now and
-          pins them there, so later runs keep them there. Bids, under a
-          student's name, lists every project they bid on with what they wrote
-          for it, and Move here does what Move does for that project. Unpin
-          frees the student from every pin, and the next run places them by
-          their bids. A pin changes the next run, not the placement shown here.
-          Remove from placement, in a row's More menu, takes the student off
-          this board and out of every run, not only their team, until you
-          restore them on the Bids tab.
+          pins them there, so later runs keep them there. A student's name opens
+          every project they bid on, under their row, with what they wrote for
+          it, and Move here does what Move does for that project. Unpin frees
+          the student from every pin, and the next run places them by their
+          bids. A pin changes the next run, not the placement shown here. Remove
+          from placement, in a row's More menu, takes the student off this board
+          and out of every run, not only their team, until you restore them on
+          the Bids tab.
         </p>
         {empty.length > 0 && (
           <p className="mt-2 text-sm">
@@ -587,9 +587,10 @@ const OpenBids = createContext<{
 }>({ open: new Set(), toggle: () => undefined });
 
 /**
- * Opens a student's bids under their row (#687). One label at every width,
- * with the state in aria-expanded, so a reader hears which way it went. The
- * name starts with the visible text, so a voice command for it matches.
+ * The student's name, which opens their bids under their row (#687): a
+ * chevron in front of it, and no line of its own. The state is in
+ * aria-expanded; the name starts with the visible text, so a voice command
+ * for it matches, and adds the bid count the chevron does not show.
  */
 function BidsToggle({
   count,
@@ -607,15 +608,15 @@ function BidsToggle({
     <Button
       aria-controls={expanded ? detailId(email) : undefined}
       aria-expanded={expanded}
-      aria-label={`Bids (${count}) of ${who}`}
-      className="mt-1 -ml-2 font-normal"
+      aria-label={`${who}, ${count} ${count === 1 ? "bid" : "bids"}`}
+      className="font-normal"
       onClick={() => toggle(email)}
-      size="sm"
+      size="bare"
       type="button"
       variant="ghost"
     >
       <Chevron aria-hidden="true" />
-      Bids ({count})
+      {who}
     </Button>
   );
 }

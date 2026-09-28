@@ -292,7 +292,7 @@ test.describe("placement workspace", () => {
       timeout: 20_000,
     });
 
-    const toggle = page.getByRole("button", { name: "Bids (2) of Ada Park" });
+    const toggle = page.getByRole("button", { name: "Ada Park, 2 bids" });
     await expect(toggle).toHaveAttribute("aria-expanded", "false");
     await toggle.click();
     await expect(toggle).toHaveAttribute("aria-expanded", "true");
@@ -303,7 +303,7 @@ test.describe("placement workspace", () => {
     await expect(tide).toContainText("Placed here");
     await expect(tide).toContainText("Tides, and clocks");
     // Several open at once.
-    await page.getByRole("button", { name: "Bids (1) of Ben Ito" }).click();
+    await page.getByRole("button", { name: "Ben Ito, 1 bid" }).click();
     await expect(
       page.getByRole("region", { name: "Bids of Ben Ito" })
     ).toContainText("Placed here");
@@ -638,7 +638,7 @@ test.describe("placement workspace", () => {
     await expect(
       page.getByRole("row", { name: /Kim Lee.*Pinned, not in the survey/ })
     ).toBeVisible();
-    await page.getByRole("button", { name: "Bids (0) of Kim Lee" }).click();
+    await page.getByRole("button", { name: "Kim Lee, 0 bids" }).click();
     await expect(
       page.getByRole("region", { name: "Bids of Kim Lee" })
     ).toHaveText("Not in the survey; no bids.");
