@@ -1,9 +1,12 @@
+import { ordinal } from "#/lib/placement/analytics";
 import type { PlacementStudent, WorkspaceProject } from "#/lib/placement/types";
+import type { StoredResult } from "#/lib/placement/workspace";
 
 /**
- * The Bids tab's per-project view (#671): every project with the students
- * who bid on it, so staff can judge a project's bidders by what they wrote
- * and pin one there before any run. Derived and never stored.
+ * The Bids tab's two views, derived and never stored. Per project (#671):
+ * every project with the students who bid on it or are pinned there, so
+ * staff can judge its bidders by what they wrote and pin one before any
+ * run. Per student (#689): where each student stands after the last run.
  */
 
 export interface ProjectBidRow {
@@ -94,23 +97,7 @@ export function projectBidRows(
     .flatMap((project) => {
       const rows = byProject.get(project.key) ?? [];
       if (rows.length === 0) {
-        return [
-          {
-            id: `${project.key}:`,
-            projectKey: project.key,
-            projectTitle: project.title,
-            email: "",
-            name: "",
-            avoid: undefined,
-            priority: null,
-            comment: "",
-            pinnedHere: false,
-            pinnedElsewhere: null,
-            preApproved: false,
-            empty: true,
-            fixed: fixed.has(project.key),
-          },
-        ];
+        return [emptyRow(project.key, project.title, fixed.has(project.key))];
       }
       return rows.sort(
         (a, b) =>
@@ -118,4 +105,139 @@ export function projectBidRows(
             (b.priority ?? Number.POSITIVE_INFINITY) || byName(a, b)
       );
     });
+}
+
+/** The one row of a project with no one to list, so it shows anyway. */
+function emptyRow(
+  projectKey: string,
+  projectTitle: string,
+  fixed: boolean
+): ProjectBidRow {
+  return {
+    id: `${projectKey}:`,
+    projectKey,
+    projectTitle,
+    email: "",
+    name: "",
+    avoid: undefined,
+    priority: null,
+    comment: "",
+    pinnedHere: false,
+    pinnedElsewhere: null,
+    preApproved: false,
+    empty: true,
+    fixed,
+  };
+}
+
+/**
+ * `projectBidRows` narrowed to the students pinned to each project (#688),
+ * in the same order. A project with none keeps one empty row, so every
+ * project still shows.
+ */
+export function pinnedRows(rows: readonly ProjectBidRow[]): ProjectBidRow[] {
+  const byProject = new Map<string, ProjectBidRow[]>();
+  for (const row of rows) {
+    const group = byProject.get(row.projectKey) ?? [];
+    group.push(row);
+    byProject.set(row.projectKey, group);
+  }
+  return [...byProject.values()].flatMap((group) => {
+    const pinned = group.filter((r) => r.pinnedHere);
+    const [first] = group;
+    return pinned.length > 0
+      ? pinned
+      : [emptyRow(first.projectKey, first.projectTitle, first.fixed)];
+  });
+}
+
+/** How a student came to be pinned to a project, as its header lists them. */
+export function pinSource(row: ProjectBidRow): string {
+  if (row.preApproved) {
+    return "pre-approved";
+  }
+  return row.priority === null ? "not in their bids" : ordinal(row.priority);
+}
+
+/**
+ * Where a student stands (#689). A pinned student stands on the pin alone,
+ * since every run keeps them there; `pending` says the last run placed them
+ * somewhere else, which the next run changes. Anyone else stands where the
+ * last run put them.
+ */
+export type Standing =
+  | { kind: "pinned"; projectKey: string; pending: boolean }
+  | {
+      kind: "placed";
+      priority: number | null;
+      projectKey: string;
+      rosterOnly: boolean;
+      team: number;
+    }
+  | { kind: "unplaced" }
+  | { kind: "not_in_run" }
+  | { kind: "no_run" };
+
+/** `student` should carry the pins in effect, the board's included. */
+export function studentStanding(
+  student: PlacementStudent,
+  result: StoredResult | undefined
+): Standing {
+  const placement = result?.placements.find((p) => p.email === student.email);
+  if (student.pin !== undefined) {
+    return {
+      kind: "pinned",
+      projectKey: student.pin,
+      pending: result !== undefined && placement?.projectKey !== student.pin,
+    };
+  }
+  if (result === undefined) {
+    return { kind: "no_run" };
+  }
+  if (placement !== undefined) {
+    return {
+      kind: "placed",
+      projectKey: placement.projectKey,
+      team: placement.team,
+      priority: placement.priority,
+      rosterOnly: student.rosterOnly ?? false,
+    };
+  }
+  return result.unplaced.some((u) => u.email === student.email)
+    ? { kind: "unplaced" }
+    : { kind: "not_in_run" };
+}
+
+/**
+ * The standing as a student's header says it. `stale` is set when the
+ * projects, parameters or bids changed since the run, which a pin does not.
+ */
+export function standingText(
+  standing: Standing,
+  titles: ReadonlyMap<string, string>,
+  stale: boolean
+): string {
+  const title = (key: string) => titles.get(key) ?? key;
+  const before = stale ? " (before your changes)" : "";
+  switch (standing.kind) {
+    case "pinned":
+      return `Pinned to ${title(standing.projectKey)}${standing.pending ? ", applies from the next run" : ""}`;
+    case "placed": {
+      let choice: string;
+      if (standing.priority === null) {
+        choice = standing.rosterOnly
+          ? "not in the survey"
+          : "not in their bids";
+      } else {
+        choice = ordinal(standing.priority);
+      }
+      return `Placed: ${title(standing.projectKey)}, team ${standing.team} (${choice})${before}`;
+    }
+    case "unplaced":
+      return `Unplaced in the last run${before}`;
+    case "not_in_run":
+      return "Not in the last run";
+    default:
+      return "No run yet";
+  }
 }

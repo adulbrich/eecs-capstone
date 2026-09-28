@@ -34,6 +34,8 @@ const searchSchema = z.object({
   tab: z.enum(TABS).default("projects"),
   /** How the Bids tab lists the bids (#671). */
   view: z.enum(BIDS_VIEWS).default("student"),
+  /** The per-project view narrowed to each project's pins (#688). */
+  pinned: z.boolean().default(false),
 });
 
 export const Route = createFileRoute("/_authed/admin/placement")({
@@ -53,7 +55,7 @@ export const Route = createFileRoute("/_authed/admin/placement")({
 
 function PlacementPage() {
   const { rows } = Route.useLoaderData();
-  const { tab, view } = Route.useSearch();
+  const { pinned, tab, view } = Route.useSearch();
   const navigate = useNavigate({ from: "/admin/placement" });
   const state = usePlacementWorkspace();
   const { workspace, bids } = state;
@@ -145,9 +147,13 @@ function PlacementPage() {
           </TabsContent>
           <TabsContent value="bids">
             <BidsTab
+              onPinnedOnly={(next) =>
+                navigate({ search: (prev) => ({ ...prev, pinned: next }) })
+              }
               onView={(next) =>
                 navigate({ search: (prev) => ({ ...prev, view: next }) })
               }
+              pinnedOnly={pinned}
               state={state}
               view={view}
               workspace={workspace}

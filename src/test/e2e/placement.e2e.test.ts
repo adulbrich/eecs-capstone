@@ -759,7 +759,8 @@ test.describe("placement workspace", () => {
     await importFiles(page);
     await page.getByRole("button", { name: "Per project" }).click();
     await expect(page).toHaveURL(/view=project/);
-    const tide = page.getByRole("rowgroup").filter({ hasText: "Tide Clock" });
+    // Anchored to the header: another group's row can name the project.
+    const tide = page.getByRole("rowgroup").filter({ hasText: /^Tide Clock/ });
     await expect(tide).toContainText("1 bid, 1 first choice");
     await expect(tide).toContainText("Tides, and");
 
@@ -769,15 +770,29 @@ test.describe("placement workspace", () => {
     await expect(
       tide.getByRole("button", { name: "Unpin Ada Park" })
     ).toBeVisible();
-    await expect(
-      page
-        .getByRole("rowgroup")
-        .filter({ hasText: "Robot Arm" })
-        .getByText("Pinned to Tide Clock")
-    ).toBeVisible();
+    const robot = page.getByRole("rowgroup").filter({ hasText: /^Robot Arm/ });
+    await expect(robot.getByText("Pinned to Tide Clock")).toBeVisible();
 
     // Ben is pinned by the bids file; Ada now by the board.
     await expect(page.getByText(/2 pinned\./)).toBeVisible();
+    // Each header names who is pinned there and how (#688).
+    await expect(tide).toContainText("Pinned: Ada Park (1st)");
+    await expect(robot).toContainText("Pinned: Ben Ito (1st)");
+
+    // Pinned only leaves each project's pins, and survives a reload.
+    await page.getByRole("switch", { name: "Pinned only" }).click();
+    await expect(page).toHaveURL(/pinned=true/);
+    await expect(robot.getByText("Pinned to Tide Clock")).toHaveCount(0);
+    await expect(robot.getByText("Ben Ito", { exact: true })).toBeVisible();
+    await page.reload();
+    await waitForHydration(page);
+    await expect(
+      page.getByRole("switch", { name: "Pinned only" })
+    ).toBeChecked();
+    await expect(robot.getByText("Ben Ito", { exact: true })).toBeVisible();
+    await expect(robot.getByText("Pinned to Tide Clock")).toHaveCount(0);
+    await page.getByRole("switch", { name: "Pinned only" }).click();
+    await expect(robot.getByText("Pinned to Tide Clock")).toBeVisible();
 
     // The pin holds through a run, as an Approve on the board would.
     await page.getByRole("tab", { name: "Parameters" }).click();
@@ -802,6 +817,53 @@ test.describe("placement workspace", () => {
       page.getByRole("row", { name: /Tide Clock.*pinned/ }).first()
     ).toBeVisible();
     await expect.poll(() => stored(page)).toContain(`"ada@${DOMAIN}":"`);
+  });
+
+  test("each student's bids say where they stand, and a pin set after a run", async ({
+    page,
+  }) => {
+    await page.goto("/admin/placement");
+    await waitForHydration(page);
+    await importFiles(page);
+    await page.getByRole("tab", { name: "Parameters" }).click();
+    await page.getByLabel("Min students").fill("1");
+    await page.getByRole("tab", { name: /Projects/ }).click();
+    await page.getByLabel("Min students per team, Robot Arm").fill("1");
+    await page.getByRole("tab", { name: /Bids/ }).click();
+    // Anchored to the header, as a per-project group can name her too.
+    const ada = page.getByRole("rowgroup").filter({ hasText: /^Ada Park/ });
+    await expect(ada).toContainText("No run yet");
+
+    await page.getByRole("tab", { name: "Results" }).click();
+    await page.getByRole("button", { name: "Run placement" }).click();
+    await expect(page.getByText("2 of 2 students placed")).toBeVisible({
+      timeout: 20_000,
+    });
+    await page.getByRole("tab", { name: /Bids/ }).click();
+    await expect(ada).toContainText("Placed: Tide Clock, team 1 (1st)");
+    await expect(
+      ada.getByRole("row", { name: /Tide Clock \(placed\)/ })
+    ).toBeVisible();
+    // Ben's pin comes from the bids file, so only the pin shows.
+    const ben = page.getByRole("rowgroup").filter({ hasText: /^Ben Ito/ });
+    await expect(ben).toContainText("Pinned to Robot Arm");
+    await expect(ben).not.toContainText("Placed:");
+
+    // A pin set after the run shows alone, and says when it takes effect.
+    await page.getByRole("button", { name: "Per project" }).click();
+    await page
+      .getByRole("button", { name: "Pin Ada Park to Robot Arm" })
+      .click();
+    const perStudent = page.getByRole("button", { name: "Per student" });
+    await perStudent.click();
+    await expect(perStudent).toHaveAttribute("aria-pressed", "true");
+    await expect(ada).toContainText(
+      "Pinned to Robot Arm, applies from the next run"
+    );
+    await expect(ada).not.toContainText("Placed:");
+    await expect(
+      ada.getByRole("row", { name: /Robot Arm \(pinned\)/ })
+    ).toBeVisible();
   });
 
   test("a Canvas roster and groups export reads as a roster with pre-approvals", async ({

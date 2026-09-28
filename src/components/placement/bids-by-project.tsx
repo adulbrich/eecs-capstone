@@ -8,7 +8,12 @@ import { RemoveStudentButton } from "#/components/placement/removed-students";
 import type { PlacementWorkspace } from "#/components/placement/use-placement-workspace";
 import { Button } from "#/components/ui/button";
 import { ordinal } from "#/lib/placement/analytics";
-import { type ProjectBidRow, projectBidRows } from "#/lib/placement/bids-view";
+import {
+  type ProjectBidRow,
+  pinnedRows,
+  pinSource,
+  projectBidRows,
+} from "#/lib/placement/bids-view";
 import type { PlacementStudent } from "#/lib/placement/types";
 import type { SortState } from "#/lib/table-state";
 import { useAdminTable } from "#/lib/use-admin-table";
@@ -35,19 +40,35 @@ function priorityLabel(row: ProjectBidRow): string {
  * the same board pin the Results tab's Approve writes.
  */
 export function BidsByProject({
+  pinnedOnly,
   state,
   students,
 }: {
+  /** Each project's pinned students alone (#688). */
+  pinnedOnly: boolean;
   state: PlacementWorkspace;
   /** The students with every pin in effect applied. */
   students: PlacementStudent[];
 }) {
   const { update } = state;
   const { navigate, search } = useLocalTableSearch();
-  const rows = useMemo(
+  const allRows = useMemo(
     () => projectBidRows(students, state.placementProjects),
     [students, state.placementProjects]
   );
+  const rows = useMemo(
+    () => (pinnedOnly ? pinnedRows(allRows) : allRows),
+    [pinnedOnly, allRows]
+  );
+  // A header counts the project's bids and lists its pins from every row,
+  // whatever the switch leaves in the table.
+  const byProject = useMemo(() => {
+    const map = new Map<string, ProjectBidRow[]>();
+    for (const row of allRows) {
+      map.set(row.projectKey, [...(map.get(row.projectKey) ?? []), row]);
+    }
+    return map;
+  }, [allRows]);
 
   const columns = useMemo(() => {
     const pin = (email: string, projectKey: string | null) =>
@@ -57,7 +78,9 @@ export function BidsByProject({
         accessorFn: (row) => row.name || row.email,
         cell: ({ row }) =>
           row.original.empty ? (
-            <span className="text-muted-foreground">No bids</span>
+            <span className="text-muted-foreground">
+              {pinnedOnly ? "No one pinned" : "No bids"}
+            </span>
           ) : (
             <div>
               <div>{row.original.name || row.original.email}</div>
@@ -163,7 +186,7 @@ export function BidsByProject({
         id: "actions",
       },
     ]);
-  }, [update]);
+  }, [update, pinnedOnly]);
 
   const { tableProps } = useAdminTable({
     columns,
@@ -181,7 +204,11 @@ export function BidsByProject({
         emptyMessage="No projects."
         getRowId={(row) => row.id}
         group={{
-          header: (groupRows) => <ProjectHeader rows={groupRows} />,
+          header: (groupRows) => (
+            <ProjectHeader
+              rows={byProject.get(groupRows[0].projectKey) ?? groupRows}
+            />
+          ),
           key: (row) => row.projectKey,
         }}
         {...tableProps}
@@ -190,19 +217,27 @@ export function BidsByProject({
   );
 }
 
+/** `rows` is every row of the project, whatever the table shows. */
 function ProjectHeader({ rows }: { rows: ProjectBidRow[] }) {
   const [first] = rows;
   const bidders = rows.filter((r) => !r.empty && r.priority !== null);
   const firstChoice = bidders.filter((r) => r.priority === 1).length;
-  const pinned = rows.filter((r) => r.pinnedHere).length;
+  const pinned = rows.filter((r) => r.pinnedHere);
   return (
     <div>
       <span className="font-medium">{first.projectTitle}</span>
       <span className="ml-2 font-normal text-muted-foreground text-xs">
         {bidders.length} {bidders.length === 1 ? "bid" : "bids"}, {firstChoice}{" "}
         first {firstChoice === 1 ? "choice" : "choices"}
-        {pinned > 0 && `, ${pinned} pinned`}
       </span>
+      {pinned.length > 0 && (
+        <p className="font-normal text-sm">
+          Pinned:{" "}
+          {pinned
+            .map((r) => `${r.name || r.email} (${pinSource(r)})`)
+            .join(", ")}
+        </p>
+      )}
       {first.fixed && (
         <p className="font-normal text-muted-foreground text-xs">
           Added from the roster: it holds only its pre-approved students, so it

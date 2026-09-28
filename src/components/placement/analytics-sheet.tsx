@@ -35,7 +35,7 @@ import {
 } from "#/lib/placement/board";
 import { downloadText } from "#/lib/placement/download";
 import type { WorkspaceProject } from "#/lib/placement/types";
-import { inputFingerprint, type Workspace } from "#/lib/placement/workspace";
+import type { Workspace } from "#/lib/placement/workspace";
 
 const percent = (share: number) => `${(share * 100).toFixed(1)}%`;
 
@@ -88,21 +88,8 @@ export function AnalyticsSheet({
     ? projectsWithoutTeam(result, projects, workspace.parameters.maxTeams)
     : [];
   const priorities = rows ? priorityDistribution(rows) : [];
-  const { bids: storedBids, parameters, titleMatches, roster } = workspace;
-  const current = useMemo(
-    () =>
-      inputFingerprint({
-        // The stored list, as the Results tab hashes it; the roster's own
-        // projects follow from the roster text, which is hashed too.
-        projects: workspace.projects,
-        parameters,
-        bids: storedBids,
-        titleMatches,
-        roster,
-      }),
-    [workspace.projects, parameters, storedBids, titleMatches, roster]
-  );
-  const stale = result !== undefined && result.fingerprint !== current;
+  const stale =
+    result !== undefined && result.fingerprint !== state.fingerprint;
 
   return (
     <Sheet>

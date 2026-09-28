@@ -63,11 +63,7 @@ import type {
   PlacementStudent,
   WorkspaceProject,
 } from "#/lib/placement/types";
-import {
-  inputFingerprint,
-  toPlacementInput,
-  type Workspace,
-} from "#/lib/placement/workspace";
+import { toPlacementInput, type Workspace } from "#/lib/placement/workspace";
 import type { SortState } from "#/lib/table-state";
 import { useAdminTable } from "#/lib/use-admin-table";
 import { useLocalTableSearch } from "#/lib/use-local-table-search";
@@ -94,26 +90,7 @@ export function ResultsTab({
     () => new Map(allProjects.map((p) => [p.key, p.title])),
     [allProjects]
   );
-  // Hashes the whole bids text, and this panel stays mounted while other
-  // tabs are edited, so it is worked out once per change to its inputs.
-  const {
-    projects,
-    parameters,
-    bids: stored,
-    titleMatches,
-    roster,
-  } = workspace;
-  const fingerprint = useMemo(
-    () =>
-      inputFingerprint({
-        projects,
-        parameters,
-        bids: stored,
-        titleMatches,
-        roster,
-      }),
-    [projects, parameters, stored, titleMatches, roster]
-  );
+  const { fingerprint } = state;
   const [running, setRunning] = useState(false);
   // A failed run, and the inputs it read: it stops being shown once they
   // change, since its diagnostics may no longer hold.
