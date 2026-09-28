@@ -578,13 +578,13 @@ function MoveTo({
         <Button
           aria-expanded={open}
           aria-label={label}
-          className="h-8 w-32 justify-between font-normal text-muted-foreground"
+          className="w-32 justify-between font-normal"
           role="combobox"
           size="sm"
           type="button"
           variant="outline"
         >
-          Move to...
+          <span className="text-muted-foreground">Move to...</span>
           <ChevronsUpDown aria-hidden="true" className="opacity-50" />
         </Button>
       </PopoverTrigger>
