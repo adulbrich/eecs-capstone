@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   applyPins,
+  bidOptions,
   bidsWithPinsCsv,
   boardRows,
   describeRun,
@@ -174,6 +175,70 @@ describe("moveTargets", () => {
     expect(titles(null, "ARM")).toEqual(["farm2Table Market", "Robot Arm"]);
     expect(titles(null, "arm robot")).toEqual(["Robot Arm"]);
     expect(titles(null, "rbt")).toEqual([]);
+  });
+});
+
+describe("bidOptions", () => {
+  const projects = [
+    { key: "z", title: "Tide Clock", weightMultiplier: 1 },
+    { key: "m", title: "Robot Arm", weightMultiplier: 1 },
+    { key: "d", title: "Arm Dropped", maxTeams: 0, weightMultiplier: 1 },
+    {
+      key: "roster:x",
+      title: "Arm Roster",
+      maxTeams: 1,
+      weightMultiplier: 1,
+      fromRoster: true,
+    },
+  ];
+  const student = {
+    email: "ada@example.edu",
+    name: "Ada Park",
+    bids: [
+      { projectKey: "gone", priority: 5, comment: "" },
+      { projectKey: "roster:x", priority: 4, comment: "" },
+      { projectKey: "d", priority: 3, comment: "" },
+      { projectKey: "m", priority: 2, comment: "arms \u{1F9BE} please" },
+      { projectKey: "z", priority: 1, comment: "tides" },
+    ],
+  };
+  const states = (current: string | null, defaultMaxTeams = 1) =>
+    bidOptions(student.bids, current, projects, defaultMaxTeams).map((o) => [
+      o.title,
+      o.state,
+    ]);
+
+  it("lists every bid first choice first, marking the placed one and what Move here can do", () => {
+    expect(states("z")).toEqual([
+      ["Tide Clock", "placed"],
+      ["Robot Arm", "movable"],
+      ["Arm Dropped", "no_teams"],
+      ["Arm Roster", "roster_only"],
+      ["gone", "not_listed"],
+    ]);
+    expect(bidOptions(student.bids, "z", projects, 1)[1]).toEqual({
+      projectKey: "m",
+      title: "Robot Arm",
+      priority: 2,
+      comment: "arms \u{1F9BE} please",
+      state: "movable",
+    });
+  });
+
+  it("marks nothing placed for an unplaced student", () => {
+    expect(states(null).map(([, state]) => state)).not.toContain("placed");
+    expect(states(null)[0]).toEqual(["Tide Clock", "movable"]);
+  });
+
+  it("reads a blank max teams as the page default", () => {
+    expect(states(null, 0).slice(0, 2)).toEqual([
+      ["Tide Clock", "no_teams"],
+      ["Robot Arm", "no_teams"],
+    ]);
+  });
+
+  it("lists nothing for a student with no bids", () => {
+    expect(bidOptions([], null, projects, 1)).toEqual([]);
   });
 });
 

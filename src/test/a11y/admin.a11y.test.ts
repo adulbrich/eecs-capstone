@@ -429,6 +429,19 @@ test("admin placement, a run on the results board", async ({ page }) => {
   });
   await checkA11y(page);
 
+  // A student's bids open under their row (#687), with Move here on each.
+  const bidsToggle = page.getByRole("button", { name: /, \d+ bids?$/ }).first();
+  await bidsToggle.click();
+  await expect(page.getByRole("region", { name: /^Bids of / })).toBeVisible();
+  await checkA11y(page);
+  // On a phone the bids join the student's card (src/styles.css).
+  await page.setViewportSize({ width: 375, height: 812 });
+  await checkA11y(page);
+  await expectNoHorizontalOverflow(page);
+  await page.setViewportSize({ width: 1280, height: 720 });
+  await bidsToggle.click();
+  await expect(page.getByRole("region", { name: /^Bids of / })).toHaveCount(0);
+
   // Move to... is a searchable combobox (#678).
   await page
     .getByRole("combobox", { name: /^Move / })

@@ -65,8 +65,9 @@ Sizes are `xs` (h-6, inline micro-actions like Post reply), `sm` (h-8, most
 contextual buttons), `default` (h-9, standalone form submits), and `lg` (h-10,
 hero / landing CTAs). Icon-only buttons use `icon-xs`, `icon-sm`, `icon`, or
 `icon-lg` to stay square. `bare` is the odd one out of the height scale: no
-height and no padding at all, for a `link` Button that sits in a panel as a
-line of text, which is what `ClearFiltersButton` uses.
+height and no padding at all, for a Button that reads as a line of text: a
+`link` one in a panel, as `ClearFiltersButton` is, or a `ghost` one that is a
+row's own title, as a student's name on the placement board is.
 
 The size variant also sets the icon size, so pass no size class on an icon
 inside a `Button`. The base class carries
@@ -720,12 +721,28 @@ still lands inside a group. On mobile the header renders as a strip above its
 cards rather than a card of its own. One level only: no nesting, collapsing or
 sorting within a group. CSV export is per-route and unaffected.
 
+### A row's detail under it
+
+`detail(row)` renders a full-width row under a data row, or nothing when it
+returns null. The page keeps which rows are open, in component state rather
+than the URL, and puts the control that opens them in a cell: a `Button` with
+`aria-expanded`, and `aria-controls` naming the detail while it is open. On
+mobile the detail joins the card above it rather than drawing a card of its
+own.
+
+It is for detail read against the row and its neighbours, where a Sheet would
+cover what the reader is comparing: the placement board's bids under a student,
+read beside the team they are on (#687). A record read or acted on alone still
+opens a Sheet, as the next section says. `detail` is the table's second
+extension after `group`; add a third only for a need neither covers.
+
 ### The line sheet
 
-Reading or acting on one request line opens a `Sheet` beside the table, never a
-row that expands inside it. `LineSheet` in `#/components/line-sheet` is the shell:
-a title, a description, a definition list of fields, the timeline, and an
-actions slot in the footer. `LineTimeline` draws the `TimelineEvent[]` that
+Reading or acting on one request line opens a `Sheet` beside the table, not a
+row's `detail` under it: a line is read and acted on alone, not against its
+neighbours (see "A row's detail under it"). `LineSheet` in
+`#/components/line-sheet` is the shell: a title, a description, a definition list
+of fields, the timeline, and an actions slot in the footer. `LineTimeline` draws the `TimelineEvent[]` that
 `lineTimeline` in `#/lib/inventory-timeline` builds from the line's own columns,
 so the staff queue and `/my/items` cannot disagree about what happened to a line.
 A row opens it through a `Details` button in its Actions cell; the sheet closes
@@ -743,11 +760,8 @@ without navigating.
 />
 ```
 
-Two things follow from choosing a sheet. `AdminDataTable` grows no expansion
-mode, which matters because the grouping mode above is already the shared
-component's one extension. And the actions get room: a fulfill flow wants more
+What choosing a sheet buys is room for the actions: a fulfill flow wants more
 than a table cell, and the sheet is where it lives rather than a seventh column.
-This is the first use of `Sheet` outside the mobile navigation drawer.
 
 ### Two empty states
 
@@ -1129,8 +1143,8 @@ under the search; #366 and #367 moved them into the search row through
 listings render the controls only in table view, from a `useAdminTable` call that
 lives in the route at every view with `seedColumns: view === "table"`, so card
 view's URL never picks up a stored column layout. Growing the table with a filters
-slot was the alternative and was declined, because the grouping mode is meant to
-be that component's one extension.
+slot was the alternative and was declined, because the table's extensions are
+meant to stay few: grouping, and since #687 a row's detail.
 
 ### Floating panel
 

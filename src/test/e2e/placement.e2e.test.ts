@@ -274,6 +274,72 @@ test.describe("placement workspace", () => {
     expect(bids).toContain(`ben@${DOMAIN},Ben Ito,,Tide Clock,,true,`);
   });
 
+  test("staff open a student's bids on the board and move them to one", async ({
+    page,
+  }) => {
+    await page.goto("/admin/placement");
+    await waitForHydration(page);
+    await importFiles(page);
+    // Ada alone can form a Tide Clock team, so only her pin can keep her
+    // off her first choice once the placement runs again.
+    await page.getByRole("tab", { name: "Parameters" }).click();
+    await page.getByLabel("Min students").fill("1");
+    await page.getByRole("tab", { name: /Projects/ }).click();
+    await page.getByLabel("Min students per team, Robot Arm").fill("1");
+    await page.getByRole("tab", { name: "Results" }).click();
+    await page.getByRole("button", { name: "Run placement" }).click();
+    await expect(page.getByText("2 of 2 students placed")).toBeVisible({
+      timeout: 20_000,
+    });
+
+    const toggle = page.getByRole("button", { name: "Ada Park, 2 bids" });
+    await expect(toggle).toHaveAttribute("aria-expanded", "false");
+    await toggle.click();
+    await expect(toggle).toHaveAttribute("aria-expanded", "true");
+    // Opening re-renders the row, not remounts it, so focus stays put.
+    await expect(toggle).toBeFocused();
+    const bids = page.getByRole("region", { name: "Bids of Ada Park" });
+    const tide = bids.getByRole("listitem").filter({ hasText: "Tide Clock" });
+    await expect(tide).toContainText("Placed here");
+    await expect(tide).toContainText("Tides, and clocks");
+    // Several open at once.
+    await page.getByRole("button", { name: "Ben Ito, 1 bid" }).click();
+    await expect(
+      page.getByRole("region", { name: "Bids of Ben Ito" })
+    ).toContainText("Placed here");
+
+    await bids
+      .getByRole("button", { name: "Move here: Ada Park to Robot Arm" })
+      .click();
+    await expect(page.getByText(/moved by hand/)).toBeVisible();
+    await expect(
+      page.getByRole("button", { name: "Unpin Ada Park" })
+    ).toBeVisible();
+    await expect(
+      bids.getByRole("listitem").filter({ hasText: "Robot Arm" })
+    ).toContainText("Placed here");
+
+    await page.getByRole("button", { name: "Run placement again" }).click();
+    await expect(page.getByText(/moved by hand/)).toBeHidden({
+      timeout: 20_000,
+    });
+    await expect(
+      page
+        .getByRole("rowgroup")
+        .filter({ hasText: "Robot Arm, team" })
+        .getByText("Ada Park", { exact: true })
+    ).toBeVisible();
+    // A project that forms no team offers no Move here, and the open list
+    // follows the Projects tab.
+    await page.getByRole("tab", { name: /Projects/ }).click();
+    await page.getByLabel("Max teams, Tide Clock").fill("0");
+    await page.getByRole("tab", { name: "Results" }).click();
+    await expect(tide).toContainText("No teams");
+    await expect(tide.getByRole("button")).toHaveCount(0);
+    await toggle.click();
+    await expect(bids).toHaveCount(0);
+  });
+
   test("an infeasible re-run explains itself and keeps the last placement", async ({
     page,
   }) => {
@@ -572,6 +638,10 @@ test.describe("placement workspace", () => {
     await expect(
       page.getByRole("row", { name: /Kim Lee.*Pinned, not in the survey/ })
     ).toBeVisible();
+    await page.getByRole("button", { name: "Kim Lee, 0 bids" }).click();
+    await expect(
+      page.getByRole("region", { name: "Bids of Kim Lee" })
+    ).toHaveText("Not in the survey; no bids.");
 
     const placement = page.waitForEvent("download");
     await page.getByRole("button", { name: "Download placement" }).click();

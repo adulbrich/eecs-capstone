@@ -476,6 +476,23 @@ a {
     padding: 0.25rem 0.25rem 0.5rem;
     text-align: left;
   }
+  /* A row's detail (`detail` in admin-data-table.tsx) belongs to the card
+     above it: the gap between them is cancelled and the two share one
+     outline, the card's last field rule dividing them. */
+  .admin-table tbody tr:has(+ tr[data-row-detail]) {
+    border-bottom-left-radius: 0;
+    border-bottom-right-radius: 0;
+  }
+  .admin-table tbody tr[data-row-detail] {
+    margin-top: -0.5rem;
+    border-top: none;
+    border-top-left-radius: 0;
+    border-top-right-radius: 0;
+  }
+  .admin-table tbody tr[data-row-detail] td {
+    display: block;
+    border-top: 1px solid var(--border);
+  }
   .admin-table tbody td {
     display: flex;
     align-items: baseline;

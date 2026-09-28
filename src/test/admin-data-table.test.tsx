@@ -6,7 +6,7 @@ import {
   screen,
   within,
 } from "@testing-library/react";
-import { useState } from "react";
+import { createContext, useContext, useState } from "react";
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import {
   type AdminColumn,
@@ -944,10 +944,93 @@ describe("group", () => {
     expect(bodies.map((b) => b.getAttribute("data-group"))).toEqual(["B"]);
   });
 
+  it("puts a row's detail directly under it, inside its group", () => {
+    const { container } = renderGrouped({
+      detail: (row) => (row.name === "beta" ? `About ${row.name}` : null),
+    });
+    const detail = container.querySelector("tr[data-row-detail]");
+    expect(detail?.closest("tbody")?.getAttribute("data-group")).toBe("B");
+    expect(detail?.previousElementSibling?.textContent).toContain("beta");
+    expect(container.querySelectorAll("tr[data-row-detail]")).toHaveLength(1);
+  });
+
   it("renders the no-match row in one plain tbody when a filter empties the table", () => {
     const { container } = renderGrouped({ data: [], filtered: true });
     expect(container.querySelectorAll("tbody")).toHaveLength(1);
     expect(container.querySelector("th[scope=rowgroup]")).toBeNull();
     expect(screen.getByText("Nothing matches these filters.")).not.toBeNull();
+  });
+});
+
+describe("detail", () => {
+  it("renders no detail rows when it returns null for every row", () => {
+    const { container } = renderTable({ detail: () => null });
+    expect(container.querySelector("tr[data-row-detail]")).toBeNull();
+    expect(container.querySelectorAll("tbody tr")).toHaveLength(DATA.length);
+  });
+
+  it("renders one full-width, unlabelled cell under the row it belongs to", () => {
+    const { container } = renderTable({
+      detail: (row) => (row.id === "2" ? <p>Alpha's detail</p> : null),
+      hidden: [],
+    });
+    const detail = container.querySelector("tr[data-row-detail]");
+    const cells = detail?.querySelectorAll("td");
+    expect(cells).toHaveLength(1);
+    expect(cells?.[0].getAttribute("colspan")).toBe("2");
+    // A data-label would draw a field name in front of it on mobile.
+    expect(cells?.[0].hasAttribute("data-label")).toBe(false);
+    expect(detail?.previousElementSibling?.textContent).toContain("Alpha");
+    expect(detail?.textContent).toBe("Alpha's detail");
+  });
+
+  it("keeps the data row mounted as its detail opens, so focus stays on the control", () => {
+    // The columns are fixed and the control reads the open state from
+    // context, as the placement board does: columns rebuilt on every toggle
+    // would remount their cells whatever the table did.
+    const Toggle = createContext<() => void>(() => undefined);
+    function OpenButton({ name }: { name: string }) {
+      const toggle = useContext(Toggle);
+      return (
+        <button onClick={toggle} type="button">
+          Open {name}
+        </button>
+      );
+    }
+    const columns: AdminColumn<Row>[] = [
+      {
+        cell: (ctx) => <OpenButton name={ctx.row.original.name} />,
+        header: "Name",
+        id: "name",
+      },
+    ];
+    function Toggling() {
+      const [open, setOpen] = useState(false);
+      return (
+        <Toggle.Provider value={() => setOpen((o) => !o)}>
+          <AdminDataTable
+            caption="Test items"
+            columns={columns}
+            data={DATA}
+            defaultSort={DEFAULT_SORT}
+            detail={(row) => (open && row.id === "2" ? "More" : null)}
+            emptyMessage="Nothing here."
+            getRowId={(row) => row.id}
+            hidden={[]}
+            onHiddenChange={vi.fn()}
+            onSortChange={vi.fn()}
+            sort={DEFAULT_SORT}
+            storageKey="test"
+          />
+        </Toggle.Provider>
+      );
+    }
+    render(<Toggling />);
+    const button = screen.getByRole("button", { name: "Open Alpha" });
+    button.focus();
+    fireEvent.click(button);
+    expect(screen.getByText("More")).not.toBeNull();
+    expect(button.isConnected).toBe(true);
+    expect(document.activeElement).toBe(button);
   });
 });
