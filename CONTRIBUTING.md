@@ -33,9 +33,11 @@ claim it        fix/ feat/ ...                                           review 
    changed, what ran locally, screenshots when a page changed (desktop and
    375px, or the opt-out line with a reason), the review passes, and the docs
    touched.
-5. **Run the review loop.** `mattpocock-skills:code-review` until a pass raises
-   nothing unanswered, then merge. No approving review is required by GitHub, so
-   this loop is the review. Record the pass count in the PR.
+5. **Run the review loop.** `mattpocock-skills:code-review` and, on any PR that
+   changes behaviour, `correctness-review` beside it, until a pass raises nothing
+   unanswered, then merge. No approving review is required by GitHub, so this loop
+   is the review. Record the pass count for each in the PR. `AGENTS.md` says what
+   exempts a PR from the correctness pass.
 6. **Clean up after the merge.** Three things outlive the branch, and each one
    has since cost somebody a debugging session:
    - **The worktree**, if the work had one: `git worktree remove <path>`. A
