@@ -291,6 +291,11 @@ test.describe("placement workspace", () => {
     await page.getByRole("button", { name: "Approve Ada Park here" }).click();
     await page.getByRole("combobox", { name: "Move Ben Ito" }).click();
     await page.getByRole("option", { name: "Tide Clock" }).click();
+    // An input change as well, as when a co-instructor lowered a project's
+    // max teams and read the old board as the new run (#680).
+    await page.getByRole("tab", { name: /Projects/ }).click();
+    await page.getByLabel("Max teams, Tide Clock").fill("1");
+    await page.getByRole("tab", { name: "Results" }).click();
     await page.getByRole("button", { name: "Run placement again" }).click();
 
     // The failure is an alert, and the board under it says it is the older
