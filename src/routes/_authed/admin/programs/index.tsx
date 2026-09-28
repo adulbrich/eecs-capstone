@@ -46,9 +46,9 @@ import { isStaff } from "#/lib/viewer";
 import { createProgram, listProgramsWithInstructors } from "#/server/programs";
 
 const searchSchema = z.object({
-  cols: z.string().optional(),
-  dir: z.enum(["asc", "desc"]).optional(),
-  sort: z.string().optional(),
+  cols: z.string().optional().catch(undefined),
+  dir: z.enum(["asc", "desc"]).optional().catch(undefined),
+  sort: z.string().optional().catch(undefined),
 });
 
 export const Route = createFileRoute("/_authed/admin/programs/")({

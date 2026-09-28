@@ -33,9 +33,9 @@ import { getTraffic } from "#/server/traffic";
 const searchSchema = z.object({
   from: z.string().regex(DAY_PATTERN).optional().catch(undefined),
   to: z.string().regex(DAY_PATTERN).optional().catch(undefined),
-  sort: z.string().optional(),
-  dir: z.enum(["asc", "desc"]).optional(),
-  cols: z.string().optional(),
+  sort: z.string().optional().catch(undefined),
+  dir: z.enum(["asc", "desc"]).optional().catch(undefined),
+  cols: z.string().optional().catch(undefined),
 });
 
 type TrafficView = Awaited<ReturnType<typeof getTraffic>>;

@@ -24,7 +24,7 @@ import {
 const STATUSES = ["all", ...PROJECT_STATUSES] as const;
 
 const searchSchema = z.object({
-  status: z.enum(STATUSES).default("all"),
+  status: z.enum(STATUSES).catch("all").default("all"),
 });
 
 export const Route = createFileRoute("/_authed/my/projects")({

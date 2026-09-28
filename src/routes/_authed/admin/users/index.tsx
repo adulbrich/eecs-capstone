@@ -39,6 +39,7 @@ import {
 import { defineCsvColumns, toCsv } from "#/lib/csv";
 import { pageTitle } from "#/lib/page-title";
 import { PAGE_SIZE_DEFAULT } from "#/lib/pagination";
+import { searchParamQuerySchema } from "#/lib/search-query";
 import type { SortState } from "#/lib/table-state";
 import { useAdminTable } from "#/lib/use-admin-table";
 import { useDebouncedDraft } from "#/lib/use-debounced-draft";
@@ -47,13 +48,13 @@ import { USER_ROLES, type UserRole } from "#/lib/vocabularies";
 import { exportUsers, listUsers } from "#/server/users";
 
 const searchSchema = z.object({
-  cols: z.string().optional(),
-  dir: z.enum(["asc", "desc"]).optional(),
-  includeBanned: z.boolean().default(true),
-  page: z.number().int().min(1).default(1),
-  q: z.string().default(""),
-  role: z.enum(USER_ROLES).nullable().default(null),
-  sort: z.string().optional(),
+  cols: z.string().optional().catch(undefined),
+  dir: z.enum(["asc", "desc"]).optional().catch(undefined),
+  includeBanned: z.boolean().catch(true).default(true),
+  page: z.number().int().min(1).catch(1).default(1),
+  q: searchParamQuerySchema,
+  role: z.enum(USER_ROLES).nullable().catch(null).default(null),
+  sort: z.string().optional().catch(undefined),
 });
 
 export const Route = createFileRoute("/_authed/admin/users/")({

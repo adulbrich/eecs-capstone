@@ -61,7 +61,7 @@ import { cancelCustomLine } from "#/server/inventory-custom";
 // Exported, with `buildColumns`, for `src/test/my-items-columns.test.tsx`,
 // which pins the default filter and that no column can sort or hide.
 export const searchSchema = z.object({
-  filter: z.enum(MY_ITEMS_FILTERS).default("open"),
+  filter: z.enum(MY_ITEMS_FILTERS).catch("open").default("open"),
 });
 
 export const Route = createFileRoute("/_authed/my/items")({

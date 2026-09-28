@@ -58,6 +58,7 @@ import {
   statusRank,
 } from "#/lib/inventory-visibility";
 import { pageTitle } from "#/lib/page-title";
+import { searchParamQuerySchema } from "#/lib/search-query";
 import { getPublicUrl } from "#/lib/storage";
 import type { SortState } from "#/lib/table-state";
 import { useAdminTable } from "#/lib/use-admin-table";
@@ -77,18 +78,18 @@ const searchSchema = z.object({
   // `.array().uuid()`; caught and treated as "no filter" instead of a
   // router error. Matches the public listing.
   categories: z.array(z.string().uuid()).max(20).catch([]).default([]),
-  cols: z.string().optional(),
-  dir: z.enum(["asc", "desc"]).optional(),
-  q: z.string().default(""),
+  cols: z.string().optional().catch(undefined),
+  dir: z.enum(["asc", "desc"]).optional().catch(undefined),
+  q: searchParamQuerySchema,
   // Client-side, unlike every other filter here: overdue is derived from the
   // deadline and now, so no query can express it. Deliberately absent from
   // loaderDeps for the same reason, since flipping it must not refetch.
-  overdueOnly: z.boolean().default(false),
+  overdueOnly: z.boolean().catch(false).default(false),
   // Staff only. Retired items are the archive: excluded from every listing by
   // default, and reachable only through this switch.
-  retiredOnly: z.boolean().default(false),
-  sort: z.string().optional(),
-  status: z.enum(ACTIVE_STATUSES).nullable().default(null),
+  retiredOnly: z.boolean().catch(false).default(false),
+  sort: z.string().optional().catch(undefined),
+  status: z.enum(ACTIVE_STATUSES).nullable().catch(null).default(null),
 });
 
 export const Route = createFileRoute("/_authed/admin/inventory/")({

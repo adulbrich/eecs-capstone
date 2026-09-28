@@ -33,6 +33,7 @@ import {
 } from "#/components/ui/pagination";
 import { pageTitle } from "#/lib/page-title";
 import { PAGE_SIZE_DEFAULT } from "#/lib/pagination";
+import { searchParamQuerySchema } from "#/lib/search-query";
 import { NOINDEX } from "#/lib/social-meta";
 import { useAdminTable } from "#/lib/use-admin-table";
 import { useSeedViewFromStorage } from "#/lib/use-seed-view";
@@ -45,23 +46,31 @@ export const searchSchema = z.object({
   // SEARCH_QUERY_MAX and the hint line under the box says so, which it
   // can only do while the URL still carries what the reader typed. A
   // `.max()` here would have been a router error on a long link, which is
-  // the shape #478 was about; a `.catch("")` would drop the search
-  // silently instead.
-  q: z.string().default(""),
+  // the shape #478 was about. `searchParamQuerySchema` says what it does
+  // with a value that is not a string.
+  q: searchParamQuerySchema,
   categories: z.array(z.string().uuid()).max(20).catch([]).default([]),
-  program: z.string().uuid().nullable().default(null),
-  archivedOnly: z.boolean().default(PROJECTS_FILTER_DEFAULTS.archivedOnly),
+  program: z.string().uuid().nullable().catch(null).default(null),
+  archivedOnly: z
+    .boolean()
+    .catch(PROJECTS_FILTER_DEFAULTS.archivedOnly)
+    .default(PROJECTS_FILTER_DEFAULTS.archivedOnly),
   // On by default, in both archive modes: one param, one default. A shared
   // link carrying no `acceptingOnly` now hides full teams, which is accepted
   // rather than shimmed (#419).
-  acceptingOnly: z.boolean().default(PROJECTS_FILTER_DEFAULTS.acceptingOnly),
+  acceptingOnly: z
+    .boolean()
+    .catch(PROJECTS_FILTER_DEFAULTS.acceptingOnly)
+    .default(PROJECTS_FILTER_DEFAULTS.acceptingOnly),
   studentProposedOnly: z
     .boolean()
+    .catch(PROJECTS_FILTER_DEFAULTS.studentProposedOnly)
     .default(PROJECTS_FILTER_DEFAULTS.studentProposedOnly),
   requiresNdaOnly: z
     .boolean()
+    .catch(PROJECTS_FILTER_DEFAULTS.requiresNdaOnly)
     .default(PROJECTS_FILTER_DEFAULTS.requiresNdaOnly),
-  page: z.number().int().min(1).default(1),
+  page: z.number().int().min(1).catch(1).default(1),
   // The server's ordering, which also decides which twenty rows make up the
   // page. Named `order` because `sort` and `dir` are the table's, below.
   //
@@ -73,7 +82,8 @@ export const searchSchema = z.object({
   // select and the prompt line below read (#424).
   order: z
     .enum(["relevance", "newest", "oldest", "title", "updated", "recommended"])
-    .optional(),
+    .optional()
+    .catch(undefined),
   // Optional so a param-less visit is detectable; the stored preference then
   // seeds it. Absent from the URL defaults to "card" at render. A value the
   // enum no longer knows (`row`, until 2026-09-02) reads as absent rather than
@@ -85,7 +95,7 @@ export const searchSchema = z.object({
   // so a stale link carrying `?sort=title&dir=asc` renders the listing
   // normally rather than raising a router error. This is the shape
   // `/my/items` already uses.
-  cols: z.string().optional(),
+  cols: z.string().optional().catch(undefined),
 });
 
 export const Route = createFileRoute("/_public/projects/")({

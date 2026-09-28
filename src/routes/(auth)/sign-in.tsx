@@ -16,11 +16,11 @@ import { pageTitle } from "#/lib/page-title";
 import { NOINDEX } from "#/lib/social-meta";
 
 const searchSchema = z.object({
-  redirect: z.string().optional(),
+  redirect: z.string().optional().catch(undefined),
   // Better Auth redirects a failed OAuth callback to errorCallbackURL with the
   // reason in `error`. Without this the param is not in the route's search
   // schema, so the page renders as if nothing went wrong.
-  error: z.string().optional(),
+  error: z.string().optional().catch(undefined),
   // Which button failed, carried in its own error URL (#579). `.catch` keeps
   // a hand-edited value from breaking the page: it reads as no provider.
   provider: z.enum(OAUTH_PROVIDERS).optional().catch(undefined),

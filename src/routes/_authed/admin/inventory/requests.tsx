@@ -51,6 +51,7 @@ import {
 import { isOpenCustomLine } from "#/lib/inventory-custom-workflow";
 import { lineTimeline } from "#/lib/inventory-timeline";
 import { pageTitle } from "#/lib/page-title";
+import { searchParamQuerySchema } from "#/lib/search-query";
 import type { SortState } from "#/lib/table-state";
 import { useAdminTable } from "#/lib/use-admin-table";
 import { useDebouncedDraft } from "#/lib/use-debounced-draft";
@@ -72,8 +73,8 @@ const STATUSES = [...INVENTORY_QUEUE_STATUSES, "all"] as const;
 const REQUEST_SEARCH_NOTE_ID = "request-search-note";
 
 const searchSchema = z.object({
-  cols: z.string().optional(),
-  dir: z.enum(["asc", "desc"]).optional(),
+  cols: z.string().optional().catch(undefined),
+  dir: z.enum(["asc", "desc"]).optional().catch(undefined),
   /**
    * A request line to bring into view, linked from the Request column on
    * `/admin/inventory`. Not in `loaderDeps`: it changes which line is
@@ -83,7 +84,7 @@ const searchSchema = z.object({
    * the plain queue rather than a 500.
    */
   line: z.string().uuid().nullable().catch(null).default(null),
-  q: z.string().default(""),
+  q: searchParamQuerySchema,
   /**
    * A request to bring into view, linked from the Requester column once the
    * reader has sorted the queue flat. Same shape and same reasoning as
@@ -91,8 +92,8 @@ const searchSchema = z.object({
    * a highlighted group.
    */
   request: z.string().uuid().nullable().catch(null).default(null),
-  sort: z.string().optional(),
-  status: z.enum(STATUSES).default("pending"),
+  sort: z.string().optional().catch(undefined),
+  status: z.enum(STATUSES).catch("pending").default("pending"),
 });
 
 export const Route = createFileRoute("/_authed/admin/inventory/requests")({

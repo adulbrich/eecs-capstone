@@ -59,6 +59,23 @@ function isLowSurrogate(code: number): boolean {
 }
 
 /**
+ * The `q` field of a route's `validateSearch` schema, which is what the URL
+ * carries rather than what the server runs.
+ *
+ * The router JSON-parses each search value, so a hand-typed `?q=2024` arrives
+ * as the number 2024 and `?q=true` as a boolean. Both go back to the text the
+ * reader typed; a bare `z.string()` threw on them, which took a public listing
+ * to the framework's error page (#609). Anything else that is not a string, an
+ * object or an array spelled in JSON, reads as no search. Uncapped, for the
+ * reason the comment on `/projects`'s `q` gives.
+ */
+export const searchParamQuerySchema = z
+  .union([z.string(), z.number(), z.boolean()])
+  .transform(String)
+  .catch("")
+  .default("");
+
+/**
  * The `q` (or `query`) field of every search schema under `src/server/`.
  *
  * It clamps rather than rejects, and it clamps on the server, so a caller
