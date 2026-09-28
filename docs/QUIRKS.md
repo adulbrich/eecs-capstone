@@ -132,7 +132,9 @@ A `getSession()` in a `beforeLoad` is a round trip on every load, and a nested p
 ### Route search params via `validateSearch`
 
 ```ts
-const searchSchema = z.object({ page: z.number().int().min(1).default(1) });
+const searchSchema = z.object({
+  page: z.number().int().min(1).catch(1).default(1),
+});
 
 export const Route = createFileRoute("/projects/")({
   validateSearch: searchSchema,
@@ -142,6 +144,8 @@ export const Route = createFileRoute("/projects/")({
 ```
 
 Search-driven loaders need `loaderDeps` so navigation with a new search param re-runs the loader.
+
+Every field takes a `.catch` (#609). A field without one fails `validateSearch` on a bad value, which is a 500 and a `Server render failed` log line, reachable by anyone with a hand-edited link. The router JSON-parses each value before the schema sees it, so no bare type is safe: `?cols=123` is a number and `?page=abc` a string. `.catch(x).default(x)` keeps the param optional for a `Link`. A `q` field is `searchParamQuerySchema` from `src/lib/search-query.ts`, which turns `?q=2024` back into the text `"2024"` rather than dropping it. `src/test/route-search-fallbacks.test.ts` fails a field under `src/routes/` without one.
 
 ### A defaulted search param is written back to the URL as its default
 
