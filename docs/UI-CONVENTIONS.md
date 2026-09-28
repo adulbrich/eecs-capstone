@@ -65,8 +65,9 @@ Sizes are `xs` (h-6, inline micro-actions like Post reply), `sm` (h-8, most
 contextual buttons), `default` (h-9, standalone form submits), and `lg` (h-10,
 hero / landing CTAs). Icon-only buttons use `icon-xs`, `icon-sm`, `icon`, or
 `icon-lg` to stay square. `bare` is the odd one out of the height scale: no
-height and no padding at all, for a `link` Button that sits in a panel as a
-line of text, which is what `ClearFiltersButton` uses.
+height and no padding at all, for a Button that reads as a line of text: a
+`link` one in a panel, as `ClearFiltersButton` is, or a `ghost` one that is a
+row's own title, as a student's name on the placement board is.
 
 The size variant also sets the icon size, so pass no size class on an icon
 inside a `Button`. The base class carries

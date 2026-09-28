@@ -609,13 +609,15 @@ function BidsToggle({
       aria-controls={expanded ? detailId(email) : undefined}
       aria-expanded={expanded}
       aria-label={`${who}, ${count} ${count === 1 ? "bid" : "bids"}`}
-      className="font-normal"
+      // Wraps as the text it replaced did: a long name, or an email standing
+      // in for one, stays inside a 375px card.
+      className="wrap-anywhere items-start whitespace-normal text-left font-normal"
       onClick={() => toggle(email)}
       size="bare"
       type="button"
       variant="ghost"
     >
-      <Chevron aria-hidden="true" />
+      <Chevron aria-hidden="true" className="mt-0.5" />
       {who}
     </Button>
   );
