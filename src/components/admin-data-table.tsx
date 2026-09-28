@@ -769,7 +769,10 @@ export function AdminDataTable<T extends RowData>({
           No data-label, so no field name is drawn in front of it there.
         */}
         <tr data-row-detail="">
-          <td className="border-b p-2" colSpan={visibleColumnCount}>
+          <td
+            className="border-b p-2 md:bg-muted/50"
+            colSpan={visibleColumnCount}
+          >
             {content}
           </td>
         </tr>
