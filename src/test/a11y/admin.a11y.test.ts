@@ -420,6 +420,23 @@ test("admin placement, a run on the results board", async ({ page }) => {
   });
   await checkA11y(page);
 
+  // Move to... is a searchable combobox (#678).
+  await page
+    .getByRole("combobox", { name: /^Move / })
+    .first()
+    .click();
+  await expect(
+    page.getByRole("combobox", { name: "Search projects" })
+  ).toBeFocused();
+  const popover = page.locator('[data-slot="popover-content"]');
+  await waitForSurfaceSettled(popover);
+  await checkA11y(page);
+  // Radix keeps the list mounted through its fade-out, and the Analytics
+  // scan below read that fading text as low contrast (the popover's side of
+  // what `closeMenu` does for a dropdown).
+  await page.keyboard.press("Escape");
+  await expect(popover).toHaveCount(0);
+
   await page.getByRole("button", { name: "Analytics" }).click();
   await expect(
     page.getByRole("dialog", { name: "Placement analytics" })

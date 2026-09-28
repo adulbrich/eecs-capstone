@@ -1,4 +1,5 @@
 import {
+  ChevronsUpDown,
   Download,
   Pin,
   PinOff,
@@ -11,16 +12,23 @@ import {
   AdminDataTable,
   defineAdminColumns,
 } from "#/components/admin-data-table";
+import { ErrorBanner } from "#/components/error-banner";
 import type { PlacementWorkspace } from "#/components/placement/use-placement-workspace";
 import { Button } from "#/components/ui/button";
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "#/components/ui/command";
 import { FieldError } from "#/components/ui/field";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "#/components/ui/select";
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "#/components/ui/popover";
 import { ordinal } from "#/lib/placement/analytics";
 import {
   applyPins,
@@ -29,6 +37,7 @@ import {
   boardRows,
   describeRun,
   moveStudent,
+  moveTargets,
   placementCsv,
   projectsWithoutTeam,
   unplacedReason,
@@ -149,6 +158,8 @@ export function ResultsTab({
   }
 
   const result = workspace.result;
+  // A failed run is shown only while the inputs it read are unchanged.
+  const failure = failed?.fingerprint === fingerprint ? failed.result : null;
   const rows = useMemo(
     () => (result ? boardRows(result, students, allProjects) : []),
     [result, students, allProjects]
@@ -220,23 +231,42 @@ export function ResultsTab({
       </div>
       {missing && <p className="mt-2 text-sm">{missing}</p>}
       <FieldError message={error} />
-      {failed && failed.fingerprint === fingerprint && (
-        <RunReport
-          lines={[
-            ...describeRun(failed.result, titles),
-            ...(result
-              ? ["The placement below is from the last run that worked."]
-              : []),
-          ]}
-          problem
-        />
+      {failed &&
+        failure === null &&
+        result === undefined &&
+        missing === null && (
+          // A run that failed after its inputs changed under it: its reasons
+          // may no longer hold, but the reader still learns it failed.
+          <p className="mt-2 text-sm">
+            The last run failed, and the projects, parameters or bids changed
+            while it ran. Run placement again.
+          </p>
+        )}
+      {failure && (
+        <ErrorBanner className="mt-4">
+          <ul className="space-y-0.5">
+            {[
+              ...describeRun(failure, titles),
+              ...(result
+                ? [
+                    "The board below still shows the last run that worked, not this one.",
+                  ]
+                : []),
+            ].map((line) => (
+              <li key={line}>{line}</li>
+            ))}
+          </ul>
+        </ErrorBanner>
       )}
       {result && (
         <Board
+          failed={failure !== null}
           projects={allProjects}
           result={result}
           rows={rows}
-          stale={result.fingerprint !== fingerprint}
+          // After a failed run the alert above says what to do; "run again"
+          // would tell the reader to repeat what just failed (#680).
+          stale={failure === null && result.fingerprint !== fingerprint}
           students={students}
           titles={titles}
           update={update}
@@ -247,11 +277,11 @@ export function ResultsTab({
   );
 }
 
-function RunReport({ lines, problem }: { lines: string[]; problem: boolean }) {
+function RunReport({ lines }: { lines: string[] }) {
   return (
     <section
       aria-label="How the run went"
-      className={`mt-4 rounded-md border px-3 py-2 text-sm ${problem ? "border-destructive/40" : ""}`}
+      className="mt-4 rounded-md border px-3 py-2 text-sm"
     >
       <ul className="space-y-0.5">
         {lines.map((line) => (
@@ -263,6 +293,7 @@ function RunReport({ lines, problem }: { lines: string[]; problem: boolean }) {
 }
 
 function Board({
+  failed,
   projects,
   result,
   rows,
@@ -272,6 +303,8 @@ function Board({
   update,
   workspace,
 }: {
+  /** The latest run failed, so this board is from an earlier one. */
+  failed: boolean;
   projects: WorkspaceProject[];
   result: NonNullable<Workspace["result"]>;
   rows: BoardRow[];
@@ -404,7 +437,12 @@ function Board({
 
   return (
     <div className="mt-4">
-      <RunReport lines={notes} problem={false} />
+      {failed && (
+        <h2 className="font-medium">
+          Last run that worked, {new Date(result.at).toLocaleString()}
+        </h2>
+      )}
+      <RunReport lines={notes} />
       <p className="mt-2 text-muted-foreground text-sm">
         Approve pins a student to the project they are on for every later run,
         over any pin from the bids file or the roster; Pin here on the Bids tab
@@ -501,31 +539,94 @@ function RowActions({
             Approve
           </Button>
         ))}
-      <Select onValueChange={onMove} value="">
-        <SelectTrigger
-          aria-label={`Move ${who}`}
-          className="h-8 w-32"
-          size="sm"
-        >
-          <SelectValue placeholder="Move to..." />
-        </SelectTrigger>
-        <SelectContent>
-          {projects
-            .filter(
-              (p) =>
-                p.key !== row.projectKey &&
-                (p.maxTeams ?? defaultMaxTeams) > 0 &&
-                // A roster project holds exactly its pre-approved students.
-                !p.fromRoster
-            )
-            .map((p) => (
-              <SelectItem key={p.key} value={p.key}>
-                {p.title}
-              </SelectItem>
-            ))}
-        </SelectContent>
-      </Select>
+      <MoveTo
+        current={row.projectKey}
+        defaultMaxTeams={defaultMaxTeams}
+        label={`Move ${who}`}
+        onMove={onMove}
+        projects={projects}
+      />
     </div>
+  );
+}
+
+/**
+ * The Move to... picker (#678): the projects by title, narrowed by any word
+ * typed, since a term's list runs to dozens of projects.
+ */
+function MoveTo({
+  current,
+  defaultMaxTeams,
+  label,
+  onMove,
+  projects,
+}: {
+  current: string | null;
+  defaultMaxTeams: number;
+  label: string;
+  onMove: (projectKey: string) => void;
+  projects: Workspace["projects"];
+}) {
+  const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState("");
+  const targets = moveTargets(projects, current, defaultMaxTeams, query);
+  const choose = (projectKey: string) => {
+    setOpen(false);
+    setQuery("");
+    onMove(projectKey);
+  };
+  return (
+    <Popover
+      onOpenChange={(next) => {
+        setOpen(next);
+        if (!next) {
+          setQuery("");
+        }
+      }}
+      open={open}
+    >
+      <PopoverTrigger asChild>
+        <Button
+          aria-expanded={open}
+          aria-label={label}
+          className="w-32 justify-between font-normal"
+          role="combobox"
+          size="sm"
+          type="button"
+          variant="outline"
+        >
+          <span className="text-muted-foreground">Move to...</span>
+          <ChevronsUpDown aria-hidden="true" className="opacity-50" />
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent align="end" className="w-72 p-0">
+        {/* The list is filtered here, by whole words anywhere in a title,
+            rather than by cmdk's fuzzy match, which keeps titles that only
+            share scattered letters with the query. */}
+        <Command shouldFilter={false}>
+          <CommandInput
+            aria-label="Search projects"
+            onValueChange={setQuery}
+            placeholder="Search projects"
+            value={query}
+          />
+          <CommandList>
+            <CommandEmpty>No project matches.</CommandEmpty>
+            <CommandGroup>
+              {targets.map((p) => (
+                <CommandItem
+                  key={p.key}
+                  onSelect={() => choose(p.key)}
+                  value={p.key}
+                >
+                  {p.title}
+                </CommandItem>
+              ))}
+            </CommandGroup>
+          </CommandList>
+        </Command>
+      </PopoverContent>
+    </Popover>
   );
 }
 
