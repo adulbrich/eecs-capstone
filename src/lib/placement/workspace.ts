@@ -455,7 +455,7 @@ export function pruneTitleMatches(
 /**
  * The workspace with `emails` taken out of placement (#679). A placement
  * shown on the board loses them at once, as a Move edits it, and is marked
- * edited; their pins stay, so a restore brings them back with them.
+ * edited. Their pins stay, and a restore brings the pins back too.
  */
 export function removeStudents(
   workspace: Workspace,
