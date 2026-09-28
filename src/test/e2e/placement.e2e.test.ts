@@ -243,7 +243,13 @@ test.describe("placement workspace", () => {
       page.getByRole("button", { name: "Unpin Ada Park" })
     ).toBeVisible();
 
+    // Move searches by any word of a title (#678). Ben is on Robot Arm, so
+    // it is not offered to him.
     await page.getByRole("combobox", { name: "Move Ben Ito" }).click();
+    const search = page.getByRole("combobox", { name: "Search projects" });
+    await search.fill("robot");
+    await expect(page.getByText("No project matches.")).toBeVisible();
+    await search.fill("clock");
     await page.getByRole("option", { name: "Tide Clock" }).click();
     await expect(page.getByText(/moved by hand/)).toBeVisible();
     await page.getByRole("button", { name: "Run placement again" }).click();
@@ -287,12 +293,21 @@ test.describe("placement workspace", () => {
     await page.getByRole("option", { name: "Tide Clock" }).click();
     await page.getByRole("button", { name: "Run placement again" }).click();
 
+    // The failure is an alert, and the board under it says it is the older
+    // run rather than asking for the run that just failed (#680).
+    const alert = page.getByRole("alert").filter({
+      hasText: "No placement satisfies every rule at once.",
+    });
+    await expect(alert).toBeVisible({ timeout: 20_000 });
+    await expect(alert).toContainText(
+      "The board below still shows the last run that worked, not this one."
+    );
     await expect(
-      page.getByText("No placement satisfies every rule at once.")
-    ).toBeVisible({ timeout: 20_000 });
-    await expect(
-      page.getByText("The placement below is from the last run that worked.")
+      page.getByRole("heading", { name: /^Last run that worked, / })
     ).toBeVisible();
+    await expect(
+      page.getByText(/Run placement again to use them/)
+    ).toBeHidden();
     await expect(page.getByText(/2 of 2 students placed/)).toBeVisible();
   });
 

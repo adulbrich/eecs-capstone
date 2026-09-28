@@ -5,6 +5,7 @@ import {
   boardRows,
   describeRun,
   moveStudent,
+  moveTargets,
   placementCsv,
   projectsWithoutTeam,
 } from "#/lib/placement/board";
@@ -140,6 +141,39 @@ describe("projectsWithoutTeam", () => {
     expect(projectsWithoutTeam(RESULT, projects, 1).map((p) => p.key)).toEqual([
       "p3",
     ]);
+  });
+});
+
+describe("moveTargets", () => {
+  const projects = [
+    { key: "z", title: "Tide Clock", weightMultiplier: 1 },
+    { key: "a", title: "farm2Table Market", weightMultiplier: 1 },
+    { key: "m", title: "Robot Arm", weightMultiplier: 1 },
+    { key: "d", title: "Arm Dropped", maxTeams: 0, weightMultiplier: 1 },
+    {
+      key: "roster:x",
+      title: "Arm Roster",
+      maxTeams: 1,
+      weightMultiplier: 1,
+      fromRoster: true,
+    },
+  ];
+  const titles = (current: string | null, query: string) =>
+    moveTargets(projects, current, 1, query).map((p) => p.title);
+
+  it("lists the other projects that can take a team, by title", () => {
+    expect(titles("z", "")).toEqual(["farm2Table Market", "Robot Arm"]);
+    expect(titles(null, "  ")).toEqual([
+      "farm2Table Market",
+      "Robot Arm",
+      "Tide Clock",
+    ]);
+  });
+
+  it("keeps the titles holding every typed word anywhere, ignoring case", () => {
+    expect(titles(null, "ARM")).toEqual(["farm2Table Market", "Robot Arm"]);
+    expect(titles(null, "arm robot")).toEqual(["Robot Arm"]);
+    expect(titles(null, "rbt")).toEqual([]);
   });
 });
 
@@ -292,7 +326,7 @@ describe("describeRun", () => {
       "3 students can be placed but the projects have 2 seats at most.",
       "At least one team per project needs 9 students, and there are 3. Turn that rule off, or drop some projects.",
       "Students are pinned to Garden Planner, which cannot reach the minimum team size.",
-      "5 students are pinned to Robot Arm, which seats 4.",
+      "5 students are pinned to Robot Arm, which seats 4. Raise its max students or max teams on the Projects tab, or unpin some.",
       "Too few students may join Garden Planner to form a team.",
     ]);
   });

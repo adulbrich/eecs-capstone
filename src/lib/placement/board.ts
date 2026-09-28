@@ -142,6 +142,32 @@ export function projectsWithoutTeam(
     .sort((a, b) => a.title.localeCompare(b.title));
 }
 
+const WHITESPACE = /\s+/;
+
+/**
+ * The projects Move offers a student on `current` (#678), by title, narrowed
+ * to those whose title holds every word of `query` anywhere, ignoring case.
+ * A project with no teams is left out, and so is one the roster added, which
+ * holds exactly its pre-approved students.
+ */
+export function moveTargets(
+  projects: readonly WorkspaceProject[],
+  current: string | null,
+  defaultMaxTeams: number,
+  query: string
+): WorkspaceProject[] {
+  const words = query.toLocaleLowerCase().split(WHITESPACE).filter(Boolean);
+  return projects
+    .filter(
+      (p) =>
+        p.key !== current &&
+        (p.maxTeams ?? defaultMaxTeams) > 0 &&
+        !p.fromRoster &&
+        words.every((w) => p.title.toLocaleLowerCase().includes(w))
+    )
+    .sort((a, b) => a.title.localeCompare(b.title));
+}
+
 /**
  * The result with one student moved by hand. The solver chooses teams and a
  * Move cannot, so the student joins the target project's smallest team (its
@@ -291,7 +317,7 @@ export function describeRun(
   }
   for (const o of d.pinOverflow) {
     lines.push(
-      `${o.pinned} students are pinned to ${titles.get(o.projectKey) ?? o.projectKey}, which seats ${o.seats}.`
+      `${o.pinned} students are pinned to ${titles.get(o.projectKey) ?? o.projectKey}, which seats ${o.seats}. Raise its max students or max teams on the Projects tab, or unpin some.`
     );
   }
   if (d.projectsBelowMin.length > 0) {
