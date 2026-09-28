@@ -741,6 +741,8 @@ test.describe("placement workspace", () => {
       .click();
     await expect(removed).toContainText("2 students");
     await page.getByRole("tab", { name: /Projects/ }).click();
+    // The tab's own table first: a count of none passes before it renders.
+    await expect(page.getByRole("cell", { name: "Tide Clock" })).toBeVisible();
     await expect(added).toHaveCount(0);
 
     const parameters = page.getByRole("tab", { name: "Parameters" });
