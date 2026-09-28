@@ -3,6 +3,7 @@ import {
   EMPTY_WORKSPACE,
   inputFingerprint,
   isEmptyWorkspace,
+  isStale,
   parseWorkspace,
   projectsFromPortal,
   pruneTitleMatches,
@@ -306,5 +307,15 @@ describe("removed students", () => {
     expect(
       isEmptyWorkspace({ ...EMPTY_WORKSPACE, removed: ["ada@example.edu"] })
     ).toBe(false);
+  });
+});
+
+describe("isStale", () => {
+  const result = { fingerprint: "abc" } as StoredResult;
+
+  it("is stale only when a result ran on other inputs", () => {
+    expect(isStale(undefined, "abc")).toBe(false);
+    expect(isStale(result, "abc")).toBe(false);
+    expect(isStale(result, "abd")).toBe(true);
   });
 });

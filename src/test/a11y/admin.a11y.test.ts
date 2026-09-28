@@ -383,6 +383,16 @@ test("@smoke admin placement, projects and bids loaded", async ({ page }) => {
     page.getByRole("button", { name: /^Pin .* to / }).first()
   ).toBeVisible();
   await checkA11y(page);
+  // Who is pinned to each project, and the Pinned only switch (#688).
+  await page
+    .getByRole("button", { name: /^Pin .* to / })
+    .first()
+    .click();
+  await expect(page.getByText(/^Pinned: /).first()).toBeVisible();
+  await page.getByRole("switch", { name: "Pinned only" }).click();
+  await expect(page.getByText("No one pinned").first()).toBeVisible();
+  await checkA11y(page);
+  await page.getByRole("switch", { name: "Pinned only" }).click();
   await page.getByRole("button", { name: "Per student" }).click();
 
   await page
@@ -476,6 +486,13 @@ test("admin placement, a run on the results board", async ({ page }) => {
   await dialog.getByRole("button", { name: "Cancel" }).click();
   await expect(dialog).toHaveCount(0);
   await closeMenu(page);
+
+  // Where each student stands after the run (#689).
+  await page.getByRole("tab", { name: /Bids/ }).click();
+  await expect(
+    page.getByText(/^(Placed|Pinned to|Unplaced)/).first()
+  ).toBeVisible();
+  await checkA11y(page);
 
   await page.getByRole("button", { name: "Analytics" }).click();
   await expect(

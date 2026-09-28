@@ -9,6 +9,7 @@ import {
 import {
   clearStoredWorkspace,
   EMPTY_WORKSPACE,
+  inputFingerprint,
   isEmptyWorkspace,
   readStoredWorkspace,
   setAsideRemoved,
@@ -131,9 +132,27 @@ export function usePlacementWorkspace() {
     };
   }, [bidsText, projects, titleMatches, roster, assignments, removed]);
 
+  // What a run reads, hashed once per change for every tab that asks
+  // whether the last run is stale. The stored project list, not the roster's
+  // additions: those follow from the roster text, which is hashed too.
+  const parameters = workspace?.parameters;
+  const fingerprint = useMemo(
+    () =>
+      inputFingerprint({
+        projects: projects ?? EMPTY_WORKSPACE.projects,
+        parameters: parameters ?? EMPTY_WORKSPACE.parameters,
+        bids: workspace?.bids ?? null,
+        titleMatches,
+        roster: storedRoster,
+      }),
+    [projects, parameters, workspace?.bids, titleMatches, storedRoster]
+  );
+
   return {
     workspace,
     bids,
+    /** `inputFingerprint` of the workspace now, to compare with a result's. */
+    fingerprint,
     roster,
     assignments,
     /**

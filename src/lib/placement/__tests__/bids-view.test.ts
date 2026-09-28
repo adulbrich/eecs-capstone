@@ -1,6 +1,13 @@
 import { describe, expect, it } from "vitest";
-import { projectBidRows } from "#/lib/placement/bids-view";
+import {
+  pinnedRows,
+  pinSource,
+  projectBidRows,
+  standingText,
+  studentStanding,
+} from "#/lib/placement/bids-view";
 import type { PlacementStudent } from "#/lib/placement/types";
+import type { StoredResult } from "#/lib/placement/workspace";
 
 // Invented names and titles only (#648).
 
@@ -111,5 +118,122 @@ describe("projectBidRows and roster projects (#670)", () => {
     );
     expect(rows.find((r) => r.projectKey === "roster:lab")?.fixed).toBe(true);
     expect(rows.find((r) => r.projectKey === "p1")?.fixed).toBe(false);
+  });
+});
+
+describe("pinnedRows and pinSource (#688)", () => {
+  const students: PlacementStudent[] = [
+    {
+      email: "ada@example.edu",
+      name: "Ada Park",
+      bids: [bid("p1", 1), bid("p2", 2)],
+      pin: "p2",
+    },
+    {
+      email: "ben@example.edu",
+      name: "Ben Ito",
+      bids: [bid("p1", 1)],
+      pin: "p3",
+    },
+    {
+      email: "kim@example.edu",
+      name: "Kim Lee",
+      bids: [],
+      pin: "p1",
+      preApproved: true,
+      rosterOnly: true,
+    },
+    { email: "cal@example.edu", name: "Cal Diaz", bids: [bid("p1", 2)] },
+  ];
+  const rows = projectBidRows(students, PROJECTS);
+
+  it("keeps only the pinned rows, and one empty row for a project with none", () => {
+    const narrowed = pinnedRows(rows);
+    expect(
+      narrowed.map((r) => [r.projectTitle, r.email, r.empty, pinSource(r)])
+    ).toEqual([
+      ["Garden Planner", "ben@example.edu", false, "not in their bids"],
+      ["Robot Arm", "ada@example.edu", false, "2nd"],
+      ["Tide Clock", "kim@example.edu", false, "pre-approved"],
+    ]);
+  });
+
+  it("leaves an empty row for every project when nobody is pinned", () => {
+    const unpinned = projectBidRows(
+      students.map(({ pin: _pin, preApproved: _pre, ...s }) => s),
+      PROJECTS
+    );
+    expect(pinnedRows(unpinned).map((r) => [r.projectTitle, r.empty])).toEqual([
+      ["Garden Planner", true],
+      ["Robot Arm", true],
+      ["Tide Clock", true],
+    ]);
+    expect(pinnedRows([])).toEqual([]);
+  });
+});
+
+describe("studentStanding and standingText (#689)", () => {
+  const titles = new Map(PROJECTS.map((p) => [p.key, p.title]));
+  const ada: PlacementStudent = {
+    email: "ada@example.edu",
+    name: "Ada Park",
+    bids: [bid("p1", 1), bid("p2", 2)],
+  };
+  const result: StoredResult = {
+    status: "optimal",
+    objective: 1,
+    gap: 0,
+    placements: [
+      { email: "ada@example.edu", projectKey: "p1", team: 2, priority: 1 },
+      { email: "kim@example.edu", projectKey: "p3", team: 1, priority: null },
+    ],
+    unplaced: [{ email: "ben@example.edu", reason: "no_eligible_project" }],
+    diagnostics: {
+      seatShortfall: null,
+      requiredSeatShortfall: null,
+      pinnedProjectsBelowMin: [],
+      pinOverflow: [],
+      projectsBelowMin: [],
+    },
+    at: "2026-09-28T12:00:00.000Z",
+    fingerprint: "x",
+  };
+  const text = (
+    student: PlacementStudent,
+    run: StoredResult | undefined,
+    stale = false
+  ) => standingText(studentStanding(student, run), titles, stale);
+
+  it("shows only the pin for a pinned student, and whether the last run disagrees", () => {
+    expect(text({ ...ada, pin: "p1" }, result)).toBe("Pinned to Tide Clock");
+    expect(text({ ...ada, pin: "p2" }, result, true)).toBe(
+      "Pinned to Robot Arm, applies from the next run"
+    );
+    expect(text({ ...ada, pin: "p2" }, undefined)).toBe("Pinned to Robot Arm");
+  });
+
+  it("shows the last placement, unplaced, not in the run, or no run", () => {
+    expect(text(ada, result)).toBe("Placed: Tide Clock, team 2 (1st)");
+    expect(text(ada, result, true)).toBe(
+      "Placed: Tide Clock, team 2 (1st) (before your changes)"
+    );
+    expect(
+      text(
+        {
+          email: "kim@example.edu",
+          name: "Kim Lee",
+          bids: [],
+          rosterOnly: true,
+        },
+        result
+      )
+    ).toBe("Placed: Garden Planner, team 1 (not in the survey)");
+    expect(text({ ...ada, email: "ben@example.edu" }, result)).toBe(
+      "Unplaced in the last run"
+    );
+    expect(text({ ...ada, email: "new@example.edu" }, result, true)).toBe(
+      "Not in the last run"
+    );
+    expect(text(ada, undefined)).toBe("No run yet");
   });
 });

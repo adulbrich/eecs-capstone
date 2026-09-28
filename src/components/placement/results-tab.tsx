@@ -64,7 +64,7 @@ import type {
   WorkspaceProject,
 } from "#/lib/placement/types";
 import {
-  inputFingerprint,
+  isStale,
   toPlacementInput,
   type Workspace,
 } from "#/lib/placement/workspace";
@@ -94,26 +94,7 @@ export function ResultsTab({
     () => new Map(allProjects.map((p) => [p.key, p.title])),
     [allProjects]
   );
-  // Hashes the whole bids text, and this panel stays mounted while other
-  // tabs are edited, so it is worked out once per change to its inputs.
-  const {
-    projects,
-    parameters,
-    bids: stored,
-    titleMatches,
-    roster,
-  } = workspace;
-  const fingerprint = useMemo(
-    () =>
-      inputFingerprint({
-        projects,
-        parameters,
-        bids: stored,
-        titleMatches,
-        roster,
-      }),
-    [projects, parameters, stored, titleMatches, roster]
-  );
+  const { fingerprint } = state;
   const [running, setRunning] = useState(false);
   // A failed run, and the inputs it read: it stops being shown once they
   // change, since its diagnostics may no longer hold.
@@ -300,7 +281,7 @@ export function ResultsTab({
           rows={rows}
           // After a failed run the alert above says what to do; "run again"
           // would tell the reader to repeat what just failed (#680).
-          stale={failure === null && result.fingerprint !== fingerprint}
+          stale={failure === null && isStale(result, fingerprint)}
           students={students}
           titles={titles}
           toggleBids={toggleBids}

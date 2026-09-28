@@ -435,6 +435,17 @@ export function inputFingerprint(
 }
 
 /**
+ * Whether the projects, parameters or bids changed since `result` ran,
+ * given `inputFingerprint` of the workspace now. False with no result.
+ */
+export function isStale(
+  result: StoredResult | undefined,
+  fingerprint: string
+): boolean {
+  return result !== undefined && result.fingerprint !== fingerprint;
+}
+
+/**
  * The title matches that still name a project, for when a new project list
  * loads: a match to a project that left falls away, and its title shows as
  * unmatched again.
