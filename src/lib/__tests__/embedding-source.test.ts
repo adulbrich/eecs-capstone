@@ -8,6 +8,10 @@ import {
   embeddingHash,
 } from "#/lib/embedding-source";
 
+/** A lone half of a surrogate pair, either half, anywhere in the string. */
+const BROKEN_PAIR =
+  /[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/;
+
 const project: EmbeddableProject = {
   title: "Autonomous Rover Telemetry",
   description: "A rover that streams sensor data.",
@@ -60,6 +64,27 @@ describe("buildProjectEmbeddingSource", () => {
       description: "x".repeat(60_000),
     });
     expect(source.length).toBe(EMBEDDING_SOURCE_LIMIT);
+  });
+
+  /**
+   * `slice` counts UTF-16 code units, so an emoji straddling the limit would
+   * leave the source ending on its high half, which `JSON.stringify` then
+   * sends to Titan as a lone `\ud83d` (#622).
+   */
+  it("never ends on half of a surrogate pair", () => {
+    const prefix = "Title: Rover\n\nDescription: ";
+    const source = buildProjectEmbeddingSource({
+      title: "Rover",
+      description: `${"x".repeat(EMBEDDING_SOURCE_LIMIT - 1 - prefix.length)}\u{1F600} tail`,
+      problemStatement: null,
+      objectives: null,
+      minQualifications: null,
+      prefQualifications: null,
+      licenseRestrictions: null,
+    });
+    expect(source.length).toBe(EMBEDDING_SOURCE_LIMIT - 1);
+    expect(source.endsWith("x")).toBe(true);
+    expect(source).not.toMatch(BROKEN_PAIR);
   });
 });
 

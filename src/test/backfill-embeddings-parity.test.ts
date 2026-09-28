@@ -90,6 +90,7 @@ const SOURCE_CODE = SOURCE_FILE.replace(/\/\*[\s\S]*?\*\//g, "").replace(
   ""
 );
 const LIMIT_PATTERN = /const EMBEDDING_SOURCE_LIMIT = ([0-9_]+);/;
+const SURROGATE_PATTERN = /const LONE_TRAILING_SURROGATE = (\/.+\/);/;
 const EMBEDDINGS_FILE = readFileSync(
   "src/server/_internal/project-embeddings.ts",
   "utf8"
@@ -317,6 +318,13 @@ describe("the production backfill's copies of the embedding helpers", () => {
     const fromSrc = LIMIT_PATTERN.exec(SOURCE_FILE)?.[1];
     const fromScript = LIMIT_PATTERN.exec(SCRIPT_FILE)?.[1];
     expect(fromSrc).toBe("20_000");
+    expect(fromScript).toBe(fromSrc);
+  });
+
+  it("drop the same half character at the cut", () => {
+    const fromSrc = SURROGATE_PATTERN.exec(SOURCE_FILE)?.[1];
+    const fromScript = SURROGATE_PATTERN.exec(SCRIPT_FILE)?.[1];
+    expect(fromSrc).toBe("/[\\uD800-\\uDBFF]$/");
     expect(fromScript).toBe(fromSrc);
   });
 
