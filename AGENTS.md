@@ -103,15 +103,15 @@ before the PR, and what each needs running.
   the diff against this file and `docs/QUIRKS.md` yourself. That is a fallback for a
   harness that lacks the tool, not a choice between equals.
 
-  That pass checks conformance, not correctness.
 - **Run `correctness-review` beside it on every PR that changes behaviour.** The
-  skill lives under `.claude/skills/` and asks what breaks the diff, with the input
-  or sequence that triggers each finding. Run it on the first pass, and again on a
-  later pass whenever the fixes since the last one changed behaviour rather than
-  wording. It follows the loop rule above: a finding is fixed or declined in writing,
-  and the PR records the pass count and any decline. A PR whose diff is prose alone
-  (docs, comments, the PR template) or a dependency bump with no source change is
-  exempt, because there is no behaviour in the diff for it to read; say so in the PR.
+  code-review pass checks conformance, not correctness. This skill lives under
+  `.claude/skills/` and asks what breaks the diff, with the input or sequence that
+  triggers each finding. Run it on the first pass, and again on a later pass
+  whenever the fixes since the last one changed behaviour rather than wording. It follows the loop rule above: a finding is fixed or declined in writing,
+  and the PR records the pass count and any decline. A PR whose diff touches only
+  documentation files, code comments or the PR template, or a dependency bump with
+  no source change, is exempt, because there is no behaviour in the diff for it to
+  read; say so in the PR. A prompt or a string literal under `src/` is behaviour.
   The conformance pass cannot stand in for it: code that follows every rule here
   can still double-submit, drop a row or leak a redirect, and that is what shipped
   when only one pass ran.
