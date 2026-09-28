@@ -1,6 +1,13 @@
-import { Undo2, UserMinus } from "lucide-react";
+import { Ellipsis, Undo2, UserMinus } from "lucide-react";
+import { ConfirmDialog } from "#/components/confirm-dialog";
 import type { PlacementWorkspace } from "#/components/placement/use-placement-workspace";
 import { Button } from "#/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "#/components/ui/dropdown-menu";
 import {
   type RemovedStudent,
   removeStudents,
@@ -8,8 +15,9 @@ import {
 } from "#/lib/placement/workspace";
 
 /**
- * Takes one student out of placement (#679): the Bids tab's two views and
- * the Results board each carry one.
+ * Takes one student out of placement (#679), from the Bids tab's two views,
+ * where the rows are about students. The Results board asks first, through
+ * `StudentMenu` (#685).
  */
 export function RemoveStudentButton({
   email,
@@ -29,8 +37,57 @@ export function RemoveStudentButton({
       variant="ghost"
     >
       <UserMinus aria-hidden="true" />
-      Remove
+      Remove from placement
     </Button>
+  );
+}
+
+/**
+ * A Results board row's actions for the student rather than the team
+ * (#685). A Remove beside Approve and Move read as "remove from this team",
+ * so it sits in this menu, and confirming says what it does.
+ */
+export function StudentMenu({
+  email,
+  name,
+  update,
+}: {
+  email: string;
+  name: string;
+  update: PlacementWorkspace["update"];
+}) {
+  const who = name || email;
+  return (
+    // Not modal, as the Columns menu is not (admin-data-table.tsx): a modal
+    // menu hides the rest of the page from assistive tech while it is open.
+    <DropdownMenu modal={false}>
+      <DropdownMenuTrigger asChild>
+        <Button
+          aria-label={`More for ${who}`}
+          size="icon-sm"
+          type="button"
+          variant="ghost"
+        >
+          <Ellipsis aria-hidden="true" />
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end">
+        <ConfirmDialog
+          busyLabel="Removing..."
+          confirmLabel="Remove from placement"
+          description={`${who} leaves every run, this board, the analytics and both downloads, not only this team. Restore brings them back from the "Removed from placement" list on the Bids tab.`}
+          onConfirm={() => update((w) => removeStudents(w, [email]))}
+          title={`Remove ${who} from placement?`}
+        >
+          {/* Kept open on select, so the dialog it opens is not unmounted
+              with the menu. */}
+          <DropdownMenuItem onSelect={(event) => event.preventDefault()}>
+            <UserMinus aria-hidden="true" />
+            Remove from placement...
+          </DropdownMenuItem>
+        </ConfirmDialog>
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 }
 

@@ -446,6 +446,24 @@ test("admin placement, a run on the results board", async ({ page }) => {
   await page.keyboard.press("Escape");
   await expect(popover).toHaveCount(0);
 
+  // Remove from placement sits in a row's More menu and asks first (#685).
+  await page
+    .getByRole("button", { name: /^More for / })
+    .first()
+    .click();
+  const menu = page.locator('[data-slot="dropdown-menu-content"]');
+  await waitForSurfaceSettled(menu);
+  await checkA11y(page);
+  await page
+    .getByRole("menuitem", { name: "Remove from placement..." })
+    .click();
+  const dialog = page.getByRole("alertdialog");
+  await waitForSurfaceSettled(dialog);
+  await checkA11y(page);
+  await dialog.getByRole("button", { name: "Cancel" }).click();
+  await expect(dialog).toHaveCount(0);
+  await closeMenu(page);
+
   await page.getByRole("button", { name: "Analytics" }).click();
   await expect(
     page.getByRole("dialog", { name: "Placement analytics" })
