@@ -5,6 +5,7 @@ import {
   mantleResponses,
   type ResponsesFn,
 } from "#/lib/_internal/bedrock-mantle";
+import { redactQueryError } from "#/lib/_internal/redact-query-error";
 import type { ReviewOutcome } from "#/lib/ai-review-limits";
 import { errorMessage } from "#/lib/error-message";
 import {
@@ -151,6 +152,8 @@ export function buildUserMessage(
   return parts.join("\n\n");
 }
 
+const FAILED = "Couldn't generate suggestions, please try again.";
+
 export function parseReviewResponse(
   response: MantleResponse,
   model: string
@@ -164,16 +167,14 @@ export function parseReviewResponse(
   }
   const toolCall = findToolCall(response.output ?? [], TOOL_NAME);
   if (!toolCall?.arguments) {
-    throw new Error("Couldn't generate suggestions, please try again.");
+    throw new Error(FAILED);
   }
   let parsed: z.infer<typeof reviewToolInputSchema>;
   try {
     // Function call arguments arrive as a JSON string, not an object.
     parsed = reviewToolInputSchema.parse(JSON.parse(toolCall.arguments));
   } catch (error) {
-    throw new Error("Couldn't generate suggestions, please try again.", {
-      cause: error,
-    });
+    throw new Error(FAILED, { cause: error });
   }
 
   const suggestions: ReviewResult["suggestions"] = {};
@@ -254,12 +255,15 @@ export async function runProjectReview(
       store: false,
     });
   } catch (error) {
+    // The thrown text is Mantle's error body or the transport detail of a
+    // failed fetch, which belongs in the log and never in a browser (#619).
+    console.error("AI review call failed", redactQueryError(error));
     // The call was attempted, so it counts even though no tokens came back.
     return {
       ...emptyRun(),
       called: true,
       outcome: "failed",
-      error: errorMessage(error, "AI review failed"),
+      error: FAILED,
     };
   }
 

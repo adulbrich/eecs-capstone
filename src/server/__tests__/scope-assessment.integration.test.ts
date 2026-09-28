@@ -1,5 +1,5 @@
 import { eq } from "drizzle-orm";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { db } from "#/db";
 import { aiReviewUsage, programs, projects, user } from "#/db/schema";
 import type { MantleResponse } from "#/lib/_internal/bedrock-mantle";
@@ -187,6 +187,26 @@ describe("the stored assessment and its staleness", () => {
       .where(eq(programs.id, program.id));
     const after = await getScopeAssessmentAs(admin, { projectId: id });
     expect(after?.stale).toBe(true);
+  });
+});
+
+describe("a failed call", () => {
+  it("reaches staff as the fixed message, with Mantle's body in the log only", async () => {
+    const admin = await makeUser(`sc-f-${Date.now()}@x.com`, "admin");
+    const { id } = await createProjectAs(admin, baseProject());
+    const logged = vi.spyOn(console, "error").mockImplementation(() => {
+      // The detail goes to the log; mantle-error-boundary.test.ts pins it.
+    });
+    const failing = () =>
+      Promise.reject(
+        new Error("Bedrock Mantle returned 403: x-amz-security-token: SECRET")
+      );
+
+    await expect(
+      assessProjectScopeAs(admin, { projectId: id }, failing)
+    ).rejects.toThrow(/^Couldn't assess the scope, please try again\.$/);
+    expect(logged.mock.calls[0]?.[1]).toContain("SECRET");
+    logged.mockRestore();
   });
 });
 

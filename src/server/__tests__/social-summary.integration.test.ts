@@ -285,9 +285,20 @@ describe("regenerateSocialSummaryAs", () => {
       socialSummaryIsManual: true,
     });
 
-    await expect(
-      regenerateSocialSummaryAs(staff, { projectId: project.id }, failing)
-    ).rejects.toThrow(/Bedrock is down/);
+    const logged = vi.spyOn(console, "error").mockImplementation(() => {
+      // The detail goes to the log; mantle-error-boundary.test.ts pins it.
+    });
+    // The fixed message, never the transport's own text (#619).
+    const refused = regenerateSocialSummaryAs(
+      staff,
+      { projectId: project.id },
+      failing
+    );
+    await expect(refused).rejects.toThrow(
+      /^Couldn't write the summary, please try again\.$/
+    );
+    expect(logged.mock.calls[0]?.[1]).toContain("Bedrock is down");
+    logged.mockRestore();
 
     const row = await readRow(project.id);
     expect(row.socialSummary).toBe("Wording staff chose.");

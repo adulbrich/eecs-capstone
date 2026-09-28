@@ -298,17 +298,19 @@ describe("the ai_write_failures metric filter in infra/alarms.tf", () => {
     async ({ counted, printed, fail }) => {
       // The interest line is the only record of that writer. The project
       // lines report a failure the refresh line already counted, so matching
-      // them would count it twice. The flag is stubbed on because the unit
-      // suite reads your dotenv files, where it may be off.
+      // them would count it twice. A failed model call also prints the core's
+      // `Social summary call failed` detail line first (#619), so every line
+      // is checked, not only the writer's own. The flag is stubbed on because
+      // the unit suite reads your dotenv files, where it may be off.
       vi.stubEnv("BEDROCK_SOCIAL_SUMMARY_ENABLED", "true");
       const error = vi
         .spyOn(console, "error")
         .mockImplementation(() => undefined);
 
       expect(await fail()).toBe("failed");
-      const line = String(error.mock.calls[0]?.[0]);
-      expect(line).toMatch(printed);
-      expect(filterMatches(line)).toBe(counted);
+      const lines = error.mock.calls.map((call) => String(call[0]));
+      expect(lines.some((line) => printed.test(line))).toBe(true);
+      expect(lines.filter(filterMatches)).toHaveLength(counted ? 1 : 0);
     }
   );
 });

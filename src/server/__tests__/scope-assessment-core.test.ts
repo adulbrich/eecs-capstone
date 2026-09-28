@@ -134,6 +134,9 @@ describe("runScopeAssessment", () => {
   });
 
   it("reports a failed call as called, so it is metered", async () => {
+    const logged = vi.spyOn(console, "error").mockImplementation(() => {
+      // mantle-error-boundary.test.ts asserts the line.
+    });
     const invoke = vi.fn<ResponsesFn>(async () => {
       throw new Error("boom");
     });
@@ -143,7 +146,8 @@ describe("runScopeAssessment", () => {
       outcome: "failed",
       result: null,
     });
-    expect(run.error).toBe("boom");
+    expect(run.error).toBe("Couldn't assess the scope, please try again.");
+    logged.mockRestore();
   });
 
   it("reports a truncated response as truncated", async () => {

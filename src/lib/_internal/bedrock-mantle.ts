@@ -144,6 +144,13 @@ function getSigner(): SignatureV4 {
 const MANTLE_TIMEOUT_MS = 60_000;
 
 /**
+ * How much of an error response's body the thrown message keeps. The message
+ * reaches the server log and nothing else (#619), and the head of the body is
+ * where Mantle names what it refused.
+ */
+const ERROR_BODY_LIMIT = 500;
+
+/**
  * Calls the OpenAI-compatible Responses API on the bedrock-mantle endpoint.
  *
  * There is no AWS SDK client for this endpoint, so this signs a plain fetch.
@@ -180,7 +187,9 @@ export const mantleResponses: ResponsesFn = async (body) => {
   }
   if (!response.ok) {
     const text = await readResponse(() => response.text());
-    throw new Error(`Bedrock Mantle returned ${response.status}: ${text}`);
+    throw new Error(
+      `Bedrock Mantle returned ${response.status}: ${text.slice(0, ERROR_BODY_LIMIT)}`
+    );
   }
   return (await readResponse(() => response.json())) as MantleResponse;
 };
