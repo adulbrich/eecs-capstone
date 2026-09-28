@@ -944,10 +944,43 @@ describe("group", () => {
     expect(bodies.map((b) => b.getAttribute("data-group"))).toEqual(["B"]);
   });
 
+  it("puts a row's detail directly under it, inside its group", () => {
+    const { container } = renderGrouped({
+      detail: (row) => (row.name === "beta" ? `About ${row.name}` : null),
+    });
+    const detail = container.querySelector("tr[data-row-detail]");
+    expect(detail?.closest("tbody")?.getAttribute("data-group")).toBe("B");
+    expect(detail?.previousElementSibling?.textContent).toContain("beta");
+    expect(container.querySelectorAll("tr[data-row-detail]")).toHaveLength(1);
+  });
+
   it("renders the no-match row in one plain tbody when a filter empties the table", () => {
     const { container } = renderGrouped({ data: [], filtered: true });
     expect(container.querySelectorAll("tbody")).toHaveLength(1);
     expect(container.querySelector("th[scope=rowgroup]")).toBeNull();
     expect(screen.getByText("Nothing matches these filters.")).not.toBeNull();
+  });
+});
+
+describe("detail", () => {
+  it("renders no detail rows when it returns null for every row", () => {
+    const { container } = renderTable({ detail: () => null });
+    expect(container.querySelector("tr[data-row-detail]")).toBeNull();
+    expect(container.querySelectorAll("tbody tr")).toHaveLength(DATA.length);
+  });
+
+  it("renders one full-width, unlabelled cell under the row it belongs to", () => {
+    const { container } = renderTable({
+      detail: (row) => (row.id === "2" ? <p>Alpha's detail</p> : null),
+      hidden: [],
+    });
+    const detail = container.querySelector("tr[data-row-detail]");
+    const cells = detail?.querySelectorAll("td");
+    expect(cells).toHaveLength(1);
+    expect(cells?.[0].getAttribute("colspan")).toBe("2");
+    // A data-label would draw a field name in front of it on mobile.
+    expect(cells?.[0].hasAttribute("data-label")).toBe(false);
+    expect(detail?.previousElementSibling?.textContent).toContain("Alpha");
+    expect(detail?.textContent).toBe("Alpha's detail");
   });
 });

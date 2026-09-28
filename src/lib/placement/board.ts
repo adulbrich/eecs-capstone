@@ -145,10 +145,24 @@ export function projectsWithoutTeam(
 const WHITESPACE = /\s+/;
 
 /**
+ * Why a Move cannot put a student on `project`, or null when it can: a
+ * project with no teams forms none, and one the roster added holds exactly
+ * its pre-approved students.
+ */
+function moveBlocked(
+  project: WorkspaceProject,
+  defaultMaxTeams: number
+): "no_teams" | "roster_only" | null {
+  if (project.fromRoster) {
+    return "roster_only";
+  }
+  return (project.maxTeams ?? defaultMaxTeams) > 0 ? null : "no_teams";
+}
+
+/**
  * The projects Move offers a student on `current` (#678), by title, narrowed
- * to those whose title holds every word of `query` anywhere, ignoring case.
- * A project with no teams is left out, and so is one the roster added, which
- * holds exactly its pre-approved students.
+ * to those whose title holds every word of `query` anywhere, ignoring case,
+ * and to those a Move can put them on.
  */
 export function moveTargets(
   projects: readonly WorkspaceProject[],
@@ -161,11 +175,57 @@ export function moveTargets(
     .filter(
       (p) =>
         p.key !== current &&
-        (p.maxTeams ?? defaultMaxTeams) > 0 &&
-        !p.fromRoster &&
+        moveBlocked(p, defaultMaxTeams) === null &&
         words.every((w) => p.title.toLowerCase().includes(w))
     )
     .sort((a, b) => a.title.localeCompare(b.title));
+}
+
+export interface BidOption {
+  comment: string;
+  priority: number;
+  projectKey: string;
+  /**
+   * `placed`: the project they are on. `movable`: Move here can put them
+   * there. The rest say why it cannot: no teams, a roster-added project, or
+   * a project no longer on the Projects tab.
+   */
+  state: "placed" | "movable" | "no_teams" | "roster_only" | "not_listed";
+  title: string;
+}
+
+/**
+ * A student's bids as the board lists them under their row (#687), first
+ * choice first, each with what Move here can do with it while they are on
+ * `current` (null when unplaced).
+ */
+export function bidOptions(
+  student: PlacementStudent,
+  current: string | null,
+  projects: readonly WorkspaceProject[],
+  defaultMaxTeams: number
+): BidOption[] {
+  const byKey = new Map(projects.map((p) => [p.key, p]));
+  return [...student.bids]
+    .sort((a, b) => a.priority - b.priority)
+    .map((bid) => {
+      const project = byKey.get(bid.projectKey);
+      let state: BidOption["state"];
+      if (bid.projectKey === current) {
+        state = "placed";
+      } else if (project === undefined) {
+        state = "not_listed";
+      } else {
+        state = moveBlocked(project, defaultMaxTeams) ?? "movable";
+      }
+      return {
+        projectKey: bid.projectKey,
+        title: project?.title ?? bid.projectKey,
+        priority: bid.priority,
+        comment: bid.comment,
+        state,
+      };
+    });
 }
 
 /**

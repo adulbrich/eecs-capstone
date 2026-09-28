@@ -15,7 +15,7 @@ import {
   useTable,
 } from "@tanstack/react-table";
 import { ChevronDown, ChevronsUpDown, ChevronUp, Columns3 } from "lucide-react";
-import { type ReactNode, useEffect, useMemo, useRef } from "react";
+import { Fragment, type ReactNode, useEffect, useMemo, useRef } from "react";
 import { EmptyState } from "#/components/empty-state";
 import { Button } from "#/components/ui/button";
 import {
@@ -298,6 +298,14 @@ export interface AdminDataTableProps<T extends RowData> {
   controls?: "inline" | "listing";
   data: T[];
   defaultSort: SortState;
+  /**
+   * Content for a full-width row under a data row, or null for none. The
+   * caller keeps which rows are open and renders the control that opens
+   * them, so the table holds no state for it. For detail read against the
+   * row and its neighbours; a record to act on alone opens a Sheet instead.
+   * See `docs/UI-CONVENTIONS.md`, "A row's detail under it".
+   */
+  detail?: (row: T) => ReactNode | null;
   /**
    * Shown alone, with no table and no controls, when there are no rows and
    * `filtered` is not set: the listing has nothing in it at all.
@@ -582,6 +590,7 @@ export function AdminDataTable<T extends RowData>({
   controls = "inline",
   data,
   defaultSort,
+  detail,
   emptyMessage,
   filtered = false,
   getRowId,
@@ -720,7 +729,8 @@ export function AdminDataTable<T extends RowData>({
 
   const renderRow = (row: Row<AdminTableFeatures, T>) => {
     const isHighlighted = !!highlightedRowId && row.id === highlightedRowId;
-    return (
+    const content = detail?.(row.original) ?? null;
+    const dataRow = (
       <TableRow
         // The documented highlight token, not a colour of its own.
         className={isHighlighted ? "bg-[var(--brand-primary-tint)]" : undefined}
@@ -746,6 +756,24 @@ export function AdminDataTable<T extends RowData>({
           );
         })}
       </TableRow>
+    );
+    if (content === null) {
+      return dataRow;
+    }
+    return (
+      <Fragment key={row.id}>
+        {dataRow}
+        {/*
+          A bare tr, as the group header is: TableRow's hover tint is for a
+          data row. `src/styles.css` joins it to the card above on mobile.
+          No data-label, so no field name is drawn in front of it there.
+        */}
+        <tr data-row-detail="">
+          <td className="border-b p-2" colSpan={visibleColumnCount}>
+            {content}
+          </td>
+        </tr>
+      </Fragment>
     );
   };
 

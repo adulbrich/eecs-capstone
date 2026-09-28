@@ -720,6 +720,20 @@ still lands inside a group. On mobile the header renders as a strip above its
 cards rather than a card of its own. One level only: no nesting, collapsing or
 sorting within a group. CSV export is per-route and unaffected.
 
+### A row's detail under it
+
+`detail(row)` renders a full-width row under a data row, or nothing when it
+returns null. The page keeps which rows are open, in component state rather
+than the URL, and puts the control that opens them in a cell: a `Button` with
+`aria-expanded`, and `aria-controls` naming the detail while it is open. On
+mobile the detail joins the card above it rather than drawing a card of its
+own.
+
+It is for detail read against the row and its neighbours, where a Sheet would
+cover what the reader is comparing: the placement board's bids under a student,
+read beside the team they are on (#687). A record read or acted on alone still
+opens a Sheet, as the next section says.
+
 ### The line sheet
 
 Reading or acting on one request line opens a `Sheet` beside the table, never a

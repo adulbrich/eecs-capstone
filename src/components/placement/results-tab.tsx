@@ -1,4 +1,7 @@
 import {
+  ArrowRightLeft,
+  ChevronDown,
+  ChevronRight,
   ChevronsUpDown,
   Download,
   Pin,
@@ -7,7 +10,7 @@ import {
   Square,
   TriangleAlert,
 } from "lucide-react";
-import { useMemo, useRef, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 import {
   AdminDataTable,
   defineAdminColumns,
@@ -33,7 +36,9 @@ import {
 import { ordinal } from "#/lib/placement/analytics";
 import {
   applyPins,
+  type BidOption,
   type BoardRow,
+  bidOptions,
   bidsWithPinsCsv,
   boardRows,
   describeRun,
@@ -318,6 +323,25 @@ function Board({
   workspace: Workspace;
 }) {
   const { navigate, search } = useLocalTableSearch();
+  // Which students show their bids: kept while the page is open, never in
+  // the workspace, and by email, so a student stays open after Move here
+  // takes them to another group.
+  const [open, setOpen] = useState<ReadonlySet<string>>(() => new Set());
+  const toggle = useCallback(
+    (email: string) =>
+      setOpen((prev) => {
+        const next = new Set(prev);
+        if (!next.delete(email)) {
+          next.add(email);
+        }
+        return next;
+      }),
+    []
+  );
+  const byEmail = useMemo(
+    () => new Map(students.map((s) => [s.email, s])),
+    [students]
+  );
   const placed = rows.filter((r) => r.projectKey !== null);
   const first = placed.filter((r) => r.priority === 1).length;
   const empty = projectsWithoutTeam(
@@ -340,23 +364,26 @@ function Board({
     ...describeRun(result, titles).slice(1),
   ];
 
-  const columns = useMemo(() => {
-    const pin = (email: string, projectKey: string | null) =>
-      update((w) => ({ ...w, pins: { ...w.pins, [email]: projectKey } }));
-    const move = (row: BoardRow, projectKey: string) => {
+  const move = useCallback(
+    (row: BoardRow, projectKey: string) => {
       // The bid's priority travels with the move, so the file and the row
       // both say which choice the new project was.
       const priority =
-        students
-          .find((s) => s.email === row.email)
-          ?.bids.find((b) => b.projectKey === projectKey)?.priority ?? null;
+        byEmail.get(row.email)?.bids.find((b) => b.projectKey === projectKey)
+          ?.priority ?? null;
       update((w) => ({
         ...w,
         pins: { ...w.pins, [row.email]: projectKey },
         result:
           w.result && moveStudent(w.result, row.email, projectKey, priority),
       }));
-    };
+    },
+    [byEmail, update]
+  );
+
+  const columns = useMemo(() => {
+    const pin = (email: string, projectKey: string | null) =>
+      update((w) => ({ ...w, pins: { ...w.pins, [email]: projectKey } }));
     return defineAdminColumns<BoardRow>()([
       {
         accessorFn: (row) => row.name || row.email,
@@ -385,6 +412,12 @@ function Board({
                 </span>
               </p>
             )}
+            <BidsToggle
+              count={byEmail.get(row.original.email)?.bids.length ?? 0}
+              expanded={open.has(row.original.email)}
+              onToggle={() => toggle(row.original.email)}
+              row={row.original}
+            />
           </div>
         ),
         enableHiding: false,
@@ -429,7 +462,15 @@ function Board({
         id: "actions",
       },
     ]);
-  }, [students, update, projects, workspace.parameters.maxTeams]);
+  }, [
+    update,
+    move,
+    projects,
+    workspace.parameters.maxTeams,
+    open,
+    byEmail,
+    toggle,
+  ]);
 
   const { tableProps } = useAdminTable({
     columns,
@@ -451,7 +492,9 @@ function Board({
         Approve pins a student to the project they are on for every later run,
         over any pin from the bids file or the roster; Pin here on the Bids tab
         does the same. Move puts the student on another project now and pins
-        them there, so later runs keep them there. Unpin frees the student from
+        them there, so later runs keep them there. Bids, under a student's name,
+        lists every project they bid on with what they wrote for it, and Move
+        here does what Move does for that project. Unpin frees the student from
         every pin, and the next run places them by their bids. A pin changes the
         next run, not the placement shown here. Remove from placement, in a
         row's More menu, takes the student off this board and out of every run,
@@ -466,6 +509,20 @@ function Board({
         <AdminDataTable
           caption="Placement by team, unplaced students first"
           data={rows}
+          detail={(row) =>
+            open.has(row.email) ? (
+              <BidsDetail
+                onMove={(key) => move(row, key)}
+                options={bidOptions(
+                  byEmail.get(row.email) ?? { ...row, bids: [] },
+                  row.projectKey,
+                  projects,
+                  workspace.parameters.maxTeams
+                )}
+                row={row}
+              />
+            ) : null
+          }
           emptyMessage="Nobody to place."
           getRowId={(row) => row.email}
           group={{
@@ -503,6 +560,128 @@ function priorityLabel(row: BoardRow): string {
     return row.pinned ? "Pinned, not in the survey" : "Not in the survey";
   }
   return row.pinned ? "Pinned, not in their bids" : "Not in their bids";
+}
+
+/**
+ * Opens a student's bids under their row (#687). One label at every width,
+ * with the state in aria-expanded, so a reader hears which way it went. The
+ * name starts with the visible text, so a voice command for it matches.
+ */
+function BidsToggle({
+  count,
+  expanded,
+  onToggle,
+  row,
+}: {
+  count: number;
+  expanded: boolean;
+  onToggle: () => void;
+  row: BoardRow;
+}) {
+  const Chevron = expanded ? ChevronDown : ChevronRight;
+  return (
+    <Button
+      aria-controls={expanded ? detailId(row.email) : undefined}
+      aria-expanded={expanded}
+      aria-label={`Bids (${count}) of ${row.name || row.email}`}
+      className="mt-1 -ml-2 font-normal"
+      onClick={onToggle}
+      size="sm"
+      type="button"
+      variant="ghost"
+    >
+      <Chevron aria-hidden="true" />
+      Bids ({count})
+    </Button>
+  );
+}
+
+const detailId = (email: string) => `placement-bids-${email}`;
+
+const BLOCKED: Record<
+  Exclude<BidOption["state"], "placed" | "movable">,
+  string
+> = {
+  no_teams: "No teams",
+  roster_only: "Holds only its pre-approved students",
+  not_listed: "Not on the Projects tab",
+};
+
+/** A student's bids under their row, each with Move here where it can. */
+function BidsDetail({
+  onMove,
+  options,
+  row,
+}: {
+  onMove: (projectKey: string) => void;
+  options: BidOption[];
+  row: BoardRow;
+}) {
+  const who = row.name || row.email;
+  return (
+    <section
+      aria-label={`Bids of ${who}`}
+      className="text-sm"
+      id={detailId(row.email)}
+    >
+      {options.length === 0 ? (
+        <p className="text-muted-foreground">
+          {row.rosterOnly ? "Not in the survey; no bids." : "No bids."}
+        </p>
+      ) : (
+        <ol className="divide-y">
+          {options.map((o) => (
+            <li
+              className="flex flex-wrap items-start gap-x-3 gap-y-1 py-1.5 md:flex-nowrap"
+              key={o.projectKey}
+            >
+              <span className="w-10 shrink-0 text-muted-foreground">
+                {ordinal(o.priority)}
+              </span>
+              <div className="min-w-0 flex-1 basis-40">
+                <div className="font-medium">{o.title}</div>
+                <div className="whitespace-pre-line text-muted-foreground">
+                  {o.comment || "No comment."}
+                </div>
+              </div>
+              <div className="shrink-0">
+                <BidAction onMove={onMove} option={o} who={who} />
+              </div>
+            </li>
+          ))}
+        </ol>
+      )}
+    </section>
+  );
+}
+
+function BidAction({
+  onMove,
+  option,
+  who,
+}: {
+  onMove: (projectKey: string) => void;
+  option: BidOption;
+  who: string;
+}) {
+  if (option.state === "placed") {
+    return <span className="font-medium">Placed here</span>;
+  }
+  if (option.state === "movable") {
+    return (
+      <Button
+        aria-label={`Move ${who} to ${option.title}`}
+        onClick={() => onMove(option.projectKey)}
+        size="sm"
+        type="button"
+        variant="outline"
+      >
+        <ArrowRightLeft aria-hidden="true" />
+        Move here
+      </Button>
+    );
+  }
+  return <span className="text-muted-foreground">{BLOCKED[option.state]}</span>;
 }
 
 function RowActions({
