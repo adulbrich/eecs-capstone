@@ -63,14 +63,18 @@ function isLowSurrogate(code: number): boolean {
  * carries rather than what the server runs.
  *
  * The router JSON-parses each search value, so a hand-typed `?q=2024` arrives
- * as the number 2024 and `?q=true` as a boolean. Both go back to the text the
- * reader typed; a bare `z.string()` threw on them, which took a public listing
- * to the framework's error page (#609). Anything else that is not a string, an
- * object or an array spelled in JSON, reads as no search. Uncapped, for the
- * reason the comment on `/projects`'s `q` gives.
+ * as the number 2024, `?q=true` as a boolean and `?q=null` as null. A bare
+ * `z.string()` threw on all three, which took a public listing to the
+ * framework's error page (#609). Each goes back to text, the value's own
+ * spelling: the reader's words unless they wrote the number another way, since
+ * `?q=1e3` reads as `1000` and the router has already dropped the original.
+ * Links the app builds are unaffected, because the router quotes a numeric
+ * string when it writes one. Anything else, an object or an array spelled in
+ * JSON, reads as no search. Uncapped, for the reason the comment on
+ * `/projects`'s `q` gives.
  */
 export const searchParamQuerySchema = z
-  .union([z.string(), z.number(), z.boolean()])
+  .union([z.string(), z.number(), z.boolean(), z.null()])
   .transform(String)
   .catch("")
   .default("");

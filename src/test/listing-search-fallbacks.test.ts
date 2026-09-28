@@ -44,6 +44,7 @@ describe.each([
   it("keeps a numeric or boolean search as the text the reader typed", () => {
     expect(parse(schema, "?q=2024").q).toBe("2024");
     expect(parse(schema, "?q=true").q).toBe("true");
+    expect(parse(schema, "?q=null").q).toBe("null");
     expect(parse(schema, "?q=rover").q).toBe("rover");
   });
 

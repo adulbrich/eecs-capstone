@@ -113,18 +113,20 @@ function scan(file: string): Scan {
     }
     result.schemas++;
     for (const property of fields.properties) {
+      const { line } = sourceFile.getLineAndCharacterOfPosition(
+        property.getStart(sourceFile)
+      );
+      const where = `${relative(process.cwd(), file)}:${line + 1}`;
+      // A spread or a computed key could carry a field this scan never sees,
+      // so it fails rather than passing unread.
       if (
         !(ts.isPropertyAssignment(property) && ts.isIdentifier(property.name))
       ) {
+        result.unguarded.push(`${where} a field this scan cannot read`);
         continue;
       }
       if (!fallsBack(property.initializer)) {
-        const { line } = sourceFile.getLineAndCharacterOfPosition(
-          property.getStart(sourceFile)
-        );
-        result.unguarded.push(
-          `${relative(process.cwd(), file)}:${line + 1} ${property.name.text}`
-        );
+        result.unguarded.push(`${where} ${property.name.text}`);
       }
     }
   }
