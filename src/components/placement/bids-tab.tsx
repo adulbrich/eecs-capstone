@@ -345,13 +345,6 @@ function StudentHeader({
   const bids = rows.filter((r) => r.priority !== null).length;
   return (
     <div>
-      <span className="float-right font-normal">
-        <RemoveStudentButton
-          email={first.email}
-          name={first.name}
-          update={update}
-        />
-      </span>
       <span className="font-medium">{first.name || first.email}</span>
       {first.name && (
         <span className="ml-2 font-normal text-muted-foreground text-xs">
@@ -362,6 +355,13 @@ function StudentHeader({
         {first.rosterOnly
           ? "on the roster, not in the survey"
           : `${bids} ${bids === 1 ? "bid" : "bids"}`}
+      </span>
+      <span className="ml-2 font-normal">
+        <RemoveStudentButton
+          email={first.email}
+          name={first.name}
+          update={update}
+        />
       </span>
       {first.preApprovedFor && (
         <span className="ml-2 font-normal text-xs">
