@@ -56,26 +56,21 @@ const hasImportIds = (grid: Grid) =>
   (grid[2] ?? []).some((cell) => importId(cell) !== undefined);
 
 /**
- * A ranking question with a column per project in the second row, which is
- * what an export still looks like once its ImportId row is gone. At least
- * two columns of one question, and never a file with the bids format's own
- * header, whose second row is a bid: one comment reading "I rank this - first"
- * must not turn a bids file into a survey.
+ * A ranking question in the second row, which is what an export still looks
+ * like once its ImportId row is gone. Never a file with the bids format's own
+ * header: its second row is a bid, and a comment reading "I rank this - first"
+ * must not turn it into a survey. Any other file would fail as bids anyway,
+ * so taking it for a survey changes only which problem it reports.
  */
 const isSurveyShaped = (grid: Grid) => {
   const header = new Set((grid[0] ?? []).map((c) => c.trim().toLowerCase()));
   if (["email", "priority", "project"].every((c) => header.has(c))) {
     return false;
   }
-  const columns = new Map<string, number>();
-  for (const question of grid[1] ?? []) {
+  return (grid[1] ?? []).some((question) => {
     const dash = question.indexOf(" - ");
-    const stem = dash === -1 ? "" : question.slice(0, dash);
-    if (stem !== "" && RANK_QUESTION.test(stem)) {
-      columns.set(stem, (columns.get(stem) ?? 0) + 1);
-    }
-  }
-  return [...columns.values()].some((n) => n >= 2);
+    return dash !== -1 && RANK_QUESTION.test(question.slice(0, dash));
+  });
 };
 
 /**

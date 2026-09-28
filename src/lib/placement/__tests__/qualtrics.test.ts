@@ -131,11 +131,6 @@ describe("isQualtricsExport", () => {
     ).toBe(false);
     expect(
       isQualtricsExport(
-        'student,choice,title,note\nada@example.edu,1,"Rank - Tide Clock",x'
-      )
-    ).toBe(false);
-    expect(
-      isQualtricsExport(
         "email,priority,project,comment\nada@example.edu,1,Rank - Tide Clock,Rank - first"
       )
     ).toBe(false);
