@@ -16,6 +16,8 @@ export interface ImportIssue {
   row: number;
   /** Every row the issue covers, when it covers more than one. */
   rows?: number[];
+  /** The problem stopped the whole file being read, not one row. */
+  wholeFile?: boolean;
 }
 
 /**
@@ -49,6 +51,11 @@ export function parseRows(text: string): {
     skipEmptyLines: "greedy",
     transformHeader: (header) => {
       const name = header.trim().toLowerCase();
+      // A column with no name is one no reader asks for, as a survey
+      // export's trailing empty columns are (#681); only a named one repeats.
+      if (name === "") {
+        return name;
+      }
       if (seen.has(name)) {
         repeated.add(name);
       }
@@ -64,6 +71,7 @@ export function parseRows(text: string): {
         level: "error",
         row: 1,
         message: `The header has "${name}" more than once; each column must appear once.`,
+        wholeFile: true,
       })),
     };
   }
@@ -88,6 +96,7 @@ export function missingColumns(
       level: "error",
       row: 1,
       message: `The file has no "${column}" column.`,
+      wholeFile: true,
     }));
 }
 

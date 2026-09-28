@@ -9,6 +9,8 @@ import type { WorkspaceProject } from "#/lib/placement/types";
  * the rest of placement reads (#656). A Qualtrics export is wide: one row
  * per response, one column per project holding its rank, and three header
  * rows (short ids, question text, ImportId JSON), so data starts on row 4.
+ * An export someone edited by hand may have lost the ImportId row (#681); it
+ * is still read, by its column names, with data from row 3.
  *
  * Columns are found by their question text rather than by QID, because QIDs
  * change whenever someone rebuilds the survey and the wording rarely does.
@@ -18,8 +20,6 @@ import type { WorkspaceProject } from "#/lib/placement/types";
  */
 
 type Grid = string[][];
-
-const FIRST_DATA_ROW = 3;
 
 interface Columns {
   avoid?: number;
@@ -52,10 +52,34 @@ function importId(cell: string | undefined): string | undefined {
   }
 }
 
-/** True when the file's third row carries Qualtrics' ImportId JSON. */
+const hasImportIds = (grid: Grid) =>
+  (grid[2] ?? []).some((cell) => importId(cell) !== undefined);
+
+/**
+ * A ranking question in the second row, which is what an export still looks
+ * like once its ImportId row is gone. Never a file with the bids format's own
+ * header: its second row is a bid, and a comment reading "I rank this - first"
+ * must not turn it into a survey. Any other file would fail as bids anyway,
+ * so taking it for a survey changes only which problem it reports.
+ */
+const isSurveyShaped = (grid: Grid) => {
+  const header = new Set((grid[0] ?? []).map((c) => c.trim().toLowerCase()));
+  if (["email", "priority", "project"].every((c) => header.has(c))) {
+    return false;
+  }
+  return (grid[1] ?? []).some((question) => {
+    const dash = question.indexOf(" - ");
+    return dash !== -1 && RANK_QUESTION.test(question.slice(0, dash));
+  });
+};
+
+/**
+ * True for a Qualtrics export: its third row carries the ImportId JSON, or,
+ * without that row, its second row holds a ranking question.
+ */
 export function isQualtricsExport(text: string): boolean {
   const { data } = Papa.parse<string[]>(text, { preview: 3 });
-  return (data[2] ?? []).some((cell) => importId(cell) !== undefined);
+  return hasImportIds(data) || isSurveyShaped(data);
 }
 
 const RANK_QUESTION = /\brank\b/i;
@@ -64,13 +88,35 @@ const AVOID_QUESTION = /prefer not to work with/i;
 const PRE_ASSIGNED_QUESTION = /pre-?assigned/i;
 const PROJECT_NAME_QUESTION = /name of your project/i;
 
+/**
+ * The metadata columns by their ImportId, and, for an export without that
+ * row, by the short name in row 1 or the label in row 2 that Qualtrics gives
+ * each of them.
+ */
+const META_COLUMNS: Record<string, [shortName: string, label: string]> = {
+  recipientEmail: ["recipientemail", "recipient email"],
+  recipientFirstName: ["recipientfirstname", "recipient first name"],
+  recipientLastName: ["recipientlastname", "recipient last name"],
+  status: ["status", "response type"],
+  finished: ["finished", "finished"],
+  recordedDate: ["recordeddate", "recorded date"],
+};
+
 function findColumns(
-  grid: Grid
+  grid: Grid,
+  withIds: boolean
 ): { columns: Columns; notes: string[] } | string {
-  const ids = (grid[2] ?? []).map(importId);
+  const ids = withIds ? (grid[2] ?? []).map(importId) : [];
+  const shortNames = (grid[0] ?? []).map((c) => c.trim().toLowerCase());
   const text = grid[1] ?? [];
+  const labels = text.map((c) => c.trim().toLowerCase());
   const byId = (id: string) => {
-    const index = ids.indexOf(id);
+    const [shortName, label] = META_COLUMNS[id] ?? ["", ""];
+    const index = withIds
+      ? ids.indexOf(id)
+      : ([shortNames.indexOf(shortName), labels.indexOf(label)].find(
+          (i) => i !== -1
+        ) ?? -1);
     return index === -1 ? undefined : index;
   };
   const email = byId("recipientEmail");
@@ -123,6 +169,11 @@ function findColumns(
   const notes = [...ignoredStems].map(
     (stem) => `Only the first ranking question is used; "${stem}" is ignored.`
   );
+  if (!withIds) {
+    notes.unshift(
+      "The export has no ImportId row (Qualtrics' third header row), so its columns were found by their names and its responses read from row 3."
+    );
+  }
   if (columns.avoid === undefined) {
     notes.push(
       'No "prefer not to work with" question was found, so no answers to it are shown.'
@@ -158,11 +209,13 @@ export function convertQualtrics(
   projects: readonly Pick<WorkspaceProject, "title">[]
 ): { csv: string; issues: ImportIssue[] } {
   const grid = Papa.parse<string[]>(text, { skipEmptyLines: "greedy" }).data;
-  const found = findColumns(grid);
+  const withIds = hasImportIds(grid);
+  const firstDataRow = withIds ? 3 : 2;
+  const found = findColumns(grid, withIds);
   if (typeof found === "string") {
     return {
       csv: "",
-      issues: [{ level: "error", row: 1, message: found }],
+      issues: [{ level: "error", row: 1, message: found, wholeFile: true }],
     };
   }
   const { columns } = found;
@@ -176,8 +229,8 @@ export function convertQualtrics(
   // The latest response per email wins; earlier ones are reported.
   const latest = new Map<string, { recorded: string; row: number }>();
   const responses: { email: string; row: number; values: string[] }[] = [];
-  grid.slice(FIRST_DATA_ROW).forEach((values, index) => {
-    const row = index + FIRST_DATA_ROW + 1;
+  grid.slice(firstDataRow).forEach((values, index) => {
+    const row = index + firstDataRow + 1;
     if (PREVIEW.has(at(values, columns.status).toLowerCase())) {
       issues.push({
         level: "warning",

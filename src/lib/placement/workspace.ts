@@ -195,6 +195,7 @@ const workspaceSchema = z
               message: z.string(),
               row: z.number().int(),
               rows: z.array(z.number().int()).optional(),
+              wholeFile: z.boolean().optional(),
             })
           )
           .optional(),
