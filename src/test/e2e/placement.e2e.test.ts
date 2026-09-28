@@ -706,6 +706,77 @@ test.describe("placement workspace", () => {
     ).toBeVisible();
   });
 
+  test("staff remove students from placement, and restore them", async ({
+    page,
+  }) => {
+    await page.goto("/admin/placement");
+    await waitForHydration(page);
+    await importFiles(page);
+    // Kim is pre-approved for a project the list lacks, and Ben answered the
+    // survey but is not on the roster, as a student who transferred out is.
+    await page.getByLabel("Roster CSV file").setInputFiles({
+      name: "roster.csv",
+      mimeType: "text/csv",
+      buffer: Buffer.from(
+        `email,name,project\nada@${DOMAIN},Ada Park,\nkim@${DOMAIN},Kim Lee,Moon Base\n`
+      ),
+    });
+    const roster = page.getByRole("region", { name: /Class roster/ });
+    await roster.getByRole("button", { name: "Remove this student" }).click();
+    const removed = page.getByRole("region", {
+      name: /Removed from placement/,
+    });
+    await expect(removed).toContainText(`Ben Ito (ben@${DOMAIN})`);
+    await expect(page.getByRole("rowheader", { name: /Ben Ito/ })).toHaveCount(
+      0
+    );
+
+    // A removed pre-approval takes its roster-added project with it.
+    await page.getByRole("tab", { name: /Projects/ }).click();
+    const added = page.getByRole("region", { name: "Added from the roster" });
+    await expect(added).toContainText("Moon Base");
+    await page.getByRole("tab", { name: /Bids/ }).click();
+    await page
+      .getByRole("button", { name: "Remove Kim Lee from placement" })
+      .click();
+    await expect(removed).toContainText("2 students");
+    await page.getByRole("tab", { name: /Projects/ }).click();
+    // The tab's own table first: a count of none passes before it renders.
+    await expect(page.getByRole("cell", { name: "Tide Clock" })).toBeVisible();
+    await expect(added).toHaveCount(0);
+
+    const parameters = page.getByRole("tab", { name: "Parameters" });
+    await parameters.click();
+    await expect(parameters).toHaveAttribute("aria-selected", "true");
+    await page.getByLabel("Min students").fill("1");
+    await page.getByRole("tab", { name: "Results" }).click();
+    await page.getByRole("button", { name: "Run placement" }).click();
+    await expect(page.getByText("1 of 1 students placed")).toBeVisible({
+      timeout: 20_000,
+    });
+    await page
+      .getByRole("button", { name: "Remove Ada Park from placement" })
+      .click();
+    await expect(page.getByText(/moved or removed by hand/)).toBeVisible();
+    await expect(page.getByText("Ada Park")).toHaveCount(0);
+
+    // New bids keep the removals.
+    await page.getByRole("tab", { name: /Bids/ }).click();
+    await page.getByRole("button", { name: "Remove bids" }).click();
+    await page.getByRole("button", { name: "Remove", exact: true }).click();
+    await page.getByLabel("Bids CSV file").setInputFiles({
+      name: "bids.csv",
+      mimeType: "text/csv",
+      buffer: Buffer.from(BIDS_CSV),
+    });
+    await expect(removed).toContainText("3 students");
+    await removed.getByRole("button", { name: "Restore Ben Ito" }).click();
+    await expect(
+      page.getByRole("rowheader", { name: /Ben Ito/ })
+    ).toBeVisible();
+    await expect(removed).toContainText("2 students");
+  });
+
   test("clearing all data empties the stored workspace after a confirmation", async ({
     page,
   }) => {

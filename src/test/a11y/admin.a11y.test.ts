@@ -394,6 +394,15 @@ test("@smoke admin placement, projects and bids loaded", async ({ page }) => {
   ).toBeVisible();
   await checkA11y(page);
 
+  // The survey students the roster lacks, removed from placement (#679).
+  await page
+    .getByRole("button", { name: /^Remove (this student|these \d+ students)$/ })
+    .click();
+  await expect(
+    page.getByRole("region", { name: /Removed from placement/ })
+  ).toBeVisible();
+  await checkA11y(page);
+
   await page.getByRole("tab", { name: "Parameters" }).click();
   await expect(page.getByLabel("Min students")).toBeVisible();
   await checkA11y(page);

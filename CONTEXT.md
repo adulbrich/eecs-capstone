@@ -295,6 +295,13 @@ pre-approved project missing from the list joins placement holding just its
 pre-approved students.
 _Avoid_: pre-assignment, reservation, override
 
+**Removed student**:
+A student staff took out of placement by hand, such as one who transferred to
+another section. A removed student is in no run, on no board and in no download
+until staff restore them, whatever bids or roster come later, and their
+pre-approval goes with them.
+_Avoid_: excluded, dropped, withdrawn, deleted
+
 **Title match**:
 Staff's word that a bid's project title, as the survey spells it, means one of the
 projects. Bids name projects by title, and a survey may cut a title short or spell it

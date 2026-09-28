@@ -6,7 +6,11 @@ import {
   parseWorkspace,
   projectsFromPortal,
   pruneTitleMatches,
+  removeStudents,
+  restoreStudent,
+  type StoredResult,
   serializeWorkspace,
+  setAsideRemoved,
   toPlacementInput,
   type Workspace,
 } from "#/lib/placement/workspace";
@@ -201,5 +205,106 @@ describe("the roster", () => {
 
   it("keeps a workspace that holds only a roster from counting as empty", () => {
     expect(isEmptyWorkspace({ ...EMPTY_WORKSPACE, roster })).toBe(false);
+  });
+});
+
+describe("removed students", () => {
+  const result: StoredResult = {
+    at: "2026-09-28T10:00:00.000Z",
+    fingerprint: "f",
+    status: "optimal",
+    gap: null,
+    objective: 100,
+    placements: [
+      {
+        email: "ada@example.edu",
+        projectKey: "robot arm",
+        team: 1,
+        priority: 1,
+      },
+      {
+        email: "kim@example.edu",
+        projectKey: "robot arm",
+        team: 1,
+        priority: 2,
+      },
+    ],
+    unplaced: [{ email: "cy@example.edu", reason: "no_eligible_project" }],
+    diagnostics: {
+      pinnedProjectsBelowMin: [],
+      pinOverflow: [],
+      projectsBelowMin: [],
+      requiredSeatShortfall: null,
+      seatShortfall: null,
+    },
+  };
+
+  it("take students off the shown placement and mark it edited", () => {
+    const next = removeStudents({ ...WORKSPACE, result }, [
+      "kim@example.edu",
+      "cy@example.edu",
+    ]);
+    expect(next.removed).toEqual(["cy@example.edu", "kim@example.edu"]);
+    expect(next.result?.placements.map((p) => p.email)).toEqual([
+      "ada@example.edu",
+    ]);
+    expect(next.result?.unplaced).toEqual([]);
+    expect(next.result?.edited).toBe(true);
+  });
+
+  it("leave a placement they were not on as it was", () => {
+    const next = removeStudents({ ...WORKSPACE, result }, ["zed@example.edu"]);
+    expect(next.result).toBe(result);
+    expect(removeStudents(next, ["zed@example.edu"]).removed).toEqual([
+      "zed@example.edu",
+    ]);
+  });
+
+  it("come back one at a time, and the list goes once it is empty", () => {
+    const next = removeStudents(WORKSPACE, [
+      "ada@example.edu",
+      "kim@example.edu",
+    ]);
+    expect(restoreStudent(next, "kim@example.edu").removed).toEqual([
+      "ada@example.edu",
+    ]);
+    expect(
+      restoreStudent(restoreStudent(next, "kim@example.edu"), "ada@example.edu")
+        .removed
+    ).toBe(undefined);
+  });
+
+  it("are set aside from the students, named when the bids or roster list them", () => {
+    const students = [
+      { email: "ada@example.edu", name: "Ada Park", bids: [] },
+      { email: "kim@example.edu", name: "Kim Lee", bids: [] },
+    ];
+    const aside = setAsideRemoved(students, [
+      "kim@example.edu",
+      "gone@example.edu",
+    ]);
+    expect(aside.kept.map((s) => s.email)).toEqual(["ada@example.edu"]);
+    expect(aside.removed).toEqual([
+      { email: "kim@example.edu", name: "Kim Lee", listed: true },
+      { email: "gone@example.edu", name: "", listed: false },
+    ]);
+  });
+
+  it("are read in lowercase from a hand-edited file, as the parsers write emails", () => {
+    const parsed = parseWorkspace(
+      JSON.stringify({ ...WORKSPACE, removed: ["Ada@Example.edu"] })
+    );
+    expect(parsed.ok && parsed.workspace.removed).toEqual(["ada@example.edu"]);
+  });
+
+  it("round-trip through a file and keep a workspace from counting as empty", () => {
+    const workspace = { ...WORKSPACE, removed: ["ada@example.edu"] };
+    expect(parseWorkspace(serializeWorkspace(workspace))).toEqual({
+      ok: true,
+      workspace,
+    });
+    expect(
+      isEmptyWorkspace({ ...EMPTY_WORKSPACE, removed: ["ada@example.edu"] })
+    ).toBe(false);
   });
 });

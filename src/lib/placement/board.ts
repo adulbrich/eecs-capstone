@@ -169,6 +169,27 @@ export function moveTargets(
 }
 
 /**
+ * The result without `emails` (#679), marked edited when that took anyone
+ * off it: removed students leave the shown placement at once, as a Move
+ * changes it at once. The same result when none of them was on it.
+ */
+export function removeFromResult(
+  result: StoredResult,
+  emails: readonly string[]
+): StoredResult {
+  const gone = new Set(emails);
+  const placements = result.placements.filter((p) => !gone.has(p.email));
+  const unplaced = result.unplaced.filter((u) => !gone.has(u.email));
+  if (
+    placements.length === result.placements.length &&
+    unplaced.length === result.unplaced.length
+  ) {
+    return result;
+  }
+  return { ...result, edited: true, placements, unplaced };
+}
+
+/**
  * The result with one student moved by hand. The solver chooses teams and a
  * Move cannot, so the student joins the target project's smallest team (its
  * first, if none formed) and the result is marked edited until the next run
