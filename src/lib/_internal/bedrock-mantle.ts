@@ -151,6 +151,29 @@ const MANTLE_TIMEOUT_MS = 60_000;
 const ERROR_BODY_LIMIT = 500;
 
 /**
+ * A signed header's value as a signature-mismatch body can echo it back in the
+ * canonical request. The value runs to the end of its line, or to a quote or
+ * backslash when the body is JSON carrying the request as an escaped string.
+ */
+const SIGNED_SECRET =
+  /(x-amz-security-token|authorization)(\s*[:=]\s*)[^\r\n"\\]*/gi;
+
+const LINE_BREAKS = /[\r\n]+/g;
+
+/**
+ * The error body as the log gets it. The session token is useless without the
+ * task role's secret key, but it does not belong in CloudWatch either
+ * (ADR-0042). Newlines go because each one starts a new log event, and the
+ * `ai_write_failures` filter counts events by how they start.
+ */
+function errorBodyForLog(text: string): string {
+  return text
+    .replace(SIGNED_SECRET, "$1$2[redacted]")
+    .replace(LINE_BREAKS, " ")
+    .slice(0, ERROR_BODY_LIMIT);
+}
+
+/**
  * Calls the OpenAI-compatible Responses API on the bedrock-mantle endpoint.
  *
  * There is no AWS SDK client for this endpoint, so this signs a plain fetch.
@@ -188,7 +211,7 @@ export const mantleResponses: ResponsesFn = async (body) => {
   if (!response.ok) {
     const text = await readResponse(() => response.text());
     throw new Error(
-      `Bedrock Mantle returned ${response.status}: ${text.slice(0, ERROR_BODY_LIMIT)}`
+      `Bedrock Mantle returned ${response.status}: ${errorBodyForLog(text)}`
     );
   }
   return (await readResponse(() => response.json())) as MantleResponse;

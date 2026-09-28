@@ -9,7 +9,12 @@ import { runSocialSummary } from "../_internal/social-summary-core";
  * stubbed `fetch`, so the thrown text is the one production builds rather
  * than a message this file made up.
  */
-const SECRET_BODY = `x-amz-security-token: SECRET\n${"y".repeat(600)}TAIL`;
+const SECRET_BODY = [
+  "The request signature we calculated does not match.",
+  "authorization:AWS4-HMAC-SHA256 Credential=AKID/20260928, Signature=abc",
+  "x-amz-security-token:SECRET",
+  `${"y".repeat(600)}TAIL`,
+].join("\n");
 
 const RUNNERS = [
   {
@@ -58,8 +63,12 @@ describe.each(RUNNERS)("a failed Mantle call in $feature", ({ fixed, run }) => {
     expect(line).toHaveLength(1);
     expect(typeof line?.[0]).toBe("string");
     expect(line?.[0]).toContain("403");
-    expect(line?.[0]).toContain("x-amz-security-token: SECRET");
-    // The body is cut at 500 characters, so what follows never reaches it.
+    expect(line?.[0]).toContain("signature we calculated does not match");
+    // The signed values are redacted, and the body is one line cut at 500
+    // characters, so what follows the cut never reaches it.
+    expect(line?.[0]).toContain("x-amz-security-token:[redacted]");
+    expect(line?.[0]).toContain("authorization:[redacted]");
+    expect(line?.[0]).not.toMatch(/SECRET|Credential|\n/);
     expect(line?.[0]).not.toContain("TAIL");
   });
 
