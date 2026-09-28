@@ -150,27 +150,57 @@ const MANTLE_TIMEOUT_MS = 60_000;
  */
 const ERROR_BODY_LIMIT = 500;
 
-/**
- * A signed header's value as an error body can echo it: `name:value` in a
- * canonical request, `name=value` in a query string, or `"name":"value"` in
- * JSON. The value runs to the end of its line, a quote or an `&`. A backslash ends
- * it too, since JSON escapes a line break as `\n`, except in `\/`, which is
- * how some encoders write the `/` a base64 token carries.
- */
-const SIGNED_SECRET =
-  /(x-amz-security-token|authorization)(["']?\s*[:=]\s*["']?)(?:\\\/|[^\r\n"'&\\])*/gi;
+/** The signed headers whose values an error body must never carry to a log. */
+const SIGNED_SECRET_HEADERS = ["x-amz-security-token", "authorization"];
 
 const LINE_BREAKS = /[\r\n]+/g;
+
+const PERCENT_ESCAPE = /%[0-9A-F]{2}/g;
+
+/**
+ * Removes this request's own signed values from an error body, in every
+ * spelling a body can echo them in: as sent, with `/` escaped as `\/` or
+ * `\u002f` the way a JSON encoder may write the `/` a base64 token carries, and
+ * percent-encoded in either case of hex. By value rather than by header name,
+ * so the framing around it (a canonical request, a query string, JSON, JSON
+ * inside a JSON string) cannot hide it; a name-matching pattern leaked through
+ * two framings in review. It covers what this process sent, so a body that
+ * echoed only a fragment of the token would still show that fragment.
+ */
+export function redactSignedValues(
+  text: string,
+  headers: Record<string, string>
+): string {
+  let redacted = text;
+  for (const [name, value] of Object.entries(headers)) {
+    if (!(value && SIGNED_SECRET_HEADERS.includes(name.toLowerCase()))) {
+      continue;
+    }
+    const encoded = encodeURIComponent(value);
+    const spellings = [
+      value,
+      value.replaceAll("/", "\\/"),
+      value.replaceAll("/", "\\u002f"),
+      value.replaceAll("/", "\\u002F"),
+      encoded,
+      encoded.replace(PERCENT_ESCAPE, (hex) => hex.toLowerCase()),
+    ];
+    for (const spelling of spellings) {
+      redacted = redacted.replaceAll(spelling, "[redacted]");
+    }
+  }
+  return redacted;
+}
 
 /**
  * The error body as the log gets it. The session token is useless without the
  * task role's secret key, but it does not belong in CloudWatch either
  * (ADR-0042). Newlines go because each one starts a new log event, and the
- * `ai_write_failures` filter counts events by how they start.
+ * `ai_write_failures` filter counts events by how they start. Redacted before
+ * the cut, so the cut cannot leave half a value behind.
  */
-function errorBodyForLog(text: string): string {
-  return text
-    .replace(SIGNED_SECRET, "$1$2[redacted]")
+function errorBodyForLog(text: string, headers: Record<string, string>) {
+  return redactSignedValues(text, headers)
     .replace(LINE_BREAKS, " ")
     .slice(0, ERROR_BODY_LIMIT);
 }
@@ -213,7 +243,7 @@ export const mantleResponses: ResponsesFn = async (body) => {
   if (!response.ok) {
     const text = await readResponse(() => response.text());
     throw new Error(
-      `Bedrock Mantle returned ${response.status}: ${errorBodyForLog(text)}`
+      `Bedrock Mantle returned ${response.status}: ${errorBodyForLog(text, signed.headers)}`
     );
   }
   return (await readResponse(() => response.json())) as MantleResponse;

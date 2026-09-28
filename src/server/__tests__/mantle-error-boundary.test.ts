@@ -9,12 +9,20 @@ import { runSocialSummary } from "../_internal/social-summary-core";
  * stubbed `fetch`, so the thrown text is the one production builds rather
  * than a message this file made up.
  */
-const SECRET_BODY = [
-  "The request signature we calculated does not match.",
-  "authorization:AWS4-HMAC-SHA256 Credential=AKID/20260928, Signature=abc",
-  "x-amz-security-token:SECRET",
-  `${"y".repeat(600)}TAIL`,
-].join("\n");
+/**
+ * A signature-mismatch body that echoes the request's own Authorization value
+ * back, as AWS does in a canonical request. The token line is the issue's
+ * `SECRET`, which is not a value this request signed: static keys sign no
+ * token, so `redactSignedValues`'s own tests carry the token cases.
+ */
+function secretBody(authorization: string) {
+  return [
+    "The request signature we calculated does not match.",
+    `authorization:${authorization}`,
+    "x-amz-security-token: SECRET",
+    `${"y".repeat(600)}TAIL`,
+  ].join("\n");
+}
 
 const RUNNERS = [
   {
@@ -48,9 +56,13 @@ afterEach(() => {
 
 describe.each(RUNNERS)("a failed Mantle call in $feature", ({ fixed, run }) => {
   it("reaches the caller as the fixed message and the log as one string", async () => {
-    vi.stubGlobal("fetch", () =>
-      Promise.resolve(new Response(SECRET_BODY, { status: 403 }))
-    );
+    let authorization = "";
+    vi.stubGlobal("fetch", (_url: string, init: RequestInit) => {
+      authorization = (init.headers as Record<string, string>).authorization;
+      return Promise.resolve(
+        new Response(secretBody(authorization), { status: 403 })
+      );
+    });
     const logged = vi.spyOn(console, "error").mockImplementation(() => {
       // The line is the assertion, not output for the test run.
     });
@@ -64,12 +76,16 @@ describe.each(RUNNERS)("a failed Mantle call in $feature", ({ fixed, run }) => {
     expect(typeof line?.[0]).toBe("string");
     expect(line?.[0]).toContain("403");
     expect(line?.[0]).toContain("signature we calculated does not match");
-    // The signed values are redacted, and the body is one line cut at 500
-    // characters, so what follows the cut never reaches it.
-    expect(line?.[0]).toContain("x-amz-security-token:[redacted]");
+    expect(line?.[0]).toContain("x-amz-security-token: SECRET");
+    // The request's own signed value is redacted, and the body is one line
+    // cut at 500 characters, so what follows the cut never reaches it.
+    expect(authorization).toMatch(/^AWS4-HMAC-SHA256 Credential=AKIDEXAMPLE/);
     expect(line?.[0]).toContain("authorization:[redacted]");
-    expect(line?.[0]).not.toMatch(/SECRET|Credential|\n/);
+    expect(line?.[0]).not.toContain(authorization);
+    expect(line?.[0]).not.toMatch(/AKIDEXAMPLE|\n/);
     expect(line?.[0]).not.toContain("TAIL");
+    // And none of it reaches the caller.
+    expect(result.error).not.toMatch(/SECRET|403/);
   });
 
   it("keeps a failed fetch's cause in the log and out of the message", async () => {
