@@ -190,8 +190,8 @@ export function BidsTab({
         {view === "project"
           ? "Pin here does what Approve does on the Results tab: every run keeps the student on that project until you unpin them, over any pin from the bids file or the roster. Unpin frees them from all of these. A pin changes the next run; the Results tab shows the last run until then."
           : "Pinned rows show every pin in effect: the bids file's, the roster's, and those set here or on the Results tab, which win over the other two."}{" "}
-        Remove takes a student out of placement, and off the board at once,
-        until you restore them from the removed list above.
+        Remove from placement takes a student out of every run, and off the
+        board at once, until you restore them from the removed list above.
       </p>
       {view === "project" ? (
         <BidsByProject state={state} students={pinned} />

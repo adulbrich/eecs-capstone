@@ -830,9 +830,29 @@ test.describe("placement workspace", () => {
     await expect(page.getByText("1 of 1 students placed")).toBeVisible({
       timeout: 20_000,
     });
-    await page
-      .getByRole("button", { name: "Remove Ada Park from placement" })
-      .click();
+    // On the board, Remove sits in the row's More menu and asks first, so
+    // it is not read as "remove from this team" (#685).
+    await expect(
+      page.getByRole("button", { name: "Remove Ada Park from placement" })
+    ).toHaveCount(0);
+    const removeFromBoard = async () => {
+      await page.getByRole("button", { name: "More for Ada Park" }).click();
+      await page
+        .getByRole("menuitem", { name: "Remove from placement..." })
+        .click();
+      return page.getByRole("alertdialog", {
+        name: "Remove Ada Park from placement?",
+      });
+    };
+    let dialog = await removeFromBoard();
+    await expect(dialog).toContainText("not only this team");
+    await dialog.getByRole("button", { name: "Cancel" }).click();
+    await expect(dialog).toHaveCount(0);
+    await page.keyboard.press("Escape");
+    await expect(page.getByRole("menu")).toHaveCount(0);
+    await expect(page.getByText(`ada@${DOMAIN}`)).toBeVisible();
+    dialog = await removeFromBoard();
+    await dialog.getByRole("button", { name: "Remove from placement" }).click();
     await expect(page.getByText(/moved or removed by hand/)).toBeVisible();
     await expect(page.getByText("Ada Park")).toHaveCount(0);
 

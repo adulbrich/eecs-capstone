@@ -13,7 +13,7 @@ import {
   defineAdminColumns,
 } from "#/components/admin-data-table";
 import { ErrorBanner } from "#/components/error-banner";
-import { RemoveStudentButton } from "#/components/placement/removed-students";
+import { StudentMenu } from "#/components/placement/removed-students";
 import type { PlacementWorkspace } from "#/components/placement/use-placement-workspace";
 import { Button } from "#/components/ui/button";
 import {
@@ -453,8 +453,9 @@ function Board({
         does the same. Move puts the student on another project now and pins
         them there, so later runs keep them there. Unpin frees the student from
         every pin, and the next run places them by their bids. A pin changes the
-        next run, not the placement shown here. Remove takes the student off
-        this board and out of every run until you restore them on the Bids tab.
+        next run, not the placement shown here. Remove from placement, in a
+        row's More menu, takes the student off this board and out of every run,
+        not only their team, until you restore them on the Bids tab.
       </p>
       {empty.length > 0 && (
         <p className="mt-2 text-sm">
@@ -553,7 +554,7 @@ function RowActions({
         onMove={onMove}
         projects={projects}
       />
-      <RemoveStudentButton email={row.email} name={row.name} update={update} />
+      <StudentMenu email={row.email} name={row.name} update={update} />
     </div>
   );
 }
