@@ -27,10 +27,13 @@ Screenshots: none, because ...
 
 ## Review loop
 
-<!-- AGENTS.md: mattpocock-skills:code-review until a pass raises nothing
-     unanswered. State the pass count. A declined finding gets one line. -->
+<!-- AGENTS.md: mattpocock-skills:code-review, and correctness-review beside it
+     when the PR changes behaviour, until a pass raises nothing unanswered. State
+     each pass count, or why the correctness pass does not apply. A declined
+     finding gets one line. -->
 
 - Passes:
+- Correctness passes:
 - Declined:
 
 ## Docs

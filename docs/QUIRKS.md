@@ -892,7 +892,7 @@ Radix fires `onOpenChange` for the closes it initiates (Escape, the overlay, a `
 | `scripts/*.ts` | Operational scripts (seeding, one-shot fixes). Not Biome-checked. |
 | `scripts/check-*.mjs` | The rule checks (`check-prose`, `check-commit-message`, `check-compression`) that lefthook, CI and the Claude Code hooks share. Not Biome-checked; tested from `src/test/`. |
 | `.claude/hooks/*.mjs` | Claude Code hooks: refuse the git and `gh` commands and the edits the rules forbid, report Biome and prose on each edit, print session context. Biome-checked; tested from `src/test/claude-hooks.test.ts`. |
-| `.claude/skills/*/SKILL.md` | Repo-local review skills (`correctness-review`, `app-security-review`), portable across harnesses, each with an `agents/openai.yaml`. Optional passes; `AGENTS.md` says when to reach for each. |
+| `.claude/skills/*/SKILL.md` | Repo-local review skills (`correctness-review`, `app-security-review`), portable across harnesses, each with an `agents/openai.yaml`. `correctness-review` is required on a PR that changes behaviour, `app-security-review` is optional; `AGENTS.md` has the rule. |
 | `docs/agents/*.md` | What the mattpocock engineering skills read about this repo: issue tracker, triage labels, domain docs. |
 | `docs/superpowers/specs/*` | Design docs for the large features that went through the superpowers workflow. Ordinary work is specified in its GitHub issue instead. |
 | `docs/superpowers/plans/*` | Implementation plans for those same specs. |
