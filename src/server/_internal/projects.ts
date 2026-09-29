@@ -256,12 +256,14 @@ export async function updateProjectAs(
   // After the commit, never inside it: a rollback would otherwise destroy the
   // object the surviving row still points at. This is the only place a key is
   // written at all; create refuses one and writes null, and
-  // `hardDeleteProjectAs` drops the last one.
+  // `hardDeleteProjectAs` drops the last one. Started, not awaited, like the
+  // refresh below: the save has committed and must not answer on S3's time
+  // (#621). `deleteOwnedObject` never rejects, and logs its own failure.
   if (changedFields.includes("imageUrl")) {
     const { deleteOwnedObject, projectImageKeys } = await import(
       "#/lib/_internal/storage"
     );
-    await deleteOwnedObject(existing.imageUrl, projectImageKeys(existing.id));
+    deleteOwnedObject(existing.imageUrl, projectImageKeys(existing.id));
   }
 
   // Archived counts as well as published, so editing an archived project keeps

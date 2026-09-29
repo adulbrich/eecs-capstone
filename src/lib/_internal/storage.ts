@@ -69,6 +69,23 @@ export interface ObjectStorage {
   put: (key: string, body: Buffer, contentType: string) => Promise<void>;
 }
 
+/**
+ * The SDK's default handler sets no request timeout, so without these a
+ * stalled S3 call holds whatever awaits it for as long as the socket stays
+ * open, the shape #618 fixed for Bedrock (#621). Each bounds the whole call,
+ * retries included, the way `EMBED_TIMEOUT_MS` does.
+ *
+ * Sized from the September 2026 ALB logs: the twelve image uploads took 0.8 s
+ * to 2.5 s end to end, and that covers receiving the body, Sharp, this put
+ * and the row write. The put itself goes from the task to S3 in one region
+ * with a body already in memory and already shrunk by Sharp; the slow client
+ * link ADR-0043 allows 60 s for is on the other side of the ALB. 20 s is
+ * eight times the slowest whole request and still leaves the request inside
+ * the ALB's 60 s idle timeout. A delete sends no body.
+ */
+export const S3_PUT_TIMEOUT_MS = 20_000;
+export const S3_DELETE_TIMEOUT_MS = 5000;
+
 class S3Storage implements ObjectStorage {
   private readonly bucket: string;
   private readonly client: S3Client;
@@ -85,15 +102,25 @@ class S3Storage implements ObjectStorage {
         Key: key,
         Body: body,
         ContentType: contentType,
-      })
+      }),
+      { abortSignal: AbortSignal.timeout(S3_PUT_TIMEOUT_MS) }
     );
   }
 
   async delete(key: string): Promise<void> {
     await this.client.send(
-      new DeleteObjectCommand({ Bucket: this.bucket, Key: key })
+      new DeleteObjectCommand({ Bucket: this.bucket, Key: key }),
+      { abortSignal: AbortSignal.timeout(S3_DELETE_TIMEOUT_MS) }
     );
   }
+}
+
+/** The storage over a given client, so a test can hand it one. */
+export function createObjectStorage(
+  bucket: string,
+  client: S3Client
+): ObjectStorage {
+  return new S3Storage(bucket, client);
 }
 
 let _instance: ObjectStorage | null = null;
@@ -103,7 +130,10 @@ export function getObjectStorage(): ObjectStorage {
     return _instance;
   }
   const config = buildStorageConfig();
-  _instance = new S3Storage(config.bucket, new S3Client(config.clientConfig));
+  _instance = createObjectStorage(
+    config.bucket,
+    new S3Client(config.clientConfig)
+  );
   return _instance;
 }
 
@@ -164,8 +194,9 @@ export const inventoryImageKeys = (itemId: string): KeySpace =>
  *
  * Best effort by design: an object that outlives its row costs storage, while
  * a delete that throws would fail a write that has already committed. So this
- * never rejects, and callers await it only so a test can assert on the result
- * rather than race it.
+ * never rejects. Most callers await it, which `S3_DELETE_TIMEOUT_MS` bounds;
+ * `updateProjectAs` starts it without awaiting, so a project save answers
+ * without waiting on S3 at all (#621).
  *
  * A key outside the row's own space is left alone, and that guard is the point
  * rather than a detail: `imageUrl` is an ordinary client-writable column, so
