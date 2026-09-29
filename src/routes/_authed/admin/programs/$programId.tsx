@@ -1,7 +1,6 @@
 import {
   createFileRoute,
   Link,
-  redirect,
   useNavigate,
   useRouter,
 } from "@tanstack/react-router";
@@ -22,18 +21,16 @@ import { FieldError } from "#/components/ui/field";
 import { Input } from "#/components/ui/input";
 import { Label } from "#/components/ui/label";
 import { Textarea } from "#/components/ui/textarea";
+import { requireStaff } from "#/lib/access-denied";
 import { pageTitle } from "#/lib/page-title";
 import { PROGRAM_COURSE_ID_HINT } from "#/lib/program-fields";
 import { useAction } from "#/lib/use-action";
-import { isStaff } from "#/lib/viewer";
 import { deleteProgram, getProgram, updateProgram } from "#/server/programs";
 
 export const Route = createFileRoute("/_authed/admin/programs/$programId")({
   head: () => ({ meta: [{ title: pageTitle("Edit Program") }] }),
   beforeLoad: ({ context }) => {
-    if (!isStaff(context.user)) {
-      throw redirect({ to: "/" });
-    }
+    requireStaff(context.user);
   },
   loader: async ({ params }) => getProgram({ data: { id: params.programId } }),
   component: ProgramEdit,

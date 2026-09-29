@@ -1,4 +1,4 @@
-import { createFileRoute, Link, redirect } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { useState } from "react";
 import { z } from "zod";
 import {
@@ -18,11 +18,11 @@ import {
 import { Card } from "#/components/ui/card";
 import { Input } from "#/components/ui/input";
 import { Label } from "#/components/ui/label";
+import { requireStaff } from "#/lib/access-denied";
 import { pageTitle } from "#/lib/page-title";
 import { DAY_PATTERN, resolveRange } from "#/lib/report-range";
 import type { SortState } from "#/lib/table-state";
 import { useAdminTable } from "#/lib/use-admin-table";
-import { isStaff } from "#/lib/viewer";
 import { getTraffic } from "#/server/traffic";
 
 /**
@@ -45,9 +45,7 @@ export const Route = createFileRoute("/_authed/admin/traffic")({
   validateSearch: searchSchema,
   head: () => ({ meta: [{ title: pageTitle("Traffic") }] }),
   beforeLoad: ({ context }) => {
-    if (!isStaff(context.user)) {
-      throw redirect({ to: "/" });
-    }
+    requireStaff(context.user);
   },
   loaderDeps: ({ search }) => ({ from: search.from, to: search.to }),
   loader: async ({ deps }) => {

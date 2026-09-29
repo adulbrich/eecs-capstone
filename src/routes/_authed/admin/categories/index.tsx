@@ -1,7 +1,6 @@
 import {
   createFileRoute,
   Link,
-  redirect,
   useNavigate,
   useRouter,
 } from "@tanstack/react-router";
@@ -42,12 +41,12 @@ import { Input } from "#/components/ui/input";
 import { Label } from "#/components/ui/label";
 import { ListCount } from "#/components/ui/pagination";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "#/components/ui/tabs";
+import { requireStaff } from "#/lib/access-denied";
 import { defineCsvColumns, toCsv } from "#/lib/csv";
 import { pageTitle } from "#/lib/page-title";
 import type { SortState } from "#/lib/table-state";
 import { useAction } from "#/lib/use-action";
 import { useAdminTable } from "#/lib/use-admin-table";
-import { isStaff } from "#/lib/viewer";
 import {
   createCategory,
   listCategoriesWithUsage,
@@ -66,9 +65,7 @@ export const Route = createFileRoute("/_authed/admin/categories/")({
   validateSearch: searchSchema,
   head: () => ({ meta: [{ title: pageTitle("Categories") }] }),
   beforeLoad: ({ context }) => {
-    if (!isStaff(context.user)) {
-      throw redirect({ to: "/" });
-    }
+    requireStaff(context.user);
   },
   loaderDeps: ({ search }) => ({ tab: search.tab }),
   loader: async ({ deps }) => {

@@ -1,3 +1,4 @@
+import { isAccessDenied } from "../access-denied";
 import { redactQueryError } from "./redact-query-error";
 
 const WHITESPACE_RUN = /\s+/g;
@@ -26,6 +27,10 @@ interface RenderedMatch {
  * value on `error` in both cases, so the status is the test and not whether
  * `error` is set. A `redirect()` returns before the callback runs.
  *
+ * Not a role guard's refusal either (#606). router-core marks that match
+ * `error` too, because the guard throws, but it is a page working as meant,
+ * and `refusedByRole` is what turns its 500 into a 403.
+ *
  * The route id rather than the URL: the URL carries the search box's `q`,
  * which is user text (ADR-0042). The cause goes through `redactQueryError`
  * for the same reason, so a failed search logs its SQL and the pool's
@@ -40,11 +45,23 @@ export function renderFailureLines(
   matches: readonly RenderedMatch[]
 ): string[] {
   return matches
-    .filter((match) => match.status === "error")
+    .filter((match) => match.status === "error" && !isAccessDenied(match.error))
     .map((match) =>
       `Server render failed on ${match.routeId} (500): ${redactQueryError(match.error)}`.replace(
         WHITESPACE_RUN,
         " "
       )
     );
+}
+
+/**
+ * Whether this render is the access-denied page (#606), for `src/server.ts`
+ * to answer 403 rather than the 500 router-core picks for any thrown value.
+ * router-core has no status of its own for it: a server render answers 200,
+ * 404 or 500, and `setResponseStatus` does not reach a rendered page.
+ */
+export function refusedByRole(matches: readonly RenderedMatch[]): boolean {
+  return matches.some(
+    (match) => match.status === "error" && isAccessDenied(match.error)
+  );
 }

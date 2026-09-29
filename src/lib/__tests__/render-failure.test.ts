@@ -1,6 +1,6 @@
 import { DrizzleQueryError } from "drizzle-orm/errors";
 import { describe, expect, it } from "vitest";
-import { renderFailureLines } from "../_internal/render-failure";
+import { refusedByRole, renderFailureLines } from "../_internal/render-failure";
 
 /** Stands in for a bound parameter: a search term, a token, an address. */
 const SECRET = "robotics-3f9a1c";
@@ -89,5 +89,39 @@ describe("renderFailureLines", () => {
         { routeId: "/_public/projects/$id", status: "notFound", error: thrown },
       ])
     ).toEqual([]);
+  });
+});
+
+// #606: a role guard's refusal is thrown, so router-core marks its match
+// `error` like a loader failure. It is the page doing its job.
+describe("a role guard's refusal", () => {
+  const refusal = {
+    routeId: "/_authed/admin",
+    status: "error",
+    error: { accessDenied: true, requires: "staff", email: "u@example.com" },
+  };
+
+  it("is not logged as a render failure", () => {
+    expect(renderFailureLines([refusal])).toEqual([]);
+  });
+
+  it("is what makes the render a 403", () => {
+    expect(
+      refusedByRole([{ routeId: "__root__", status: "success" }, refusal])
+    ).toBe(true);
+  });
+
+  it("is not a loader failure, and not a refusal that rendered", () => {
+    expect(
+      refusedByRole([
+        {
+          routeId: "/_public/projects/",
+          status: "error",
+          error: failedSearch(),
+        },
+      ])
+    ).toBe(false);
+    // `notFound()` keeps its thrown value on `error` with another status.
+    expect(refusedByRole([{ ...refusal, status: "notFound" }])).toBe(false);
   });
 });

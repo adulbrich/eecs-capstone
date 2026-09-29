@@ -1,4 +1,4 @@
-import { createFileRoute, Link, redirect } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import {
   ArrowRight,
   BarChart3,
@@ -12,16 +12,15 @@ import {
   Users,
 } from "lucide-react";
 import { Card } from "#/components/ui/card";
+import { requireStaff } from "#/lib/access-denied";
 import { pageTitle } from "#/lib/page-title";
-import { isAdmin, isStaff } from "#/lib/viewer";
+import { isAdmin } from "#/lib/viewer";
 import { getAdminStats } from "#/server/admin";
 
 export const Route = createFileRoute("/_authed/admin/")({
   head: () => ({ meta: [{ title: pageTitle("Admin") }] }),
   beforeLoad: ({ context }) => {
-    if (!isStaff(context.user)) {
-      throw redirect({ to: "/" });
-    }
+    requireStaff(context.user);
   },
   loader: async () => getAdminStats(),
   component: AdminHome,

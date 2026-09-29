@@ -1,7 +1,6 @@
 import {
   createFileRoute,
   Link,
-  redirect,
   useNavigate,
   useRouter,
 } from "@tanstack/react-router";
@@ -26,6 +25,7 @@ import { FieldError } from "#/components/ui/field";
 import { Input } from "#/components/ui/input";
 import { Label } from "#/components/ui/label";
 import { ListCount } from "#/components/ui/pagination";
+import { requireStaff } from "#/lib/access-denied";
 import { defineCsvColumns, toCsv } from "#/lib/csv";
 import { pageTitle } from "#/lib/page-title";
 import { searchParamQuerySchema } from "#/lib/search-query";
@@ -33,7 +33,6 @@ import type { SortState } from "#/lib/table-state";
 import { useAction } from "#/lib/use-action";
 import { useAdminTable } from "#/lib/use-admin-table";
 import { useDebouncedDraft } from "#/lib/use-debounced-draft";
-import { isStaff } from "#/lib/viewer";
 import {
   exportMentors,
   listMentors,
@@ -54,9 +53,7 @@ export const Route = createFileRoute("/_authed/admin/mentors/")({
   validateSearch: searchSchema,
   head: () => ({ meta: [{ title: pageTitle("Mentors") }] }),
   beforeLoad: ({ context }) => {
-    if (!isStaff(context.user)) {
-      throw redirect({ to: "/" });
-    }
+    requireStaff(context.user);
   },
   // Only the filter field: sort and column visibility are client state and
   // must not re-run the loader.

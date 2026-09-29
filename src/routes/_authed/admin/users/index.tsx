@@ -1,9 +1,4 @@
-import {
-  createFileRoute,
-  Link,
-  redirect,
-  useNavigate,
-} from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useCallback } from "react";
 import { z } from "zod";
 import {
@@ -36,6 +31,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "#/components/ui/select";
+import { requireAdmin } from "#/lib/access-denied";
 import { defineCsvColumns, toCsv } from "#/lib/csv";
 import { pageTitle } from "#/lib/page-title";
 import { PAGE_SIZE_DEFAULT } from "#/lib/pagination";
@@ -43,7 +39,6 @@ import { searchParamQuerySchema } from "#/lib/search-query";
 import type { SortState } from "#/lib/table-state";
 import { useAdminTable } from "#/lib/use-admin-table";
 import { useDebouncedDraft } from "#/lib/use-debounced-draft";
-import { isAdmin } from "#/lib/viewer";
 import { USER_ROLES, type UserRole } from "#/lib/vocabularies";
 import { exportUsers, listUsers } from "#/server/users";
 
@@ -61,9 +56,7 @@ export const Route = createFileRoute("/_authed/admin/users/")({
   validateSearch: searchSchema,
   head: () => ({ meta: [{ title: pageTitle("Users") }] }),
   beforeLoad: ({ context }) => {
-    if (!isAdmin(context.user)) {
-      throw redirect({ to: "/admin" });
-    }
+    requireAdmin(context.user);
   },
   // Unlike the other admin tables, this one paginates on the server, so a
   // sort change requires a new query: sort and dir have to be loader deps

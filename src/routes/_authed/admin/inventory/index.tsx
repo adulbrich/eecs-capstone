@@ -1,9 +1,4 @@
-import {
-  createFileRoute,
-  Link,
-  redirect,
-  useNavigate,
-} from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { PackagePlus } from "lucide-react";
 import { useCallback, useId } from "react";
 import { z } from "zod";
@@ -45,6 +40,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "#/components/ui/select";
+import { requireStaff } from "#/lib/access-denied";
 import { defineCsvColumns, toCsv } from "#/lib/csv";
 import { formatHoldShort, holdFromStoredRow } from "#/lib/hold";
 import {
@@ -63,7 +59,6 @@ import { getPublicUrl } from "#/lib/storage";
 import type { SortState } from "#/lib/table-state";
 import { useAdminTable } from "#/lib/use-admin-table";
 import { useDebouncedDraft } from "#/lib/use-debounced-draft";
-import { isStaff } from "#/lib/viewer";
 import type { ItemStatus } from "#/lib/vocabularies";
 import {
   listAdminInventory,
@@ -96,9 +91,7 @@ export const Route = createFileRoute("/_authed/admin/inventory/")({
   validateSearch: searchSchema,
   head: () => ({ meta: [{ title: pageTitle("Inventory") }] }),
   beforeLoad: ({ context }) => {
-    if (!isStaff(context.user)) {
-      throw redirect({ to: "/" });
-    }
+    requireStaff(context.user);
   },
   // Only the filter fields: sort and column visibility are client state and
   // must not re-run the loader.

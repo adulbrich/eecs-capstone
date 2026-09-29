@@ -1,9 +1,9 @@
-import { createFileRoute, redirect, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { toast } from "sonner";
 import { z } from "zod";
 import { InventoryForm } from "#/components/inventory-form";
+import { requireStaff } from "#/lib/access-denied";
 import { pageTitle } from "#/lib/page-title";
-import { isStaff } from "#/lib/viewer";
 
 /**
  * "Create item from this line" on the request queue opens this form
@@ -24,9 +24,7 @@ export const Route = createFileRoute("/_authed/inventory/new")({
   // Same reasoning as the edit route: `_authed` only guarantees signed-in.
   // `createInventoryItemAs` asserts staff independently.
   beforeLoad: ({ context }) => {
-    if (!isStaff(context.user)) {
-      throw redirect({ to: "/" });
-    }
+    requireStaff(context.user);
   },
   component: NewInventoryItem,
 });
