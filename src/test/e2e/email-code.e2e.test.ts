@@ -355,6 +355,48 @@ test.describe("refusals on the emailed code", () => {
     }
   });
 
+  // The code is checked, not spent, so it can expire or lose its guess budget
+  // between the name step and the redeem. The refusal says to ask for a new
+  // code, and with the other sign-in methods hidden there has to be a control
+  // that does. Stubbed, because no real code can be made to fail on cue.
+  test("a refused redeem on the name step offers the way back", async ({
+    page,
+  }) => {
+    const email = fixtureEmail();
+    const redeem = "**/api/auth/sign-in/email-otp";
+
+    try {
+      const code = await startCodeStep(page, email);
+      await page.getByLabel("Code", { exact: true }).fill(code);
+      await page.getByRole("button", { name: "Confirm code" }).click();
+      await expect(page.getByLabel("Your name", { exact: true })).toBeVisible();
+      const back = page.getByRole("button", {
+        name: "Use a different address",
+      });
+      // Not before a refusal: the happy path is one click from signed in.
+      await expect(back).toHaveCount(0);
+
+      await page.route(redeem, (route) =>
+        route.fulfill({
+          status: 400,
+          contentType: "application/json",
+          body: JSON.stringify({ code: "INVALID_OTP", message: "Invalid OTP" }),
+        })
+      );
+      await page.getByLabel("Your name", { exact: true }).fill("Took Too Long");
+      await page.getByRole("button", { name: "Create account" }).click();
+      await expect(page.getByRole("alert")).toContainText(
+        /ask for a new code/i
+      );
+      await back.click();
+      await expect(page.getByLabel("Email", { exact: true })).toBeVisible();
+      await expectOtherMethods(page, "shown");
+    } finally {
+      await page.unroute(redeem);
+      await removeRow(email);
+    }
+  });
+
   test("an expired code is refused, and asking again recovers", async ({
     page,
   }) => {

@@ -61,9 +61,9 @@ function SignIn() {
         )}
         <EmailCodeForm onStepChange={setStep} redirectTo={redirectTo} />
         {/* Only on the address step (#611). Past it the form's own submit is
-            the one primary action; "Use a different address" is the way back
-            to these for somebody whose code never arrives. The name step has
-            no way back and needs none: its code is already checked. */}
+            the one primary action, and "Use a different address" is the way
+            back to these: on the code step always, for somebody whose code
+            never arrives, and on the name step once a redeem is refused. */}
         {step === "address" && <OAuthSignInButtons redirectTo={redirectTo} />}
         {/* Worded to be true for a returning visitor too, because this page
             creates accounts: a new address reaches the name step, and a first

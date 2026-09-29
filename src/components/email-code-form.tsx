@@ -467,6 +467,24 @@ export function EmailCodeForm({
       <Button className="w-full" disabled={loading} type="submit">
         {loading ? "Creating..." : "Create account"}
       </Button>
+      {/* Only after a refusal (#611). The code was checked but not spent, so
+          it can expire or lose its guesses before this redeem, and the
+          refusal says to ask for a new code; with the other sign-in methods
+          hidden past the address step, this is the control that does. */}
+      {error !== null && (
+        <Button
+          className="w-full"
+          disabled={loading}
+          onClick={() => {
+            setError(null);
+            goToStep("address");
+          }}
+          type="button"
+          variant="outline"
+        >
+          Use a different address
+        </Button>
+      )}
     </form>
   );
 }
