@@ -41,7 +41,7 @@ import { authClient } from "#/lib/auth-client";
  * privacy notice for that reason.
  */
 
-type Step = "address" | "code" | "name";
+export type Step = "address" | "code" | "name";
 
 /**
  * Each step's form carries a `key`, and it is load-bearing rather than the
@@ -141,9 +141,26 @@ function formValue(e: React.FormEvent<HTMLFormElement>, field: string): string {
   return String(new FormData(e.currentTarget).get(field) ?? "");
 }
 
-export function EmailCodeForm({ redirectTo }: { redirectTo?: string }) {
+export function EmailCodeForm({
+  redirectTo,
+  onStepChange,
+}: {
+  redirectTo?: string;
+  /**
+   * Called on every move between steps, so the page can hide the other
+   * sign-in methods once a code is out (#611). The form starts on `address`
+   * and does not call this for it.
+   */
+  onStepChange?: (step: Step) => void;
+}) {
   const navigate = useNavigate();
-  const [step, setStep] = useState<Step>("address");
+  const [step, setStepState] = useState<Step>("address");
+  // In the handler rather than an effect on `step`, so the page hides its
+  // buttons in the same render the form changes step, not one render later.
+  function setStep(next: Step) {
+    setStepState(next);
+    onStepChange?.(next);
+  }
   const [email, setEmail] = useState("");
   const [code, setCode] = useState("");
   // Controlled, unlike the other two fields, so a refusal can empty it.

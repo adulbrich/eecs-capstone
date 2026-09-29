@@ -4,8 +4,9 @@ import {
   redirect,
   useSearch,
 } from "@tanstack/react-router";
+import { useState } from "react";
 import { z } from "zod";
-import { EmailCodeForm } from "#/components/email-code-form";
+import { EmailCodeForm, type Step } from "#/components/email-code-form";
 import {
   OAUTH_PROVIDERS,
   OAuthErrorBanner,
@@ -49,6 +50,7 @@ function SignIn() {
   } = useSearch({
     from: "/(auth)/sign-in",
   });
+  const [step, setStep] = useState<Step>("address");
 
   return (
     <div className="flex min-h-[calc(100vh-3.5rem)] items-start justify-center px-4 pt-12 pb-20">
@@ -57,8 +59,12 @@ function SignIn() {
         {oauthError && (
           <OAuthErrorBanner code={oauthError} provider={failedProvider} />
         )}
-        <EmailCodeForm redirectTo={redirectTo} />
-        <OAuthSignInButtons redirectTo={redirectTo} />
+        <EmailCodeForm onStepChange={setStep} redirectTo={redirectTo} />
+        {/* Only on the address step (#611). Past it the form's own submit is
+            the one primary action; "Use a different address" is the way back
+            to these for somebody whose code never arrives. The name step has
+            no way back and needs none: its code is already checked. */}
+        {step === "address" && <OAuthSignInButtons redirectTo={redirectTo} />}
         {/* Worded to be true for a returning visitor too, because this page
             creates accounts: a new address reaches the name step, and a first
             ONID or GitHub sign-in creates one with no step at all (#586). The

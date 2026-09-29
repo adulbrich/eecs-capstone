@@ -26,6 +26,7 @@ test.describe("@smoke signing in with an emailed code", () => {
     try {
       await page.goto("/sign-in");
       await waitForHydration(page);
+      await expectOtherMethods(page, "shown");
 
       await page.getByLabel("Email", { exact: true }).fill(email);
       const sentAt = await logSize();
@@ -36,12 +37,19 @@ test.describe("@smoke signing in with an emailed code", () => {
       // steps render the same shape in the same position, so without a `key`
       // React reuses the input node and its uncontrolled value comes with it.
       await expect(page.getByLabel("Code", { exact: true })).toHaveValue("");
+      // Once a code is out, the form's submit is the page's one primary
+      // action, and the other sign-in methods wait behind "Use a different
+      // address" (#611).
+      await expectOtherMethods(page, "hidden");
+      await expect(primaryButtons(page)).toHaveText(["Confirm code"]);
       await page.getByLabel("Code", { exact: true }).fill(code);
       await page.getByRole("button", { name: "Confirm code" }).click();
 
       // The address has no account, so the form asks for a name rather than
       // redeeming the code and failing on the blank one.
       await expect(page.getByLabel("Your name", { exact: true })).toBeVisible();
+      await expectOtherMethods(page, "hidden");
+      await expect(primaryButtons(page)).toHaveText(["Create account"]);
       // The one moment a code creates an account, so the notice is here, in
       // the form, and not only on the page around it (#586). In a new tab,
       // because following it in this one would lose the checked code.
@@ -329,6 +337,24 @@ test.describe("refusals on the emailed code", () => {
     }
   });
 
+  test("going back to the address brings the other sign-in methods back", async ({
+    page,
+  }) => {
+    const email = fixtureEmail();
+
+    try {
+      await startCodeStep(page, email);
+      await expectOtherMethods(page, "hidden");
+      // The way to ONID or GitHub for somebody whose code never arrives.
+      await page
+        .getByRole("button", { name: "Use a different address" })
+        .click();
+      await expectOtherMethods(page, "shown");
+    } finally {
+      await removeRow(email);
+    }
+  });
+
   test("an expired code is refused, and asking again recovers", async ({
     page,
   }) => {
@@ -478,6 +504,33 @@ test.describe("refusals on the emailed code", () => {
     }
   });
 });
+
+/**
+ * Whether "Continue with ONID" and "Continue with GitHub" are on the page.
+ * Hidden means absent from the DOM, not only out of sight (#611).
+ */
+async function expectOtherMethods(
+  page: Page,
+  state: "shown" | "hidden"
+): Promise<void> {
+  for (const name of ["Continue with ONID", "Continue with GitHub"]) {
+    const button = page.getByRole("button", { name, exact: true });
+    if (state === "shown") {
+      await expect(button).toBeVisible();
+    } else {
+      await expect(button).toHaveCount(0);
+    }
+  }
+}
+
+/**
+ * The filled buttons on the page outside the site header, by the variant
+ * `Button` writes to `data-variant`. Outside the header because what #611 is
+ * about is the sign-in card's own main action.
+ */
+function primaryButtons(page: Page): Locator {
+  return page.locator('button[data-variant="default"]:not(header *)');
+}
 
 /** `allowedAttempts` in `src/lib/auth.ts`, restated so a change here is loud. */
 const ALLOWED_ATTEMPTS = 3;
