@@ -1,5 +1,5 @@
-import { createFileRoute, Outlet, redirect } from "@tanstack/react-router";
-import { isStaff } from "#/lib/viewer";
+import { createFileRoute, Outlet } from "@tanstack/react-router";
+import { requireStaff } from "#/lib/access-denied";
 
 // `_authed` has already read the session and redirected a signed-out viewer,
 // so this layer and every page below it ask about `context.user` rather than
@@ -8,9 +8,7 @@ import { isStaff } from "#/lib/viewer";
 // access level (ADR-0003).
 export const Route = createFileRoute("/_authed/admin")({
   beforeLoad: ({ context }) => {
-    if (!isStaff(context.user)) {
-      throw redirect({ to: "/" });
-    }
+    requireStaff(context.user);
   },
   component: () => <Outlet />,
 });

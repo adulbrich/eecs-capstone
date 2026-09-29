@@ -1,8 +1,8 @@
 // @vitest-environment jsdom
 import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
-import { isRedirect } from "@tanstack/react-router";
 import { describe, expect, it } from "vitest";
+import { isAccessDenied } from "#/lib/access-denied";
 import { USER_ROLES } from "#/lib/vocabularies";
 import { Route as adminLayout } from "#/routes/_authed/admin";
 import { Route as analytics } from "#/routes/_authed/admin/analytics";
@@ -28,21 +28,28 @@ import { Route as itemNew } from "#/routes/_authed/inventory/new";
  * The browser suites reach them only through a server render (`page.goto`),
  * so this runs each one directly, which is also the path a client navigation
  * takes, and pins which roles each lets through.
+ *
+ * A viewer without the role is refused where they stand, with the role the
+ * page needs, rather than redirected (#606).
  */
 
 type Guard = (options: { context: { user: unknown } }) => unknown;
+
+const EMAIL = "someone@example.com";
 
 function guardOf(route: { options: unknown }): Guard {
   return (route.options as { beforeLoad: Guard }).beforeLoad;
 }
 
-function redirectOf(guard: Guard, role: string): string | null {
+/** The role the guard says is missing, or null when it lets the viewer in. */
+function refusalOf(guard: Guard, role: string): string | null {
   try {
-    guard({ context: { user: { id: "u1", role } } });
+    guard({ context: { user: { id: "u1", role, email: EMAIL } } });
     return null;
   } catch (thrown) {
-    if (isRedirect(thrown)) {
-      return String(thrown.options.to);
+    if (isAccessDenied(thrown)) {
+      expect(thrown.email).toBe(EMAIL);
+      return thrown.requires;
     }
     throw thrown;
   }
@@ -73,6 +80,10 @@ const ADMIN_GATED = {
 
 const ROUTES_DIR = join(process.cwd(), "src/routes/_authed");
 
+/** Any redirect at all: every guarded file below is a role guard. */
+const REDIRECT = /\bredirect\(/;
+const ROLE_GUARD = /require(Staff|Admin)\(context\.user\)/;
+
 function routeFiles(): string[] {
   return readdirSync(ROUTES_DIR, { recursive: true, encoding: "utf8" }).filter(
     (file) => file.endsWith(".tsx") || file.endsWith(".ts")
@@ -91,26 +102,30 @@ function fileOf(id: string): string {
 
 describe("route guards below _authed", () => {
   for (const [id, route] of Object.entries(STAFF_GATED)) {
-    it(`${id} admits staff and sends anyone else home`, () => {
+    it(`${id} admits staff and refuses anyone else`, () => {
       const guard = guardOf(route);
-      expect(redirectOf(guard, "user")).toBe("/");
-      expect(redirectOf(guard, "instructor")).toBeNull();
-      expect(redirectOf(guard, "admin")).toBeNull();
+      expect(refusalOf(guard, "user")).toBe("staff");
+      expect(refusalOf(guard, "instructor")).toBeNull();
+      expect(refusalOf(guard, "admin")).toBeNull();
     });
   }
 
   for (const [id, route] of Object.entries(ADMIN_GATED)) {
-    it(`${id} admits admins and sends anyone else back to /admin`, () => {
+    it(`${id} admits admins and refuses anyone else`, () => {
       const guard = guardOf(route);
-      expect(redirectOf(guard, "user")).toBe("/admin");
-      expect(redirectOf(guard, "instructor")).toBe("/admin");
-      expect(redirectOf(guard, "admin")).toBeNull();
+      // In the app a plain user never reaches this guard: the admin layout
+      // above it refuses them first, as lacking staff. Alone, it says admin.
+      expect(refusalOf(guard, "user")).toBe("admin");
+      expect(refusalOf(guard, "instructor")).toBe("admin");
+      expect(refusalOf(guard, "admin")).toBeNull();
     });
   }
 
   it("hands the user detail page its actor from context", () => {
     const guard = guardOf(userDetail);
-    expect(guard({ context: { user: { id: "a1", role: "admin" } } })).toEqual({
+    expect(
+      guard({ context: { user: { id: "a1", role: "admin", email: EMAIL } } })
+    ).toEqual({
       actorId: "a1",
     });
   });
@@ -129,6 +144,23 @@ describe("route guards below _authed", () => {
         .filter((file) => sourceOf(file).includes("beforeLoad"))
         .sort()
     ).toEqual(tested);
+  });
+
+  it("redirects nobody below _authed.tsx for lacking a role", () => {
+    // A role guard that redirects hides why the page did not open (#606).
+    // `requireStaff` and `requireAdmin` refuse in place instead. The files
+    // with a `beforeLoad` are exactly the role-gated ones (the test above),
+    // so none of them has a reason to redirect. The project edit page, which
+    // sends a viewer who cannot edit back to the project, guards in its
+    // loader and is not one of them.
+    const guarded = routeFiles().filter((file) =>
+      sourceOf(file).includes("beforeLoad")
+    );
+    for (const file of guarded) {
+      const source = sourceOf(file);
+      expect(source, file).not.toMatch(REDIRECT);
+      expect(source, file).toMatch(ROLE_GUARD);
+    }
   });
 
   it("reads the session nowhere below _authed.tsx", () => {

@@ -1,38 +1,105 @@
+import type { Page } from "@playwright/test";
 import { expect, test } from "@playwright/test";
 import { and, ilike, like, not } from "drizzle-orm";
 // biome-ignore lint/performance/noNamespaceImport: drizzle needs the schema namespace object
 import * as schema from "../../db/schema";
+import { waitForHydration } from "../shared/playwright";
 import { ADMIN_AUTH, USER_AUTH } from "./constants";
-import { E2E_PREFIX, openDb } from "./fixtures";
+import {
+  createFixtureUser,
+  deleteFixtureUser,
+  E2E_PREFIX,
+  openDb,
+  withDb,
+} from "./fixtures";
+import { enterEmailedCode } from "./mail";
 
 /**
- * The admin layout redirects by role rather than rendering a 403, and the
- * public detail routes render their staff panels on a role check with no route
- * guard at all. Both are browser behaviors, which is why they live here rather
- * than in the integration suite: a redirect is not something a server-function
- * test can observe, and a conditionally rendered panel is only absent in a real
- * render.
+ * A signed-out visitor is sent to sign in and back; a signed-in one without
+ * the role gets the access-denied page at the URL they asked for, with a 403
+ * (#606). The public detail routes render their staff panels on a role check
+ * with no route guard at all. All three are browser behaviors, which is why
+ * they live here rather than in the integration suite: a status on a rendered
+ * page is not something a server-function test can observe, and a
+ * conditionally rendered panel is only absent in a real render.
  */
 test.describe("@smoke authorization", () => {
   test("sends an anonymous visitor to sign-in with a return path", async ({
     page,
   }) => {
     await page.goto("/admin/projects");
-
-    // The redirect param carries the clean path, not the search-param-normalized
-    // one the router bounces through on the way. That is what a user returning
-    // from sign-in depends on, so it is worth pinning exactly.
-    await expect(page).toHaveURL("/sign-in?redirect=%2Fadmin%2Fprojects");
+    const signIn = new URL(page.url());
+    expect(signIn.pathname).toBe("/sign-in");
+    expect(returnPath(signIn).pathname).toBe("/admin/projects");
   });
 
-  test("sends a signed-in non-staff user home", async ({ browser }) => {
+  test("brings the query string back through sign-in", async ({ page }) => {
+    // A filtered admin list has to come back filtered (#606). Before, only
+    // the path made the trip. The router fills in the page's search defaults
+    // before `_authed` sees the URL, so the return path carries those too;
+    // the one that matters is the one the visitor chose.
+    await page.goto("/admin/projects?q=robotics");
+    const signIn = new URL(page.url());
+    expect(signIn.pathname).toBe("/sign-in");
+    const back = returnPath(signIn);
+    expect(back.pathname).toBe("/admin/projects");
+    expect(back.searchParams.get("q")).toBe("robotics");
+
+    await waitForHydration(page);
+    await enterEmailedCode(page, "admin@example.com");
+    await page.waitForURL((url) => url.pathname === "/admin/projects", {
+      timeout: 15_000,
+    });
+    expect(new URL(page.url()).searchParams.get("q")).toBe("robotics");
+    await expect(page.getByRole("searchbox")).toHaveValue("robotics");
+  });
+
+  test("tells a signed-in non-staff user where they are and what it needs", async ({
+    browser,
+  }) => {
     const context = await browser.newContext({ storageState: USER_AUTH });
     try {
       const page = await context.newPage();
-      await page.goto("/admin/projects");
-      await expect(page).toHaveURL("/");
+      const response = await page.goto("/admin/projects");
+      // Refused in place: the URL stays for them to report, and the status
+      // says what the page does.
+      expect(response?.status()).toBe(403);
+      expect(new URL(page.url()).pathname).toBe("/admin/projects");
+      // After hydration, because the refusal crosses from the server render
+      // to the browser, and a shape that did not survive would turn this
+      // into the generic error page once React took over.
+      await waitForHydration(page);
+      await expectRefusal(page, "user@example.com", "a staff role");
     } finally {
       await context.close();
+    }
+  });
+
+  test("tells staff who are not admins that /admin/users needs an admin", async ({
+    browser,
+  }) => {
+    const instructor = await withDb((db) =>
+      createFixtureUser(db, { role: "instructor" })
+    );
+    const context = await browser.newContext();
+    try {
+      const page = await context.newPage();
+      await page.goto("/sign-in");
+      await waitForHydration(page);
+      await enterEmailedCode(page, instructor.email);
+      await page.waitForURL((url) => !url.pathname.startsWith("/sign-in"));
+
+      // Staff, so the admin pages open for them.
+      const admin = await page.goto("/admin");
+      expect(admin?.status()).toBe(200);
+
+      const response = await page.goto("/admin/users");
+      expect(response?.status()).toBe(403);
+      expect(new URL(page.url()).pathname).toBe("/admin/users");
+      await expectRefusal(page, instructor.email, "an admin role");
+    } finally {
+      await context.close();
+      await withDb((db) => deleteFixtureUser(db, instructor.id));
     }
   });
 
@@ -91,6 +158,27 @@ test.describe("@smoke authorization", () => {
     }
   });
 });
+
+/** Where `/sign-in` will send the visitor back to, as a URL on this site. */
+function returnPath(signIn: URL): URL {
+  return new URL(signIn.searchParams.get("redirect") ?? "", signIn.origin);
+}
+
+/** The access-denied page, naming the account and the role the page needs. */
+async function expectRefusal(
+  page: Page,
+  email: string,
+  role: string
+): Promise<void> {
+  await expect(
+    page.getByRole("heading", { level: 1, name: "You do not have access" })
+  ).toBeVisible();
+  await expect(page.getByText(`You are signed in as ${email}.`)).toBeVisible();
+  await expect(page.getByText(`This page needs ${role}.`)).toBeVisible();
+  await expect(
+    page.getByRole("link", { name: "Browse projects" })
+  ).toHaveAttribute("href", "/projects");
+}
 
 /**
  * A seeded item, never a fixture from either Playwright suite. Both filters

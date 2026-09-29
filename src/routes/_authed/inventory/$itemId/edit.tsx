@@ -1,18 +1,13 @@
-import {
-  createFileRoute,
-  notFound,
-  redirect,
-  useNavigate,
-} from "@tanstack/react-router";
+import { createFileRoute, notFound, useNavigate } from "@tanstack/react-router";
 import { toast } from "sonner";
 import { InventoryForm } from "#/components/inventory-form";
+import { requireStaff } from "#/lib/access-denied";
 import type {
   InventoryItemPublic,
   InventoryItemStaff,
 } from "#/lib/inventory-visibility";
 import { isUuid } from "#/lib/is-uuid";
 import { pageTitle } from "#/lib/page-title";
-import { isStaff } from "#/lib/viewer";
 import { getInventoryItem } from "#/server/inventory";
 
 /**
@@ -34,9 +29,7 @@ export const Route = createFileRoute("/_authed/inventory/$itemId/edit")({
   // now guessable from the public detail page. Defence in depth over
   // `updateInventoryItemAs`, which asserts staff on its own.
   beforeLoad: ({ context }) => {
-    if (!isStaff(context.user)) {
-      throw redirect({ to: "/" });
-    }
+    requireStaff(context.user);
   },
   loader: async ({ params }) => {
     // A param that cannot name an item is a 404, not a 500 from the server

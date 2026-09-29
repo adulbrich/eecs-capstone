@@ -1,9 +1,4 @@
-import {
-  createFileRoute,
-  Link,
-  redirect,
-  useRouter,
-} from "@tanstack/react-router";
+import { createFileRoute, Link, useRouter } from "@tanstack/react-router";
 import { BanForm } from "#/components/ban-form";
 import { LocalTime } from "#/components/local-time";
 import { RoleSelect } from "#/components/role-select";
@@ -15,19 +10,17 @@ import {
   BreadcrumbPage,
   BreadcrumbSeparator,
 } from "#/components/ui/breadcrumb";
+import { requireAdmin } from "#/lib/access-denied";
 import { AI_FEATURE_NOUN } from "#/lib/ai-review-limits";
 import { pageTitle } from "#/lib/page-title";
 import { signInMethods } from "#/lib/sign-in-methods";
-import { isAdmin } from "#/lib/viewer";
 import type { UserRole } from "#/lib/vocabularies";
 import { getUser } from "#/server/users";
 
 export const Route = createFileRoute("/_authed/admin/users/$userId")({
   head: () => ({ meta: [{ title: pageTitle("Manage User") }] }),
   beforeLoad: ({ context }) => {
-    if (!isAdmin(context.user)) {
-      throw redirect({ to: "/admin" });
-    }
+    requireAdmin(context.user);
     return { actorId: context.user.id };
   },
   loader: async ({ params }) => await getUser({ data: { id: params.userId } }),

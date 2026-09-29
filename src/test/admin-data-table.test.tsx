@@ -284,8 +284,8 @@ describe("AdminDataTable", () => {
     //
     // Both halves matter. The message is what a developer sees, and promoting
     // exactly one cell is what stops the page being wrong while nobody is
-    // looking. Throwing would take the admin page down over a card title,
-    // since nothing here declares an errorComponent.
+    // looking. Throwing would swap the admin page for the router's error
+    // component over a card title.
     const error = vi.spyOn(console, "error").mockImplementation(() => {
       // Silenced: this test asserts on the call, and the message would
       // otherwise be noise in the run.

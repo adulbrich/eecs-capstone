@@ -17,7 +17,7 @@ import { rowFor, statusSection } from "./locators";
  *
  * `/inventory/new` and `/inventory/$itemId/edit` sit under `_authed`, which
  * only guarantees a signed-in viewer. Their staff gate is a `beforeLoad`
- * redirect, so it is visible in a browser and nowhere else.
+ * refusal, so it is visible in a browser and nowhere else.
  */
 test.describe("inventory item administration", () => {
   test("a signed-in student cannot reach either staff form", async ({
@@ -40,12 +40,15 @@ test.describe("inventory item administration", () => {
       // inheriting one: `_authed` guarantees only that somebody is signed in,
       // so each is separately capable of being left open.
       for (const path of ["/inventory/new", `/inventory/${itemId}/edit`]) {
-        await page.goto(path);
+        const response = await page.goto(path);
 
-        // Home, not a 403. The admin layout and these two routes all redirect
-        // rather than render a refusal, which is a decision worth pinning: a
-        // 403 page would be a different product.
-        await expect(page).toHaveURL("/");
+        // Refused where they stand, with a 403, rather than sent home without
+        // a reason (#606).
+        expect(response?.status()).toBe(403);
+        expect(new URL(page.url()).pathname).toBe(path);
+        await expect(
+          page.getByRole("heading", { name: "You do not have access" })
+        ).toBeVisible();
       }
     } finally {
       await context.close();

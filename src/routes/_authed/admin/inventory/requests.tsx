@@ -1,7 +1,6 @@
 import {
   createFileRoute,
   Link,
-  redirect,
   useNavigate,
   useRouter,
 } from "@tanstack/react-router";
@@ -48,6 +47,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "#/components/ui/select";
+import { requireStaff } from "#/lib/access-denied";
 import { isOpenCustomLine } from "#/lib/inventory-custom-workflow";
 import { lineTimeline } from "#/lib/inventory-timeline";
 import { pageTitle } from "#/lib/page-title";
@@ -56,7 +56,6 @@ import type { SortState } from "#/lib/table-state";
 import { useAdminTable } from "#/lib/use-admin-table";
 import { useDebouncedDraft } from "#/lib/use-debounced-draft";
 import { cn } from "#/lib/utils";
-import { isStaff } from "#/lib/viewer";
 import {
   INVENTORY_CUSTOM_LINE_STATUSES,
   INVENTORY_REQUEST_ITEM_STATUSES,
@@ -100,9 +99,7 @@ export const Route = createFileRoute("/_authed/admin/inventory/requests")({
   validateSearch: searchSchema,
   head: () => ({ meta: [{ title: pageTitle("Inventory Requests") }] }),
   beforeLoad: ({ context }) => {
-    if (!isStaff(context.user)) {
-      throw redirect({ to: "/" });
-    }
+    requireStaff(context.user);
   },
   // Only the filter fields: sort and column visibility are client state and
   // must not re-run the loader.

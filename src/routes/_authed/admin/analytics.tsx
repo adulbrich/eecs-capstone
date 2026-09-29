@@ -1,4 +1,4 @@
-import { createFileRoute, Link, redirect } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { z } from "zod";
 import { LocalTime } from "#/components/local-time";
 import {
@@ -19,11 +19,11 @@ import {
   SelectTrigger,
   SelectValue,
 } from "#/components/ui/select";
+import { requireStaff } from "#/lib/access-denied";
 import { slotsHint } from "#/lib/analytics-copy";
 import { pageTitle } from "#/lib/page-title";
 import { PROJECT_STATUS_LABEL } from "#/lib/project-workflow";
 import { resolveRange } from "#/lib/report-range";
-import { isStaff } from "#/lib/viewer";
 import type {
   InventoryRequestItemStatus,
   ItemStatus,
@@ -56,9 +56,7 @@ export const Route = createFileRoute("/_authed/admin/analytics")({
   validateSearch: searchSchema,
   head: () => ({ meta: [{ title: pageTitle("Analytics") }] }),
   beforeLoad: ({ context }) => {
-    if (!isStaff(context.user)) {
-      throw redirect({ to: "/" });
-    }
+    requireStaff(context.user);
   },
   loaderDeps: ({ search }) => ({
     from: search.from,

@@ -1,9 +1,4 @@
-import {
-  createFileRoute,
-  Link,
-  redirect,
-  useNavigate,
-} from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { z } from "zod";
 import { AnalyticsSheet } from "#/components/placement/analytics-sheet";
 import { BidsTab } from "#/components/placement/bids-tab";
@@ -22,8 +17,8 @@ import {
 } from "#/components/ui/breadcrumb";
 import { FieldError } from "#/components/ui/field";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "#/components/ui/tabs";
+import { requireStaff } from "#/lib/access-denied";
 import { pageTitle } from "#/lib/page-title";
-import { isStaff } from "#/lib/viewer";
 import { listPrograms } from "#/server/programs";
 
 const TABS = ["projects", "bids", "parameters", "results"] as const;
@@ -42,9 +37,7 @@ export const Route = createFileRoute("/_authed/admin/placement")({
   validateSearch: searchSchema,
   head: () => ({ meta: [{ title: pageTitle("Placement") }] }),
   beforeLoad: ({ context }) => {
-    if (!isStaff(context.user)) {
-      throw redirect({ to: "/" });
-    }
+    requireStaff(context.user);
   },
   // The program list is the page's only server read besides the published
   // projects a staff member asks for. Nothing about a student is sent

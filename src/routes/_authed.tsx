@@ -7,7 +7,10 @@ export const Route = createFileRoute("/_authed")({
     if (!session?.user) {
       throw redirect({
         to: "/sign-in",
-        search: { redirect: location.pathname },
+        // The query string too, so a filtered admin list comes back filtered
+        // (#606). `href` is path, search and hash, never the origin, and
+        // `/sign-in` checks it is a path on this site all the same.
+        search: { redirect: location.href },
       });
     }
     return { user: session.user };

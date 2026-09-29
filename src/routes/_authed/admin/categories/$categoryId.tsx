@@ -1,9 +1,4 @@
-import {
-  createFileRoute,
-  Link,
-  redirect,
-  useNavigate,
-} from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
 import { toast } from "sonner";
 import {
@@ -23,9 +18,9 @@ import { Button } from "#/components/ui/button";
 import { FieldError } from "#/components/ui/field";
 import { Input } from "#/components/ui/input";
 import { Label } from "#/components/ui/label";
+import { requireStaff } from "#/lib/access-denied";
 import { pageTitle } from "#/lib/page-title";
 import { useAction } from "#/lib/use-action";
-import { isStaff } from "#/lib/viewer";
 import {
   deleteCategory,
   getCategory,
@@ -36,9 +31,7 @@ import {
 export const Route = createFileRoute("/_authed/admin/categories/$categoryId")({
   head: () => ({ meta: [{ title: pageTitle("Edit Category") }] }),
   beforeLoad: ({ context }) => {
-    if (!isStaff(context.user)) {
-      throw redirect({ to: "/" });
-    }
+    requireStaff(context.user);
   },
   loader: async ({ params }) => {
     const [{ category }, { types }] = await Promise.all([

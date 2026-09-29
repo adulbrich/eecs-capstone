@@ -425,11 +425,18 @@ test("delete confirmation dialog", async ({ page }) => {
   await expect(dialog).toHaveCount(0);
 });
 
-test("the traffic reports refuse a signed-in user who is not staff", async ({
-  page,
-}) => {
-  // Staff only, the same guard as /admin/analytics: a user is sent home.
+test("the access-denied page, on the traffic reports", async ({ page }) => {
+  // Staff only, the same guard as /admin/analytics: a user is refused where
+  // they stand, not sent home (#606).
   await page.goto("/admin/traffic");
-  await page.waitForURL((url) => url.pathname === "/");
+  await waitForHydration(page);
+  await expect(
+    page.getByRole("heading", { level: 1, name: "You do not have access" })
+  ).toBeVisible();
   await expect(page.getByRole("heading", { name: "Traffic" })).toHaveCount(0);
+  await checkA11y(page);
+
+  await page.setViewportSize({ width: 375, height: 812 });
+  await expectNoHorizontalOverflow(page);
+  await checkA11y(page);
 });

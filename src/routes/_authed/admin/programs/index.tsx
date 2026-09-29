@@ -1,7 +1,6 @@
 import {
   createFileRoute,
   Link,
-  redirect,
   useNavigate,
   useRouter,
 } from "@tanstack/react-router";
@@ -36,13 +35,13 @@ import { FieldError } from "#/components/ui/field";
 import { Input } from "#/components/ui/input";
 import { Label } from "#/components/ui/label";
 import { ListCount } from "#/components/ui/pagination";
+import { requireStaff } from "#/lib/access-denied";
 import { defineCsvColumns, toCsv } from "#/lib/csv";
 import { pageTitle } from "#/lib/page-title";
 import { PROGRAM_COURSE_ID_HINT } from "#/lib/program-fields";
 import type { SortState } from "#/lib/table-state";
 import { useAction } from "#/lib/use-action";
 import { useAdminTable } from "#/lib/use-admin-table";
-import { isStaff } from "#/lib/viewer";
 import { createProgram, listProgramsWithInstructors } from "#/server/programs";
 
 const searchSchema = z.object({
@@ -55,9 +54,7 @@ export const Route = createFileRoute("/_authed/admin/programs/")({
   validateSearch: searchSchema,
   head: () => ({ meta: [{ title: pageTitle("Programs") }] }),
   beforeLoad: ({ context }) => {
-    if (!isStaff(context.user)) {
-      throw redirect({ to: "/" });
-    }
+    requireStaff(context.user);
   },
   loader: async () => listProgramsWithInstructors(),
   component: ProgramsAdmin,

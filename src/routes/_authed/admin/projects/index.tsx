@@ -1,7 +1,6 @@
 import {
   createFileRoute,
   Link,
-  redirect,
   stripSearchParams,
   useNavigate,
 } from "@tanstack/react-router";
@@ -51,6 +50,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "#/components/ui/select";
+import { requireStaff } from "#/lib/access-denied";
 import {
   ADMIN_DATE_FIELD_LABEL,
   ADMIN_DATE_FIELDS,
@@ -72,7 +72,6 @@ import { searchParamQuerySchema } from "#/lib/search-query";
 import type { SortState } from "#/lib/table-state";
 import { useAdminTable } from "#/lib/use-admin-table";
 import { useDebouncedDraft } from "#/lib/use-debounced-draft";
-import { isStaff } from "#/lib/viewer";
 import { PROJECT_STATUSES, type ProjectStatus } from "#/lib/vocabularies";
 import { listPrograms } from "#/server/programs";
 import {
@@ -208,9 +207,7 @@ export const Route = createFileRoute("/_authed/admin/projects/")({
   search: { middlewares: [stripSearchParams(SWITCH_DEFAULTS)] },
   head: () => ({ meta: [{ title: pageTitle("Projects") }] }),
   beforeLoad: ({ context }) => {
-    if (!isStaff(context.user)) {
-      throw redirect({ to: "/" });
-    }
+    requireStaff(context.user);
   },
   // Only the filter fields: sort and column visibility are client state and
   // must not re-run the loader.

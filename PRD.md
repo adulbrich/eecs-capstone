@@ -529,8 +529,8 @@ catalogue that decided the matrix below; #288 shipped it.
   tiles turn into colored, clickable alerts that deep-link to the filtered work
   queues (`/admin/projects` with the status set narrowed to submitted,
   `/admin/inventory/requests?tab=pending`) when items are pending.
-- [x] Admin-only user list at `/admin/users` (instructors are redirected to
-  `/admin`).
+- [x] Admin-only user list at `/admin/users` (an instructor sees the
+  access-denied page there, ADR-0057).
 - [x] Text search (email + name), role filter, include-banned toggle.
 - [x] User detail at `/admin/users/$id`: profile block, sign-in methods (the
   emailed code, which every account has, plus any linked ONID or GitHub
