@@ -80,8 +80,8 @@ const ADMIN_GATED = {
 
 const ROUTES_DIR = join(process.cwd(), "src/routes/_authed");
 
-/** A hand-written role check in a guard, which is where a redirect hid. */
-const ROLE_CHECK = /if \(!is(Staff|Admin)\(/;
+/** Any redirect at all: every guarded file below is a role guard. */
+const REDIRECT = /\bredirect\(/;
 const ROLE_GUARD = /require(Staff|Admin)\(context\.user\)/;
 
 function routeFiles(): string[] {
@@ -148,15 +148,17 @@ describe("route guards below _authed", () => {
 
   it("redirects nobody below _authed.tsx for lacking a role", () => {
     // A role guard that redirects hides why the page did not open (#606).
-    // `requireStaff` and `requireAdmin` refuse in place instead. Redirects
-    // that are not about a role, such as the project edit page sending a
-    // viewer who cannot edit back to the project, do not mention either.
+    // `requireStaff` and `requireAdmin` refuse in place instead. The files
+    // with a `beforeLoad` are exactly the role-gated ones (the test above),
+    // so none of them has a reason to redirect. The project edit page, which
+    // sends a viewer who cannot edit back to the project, guards in its
+    // loader and is not one of them.
     const guarded = routeFiles().filter((file) =>
       sourceOf(file).includes("beforeLoad")
     );
     for (const file of guarded) {
       const source = sourceOf(file);
-      expect(source, file).not.toMatch(ROLE_CHECK);
+      expect(source, file).not.toMatch(REDIRECT);
       expect(source, file).toMatch(ROLE_GUARD);
     }
   });

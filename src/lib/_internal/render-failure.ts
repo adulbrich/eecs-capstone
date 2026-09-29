@@ -1,4 +1,4 @@
-import { isAccessDenied } from "../access-denied";
+import { isAccessDenied } from "#/lib/access-denied";
 import { redactQueryError } from "./redact-query-error";
 
 const WHITESPACE_RUN = /\s+/g;

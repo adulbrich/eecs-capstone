@@ -680,9 +680,9 @@ export function AdminDataTable<T extends RowData>({
     if (!tooManyCardHeaders) {
       return;
     }
-    // Reported rather than thrown: nothing in this app declares an
-    // `errorComponent`, so a render-time throw replaces the whole admin page,
-    // and trading a squeezed card title for a blank screen is the worse bug.
+    // Reported rather than thrown: a render-time throw replaces the page's
+    // content with the router's error component, and trading a squeezed card
+    // title for an error page is the worse bug.
     // In an effect rather than in the memo above because a memo can run and be
     // discarded, which would make the warning appear or not on a detail of
     // React's scheduling.

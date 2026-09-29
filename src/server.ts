@@ -2,9 +2,9 @@
  * TanStack Start's server entry, replacing the default one to add a log line
  * for a failed server render (#602) and a 403 for the access-denied page
  * (#606); `renderFailureLines` says why this is the one place that sees every
- * route's failure. Nitro loads this on
- * the first request rather than at boot (docs/QUIRKS.md, TanStack Start), so
- * a check that must stop the process belongs in a Nitro plugin, not here.
+ * route's failure. Nitro loads this on the first request rather than at boot
+ * (docs/QUIRKS.md, TanStack Start), so a check that must stop the process
+ * belongs in a Nitro plugin, not here.
  */
 
 import {
