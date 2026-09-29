@@ -650,6 +650,16 @@ the size at the breakpoint would cost a second class set for a button that is
 square enough at `sm` with the text hidden. A pending or error label stays visible
 at every width, because an icon alone says too little about a failure.
 
+`headerHint` is one sentence about what a column means, for a column whose name
+alone would mislead: `/admin/projects`' "Updated" moves only for a change a visitor
+can see, not for every save (#502). It renders as a ghost `icon-xs` info button
+beside the header, named "About the <header> column", with the sentence in a
+`Tooltip` from `#/components/ui/tooltip`, so it takes no width. It opens on focus as
+well as on hover. It is desktop only by construction: below `md` the header row is
+hidden and the header travels as each card's field label, and a tooltip does not
+open on touch. Anything a staff member must know to act correctly belongs on the
+page, not in a hint.
+
 ### A free-text column is bounded and clamped
 
 From `md` up every `TableCell` is `md:whitespace-nowrap`, so a cell cannot wrap

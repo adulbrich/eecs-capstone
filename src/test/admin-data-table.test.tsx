@@ -201,6 +201,47 @@ describe("AdminDataTable", () => {
     expect(onSortChange).toHaveBeenCalledWith(DEFAULT_SORT);
   });
 
+  describe("headerHint", () => {
+    const HINT = "Where the item sits today.";
+    const hinted: AdminColumn<Row>[] = [
+      COLUMNS[0],
+      { ...COLUMNS[1], headerHint: HINT },
+    ];
+
+    it("puts an info button named for its column beside the header", () => {
+      renderTable({ columns: hinted, hidden: [] });
+      const header = screen.getByRole("columnheader", { name: /Location/ });
+      expect(
+        within(header).getByRole("button", {
+          name: "About the Location column",
+        })
+      ).toBeTruthy();
+      // Only the hinted column gets one.
+      expect(
+        screen.queryByRole("button", { name: /About the Name/ })
+      ).toBeNull();
+    });
+
+    it("shows the hint on focus, for a keyboard reader as well as a mouse", async () => {
+      renderTable({ columns: hinted, hidden: [] });
+      const button = screen.getByRole("button", {
+        name: "About the Location column",
+      });
+      expect(screen.queryByRole("tooltip")).toBeNull();
+      fireEvent.focus(button);
+      expect((await screen.findByRole("tooltip")).textContent).toContain(HINT);
+    });
+
+    it("keeps the hint out of the mobile field label", () => {
+      const { container } = renderTable({ columns: hinted, hidden: [] });
+      const firstRow = container.querySelectorAll("tbody tr")[0];
+      const labels = [...firstRow.querySelectorAll("td")].map((td) =>
+        td.getAttribute("data-label")
+      );
+      expect(labels).toEqual(["Name", "Location"]);
+    });
+  });
+
   it("hides a column's header and every one of its cells", () => {
     renderTable();
     expect(screen.queryByRole("columnheader", { name: /Location/ })).toBeNull();
