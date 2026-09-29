@@ -154,11 +154,11 @@ export function EmailCodeForm({
   onStepChange?: (step: Step) => void;
 }) {
   const navigate = useNavigate();
-  const [step, setStepState] = useState<Step>("address");
+  const [step, setStep] = useState<Step>("address");
   // In the handler rather than an effect on `step`, so the page hides its
   // buttons in the same render the form changes step, not one render later.
-  function setStep(next: Step) {
-    setStepState(next);
+  function goToStep(next: Step) {
+    setStep(next);
     onStepChange?.(next);
   }
   const [email, setEmail] = useState("");
@@ -209,7 +209,7 @@ export function EmailCodeForm({
     }
     setEmail(address);
     setDraft("");
-    setStep("code");
+    goToStep("code");
   }
 
   /**
@@ -262,7 +262,7 @@ export function EmailCodeForm({
         // The code is right and the address has no account, so this is a new
         // person. The code is still unspent; step 3 redeems it.
         setCode(entered);
-        setStep("name");
+        goToStep("name");
         return;
       }
       refuse(checkError, "That code did not work.");
@@ -415,7 +415,7 @@ export function EmailCodeForm({
           disabled={loading}
           onClick={() => {
             setError(null);
-            setStep("address");
+            goToStep("address");
           }}
           type="button"
           variant="outline"
