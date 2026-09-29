@@ -41,7 +41,7 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "#/components/ui/popover";
-import { ordinal, teamSizes } from "#/lib/placement/analytics";
+import { ordinal, type TeamSizes, teamSizes } from "#/lib/placement/analytics";
 import {
   applyPins,
   type BidOption,
@@ -301,12 +301,12 @@ export function ResultsTab({
 function Figures({
   first,
   placed,
-  teams,
+  sizes,
   total,
 }: {
   first: number;
   placed: number;
-  teams: ReturnType<typeof teamSizes>;
+  sizes: TeamSizes;
   total: number;
 }) {
   const unplaced = total - placed;
@@ -328,7 +328,7 @@ function Figures({
         <Figure
           hint={
             placed > 0
-              ? `${Math.round((first / placed) * 100)}% of placed`
+              ? `${Math.floor((first / placed) * 100)}% of placed`
               : null
           }
           label="First choice"
@@ -336,17 +336,17 @@ function Figures({
         />
         <Figure
           hint={
-            teams.projects > 0
-              ? `on ${teams.projects} ${teams.projects === 1 ? "project" : "projects"}`
+            sizes.projects > 0
+              ? `on ${sizes.projects} ${sizes.projects === 1 ? "project" : "projects"}`
               : null
           }
           label="Teams"
-          value={teams.teams}
+          value={sizes.teams}
         />
         <Figure
-          hint={sizeRange(teams.min, teams.max)}
+          hint={sizeRange(sizes.min, sizes.max)}
           label="Students per team"
-          value={teams.mean === null ? "-" : teams.mean.toFixed(1)}
+          value={sizes.mean === null ? "-" : sizes.mean.toFixed(1)}
         />
       </dl>
     </section>
@@ -371,7 +371,7 @@ function Figure({
   value: React.ReactNode;
 }) {
   return (
-    <Card className="p-3">
+    <Card className="p-4">
       <dt className="text-muted-foreground text-sm">{label}</dt>
       <dd className="mt-1 font-semibold text-2xl tabular-nums">{value}</dd>
       {hint && <dd className="mt-0.5 text-muted-foreground text-xs">{hint}</dd>}
@@ -432,7 +432,7 @@ function Board({
     projects,
     workspace.parameters.maxTeams
   );
-  const teams = teamSizes(rows);
+  const sizes = teamSizes(rows);
   const notes = [
     // After a failed run the heading above already carries the time.
     ...(failed ? [] : [`Ran at ${new Date(result.at).toLocaleString()}.`]),
@@ -571,10 +571,12 @@ function Board({
         <Figures
           first={first}
           placed={placed.length}
-          teams={teams}
+          sizes={sizes}
           total={rows.length}
         />
-        <RunReport lines={notes} />
+        {/* Empty after a failed re-run of a clean placement: the heading
+            above carries the time, and nothing else needs saying. */}
+        {notes.length > 0 && <RunReport lines={notes} />}
         <p className="mt-2 text-muted-foreground text-sm">
           Approve pins a student to the project they are on for every later run,
           over any pin from the bids file or the roster; Pin here on the Bids

@@ -95,7 +95,7 @@ export function AnalyticsSheet({
     ? projectsWithoutTeam(result, projects, workspace.parameters.maxTeams)
     : [];
   const priorities = rows ? priorityDistribution(rows) : [];
-  const teams = rows ? teamSizes(rows) : null;
+  const sizes = rows ? teamSizes(rows) : null;
   const stale = isStale(result, state.fingerprint);
 
   return (
@@ -219,19 +219,19 @@ export function AnalyticsSheet({
           </Section>
 
           <Section
-            csv={() => toCsv(TEAM_SIZE_COLUMNS, teams?.bySize ?? [])}
+            csv={() => toCsv(TEAM_SIZE_COLUMNS, sizes?.bySize ?? [])}
             empty={afterRun(
-              teams !== null,
-              teams?.teams ?? 0,
+              sizes !== null,
+              sizes?.teams ?? 0,
               "No team formed."
             )}
             filename="team-sizes"
             title="Team sizes"
           >
-            {teams && teams.mean !== null && (
+            {sizes && sizes.mean !== null && (
               <p className="text-muted-foreground text-sm">
-                {teams.teams} {teams.teams === 1 ? "team" : "teams"},{" "}
-                {teams.mean.toFixed(1)} students per team on average.
+                {sizes.teams} {sizes.teams === 1 ? "team" : "teams"},{" "}
+                {sizes.mean.toFixed(1)} students per team on average.
               </p>
             )}
             <Table>
@@ -243,7 +243,7 @@ export function AnalyticsSheet({
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {teams?.bySize.map((t) => (
+                {sizes?.bySize.map((t) => (
                   <TableRow key={t.size}>
                     <TableCell className="tabular-nums">{t.size}</TableCell>
                     <TableCell className="text-right tabular-nums">

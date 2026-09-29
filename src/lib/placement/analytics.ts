@@ -116,7 +116,7 @@ export interface TeamSizeRow {
 export interface TeamSizes {
   /** Smallest size first, only the sizes some team has. */
   bySize: TeamSizeRow[];
-  /** Null with no teams, as are `min` and `mean`. */
+  /** `max`, `mean` and `min` are all null with no teams. */
   max: number | null;
   /** Placed students per team. */
   mean: number | null;

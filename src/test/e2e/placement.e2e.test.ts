@@ -242,6 +242,7 @@ test.describe("placement workspace", () => {
     });
     // One team per project: Ada on Tide Clock, pinned Ben on Robot Arm.
     await expect(figures(page).getByText("every team 1")).toBeVisible();
+    await expect(page.getByText(/^Ran at /)).toBeVisible();
 
     await page.getByRole("button", { name: "Approve Ada Park here" }).click();
     await expect(
@@ -1018,6 +1019,8 @@ test.describe("placement workspace", () => {
     await dialog.getByRole("button", { name: "Remove from placement" }).click();
     await expect(page.getByText(/moved or removed by hand/)).toBeVisible();
     await expect(page.getByText("Ada Park")).toHaveCount(0);
+    // The figures drop her without a run (#701).
+    await expect(placedFigure(page, "0 of 0")).toBeVisible();
 
     // New bids keep the removals.
     await page.getByRole("tab", { name: /Bids/ }).click();
