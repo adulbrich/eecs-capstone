@@ -26,6 +26,7 @@ import { ErrorBanner } from "#/components/error-banner";
 import { StudentMenu } from "#/components/placement/removed-students";
 import type { PlacementWorkspace } from "#/components/placement/use-placement-workspace";
 import { Button } from "#/components/ui/button";
+import { Card } from "#/components/ui/card";
 import {
   Command,
   CommandEmpty,
@@ -40,7 +41,7 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "#/components/ui/popover";
-import { ordinal } from "#/lib/placement/analytics";
+import { ordinal, teamSizes } from "#/lib/placement/analytics";
 import {
   applyPins,
   type BidOption,
@@ -293,6 +294,91 @@ export function ResultsTab({
   );
 }
 
+/**
+ * The run's headline numbers (#701), read from the board as it stands, so a
+ * Move or a removal changes them at once.
+ */
+function Figures({
+  first,
+  placed,
+  teams,
+  total,
+}: {
+  first: number;
+  placed: number;
+  teams: ReturnType<typeof teamSizes>;
+  total: number;
+}) {
+  const unplaced = total - placed;
+  return (
+    <section aria-label="Placement figures" className="mt-4">
+      <dl className="grid grid-cols-2 gap-2 md:grid-cols-4">
+        <Figure
+          hint={unplaced > 0 ? `${unplaced} unplaced` : null}
+          label="Placed"
+          value={
+            <>
+              {placed}{" "}
+              <span className="font-normal text-base text-muted-foreground">
+                of {total}
+              </span>
+            </>
+          }
+        />
+        <Figure
+          hint={
+            placed > 0
+              ? `${Math.round((first / placed) * 100)}% of placed`
+              : null
+          }
+          label="First choice"
+          value={first}
+        />
+        <Figure
+          hint={
+            teams.projects > 0
+              ? `on ${teams.projects} ${teams.projects === 1 ? "project" : "projects"}`
+              : null
+          }
+          label="Teams"
+          value={teams.teams}
+        />
+        <Figure
+          hint={sizeRange(teams.min, teams.max)}
+          label="Students per team"
+          value={teams.mean === null ? "-" : teams.mean.toFixed(1)}
+        />
+      </dl>
+    </section>
+  );
+}
+
+/** Under the mean: "3 to 4", or "every team 4" when they are one size. */
+function sizeRange(min: number | null, max: number | null): string | null {
+  if (min === null || max === null) {
+    return null;
+  }
+  return min === max ? `every team ${max}` : `${min} to ${max}`;
+}
+
+function Figure({
+  hint,
+  label,
+  value,
+}: {
+  hint: string | null;
+  label: string;
+  value: React.ReactNode;
+}) {
+  return (
+    <Card className="p-3">
+      <dt className="text-muted-foreground text-sm">{label}</dt>
+      <dd className="mt-1 font-semibold text-2xl tabular-nums">{value}</dd>
+      {hint && <dd className="mt-0.5 text-muted-foreground text-xs">{hint}</dd>}
+    </Card>
+  );
+}
+
 function RunReport({ lines }: { lines: string[] }) {
   return (
     <section
@@ -346,8 +432,10 @@ function Board({
     projects,
     workspace.parameters.maxTeams
   );
+  const teams = teamSizes(rows);
   const notes = [
-    `${placed.length} of ${rows.length} students placed, ${first} on their first choice, at ${new Date(result.at).toLocaleString()}.`,
+    // After a failed run the heading above already carries the time.
+    ...(failed ? [] : [`Ran at ${new Date(result.at).toLocaleString()}.`]),
     ...(stale
       ? [
           "The projects, parameters or bids changed since this run. Run placement again to use them.",
@@ -480,6 +568,12 @@ function Board({
             Last run that worked, {new Date(result.at).toLocaleString()}
           </h2>
         )}
+        <Figures
+          first={first}
+          placed={placed.length}
+          teams={teams}
+          total={rows.length}
+        />
         <RunReport lines={notes} />
         <p className="mt-2 text-muted-foreground text-sm">
           Approve pins a student to the project they are on for every later run,

@@ -22,6 +22,14 @@ const BIDS_CSV = [
 ].join("\n");
 const STORAGE_KEY = "cs-capstone:placement:v1";
 
+/** The Results tab's figure tiles (#701), there once a run has finished. */
+const figures = (page: Page) =>
+  page.getByRole("region", { name: "Placement figures" });
+
+/** The Placed tile's value, as "2 of 2". */
+const placedFigure = (page: Page, value: string) =>
+  figures(page).getByText(value, { exact: true });
+
 async function importFiles(page: Page) {
   await page.getByLabel("Projects CSV file").setInputFiles({
     name: "projects.csv",
@@ -63,7 +71,7 @@ test.describe("placement workspace", () => {
     // A run too, so the worker and its WASM fetch are among the requests.
     await page.getByRole("tab", { name: "Results" }).click();
     await page.getByRole("button", { name: "Run placement" }).click();
-    await expect(page.getByText(/students placed/)).toBeVisible({
+    await expect(figures(page)).toBeVisible({
       timeout: 20_000,
     });
     expect(sent.some((r) => r.includes(".wasm"))).toBe(true);
@@ -229,9 +237,11 @@ test.describe("placement workspace", () => {
     await page.getByLabel("Min students per team, Robot Arm").fill("1");
     await page.getByRole("tab", { name: "Results" }).click();
     await page.getByRole("button", { name: "Run placement" }).click();
-    await expect(page.getByText("2 of 2 students placed")).toBeVisible({
+    await expect(placedFigure(page, "2 of 2")).toBeVisible({
       timeout: 20_000,
     });
+    // One team per project: Ada on Tide Clock, pinned Ben on Robot Arm.
+    await expect(figures(page).getByText("every team 1")).toBeVisible();
 
     await page.getByRole("button", { name: "Approve Ada Park here" }).click();
     await expect(
@@ -252,6 +262,8 @@ test.describe("placement workspace", () => {
     await search.fill("clock");
     await page.getByRole("option", { name: "Tide Clock" }).click();
     await expect(page.getByText(/moved by hand/)).toBeVisible();
+    // The figures follow the Move without a run (#701).
+    await expect(figures(page).getByText("every team 2")).toBeVisible();
     await page.getByRole("button", { name: "Run placement again" }).click();
     await expect(page.getByText(/moved by hand/)).toBeHidden({
       timeout: 20_000,
@@ -288,7 +300,7 @@ test.describe("placement workspace", () => {
     await page.getByLabel("Min students per team, Robot Arm").fill("1");
     await page.getByRole("tab", { name: "Results" }).click();
     await page.getByRole("button", { name: "Run placement" }).click();
-    await expect(page.getByText("2 of 2 students placed")).toBeVisible({
+    await expect(placedFigure(page, "2 of 2")).toBeVisible({
       timeout: 20_000,
     });
 
@@ -348,7 +360,7 @@ test.describe("placement workspace", () => {
     await importFiles(page);
     await page.getByRole("tab", { name: "Results" }).click();
     await page.getByRole("button", { name: "Run placement" }).click();
-    await expect(page.getByText("2 of 2 students placed")).toBeVisible({
+    await expect(placedFigure(page, "2 of 2")).toBeVisible({
       timeout: 20_000,
     });
 
@@ -379,7 +391,7 @@ test.describe("placement workspace", () => {
     await expect(
       page.getByText(/Run placement again to use them/)
     ).toBeHidden();
-    await expect(page.getByText(/2 of 2 students placed/)).toBeVisible();
+    await expect(placedFigure(page, "2 of 2")).toBeVisible();
   });
 
   test("an export that lost its ImportId row still converts, and one with no email says why it cannot", async ({
@@ -464,18 +476,19 @@ test.describe("placement workspace", () => {
     await importFiles(page);
     await page.getByRole("tab", { name: "Results" }).click();
     await page.getByRole("button", { name: "Run placement" }).click();
-    await expect(page.getByText(/students placed/)).toBeVisible({
+    await expect(figures(page)).toBeVisible({
       timeout: 20_000,
     });
     await page.getByRole("button", { name: "Analytics" }).click();
     const sheet = page.getByRole("dialog", { name: "Placement analytics" });
 
     // Both students land on Robot Arm; Tide Clock's minimum of 3 leaves it
-    // without a team, so three tables have rows and one says it has none.
+    // without a team, so four sections have rows and one says it has none.
     const headers: Record<string, string> = {
       "bids per project": "project,first_choice_bids,total_bids",
       "priority distribution":
         "priority,students,percent_of_placed,percent_of_all",
+      "team sizes": "students_per_team,teams,students",
       "projects with no team formed": "project",
     };
     for (const [table, header] of Object.entries(headers)) {
@@ -487,6 +500,9 @@ test.describe("placement workspace", () => {
       expect(text.replace(/^\uFEFF/, "").split("\r\n")[0]).toBe(header);
     }
     await expect(sheet.getByText("Every student is placed.")).toBeVisible();
+    await expect(
+      sheet.getByText("1 team, 2.0 students per team on average.")
+    ).toBeVisible();
     await sheet.getByRole("button", { name: "Close" }).click();
     await expect(sheet).toBeHidden();
   });
@@ -628,7 +644,7 @@ test.describe("placement workspace", () => {
 
     await page.getByRole("tab", { name: "Results" }).click();
     await page.getByRole("button", { name: "Run placement" }).click();
-    await expect(page.getByText("3 of 3 students placed")).toBeVisible({
+    await expect(placedFigure(page, "3 of 3")).toBeVisible({
       timeout: 20_000,
     });
     await expect(
@@ -714,7 +730,7 @@ test.describe("placement workspace", () => {
 
     await page.getByRole("tab", { name: "Results" }).click();
     await page.getByRole("button", { name: "Run placement" }).click();
-    await expect(page.getByText("4 of 4 students placed")).toBeVisible({
+    await expect(placedFigure(page, "4 of 4")).toBeVisible({
       timeout: 20_000,
     });
     const group = (label: string) =>
@@ -804,7 +820,7 @@ test.describe("placement workspace", () => {
     await page.getByRole("tab", { name: "Results" }).click();
     await expect(page).toHaveURL(/view=project/);
     await page.getByRole("button", { name: "Run placement" }).click();
-    await expect(page.getByText(/students placed/)).toBeVisible({
+    await expect(figures(page)).toBeVisible({
       timeout: 20_000,
     });
     await expect(
@@ -851,7 +867,7 @@ test.describe("placement workspace", () => {
 
     await page.getByRole("tab", { name: "Results" }).click();
     await page.getByRole("button", { name: "Run placement" }).click();
-    await expect(page.getByText("2 of 2 students placed")).toBeVisible({
+    await expect(placedFigure(page, "2 of 2")).toBeVisible({
       timeout: 20_000,
     });
     await page.getByRole("tab", { name: /Bids/ }).click();
@@ -918,7 +934,7 @@ test.describe("placement workspace", () => {
     await page.getByLabel("Min students per team, Robot Arm").fill("1");
     await page.getByRole("tab", { name: "Results" }).click();
     await page.getByRole("button", { name: "Run placement" }).click();
-    await expect(page.getByText("3 of 3 students placed")).toBeVisible({
+    await expect(placedFigure(page, "3 of 3")).toBeVisible({
       timeout: 20_000,
     });
     await expect(
@@ -974,7 +990,7 @@ test.describe("placement workspace", () => {
     await page.getByLabel("Min students").fill("1");
     await page.getByRole("tab", { name: "Results" }).click();
     await page.getByRole("button", { name: "Run placement" }).click();
-    await expect(page.getByText("1 of 1 students placed")).toBeVisible({
+    await expect(placedFigure(page, "1 of 1")).toBeVisible({
       timeout: 20_000,
     });
     // On the board, Remove sits in the row's More menu and asks first, so

@@ -25,6 +25,8 @@ import {
   type PriorityRow,
   type ProjectBids,
   priorityDistribution,
+  type TeamSizeRow,
+  teamSizes,
 } from "#/lib/placement/analytics";
 import {
   applyPins,
@@ -50,6 +52,11 @@ const PRIORITY_COLUMNS: CsvColumn<PriorityRow>[] = [
   { header: "percent_of_placed", value: (r) => percent(r.ofPlaced) },
   { header: "percent_of_all", value: (r) => percent(r.ofAll) },
 ];
+const TEAM_SIZE_COLUMNS: CsvColumn<TeamSizeRow>[] = [
+  { header: "students_per_team", value: (r) => r.size },
+  { header: "teams", value: (r) => r.teams },
+  { header: "students", value: (r) => r.students },
+];
 const UNPLACED_COLUMNS: CsvColumn<BoardRow>[] = [
   { header: "email", value: (r) => r.email },
   { header: "name", value: (r) => r.name },
@@ -62,7 +69,7 @@ const NO_TEAM_COLUMNS: CsvColumn<WorkspaceProject>[] = [
 /**
  * The analytics over a placement workspace (#650), in a Sheet so the page
  * behind it stays where the reader left it. Bids per project is there as
- * soon as bids are; the other three wait for a run.
+ * soon as bids are; the other four wait for a run.
  */
 export function AnalyticsSheet({
   state,
@@ -88,6 +95,7 @@ export function AnalyticsSheet({
     ? projectsWithoutTeam(result, projects, workspace.parameters.maxTeams)
     : [];
   const priorities = rows ? priorityDistribution(rows) : [];
+  const teams = rows ? teamSizes(rows) : null;
   const stale = isStale(result, state.fingerprint);
 
   return (
@@ -122,7 +130,7 @@ export function AnalyticsSheet({
           {stale && (
             <p className="text-sm" role="status">
               The projects or parameters changed since the last run, so the
-              three tables after the first describe that run, not the current
+              sections after the first describe that run, not the current
               settings. Run placement again for current figures.
             </p>
           )}
@@ -203,6 +211,46 @@ export function AnalyticsSheet({
                     </TableCell>
                     <TableCell className="text-right tabular-nums">
                       {percent(p.ofAll)}
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </Section>
+
+          <Section
+            csv={() => toCsv(TEAM_SIZE_COLUMNS, teams?.bySize ?? [])}
+            empty={afterRun(
+              teams !== null,
+              teams?.teams ?? 0,
+              "No team formed."
+            )}
+            filename="team-sizes"
+            title="Team sizes"
+          >
+            {teams && teams.mean !== null && (
+              <p className="text-muted-foreground text-sm">
+                {teams.teams} {teams.teams === 1 ? "team" : "teams"},{" "}
+                {teams.mean.toFixed(1)} students per team on average.
+              </p>
+            )}
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Students per team</TableHead>
+                  <TableHead className="text-right">Teams</TableHead>
+                  <TableHead className="text-right">Students</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {teams?.bySize.map((t) => (
+                  <TableRow key={t.size}>
+                    <TableCell className="tabular-nums">{t.size}</TableCell>
+                    <TableCell className="text-right tabular-nums">
+                      {t.teams}
+                    </TableCell>
+                    <TableCell className="text-right tabular-nums">
+                      {t.students}
                     </TableCell>
                   </TableRow>
                 ))}

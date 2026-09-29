@@ -3,6 +3,7 @@ import {
   bidsPerProject,
   ordinal,
   priorityDistribution,
+  teamSizes,
 } from "#/lib/placement/analytics";
 import type { BoardRow } from "#/lib/placement/board";
 
@@ -147,5 +148,66 @@ describe("priorityDistribution with pre-approvals (#670)", () => {
       ["1st choice", 1],
       ["Pre-approved", 2],
     ]);
+  });
+});
+
+describe("teamSizes (#701)", () => {
+  const on = (email: string, projectKey: string, team: number): BoardRow => ({
+    ...row(email, projectKey, 1),
+    team,
+  });
+
+  it("counts each project's teams apart, with the mean and range of their sizes", () => {
+    const rows = [
+      on("a", "p1", 1),
+      on("b", "p1", 1),
+      on("c", "p1", 1),
+      on("d", "p1", 2),
+      on("e", "p1", 2),
+      on("f", "p1", 2),
+      on("g", "p1", 2),
+      // Team 1 of another project is another team.
+      on("h", "p2", 1),
+      on("i", "p2", 1),
+      on("j", "p2", 1),
+      on("k", "p2", 1),
+      row("z", null, null),
+    ];
+    expect(teamSizes(rows)).toEqual({
+      bySize: [
+        { size: 3, teams: 1, students: 3 },
+        { size: 4, teams: 2, students: 8 },
+      ],
+      teams: 3,
+      projects: 2,
+      mean: 11 / 3,
+      min: 3,
+      max: 4,
+    });
+  });
+
+  it("counts a one-student team a Move started", () => {
+    const rows = [
+      on("a", "p1", 1),
+      on("b", "p1", 1),
+      on("c", "p1", 1),
+      on("m", "p2", 1),
+    ];
+    const sizes = teamSizes(rows);
+    expect(sizes.teams).toBe(2);
+    expect([sizes.min, sizes.max, sizes.mean]).toEqual([1, 3, 2]);
+  });
+
+  it("has no teams and no sizes with nobody placed", () => {
+    const none = {
+      bySize: [],
+      teams: 0,
+      projects: 0,
+      mean: null,
+      min: null,
+      max: null,
+    };
+    expect(teamSizes([])).toEqual(none);
+    expect(teamSizes([row("z", null, null)])).toEqual(none);
   });
 });
