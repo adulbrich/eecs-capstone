@@ -49,9 +49,17 @@ function isQueryError(value: unknown): value is QueryErrorShape {
 }
 
 /**
- * The two shapes a parameter tail arrives in.
+ * The two shapes a parameter tail arrives in, as one pattern.
  *
- * The first is `DrizzleQueryError`'s own message template. The second is what
+ * The first is `DrizzleQueryError`'s own message template, which writes
+ * exactly `\nparams:`. Any single whitespace character matches in place of
+ * that newline (#608): a space, an indent, a tab and U+2028 all left the
+ * parameters whole under the old literal, and a wrapper that reflows or
+ * indents the message would produce them. The cost is that prose containing
+ * " params:" after a space is truncated there too; a string that starts with
+ * "params:" is not, since nothing precedes it. An escaped `\n`, `\r` or `\t`
+ * counts as whitespace too, which is the same message after a wrapper put it
+ * through `JSON.stringify`. The second is what
  * `JSON.stringify` of that error produces, because it sets `query` and
  * `params` as own enumerable properties, so a serialized copy carries the
  * parameters with no newline in front of them. Nothing here serializes a
@@ -61,7 +69,7 @@ function isQueryError(value: unknown): value is QueryErrorShape {
  * service that writes to a log group, and that change would otherwise reopen
  * this silently.
  */
-const PARAM_MARKERS = ["\nparams:", '"params":'];
+const PARAM_MARKER = /(?:\s|\\[nrt])params:|"params":/;
 
 /**
  * Strips the parameter tail off a message that already carries one.
@@ -80,14 +88,16 @@ function scrubQueryText(text: string): string {
   // whole. Nothing in this codebase or in Better Auth does that today, but the
   // cost of covering it is one dropped condition, and the failure mode of the
   // looser test is a truncated log line rather than a leaked one.
-  const marker = PARAM_MARKERS.reduce((earliest, candidate) => {
-    const at = text.indexOf(candidate);
-    return at !== -1 && at < earliest ? at : earliest;
-  }, Number.POSITIVE_INFINITY);
-  if (marker === Number.POSITIVE_INFINITY) {
+  // `search` returns the earliest match of either alternative, which is the
+  // one to cut at: everything after it is a parameter tail.
+  const marker = text.search(PARAM_MARKER);
+  if (marker === -1) {
     return text;
   }
-  return `${text.slice(0, marker)} [params redacted]`;
+  // `trimEnd` because the match is the one character before `params:`, so an
+  // indent or a `\r\n` would leave the rest of its run behind, and a raw
+  // newline starts a new awslogs event for the callers that do not collapse.
+  return `${text.slice(0, marker).trimEnd()} [params redacted]`;
 }
 
 function truncate(sql: string): string {
@@ -172,7 +182,7 @@ export function redactingAuthLogger(
     const safeMessage = redactQueryError(message);
     const line = `[Better Auth] ${level}: ${safeMessage}${extra.length > 0 ? ` ${extra.join(" ")}` : ""}`;
     // One line, and only after redaction, which finds parameters by the
-    // newline in front of them. awslogs makes each line its own event, and
+    // whitespace in front of them. awslogs makes each line its own event, and
     // Better Auth logs a rejected callbackURL word for word, so a newline in
     // one would start an event a stranger wrote, which the `ai_write_failures`
     // metric filter in `infra/alarms.tf` would count.

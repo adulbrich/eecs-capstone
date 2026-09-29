@@ -63,9 +63,10 @@ describe("renderFailureLines", () => {
     expect(lines[0]).toContain('"program"');
   });
 
-  it("redacts before it collapses, so a parameter tail is still found", () => {
-    // `redactQueryError` finds the tail by the newline in "\nparams:". The
-    // other order would turn it into " params:" and log the parameter.
+  it("keeps a parameter tail out of the render failure line", () => {
+    // The other order turns "\nparams:" into " params:". Since #608 the
+    // redaction finds that shape too, so either order passes: this is a leak
+    // regression for the render path, and it no longer pins the order.
     const [line] = renderFailureLines([
       {
         routeId: "/_public/projects/",
