@@ -72,8 +72,9 @@ export interface ObjectStorage {
 /**
  * The SDK's default handler sets no request timeout, so without these a
  * stalled S3 call holds whatever awaits it for as long as the socket stays
- * open, the shape #618 fixed for Bedrock (#621). Each bounds the whole call,
- * retries included, the way `EMBED_TIMEOUT_MS` does.
+ * open, the shape #618 fixed for Bedrock (#621). The signal is shared by
+ * every attempt, so a stall costs the timeout plus the SDK's retry backoff,
+ * a few hundred milliseconds, rather than a fresh timeout per retry.
  *
  * Sized from the September 2026 ALB logs: the twelve image uploads took 0.8 s
  * to 2.5 s end to end, and that covers receiving the body, Sharp, this put

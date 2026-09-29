@@ -84,10 +84,14 @@ describe("updateProjectAs when the old image's delete never settles", () => {
       .set({ imageUrl: oldKey })
       .where(eq(projects.id, id));
 
+    let timer: ReturnType<typeof setTimeout> | undefined;
     const answer = await Promise.race([
       updateProjectAs(admin, { ...baseProject(), id, imageUrl: newKey }, embed),
-      new Promise((resolve) => setTimeout(() => resolve(NEVER), 5000)),
+      new Promise((resolve) => {
+        timer = setTimeout(() => resolve(NEVER), 5000);
+      }),
     ]);
+    clearTimeout(timer);
 
     expect(answer).toEqual({ id, updated: true });
     const [row] = await db
