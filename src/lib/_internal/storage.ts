@@ -227,14 +227,20 @@ const backgroundDeletes = new Set<Promise<void>>();
 
 /**
  * `deleteOwnedObject`, started and not awaited, for a caller whose response
- * must not wait on S3 once its row has committed (#621). Safe to leave
- * floating because `deleteOwnedObject` never rejects.
+ * must not wait on S3 once its row has committed (#621).
  */
 export function deleteOwnedObjectInBackground(
   key: string | null | undefined,
   space: KeySpace
 ): void {
-  const run = deleteOwnedObject(key, space);
+  // `deleteOwnedObject` catches its own S3 failure; this catch is for
+  // anything that slips past it, since nobody awaits `run` and a rejection
+  // here would be unhandled, as `refreshProjectInBackground` guards too.
+  const run = deleteOwnedObject(key, space).catch((error: unknown) => {
+    console.warn(
+      `Background delete of ${key} failed: ${redactQueryError(error)}`
+    );
+  });
   backgroundDeletes.add(run);
   run.finally(() => backgroundDeletes.delete(run));
 }
