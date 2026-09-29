@@ -64,8 +64,9 @@ describe("renderFailureLines", () => {
   });
 
   it("redacts before it collapses, so a parameter tail is still found", () => {
-    // `redactQueryError` finds the tail by the newline in "\nparams:". The
-    // other order would turn it into " params:" and log the parameter.
+    // The other order turns "\nparams:" into " params:". Since #608 the
+    // redaction finds that shape too, so this pins the order rather than
+    // being the only thing between the parameter and the log.
     const [line] = renderFailureLines([
       {
         routeId: "/_public/projects/",

@@ -102,6 +102,47 @@ describe("redactQueryError", () => {
     expect(redactQueryError(serialized)).not.toContain(SECRET);
   });
 
+  describe("a params tail after whitespace other than one newline (#608)", () => {
+    // DrizzleQueryError always writes exactly "\nparams:", so none of these
+    // has a producer today. A wrapper that reflows the message would make one,
+    // and the looser match costs a truncated line where the tighter one would
+    // cost a leaked token.
+    const shapes = [
+      ["a space", `Failed query: select 1 params: ${SECRET}`],
+      ["an indent", `Failed query: select 1\n  params: ${SECRET}`],
+      ["a tab", `Failed query: select 1\tparams: ${SECRET}`],
+      ["U+2028", `Failed query: select 1 params: ${SECRET}`],
+      ["U+2029", `Failed query: select 1 params: ${SECRET}`],
+      ["a carriage return", `Failed query: select 1\r\nparams: ${SECRET}`],
+    ] as const;
+
+    for (const [name, text] of shapes) {
+      it(`redacts it after ${name}, as a string`, () => {
+        const line = redactQueryError(text);
+        expect(line).not.toContain(SECRET);
+        expect(line).toContain("Failed query: select 1");
+        expect(line).toContain("[params redacted]");
+      });
+
+      it(`redacts it after ${name}, as an Error message`, () => {
+        const line = redactQueryError(new Error(text));
+        expect(line).not.toContain(SECRET);
+        expect(line).toContain("[params redacted]");
+      });
+    }
+
+    it("cuts at the earliest marker when both shapes appear", () => {
+      const text = `a params: ${SECRET} "params":["other"]`;
+      expect(redactQueryError(text)).toBe("a [params redacted]");
+    });
+  });
+
+  it("leaves the word params alone mid-sentence without a colon", () => {
+    const text = "the request had no params so nothing was bound";
+    expect(redactQueryError(text)).toBe(text);
+    expect(redactQueryError(new Error(text))).toBe(`Error: ${text}`);
+  });
+
   it("leaves an ordinary string alone", () => {
     expect(redactQueryError("params: not a query error")).toBe(
       "params: not a query error"
