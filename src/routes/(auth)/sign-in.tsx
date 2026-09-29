@@ -13,10 +13,13 @@ import {
 import { OAuthSignInButtons } from "#/components/oauth-sign-in-buttons";
 import { getSession } from "#/lib/auth-guards";
 import { pageTitle } from "#/lib/page-title";
+import { sameOriginPath } from "#/lib/same-origin-path";
 import { NOINDEX } from "#/lib/social-meta";
 
-const searchSchema = z.object({
-  redirect: z.string().optional().catch(undefined),
+export const searchSchema = z.object({
+  // A path on this site or nothing, so the code form's navigate and the
+  // OAuth buttons' callbackURL both receive a checked value (#702).
+  redirect: z.string().optional().transform(sameOriginPath).catch(undefined),
   // Better Auth redirects a failed OAuth callback to errorCallbackURL with the
   // reason in `error`. Without this the param is not in the route's search
   // schema, so the page renders as if nothing went wrong.
