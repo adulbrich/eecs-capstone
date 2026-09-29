@@ -340,6 +340,11 @@ const COLUMNS = defineAdminColumns<Row>()([
     accessorFn: (row) => row.updatedAt,
     cell: ({ row }) => <LocalTime dateOnly value={row.original.updatedAt} />,
     header: "Updated",
+    // The column orders the public "Recently updated" listing, so staff-only
+    // saves leave it alone (#502), which a reader of this table would not
+    // guess from the name.
+    headerHint:
+      "The last change a visitor can see. Staff-only edits, such as naming a mentor or relinking a proposer, do not move it. The edit log has every change.",
     id: "updatedAt",
     sortFn: "datetime",
   },

@@ -14,7 +14,13 @@ import {
   tableFeatures,
   useTable,
 } from "@tanstack/react-table";
-import { ChevronDown, ChevronsUpDown, ChevronUp, Columns3 } from "lucide-react";
+import {
+  ChevronDown,
+  ChevronsUpDown,
+  ChevronUp,
+  Columns3,
+  Info,
+} from "lucide-react";
 import { Fragment, type ReactNode, useEffect, useMemo, useRef } from "react";
 import { EmptyState } from "#/components/empty-state";
 import { Button } from "#/components/ui/button";
@@ -36,6 +42,12 @@ import {
   TableHeader,
   TableRow,
 } from "#/components/ui/table";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "#/components/ui/tooltip";
 import {
   clearStoredHidden,
   type SortState,
@@ -119,6 +131,12 @@ function localeCompareSortFn<T extends RowData>(
  * it is (a name or a title, usually beside a thumbnail), where a "Name"
  * label would only squeeze the title into what is left of the row. At most
  * one column per table should set it.
+ *
+ * `headerHint` is a sentence about what the column means, for when its name
+ * alone would mislead: an info button beside the header opens it as a
+ * tooltip, so it takes no width. Desktop only, by construction: below `md`
+ * the header row is hidden and the column name travels as each card's field
+ * label, and a tooltip does not open on touch anyway.
  */
 export type AdminColumn<T extends RowData> = ColumnDef<
   AdminTableFeatures,
@@ -132,6 +150,7 @@ interface AdminColumnExtras {
   cardHeader?: boolean;
   defaultHidden?: boolean;
   header: string;
+  headerHint?: string;
   id: string;
 }
 
@@ -568,6 +587,33 @@ function ariaSort(
   return "none";
 }
 
+/**
+ * The info button beside a header that carries a `headerHint`. A sibling of
+ * the sort button rather than inside it, since a button cannot hold another,
+ * and named for its column so a screen reader does not hear three "About"
+ * buttons. Radix points the trigger's `aria-describedby` at the text while it
+ * is open, which it is on focus as well as on hover.
+ */
+function HeaderHint({ label, text }: { label: string; text: string }) {
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <Button
+          aria-label={`About the ${label} column`}
+          size="icon-xs"
+          type="button"
+          variant="ghost"
+        >
+          <Info aria-hidden="true" className="text-muted-foreground" />
+        </Button>
+      </TooltipTrigger>
+      <TooltipContent className="max-w-xs" side="bottom">
+        {text}
+      </TooltipContent>
+    </Tooltip>
+  );
+}
+
 function SortIcon({ direction }: { direction: false | "asc" | "desc" }) {
   if (direction === "asc") {
     return <ChevronUp aria-hidden className="size-3.5" />;
@@ -611,6 +657,10 @@ export function AdminDataTable<T extends RowData>({
   // whose type also admits render functions.
   const labels = useMemo(
     () => new Map(columns.map((column) => [column.id, column.header])),
+    [columns]
+  );
+  const hints = useMemo(
+    () => new Map(columns.map((column) => [column.id, column.headerHint])),
     [columns]
   );
   const marked = useMemo(
@@ -820,36 +870,44 @@ export function AdminDataTable<T extends RowData>({
         >
           <TableCaption className="sr-only">{caption}</TableCaption>
           <TableHeader>
-            {table.getHeaderGroups().map((headerGroup) => (
-              <TableRow key={headerGroup.id}>
-                {headerGroup.headers.map((header) => {
-                  const direction = header.column.getIsSorted();
-                  const label = labels.get(header.column.id) ?? "";
-                  const canSort = header.column.getCanSort();
-                  return (
-                    <TableHead
-                      aria-sort={canSort ? ariaSort(direction) : undefined}
-                      className="bg-secondary md:sticky md:top-0 md:z-10"
-                      key={header.id}
-                      scope="col"
-                    >
-                      {canSort ? (
-                        <button
-                          className="inline-flex items-center gap-1 hover:underline"
-                          onClick={header.column.getToggleSortingHandler()}
-                          type="button"
-                        >
-                          {label}
-                          <SortIcon direction={direction} />
-                        </button>
-                      ) : (
-                        label
-                      )}
-                    </TableHead>
-                  );
-                })}
-              </TableRow>
-            ))}
+            <TooltipProvider>
+              {table.getHeaderGroups().map((headerGroup) => (
+                <TableRow key={headerGroup.id}>
+                  {headerGroup.headers.map((header) => {
+                    const direction = header.column.getIsSorted();
+                    const label = labels.get(header.column.id) ?? "";
+                    const hint = hints.get(header.column.id);
+                    const canSort = header.column.getCanSort();
+                    return (
+                      <TableHead
+                        aria-sort={canSort ? ariaSort(direction) : undefined}
+                        className="bg-secondary md:sticky md:top-0 md:z-10"
+                        key={header.id}
+                        scope="col"
+                      >
+                        <span className="inline-flex items-center gap-1">
+                          {canSort ? (
+                            <button
+                              className="inline-flex items-center gap-1 hover:underline"
+                              onClick={header.column.getToggleSortingHandler()}
+                              type="button"
+                            >
+                              {label}
+                              <SortIcon direction={direction} />
+                            </button>
+                          ) : (
+                            label
+                          )}
+                          {hint ? (
+                            <HeaderHint label={label} text={hint} />
+                          ) : null}
+                        </span>
+                      </TableHead>
+                    );
+                  })}
+                </TableRow>
+              ))}
+            </TooltipProvider>
           </TableHeader>
           {group && grouped && groups.length > 0 ? (
             groups.map(({ key, rows: rowsOfGroup }) => {
