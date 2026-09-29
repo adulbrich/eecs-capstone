@@ -14,8 +14,8 @@ const BASE = "http://same-origin.invalid";
  * resolves to the same origin once the URL parser has had it: the parser
  * drops a tab or newline before it reads an authority, so `/\t/evil.example`
  * passes the prefix checks and is still `//evil.example`. Returns what the
- * parser resolved rather than the input, so the value that was checked is the
- * value that is used.
+ * parser resolved rather than the input, and checks that too, so the value
+ * that was checked is the value that is used.
  *
  * TanStack Router and Better Auth each refuse an off-site target today (see
  * QUIRKS, "Route search params via `validateSearch`"). This is the check the
@@ -39,5 +39,11 @@ export function sameOriginPath(value: unknown): string | undefined {
   if (url.origin !== BASE) {
     return;
   }
-  return `${url.pathname}${url.search}${url.hash}`;
+  // Checked again on the way out, because resolving dot segments can make a
+  // `//` the input did not start with: `/.//evil.example` and
+  // `/a/..//evil.example` both come back as `//evil.example`, which a caller
+  // would read as another host. The parser has already turned every
+  // backslash in the path into `/`, so this one prefix covers `/\` too.
+  const resolved = `${url.pathname}${url.search}${url.hash}`;
+  return resolved.startsWith("//") ? undefined : resolved;
 }

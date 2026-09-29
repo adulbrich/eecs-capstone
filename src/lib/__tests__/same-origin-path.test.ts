@@ -21,6 +21,12 @@ describe("sameOriginPath", () => {
     // prefix checks alone would pass it.
     ["a tab inside the slashes", "/\t/evil.example"],
     ["a newline inside the slashes", "/\n/evil.example"],
+    // Each passes the prefix checks and resolves to `//evil.example`, so the
+    // resolved path has to be checked as well as the input.
+    ["a dot segment before the slashes", "/.//evil.example"],
+    ["a parent segment before the slashes", "/a/..//evil.example"],
+    ["an encoded dot segment", "/%2e//evil.example"],
+    ["a dot segment before a backslash", "/./\\evil.example"],
     ["a relative path", "projects"],
     ["an empty string", ""],
   ])("reads %s as absent", (_name, value) => {
