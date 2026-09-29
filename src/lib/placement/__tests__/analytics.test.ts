@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   bidsPerProject,
   ordinal,
+  percentDown,
   priorityDistribution,
   teamSizes,
 } from "#/lib/placement/analytics";
@@ -209,5 +210,17 @@ describe("teamSizes (#701)", () => {
     };
     expect(teamSizes([])).toEqual(none);
     expect(teamSizes([row("z", null, null)])).toEqual(none);
+  });
+});
+
+describe("percentDown (#701)", () => {
+  it.each([
+    [29, 100, 29],
+    [57, 100, 57],
+    [199, 200, 99],
+    [1, 201, 0],
+    [3, 3, 100],
+  ])("writes %i of %i as %i", (count, of, percent) => {
+    expect(percentDown(count, of)).toBe(percent);
   });
 });

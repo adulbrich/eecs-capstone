@@ -41,7 +41,12 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "#/components/ui/popover";
-import { ordinal, type TeamSizes, teamSizes } from "#/lib/placement/analytics";
+import {
+  ordinal,
+  percentDown,
+  type TeamSizes,
+  teamSizes,
+} from "#/lib/placement/analytics";
 import {
   applyPins,
   type BidOption,
@@ -326,11 +331,7 @@ function Figures({
           }
         />
         <Figure
-          hint={
-            placed > 0
-              ? `${Math.floor((first / placed) * 100)}% of placed`
-              : null
-          }
+          hint={placed > 0 ? `${percentDown(first, placed)}% of placed` : null}
           label="First choice"
           value={first}
         />

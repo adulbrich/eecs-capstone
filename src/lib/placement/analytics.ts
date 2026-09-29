@@ -106,6 +106,14 @@ export function priorityDistribution(rows: readonly BoardRow[]): PriorityRow[] {
   ];
 }
 
+/**
+ * `count` of `of` as a whole percent, rounded down so one student short of
+ * everyone never reads 100%. Integer math: `(29 / 100) * 100` is 28.999...
+ */
+export function percentDown(count: number, of: number): number {
+  return Math.floor((count * 100) / of);
+}
+
 export interface TeamSizeRow {
   size: number;
   /** Students on teams of this size: `size` times `teams`. */
