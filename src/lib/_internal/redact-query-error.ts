@@ -57,7 +57,9 @@ function isQueryError(value: unknown): value is QueryErrorShape {
  * parameters whole under the old literal, and a wrapper that reflows or
  * indents the message would produce them. The cost is that prose containing
  * " params:" after a space is truncated there too; a string that starts with
- * "params:" is not, since nothing precedes it. The second is what
+ * "params:" is not, since nothing precedes it. An escaped `\n`, `\r` or `\t`
+ * counts as whitespace too, which is the same message after a wrapper put it
+ * through `JSON.stringify`. The second is what
  * `JSON.stringify` of that error produces, because it sets `query` and
  * `params` as own enumerable properties, so a serialized copy carries the
  * parameters with no newline in front of them. Nothing here serializes a
@@ -67,7 +69,7 @@ function isQueryError(value: unknown): value is QueryErrorShape {
  * service that writes to a log group, and that change would otherwise reopen
  * this silently.
  */
-const PARAM_MARKER = /\sparams:|"params":/;
+const PARAM_MARKER = /(?:\s|\\[nrt])params:|"params":/;
 
 /**
  * Strips the parameter tail off a message that already carries one.
@@ -92,7 +94,10 @@ function scrubQueryText(text: string): string {
   if (marker === -1) {
     return text;
   }
-  return `${text.slice(0, marker)} [params redacted]`;
+  // `trimEnd` because the match is the one character before `params:`, so an
+  // indent or a `\r\n` would leave the rest of its run behind, and a raw
+  // newline starts a new awslogs event for the callers that do not collapse.
+  return `${text.slice(0, marker).trimEnd()} [params redacted]`;
 }
 
 function truncate(sql: string): string {

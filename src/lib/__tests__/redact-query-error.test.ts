@@ -114,14 +114,14 @@ describe("redactQueryError", () => {
       ["U+2028", `Failed query: select 1 params: ${SECRET}`],
       ["U+2029", `Failed query: select 1 params: ${SECRET}`],
       ["a carriage return", `Failed query: select 1\r\nparams: ${SECRET}`],
+      ["an escaped newline", `Failed query: select 1\\nparams: ${SECRET}`],
     ] as const;
 
     for (const [name, text] of shapes) {
       it(`redacts it after ${name}, as a string`, () => {
         const line = redactQueryError(text);
         expect(line).not.toContain(SECRET);
-        expect(line).toContain("Failed query: select 1");
-        expect(line).toContain("[params redacted]");
+        expect(line).toBe("Failed query: select 1 [params redacted]");
       });
 
       it(`redacts it after ${name}, as an Error message`, () => {

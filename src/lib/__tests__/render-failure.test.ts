@@ -65,8 +65,8 @@ describe("renderFailureLines", () => {
 
   it("redacts before it collapses, so a parameter tail is still found", () => {
     // The other order turns "\nparams:" into " params:". Since #608 the
-    // redaction finds that shape too, so this pins the order rather than
-    // being the only thing between the parameter and the log.
+    // redaction finds that shape too, so either order passes: this is a leak
+    // regression for the render path, and it no longer pins the order.
     const [line] = renderFailureLines([
       {
         routeId: "/_public/projects/",
