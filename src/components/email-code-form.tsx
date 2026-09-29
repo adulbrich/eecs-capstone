@@ -41,7 +41,7 @@ import { authClient } from "#/lib/auth-client";
  * privacy notice for that reason.
  */
 
-type Step = "address" | "code" | "name";
+export type Step = "address" | "code" | "name";
 
 /**
  * Each step's form carries a `key`, and it is load-bearing rather than the
@@ -141,9 +141,26 @@ function formValue(e: React.FormEvent<HTMLFormElement>, field: string): string {
   return String(new FormData(e.currentTarget).get(field) ?? "");
 }
 
-export function EmailCodeForm({ redirectTo }: { redirectTo?: string }) {
+export function EmailCodeForm({
+  redirectTo,
+  onStepChange,
+}: {
+  redirectTo?: string;
+  /**
+   * Called on every move between steps, so the page can hide the other
+   * sign-in methods once a code is out (#611). The form starts on `address`
+   * and does not call this for it.
+   */
+  onStepChange?: (step: Step) => void;
+}) {
   const navigate = useNavigate();
   const [step, setStep] = useState<Step>("address");
+  // In the handler rather than an effect on `step`, so the page hides its
+  // buttons in the same render the form changes step, not one render later.
+  function goToStep(next: Step) {
+    setStep(next);
+    onStepChange?.(next);
+  }
   const [email, setEmail] = useState("");
   const [code, setCode] = useState("");
   // Controlled, unlike the other two fields, so a refusal can empty it.
@@ -192,7 +209,7 @@ export function EmailCodeForm({ redirectTo }: { redirectTo?: string }) {
     }
     setEmail(address);
     setDraft("");
-    setStep("code");
+    goToStep("code");
   }
 
   /**
@@ -245,7 +262,7 @@ export function EmailCodeForm({ redirectTo }: { redirectTo?: string }) {
         // The code is right and the address has no account, so this is a new
         // person. The code is still unspent; step 3 redeems it.
         setCode(entered);
-        setStep("name");
+        goToStep("name");
         return;
       }
       refuse(checkError, "That code did not work.");
@@ -398,7 +415,7 @@ export function EmailCodeForm({ redirectTo }: { redirectTo?: string }) {
           disabled={loading}
           onClick={() => {
             setError(null);
-            setStep("address");
+            goToStep("address");
           }}
           type="button"
           variant="outline"
@@ -450,6 +467,26 @@ export function EmailCodeForm({ redirectTo }: { redirectTo?: string }) {
       <Button className="w-full" disabled={loading} type="submit">
         {loading ? "Creating..." : "Create account"}
       </Button>
+      {/* Only after a refusal (#611). The code was checked but not spent, so
+          it can expire or lose its guesses before this redeem, and the
+          refusal says to ask for a new code; with the other sign-in methods
+          hidden past the address step, this is the control that does. It
+          shows after a redeem that never answered too, where retrying is
+          the better advice but leaving is not wrong. No `disabled`: a submit
+          clears the error, so this is gone before the request goes out. */}
+      {error !== null && (
+        <Button
+          className="w-full"
+          onClick={() => {
+            setError(null);
+            goToStep("address");
+          }}
+          type="button"
+          variant="outline"
+        >
+          Use a different address
+        </Button>
+      )}
     </form>
   );
 }
