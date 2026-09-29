@@ -470,11 +470,13 @@ export function EmailCodeForm({
       {/* Only after a refusal (#611). The code was checked but not spent, so
           it can expire or lose its guesses before this redeem, and the
           refusal says to ask for a new code; with the other sign-in methods
-          hidden past the address step, this is the control that does. */}
+          hidden past the address step, this is the control that does. It
+          shows after a redeem that never answered too, where retrying is
+          the better advice but leaving is not wrong. No `disabled`: a submit
+          clears the error, so this is gone before the request goes out. */}
       {error !== null && (
         <Button
           className="w-full"
-          disabled={loading}
           onClick={() => {
             setError(null);
             goToStep("address");
