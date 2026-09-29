@@ -317,10 +317,15 @@ export async function updateProjectProposerAs(
   // proposer nothing they do not know (#385); an unlink tells nobody, as the
   // notifiers already decide. Same gate as the mentor save.
   const reassigned = changedFields.includes("proposerEmail") && !!proposerEmail;
+  // `updated_at` orders the public "Recently updated" listing, so it moves
+  // only for a change a visitor can see (#502). Of these three columns only
+  // `studentProposed` reaches `projectDetailView`; the address and the
+  // account link stay on the staff read.
+  const visible = changedFields.includes("studentProposed");
   await db.transaction(async (tx) => {
     await tx
       .update(projects)
-      .set({ ...newValues, updatedAt: new Date() })
+      .set({ ...newValues, ...(visible ? { updatedAt: new Date() } : {}) })
       .where(eq(projects.id, existing.id));
     await tx.insert(projectEditLog).values({
       projectId: existing.id,
@@ -405,9 +410,12 @@ export async function updateProjectMentorshipAs(
     return { id: existing.id, updated: false };
   }
   await db.transaction(async (tx) => {
+    // No `updatedAt`: it orders the public "Recently updated" listing, and
+    // the mentor stays on the staff read (#402), so no visitor can see this
+    // change (#502). The edit log row below is the record that it happened.
     await tx
       .update(projects)
-      .set({ ...newValues, updatedAt: new Date() })
+      .set(newValues)
       .where(eq(projects.id, existing.id));
     await tx.insert(projectEditLog).values({
       projectId: existing.id,
