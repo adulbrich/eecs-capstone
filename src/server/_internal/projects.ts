@@ -258,12 +258,15 @@ export async function updateProjectAs(
   // written at all; create refuses one and writes null, and
   // `hardDeleteProjectAs` drops the last one. Started, not awaited, like the
   // refresh below: the save has committed and must not answer on S3's time
-  // (#621). `deleteOwnedObject` never rejects, and logs its own failure.
+  // (#621). A test reads the result after `settleBackgroundDeletes()`.
   if (changedFields.includes("imageUrl")) {
-    const { deleteOwnedObject, projectImageKeys } = await import(
+    const { deleteOwnedObjectInBackground, projectImageKeys } = await import(
       "#/lib/_internal/storage"
     );
-    deleteOwnedObject(existing.imageUrl, projectImageKeys(existing.id));
+    deleteOwnedObjectInBackground(
+      existing.imageUrl,
+      projectImageKeys(existing.id)
+    );
   }
 
   // Archived counts as well as published, so editing an archived project keeps

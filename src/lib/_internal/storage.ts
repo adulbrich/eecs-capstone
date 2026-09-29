@@ -196,8 +196,8 @@ export const inventoryImageKeys = (itemId: string): KeySpace =>
  * Best effort by design: an object that outlives its row costs storage, while
  * a delete that throws would fail a write that has already committed. So this
  * never rejects. Most callers await it, which `S3_DELETE_TIMEOUT_MS` bounds;
- * `updateProjectAs` starts it without awaiting, so a project save answers
- * without waiting on S3 at all (#621).
+ * `updateProjectAs` starts it through `deleteOwnedObjectInBackground`, so a
+ * project save answers without waiting on S3 at all (#621).
  *
  * A key outside the row's own space is left alone, and that guard is the point
  * rather than a detail: `imageUrl` is an ordinary client-writable column, so
@@ -220,6 +220,33 @@ export async function deleteOwnedObject(
     await getObjectStorage().delete(key);
   } catch (e) {
     console.warn(`Failed to delete object ${key}: ${redactQueryError(e)}`);
+  }
+}
+
+const backgroundDeletes = new Set<Promise<void>>();
+
+/**
+ * `deleteOwnedObject`, started and not awaited, for a caller whose response
+ * must not wait on S3 once its row has committed (#621). Safe to leave
+ * floating because `deleteOwnedObject` never rejects.
+ */
+export function deleteOwnedObjectInBackground(
+  key: string | null | undefined,
+  space: KeySpace
+): void {
+  const run = deleteOwnedObject(key, space);
+  backgroundDeletes.add(run);
+  run.finally(() => backgroundDeletes.delete(run));
+}
+
+/**
+ * Resolves once every background delete started so far has finished. For
+ * tests, which otherwise race the delete: an assertion that an object
+ * survived would pass before a wrong delete reached S3.
+ */
+export async function settleBackgroundDeletes(): Promise<void> {
+  while (backgroundDeletes.size > 0) {
+    await Promise.allSettled([...backgroundDeletes]);
   }
 }
 
