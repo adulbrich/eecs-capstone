@@ -105,3 +105,66 @@ export function priorityDistribution(rows: readonly BoardRow[]): PriorityRow[] {
     ...(unranked > 0 ? [row("Placed outside their bids", unranked)] : []),
   ];
 }
+
+/**
+ * `count` of `of` as a whole percent, rounded down so one student short of
+ * everyone never reads 100%. Integer math: `(29 / 100) * 100` is 28.999...
+ */
+export function percentDown(count: number, of: number): number {
+  return Math.floor((count * 100) / of);
+}
+
+export interface TeamSizeRow {
+  size: number;
+  /** Students on teams of this size: `size` times `teams`. */
+  students: number;
+  teams: number;
+}
+
+export interface TeamSizes {
+  /** Smallest size first, only the sizes some team has. */
+  bySize: TeamSizeRow[];
+  /** `max`, `mean` and `min` are all null with no teams. */
+  max: number | null;
+  /** Placed students per team. */
+  mean: number | null;
+  min: number | null;
+  /** Projects with at least one team. */
+  projects: number;
+  teams: number;
+}
+
+/**
+ * How many teams the placement on the board formed and how big they are
+ * (#701). A team is a project and team number with someone on it, counted
+ * from the rows rather than the solver's team numbers, so a Move that starts
+ * a project's first team counts, one student or not.
+ */
+export function teamSizes(rows: readonly BoardRow[]): TeamSizes {
+  const sizes = new Map<string, number>();
+  const projects = new Set<string>();
+  for (const r of rows) {
+    if (r.projectKey !== null) {
+      const team = `${r.projectKey}\u0000${r.team}`;
+      sizes.set(team, (sizes.get(team) ?? 0) + 1);
+      projects.add(r.projectKey);
+    }
+  }
+  const counts = new Map<number, number>();
+  for (const size of sizes.values()) {
+    counts.set(size, (counts.get(size) ?? 0) + 1);
+  }
+  const bySize = [...counts.entries()]
+    .sort((a, b) => a[0] - b[0])
+    .map(([size, count]) => ({ size, teams: count, students: size * count }));
+  const teams = sizes.size;
+  const placed = bySize.reduce((sum, r) => sum + r.students, 0);
+  return {
+    bySize,
+    teams,
+    projects: projects.size,
+    mean: teams === 0 ? null : placed / teams,
+    min: bySize[0]?.size ?? null,
+    max: bySize.at(-1)?.size ?? null,
+  };
+}

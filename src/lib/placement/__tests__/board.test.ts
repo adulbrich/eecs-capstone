@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { teamSizes } from "#/lib/placement/analytics";
 import {
   applyPins,
   bidOptions,
@@ -406,5 +407,15 @@ describe("describeRun", () => {
     expect(
       describeRun({ ...RESULT, status: "time_limit", gap: 0.0123 }, TITLES)[0]
     ).toContain("within 1.2%");
+  });
+});
+
+describe("team figures after a Move (#701)", () => {
+  it("count the one-student team a Move starts on a project with none", () => {
+    // Garden Planner formed no team; Ada alone starts its first.
+    const moved = moveStudent(RESULT, "ada@example.edu", "p3", null);
+    const sizes = teamSizes(boardRows(moved, STUDENTS, PROJECTS));
+    expect(sizes.teams).toBe(2);
+    expect(sizes.bySize).toEqual([{ size: 1, teams: 2, students: 2 }]);
   });
 });

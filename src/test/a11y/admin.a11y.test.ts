@@ -434,7 +434,9 @@ test("admin placement, a run on the results board", async ({ page }) => {
   });
   await page.getByRole("tab", { name: "Results" }).click();
   await page.getByRole("button", { name: "Run placement" }).click();
-  await expect(page.getByText(/students placed/)).toBeVisible({
+  await expect(
+    page.getByRole("region", { name: "Placement figures" })
+  ).toBeVisible({
     timeout: 20_000,
   });
   await checkA11y(page);
