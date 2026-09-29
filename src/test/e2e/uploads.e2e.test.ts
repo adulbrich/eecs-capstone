@@ -48,7 +48,11 @@ test.describe("project image upload", () => {
       await owner.goto(`/projects/${projectId}/edit`);
       await waitForHydration(owner, "form");
 
-      await pickImage(owner);
+      // Noise, so the crop the browser encodes is as large as this form can
+      // send: the uploader scales it to 1600x900 and writes WebP at 0.85, and
+      // noise barely compresses (#621). A flat colour would upload a few KB
+      // and say nothing about a slow or bounded put.
+      await pickImage(owner, { noise: true });
       await dragCrop(owner);
       await owner.getByRole("button", { name: "Use image" }).click();
 
@@ -72,6 +76,17 @@ test.describe("project image upload", () => {
       const image = owner.locator(`img[src^="${storageBase()}/projects/"]`);
       await expect(image).toBeVisible();
       await expectDecoded(image);
+
+      // The object that reached storage is large, which is what the put
+      // carried: without this the test says nothing about a large put landing
+      // inside `S3_PUT_TIMEOUT_MS`. Read back rather than off the request,
+      // because Chromium does not hand Playwright a multipart body that
+      // carries a file.
+      const stored = await owner.request.get(
+        (await image.getAttribute("src")) ?? ""
+      );
+      const storedBytes = (await stored.body()).length;
+      expect(storedBytes).toBeGreaterThan(LARGE_UPLOAD_BYTES);
 
       // Remove is the uploader's other write, and like the upload it lands on
       // Save rather than on the click. `exact`, because the proposer picker
@@ -243,24 +258,30 @@ function storageBase(): string {
 }
 
 /**
+ * The floor for "a large upload", checked against the stored object. A
+ * 1600x900 crop of random noise, which is the most the project form can send,
+ * stored as 889 KB once the server had re-encoded it (2026-09-28); the flat
+ * colour crop the other tests use stores as about 1 KB.
+ */
+const LARGE_UPLOAD_BYTES = 700_000;
+
+/**
  * Hands the hidden file input a generated PNG.
  *
  * Generated rather than committed: a binary fixture in the repo is a file
  * nobody can review, and sharp is already a dependency. 1200x800 is wide enough
  * that both aspect ratios (16:9 for a project, 1:1 for an avatar) crop to
  * something rather than failing to fit.
+ *
+ * `noise` makes it 2000x1125 of random pixels instead: the default 80% crop of
+ * that is 1600x900, the project uploader's cap, so the upload is as large as
+ * the form allows. About 7 MB as a PNG, under the 10 MB limit.
  */
-async function pickImage(page: Page): Promise<void> {
-  const png = await sharp({
-    create: {
-      width: 1200,
-      height: 800,
-      channels: 3,
-      background: { r: 214, g: 96, b: 24 },
-    },
-  })
-    .png()
-    .toBuffer();
+async function pickImage(
+  page: Page,
+  { noise = false }: { noise?: boolean } = {}
+): Promise<void> {
+  const png = noise ? await noisePng(2000, 1125) : await flatPng();
 
   // Through the button, not `setInputFiles` on the hidden input. This helper
   // used to set the input directly because Playwright can, and that is exactly
@@ -275,6 +296,29 @@ async function pickImage(page: Page): Promise<void> {
     mimeType: "image/png",
     buffer: png,
   });
+}
+
+function flatPng(): Promise<Buffer> {
+  return sharp({
+    create: {
+      width: 1200,
+      height: 800,
+      channels: 3,
+      background: { r: 214, g: 96, b: 24 },
+    },
+  })
+    .png()
+    .toBuffer();
+}
+
+function noisePng(width: number, height: number): Promise<Buffer> {
+  const raw = Buffer.alloc(width * height * 3);
+  for (let i = 0; i < raw.length; i++) {
+    raw[i] = Math.floor(Math.random() * 256);
+  }
+  return sharp(raw, { raw: { width, height, channels: 3 } })
+    .png()
+    .toBuffer();
 }
 
 /**

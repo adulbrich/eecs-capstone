@@ -10,6 +10,7 @@ import { eq } from "drizzle-orm";
 import { describe, expect, it } from "vitest";
 import { db } from "#/db";
 import { projects, user } from "#/db/schema";
+import { settleBackgroundDeletes } from "#/lib/_internal/storage";
 import { auth } from "#/lib/auth";
 import {
   createProjectAs,
@@ -305,6 +306,8 @@ describe("updateProjectAs image cleanup", () => {
       ...baseProject(),
       imageUrl: `projects/${id}/new.webp`,
     });
+    // The save no longer waits on the delete (#621).
+    await settleBackgroundDeletes();
 
     expect(await objectExists(oldKey)).toBe(false);
   });
@@ -330,6 +333,8 @@ describe("updateProjectAs image cleanup", () => {
       ...baseProject(),
       imageUrl: `projects/${attackerId}/mine.webp`,
     });
+    // Without this the assertion could run before a wrong delete landed.
+    await settleBackgroundDeletes();
 
     expect(await objectExists(victimKey)).toBe(true);
   });
