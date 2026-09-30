@@ -557,6 +557,45 @@ export function pruneTitleMatches(
   return kept.length > 0 ? Object.fromEntries(kept) : undefined;
 }
 
+const ROSTER_KEY = /^roster:\S/;
+
+/** Every project key a run names: its placements and its diagnostics. */
+function resultKeys(result: StoredResult): Set<string> {
+  const d = result.diagnostics;
+  return new Set([
+    ...result.placements.map((p) => p.projectKey),
+    ...d.projectsBelowMin,
+    ...d.pinnedProjectsBelowMin,
+    ...d.pinOverflow.map((o) => o.projectKey),
+  ]);
+}
+
+/** The run with one project key renamed wherever it names it. */
+function renameInResult(
+  result: StoredResult,
+  from: string,
+  to: string
+): StoredResult {
+  const rename = (key: string) => (key === from ? to : key);
+  const d = result.diagnostics;
+  return {
+    ...result,
+    placements: result.placements.map((p) => ({
+      ...p,
+      projectKey: rename(p.projectKey),
+    })),
+    diagnostics: {
+      ...d,
+      projectsBelowMin: d.projectsBelowMin.map(rename),
+      pinnedProjectsBelowMin: d.pinnedProjectsBelowMin.map(rename),
+      pinOverflow: d.pinOverflow.map((o) => ({
+        ...o,
+        projectKey: rename(o.projectKey),
+      })),
+    },
+  };
+}
+
 /**
  * The workspace with one project added by hand (#716), keyed by its
  * normalized title as a CSV project is, or the reason it cannot be: the
@@ -571,8 +610,17 @@ export function addProject(
   project: Omit<WorkspaceProject, "key" | "addedByHand" | "fromRoster">
 ): { ok: true; workspace: Workspace } | { ok: false; message: string } {
   const key = normalizeTitle(project.title);
-  if (key === "" || key.startsWith(rosterProjectKey(""))) {
+  if (key === "") {
     return { ok: false, message: "Enter a title with letters or digits." };
+  }
+  // The roster's own projects are keyed "roster:<title>", with no space
+  // after the colon; "Roster: Lab Tools" keeps its space and never collides.
+  if (ROSTER_KEY.test(key)) {
+    return {
+      ok: false,
+      message:
+        'A title cannot start with "roster:" followed directly by a letter or digit; projects the roster adds are named that way.',
+    };
   }
   if (
     workspace.projects.some(
@@ -598,12 +646,8 @@ export function addProject(
       pins: repointRosterPins(workspace.pins, { [key]: { projectKey: key } }),
       titleMatches:
         Object.keys(titleMatches).length > 0 ? titleMatches : undefined,
-      result: workspace.result && {
-        ...workspace.result,
-        placements: workspace.result.placements.map((p) =>
-          p.projectKey === fromRoster ? { ...p, projectKey: key } : p
-        ),
-      },
+      result:
+        workspace.result && renameInResult(workspace.result, fromRoster, key),
     },
   };
 }
@@ -612,14 +656,14 @@ export function addProject(
  * The workspace without one project (#716). A title matched to it by hand
  * goes too, so its bids show as unmatched again; a pin to it stays, and the
  * next run reports it as a pin to a dropped project. The last run stays and
- * reads as stale, unless it placed anyone on the project: a board naming a
- * project the list no longer has would show its bare key, so that run goes.
+ * reads as stale, unless it names the project, by a placement or in what it
+ * says about the run: a board naming a project the list no longer has would
+ * show its bare key, so that run goes.
  */
 export function removeProject(workspace: Workspace, key: string): Workspace {
   const projects = workspace.projects.filter((p) => p.key !== key);
-  const placedThere = workspace.result?.placements.some(
-    (p) => p.projectKey === key
-  );
+  const placedThere =
+    workspace.result !== undefined && resultKeys(workspace.result).has(key);
   return {
     ...workspace,
     projects,

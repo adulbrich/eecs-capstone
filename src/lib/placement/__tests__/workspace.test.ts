@@ -641,3 +641,48 @@ describe("removeProject and the last run", () => {
     expect(removeProject(withRun, "tide clock").result).toBe(RESULT);
   });
 });
+
+describe("addProject and roster-shaped titles", () => {
+  it("refuses only a title that could be a roster key, and takes one with a space", () => {
+    expect(
+      addProject(WORKSPACE, { title: "roster:lab", weightMultiplier: 1 }).ok
+    ).toBe(false);
+    expect(
+      addProject(WORKSPACE, { title: "Roster: Lab Tools", weightMultiplier: 1 })
+        .ok
+    ).toBe(true);
+  });
+});
+
+describe("the last run's diagnostics", () => {
+  const belowMin = {
+    ...RESULT,
+    placements: [],
+    diagnostics: { ...RESULT.diagnostics, projectsBelowMin: ["tide clock"] },
+  };
+
+  it("drop the run when they name a removed project", () => {
+    expect(
+      removeProject({ ...WORKSPACE, result: belowMin }, "tide clock").result
+    ).toBe(undefined);
+  });
+
+  it("follow a roster-added project the new one takes over", () => {
+    const added = addProject(
+      {
+        ...WORKSPACE,
+        result: {
+          ...belowMin,
+          diagnostics: {
+            ...belowMin.diagnostics,
+            projectsBelowMin: ["roster:moon base"],
+          },
+        },
+      },
+      { title: "Moon Base", weightMultiplier: 1 }
+    );
+    expect(
+      added.ok && added.workspace.result?.diagnostics.projectsBelowMin
+    ).toEqual(["moon base"]);
+  });
+});
