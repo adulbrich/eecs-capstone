@@ -356,7 +356,8 @@ export async function listProjectCategoriesAs(
   // to the people who can see the draft, and to nobody else. Its one caller,
   // the staff categories section, sits on a page that already loaded the
   // project through a gated read, so this refuses a call made with a bare
-  // id, or for a draft deleted after the page loaded. The detail page reads the same rows from getProjectAs (#726).
+  // id, or for a draft deleted after the page loaded. The detail page reads
+  // the same rows from getProjectAs (#726).
   const [project] = await db
     .select({
       id: projects.id,
