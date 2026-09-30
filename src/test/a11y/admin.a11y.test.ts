@@ -486,6 +486,7 @@ test("admin placement, a run on the results board", async ({ page }) => {
     buffer: Buffer.from(PLACEMENT_BIDS_CSV),
   });
   // Kim is on the roster and not in the survey, so the card lists them (#714).
+  await page.getByRole("tab", { name: /Roster/ }).click();
   await page
     .getByLabel("Roster emails")
     .fill("ada@example.edu\nben@example.edu\nkim@example.edu");
