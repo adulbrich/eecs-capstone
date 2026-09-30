@@ -25,7 +25,6 @@ import { FIELD_HEADINGS } from "#/lib/project-review-fields";
 import { programLabel } from "#/lib/project-visibility";
 import { absoluteUrl } from "#/lib/site-url";
 import { NOINDEX, socialDescription } from "#/lib/social-meta";
-import { listProjectCategories } from "#/server/categories";
 import { getProject, listProjectComments } from "#/server/projects-queries";
 
 const PROTOCOL_RE = /^https?:\/\//i;
@@ -40,7 +39,7 @@ interface ProjectDetailData {
   canEdit: GetProjectResult["canEdit"];
   history: GetProjectResult["history"];
   project: NonNullable<GetProjectResult["project"]>;
-  projectCategories: Awaited<ReturnType<typeof listProjectCategories>>["rows"];
+  projectCategories: GetProjectResult["categories"];
   viewerIsOwner: GetProjectResult["viewerIsOwner"];
   viewerIsStaff: GetProjectResult["viewerIsStaff"];
 }
@@ -94,16 +93,13 @@ export const Route = createFileRoute("/_public/projects/$projectId")({
     if (!data.project) {
       throw notFound();
     }
-    const { rows: projectCategories } = await listProjectCategories({
-      data: { projectId: params.projectId },
-    });
     return {
       project: data.project,
       history: data.history,
       canEdit: data.canEdit,
       viewerIsStaff: data.viewerIsStaff,
       viewerIsOwner: data.viewerIsOwner,
-      projectCategories,
+      projectCategories: data.categories,
     };
   },
   component: ProjectDetail,

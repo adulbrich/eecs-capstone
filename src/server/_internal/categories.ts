@@ -353,9 +353,11 @@ export async function listProjectCategoriesAs(
   data: { projectId: string }
 ) {
   // Same gate as listProjectCommentsAs: a draft's category names are visible
-  // to the people who can see the draft, and to nobody else. Both callers
-  // (the public detail page and the edit route) already load the project
-  // through a gated read, so this refuses only a call made with a bare id.
+  // to the people who can see the draft, and to nobody else. Its one caller,
+  // the staff categories section, sits on a page that already loaded the
+  // project through a gated read, so this refuses a call made with a bare
+  // id, or for a draft deleted after the page loaded. The detail page reads
+  // the same rows from getProjectAs (#726).
   const [project] = await db
     .select({
       id: projects.id,
@@ -368,7 +370,17 @@ export async function listProjectCategoriesAs(
   if (!(project && canSeeProject(project, viewer))) {
     throw new Error("Forbidden");
   }
-  const rows = await db
+  return { rows: await projectCategoryRows(data.projectId) };
+}
+
+/**
+ * A project's category names, ungated. Only for a caller that has already
+ * applied `canSeeProject` to this project: `listProjectCategoriesAs` above,
+ * and `getProjectAs`, which returns them with the project so the detail page
+ * loads in one request (#726).
+ */
+export function projectCategoryRows(projectId: string) {
+  return db
     .select({
       id: categories.id,
       name: categories.name,
@@ -376,9 +388,8 @@ export async function listProjectCategoriesAs(
     })
     .from(projectCategories)
     .innerJoin(categories, eq(projectCategories.categoryId, categories.id))
-    .where(eq(projectCategories.projectId, data.projectId))
+    .where(eq(projectCategories.projectId, projectId))
     .orderBy(categories.type, categories.name);
-  return { rows };
 }
 
 export async function listProjectCategoriesImpl(data: { projectId: string }) {

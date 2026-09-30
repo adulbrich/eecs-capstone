@@ -41,6 +41,7 @@ import { stripMarkdown } from "#/lib/strip-markdown";
 import { assertStaff, isStaff, type Viewer } from "#/lib/viewer";
 import type { ProjectStatus } from "#/lib/vocabularies";
 import type { AdminProjectsFilter } from "../projects-queries";
+import { projectCategoryRows } from "./categories";
 import {
   adminProjectListSelect,
   adminProjectSummarySelect,
@@ -394,19 +395,11 @@ export async function getProjectAs(viewer: Viewer, data: { id: string }) {
     })
     .from(projects)
     .where(eq(projects.id, data.id));
-  if (!project) {
+  if (!(project && canSeeProject(project, viewer))) {
     return {
       project: null,
       history: [],
-      canEdit: false,
-      viewerIsStaff: false,
-      viewerIsOwner: false,
-    };
-  }
-  if (!canSeeProject(project, viewer)) {
-    return {
-      project: null,
-      history: [],
+      categories: [],
       canEdit: false,
       viewerIsStaff: false,
       viewerIsOwner: false,
@@ -462,6 +455,9 @@ export async function getProjectAs(viewer: Viewer, data: { id: string }) {
   return {
     project: detail,
     history,
+    // After the gate above, never before it: a draft's category names are
+    // visible only to the people who can see the draft.
+    categories: await projectCategoryRows(data.id),
     canEdit,
     viewerIsStaff,
     viewerIsOwner,

@@ -114,7 +114,7 @@ export const ACCESS_CONTRACT: Record<string, AccessDeclaration> = {
   },
   "server/categories.ts:listProjectCategories": {
     level: "public",
-    note: "canSeeProject gates the project inside listProjectCategoriesAs, so a draft's category names reach staff and the proposer only; published and archived are public. Both callers load the project through a gated read first, so the guard refuses only a bare id.",
+    note: "canSeeProject gates the project inside listProjectCategoriesAs, so a draft's category names reach staff and the proposer only; published and archived are public. Its one caller, the staff categories section, sits on a page that loaded the project through a gated read, so the guard refuses a bare id, or a draft deleted after the page loaded. The project page reads the same rows from getProject.",
   },
   "server/categories.ts:setProjectCategories": {
     level: "staff",
@@ -277,7 +277,7 @@ export const ACCESS_CONTRACT: Record<string, AccessDeclaration> = {
   },
   "server/projects-queries.ts:getProject": {
     level: "public",
-    note: "canSeeProject decides, so a draft 404s for a stranger. Status history and staff fields are withheld separately. The projection carries contactEmail, which is manually entered and publicly visible by design, and must never carry proposerEmail.",
+    note: "canSeeProject decides, so a draft 404s for a stranger. Status history and staff fields are withheld separately. The projection carries contactEmail, which is manually entered and publicly visible by design, and must never carry proposerEmail. The project's category names ride the same payload, read after the canSeeProject gate, so a hidden project returns none (#726).",
   },
   "server/projects-queries.ts:getSimilarProjects": {
     level: "public",
