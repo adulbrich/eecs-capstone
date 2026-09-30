@@ -214,10 +214,9 @@ export const ACCESS_CONTRACT: Record<string, AccessDeclaration> = {
   },
   "server/inventory.ts:uploadInventoryImage": { level: "staff" },
 
-  "server/notifications.ts:listMyNotifications": { level: "authenticated" },
+  "server/notifications.ts:getMyNotifications": { level: "authenticated" },
   "server/notifications.ts:markAllRead": { level: "authenticated" },
   "server/notifications.ts:markRead": { level: "authenticated" },
-  "server/notifications.ts:unreadCount": { level: "authenticated" },
 
   "server/profile.ts:updateProfile": {
     level: "authenticated",

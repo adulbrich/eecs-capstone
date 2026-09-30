@@ -3,21 +3,17 @@ import { z } from "zod";
 
 const idSchema = z.object({ id: z.string().uuid() });
 
-export const listMyNotifications = createServerFn({ method: "GET" }).handler(
+/**
+ * The bell's one read per tick: the unread count and the ten newest rows
+ * together, so a signed-in tab costs one request and one session read a
+ * minute rather than two of each (#725).
+ */
+export const getMyNotifications = createServerFn({ method: "GET" }).handler(
   async () => {
-    const { listMyNotificationsForCurrentUser } = await import(
+    const { getMyNotificationsForCurrentUser } = await import(
       "./_internal/notifications"
     );
-    return listMyNotificationsForCurrentUser();
-  }
-);
-
-export const unreadCount = createServerFn({ method: "GET" }).handler(
-  async () => {
-    const { unreadCountForCurrentUser } = await import(
-      "./_internal/notifications"
-    );
-    return unreadCountForCurrentUser();
+    return getMyNotificationsForCurrentUser();
   }
 );
 

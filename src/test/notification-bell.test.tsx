@@ -21,8 +21,9 @@ let session: { user: { id: string } } | null = null;
 let unread = 2;
 
 vi.mock("#/server/notifications", () => ({
-  listMyNotifications: vi.fn(() =>
+  getMyNotifications: vi.fn(() =>
     Promise.resolve({
+      count: unread,
       rows: [
         {
           createdAt: "2026-09-01T12:00:00Z",
@@ -41,7 +42,19 @@ vi.mock("#/server/notifications", () => ({
     unread = 0;
     return Promise.resolve({ ok: true });
   }),
-  unreadCount: vi.fn(() => Promise.resolve({ count: unread })),
+}));
+
+// The bell reads after each client navigation, which it hears as the
+// router's `onResolved`. `navigate()` below fires it for every subscriber.
+const resolvedListeners = new Set<() => void>();
+vi.mock("@tanstack/react-router", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@tanstack/react-router")>()),
+  useRouter: () => ({
+    subscribe: (_event: "onResolved", listener: () => void) => {
+      resolvedListeners.add(listener);
+      return () => resolvedListeners.delete(listener);
+    },
+  }),
 }));
 
 vi.mock("#/lib/auth-client", () => ({
@@ -49,14 +62,9 @@ vi.mock("#/lib/auth-client", () => ({
 }));
 
 import { NotificationBell } from "#/components/notification-bell";
-import {
-  listMyNotifications,
-  markRead,
-  unreadCount,
-} from "#/server/notifications";
+import { getMyNotifications, markRead } from "#/server/notifications";
 
-const mockedCount = vi.mocked(unreadCount);
-const mockedList = vi.mocked(listMyNotifications);
+const mockedRead = vi.mocked(getMyNotifications);
 
 beforeAll(() => {
   installResizeObserver();
@@ -73,7 +81,16 @@ afterEach(() => {
   focusManager.setFocused(undefined);
   session = null;
   unread = 2;
+  resolvedListeners.clear();
 });
+
+function navigate() {
+  act(() => {
+    for (const listener of resolvedListeners) {
+      listener();
+    }
+  });
+}
 
 // The header's two rows, one per breakpoint: CSS hides one, both mount.
 function twoBells(qc: QueryClient) {
@@ -104,51 +121,68 @@ async function settledOnMount() {
 }
 
 describe("NotificationBell, mounted twice", () => {
-  it("makes one read of each on mount", async () => {
+  it("makes one read on mount", async () => {
     session = { user: { id: "u1" } };
     renderTwoBells();
     await settledOnMount();
-    expect(mockedCount).toHaveBeenCalledTimes(1);
-    expect(mockedList).toHaveBeenCalledTimes(1);
+    expect(mockedRead).toHaveBeenCalledTimes(1);
   });
 
-  it("makes one read of each per 60 second tick", async () => {
-    // Only the interval is faked, so waitFor keeps its real setTimeout.
+  it("makes no read on a timer while the tab stays on one page", async () => {
     vi.useFakeTimers({ toFake: ["setInterval", "clearInterval"] });
     session = { user: { id: "u1" } };
     renderTwoBells();
     await settledOnMount();
 
     await act(async () => {
-      vi.advanceTimersByTime(60_000);
+      vi.advanceTimersByTime(10 * 60_000);
     });
-    await waitFor(() => expect(mockedCount).toHaveBeenCalledTimes(2));
-    expect(mockedList).toHaveBeenCalledTimes(2);
-
     await act(async () => {
-      vi.advanceTimersByTime(60_000);
+      await Promise.resolve();
     });
-    await waitFor(() => expect(mockedCount).toHaveBeenCalledTimes(3));
-    expect(mockedList).toHaveBeenCalledTimes(3);
+    expect(mockedRead).toHaveBeenCalledTimes(1);
   });
 
-  it("makes one read of each when the window regains focus", async () => {
+  it("makes one read after a navigation once the last read is 30 s old", async () => {
+    // Only the clock is faked, so waitFor keeps its real setTimeout.
+    vi.useFakeTimers({ toFake: ["Date"] });
     session = { user: { id: "u1" } };
     renderTwoBells();
     await settledOnMount();
-    expect(mockedCount).toHaveBeenCalledTimes(1);
+
+    // Fresh: a navigation straight after the mount's read reads nothing.
+    navigate();
+    await act(async () => {
+      await Promise.resolve();
+    });
+    expect(mockedRead).toHaveBeenCalledTimes(1);
+
+    // Both bells hear it, and the two subscriptions make one read.
+    vi.setSystemTime(Date.now() + 31_000);
+    navigate();
+    await waitFor(() => expect(mockedRead).toHaveBeenCalledTimes(2));
+    await act(async () => {
+      await Promise.resolve();
+    });
+    expect(mockedRead).toHaveBeenCalledTimes(2);
+  });
+
+  it("makes one read when the window regains focus", async () => {
+    session = { user: { id: "u1" } };
+    renderTwoBells();
+    await settledOnMount();
+    expect(mockedRead).toHaveBeenCalledTimes(1);
 
     act(() => {
       focusManager.setFocused(false);
       focusManager.setFocused(true);
     });
-    await waitFor(() => expect(mockedCount).toHaveBeenCalledTimes(2));
-    expect(mockedList).toHaveBeenCalledTimes(2);
+    await waitFor(() => expect(mockedRead).toHaveBeenCalledTimes(2));
     // A second focus-driven read would land here if each bell refetched.
     await act(async () => {
       await Promise.resolve();
     });
-    expect(mockedCount).toHaveBeenCalledTimes(2);
+    expect(mockedRead).toHaveBeenCalledTimes(2);
   });
 
   it("clears the count in both bells after one mark-read, with one read", async () => {
@@ -158,7 +192,7 @@ describe("NotificationBell, mounted twice", () => {
 
     // Opening the popover refreshes it, as it did before.
     fireEvent.click(bells()[0]);
-    await waitFor(() => expect(mockedCount).toHaveBeenCalledTimes(2));
+    await waitFor(() => expect(mockedRead).toHaveBeenCalledTimes(2));
     const row = await screen.findByRole("button", {
       name: /Your hold is ready/,
     });
@@ -171,8 +205,7 @@ describe("NotificationBell, mounted twice", () => {
       }
     });
     expect(vi.mocked(markRead)).toHaveBeenCalledTimes(1);
-    expect(mockedCount).toHaveBeenCalledTimes(3);
-    expect(mockedList).toHaveBeenCalledTimes(3);
+    expect(mockedRead).toHaveBeenCalledTimes(3);
   });
 
   it("never shows one user's notifications to the next in the same tab", async () => {
@@ -183,12 +216,11 @@ describe("NotificationBell, mounted twice", () => {
     // u1's session ends without a reload and u2 signs in on the client. u2's
     // read never answers, so anything the bells show is u1's cache.
     const pending = () => new Promise<never>(() => undefined);
-    mockedCount.mockImplementationOnce(pending);
-    mockedList.mockImplementationOnce(pending);
+    mockedRead.mockImplementationOnce(pending);
     session = { user: { id: "u2" } };
     rerenderTwoBells();
 
-    await waitFor(() => expect(mockedCount).toHaveBeenCalledTimes(2));
+    await waitFor(() => expect(mockedRead).toHaveBeenCalledTimes(2));
     for (const bell of bells()) {
       expect(bell.textContent).toBe("");
     }
@@ -197,14 +229,14 @@ describe("NotificationBell, mounted twice", () => {
   it("clears the count, without a redirect, when the server has ended the session", async () => {
     // `requireUser` refuses with a redirect, and the router's query
     // integration navigates on any redirect that reaches the query cache's
-    // `onError`, so a tick would carry a tab mid-edit to /sign-in.
+    // `onError`, so the next read would carry a tab mid-edit to /sign-in.
     const onError = vi.fn();
     const qc = new QueryClient({ queryCache: new QueryCache({ onError }) });
     session = { user: { id: "u1" } };
     render(twoBells(qc));
     await settledOnMount();
 
-    mockedCount.mockRejectedValueOnce(redirect({ to: "/sign-in" }));
+    mockedRead.mockRejectedValueOnce(redirect({ to: "/sign-in" }));
     await act(async () => {
       await qc.invalidateQueries({ queryKey: ["notifications"] });
     });
@@ -223,7 +255,6 @@ describe("NotificationBell, mounted twice", () => {
       await Promise.resolve();
     });
     expect(bells()).toHaveLength(2);
-    expect(mockedCount).not.toHaveBeenCalled();
-    expect(mockedList).not.toHaveBeenCalled();
+    expect(mockedRead).not.toHaveBeenCalled();
   });
 });

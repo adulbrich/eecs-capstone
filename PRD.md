@@ -407,8 +407,9 @@ catalogue that decided the matrix below; #288 shipped it.
   emit.
 - [x] Bell in the site header, on desktop and in the mobile bar: unread count
   capped at 9+, the newest ten rows, click marks read and follows the link, mark
-  all read. Polls every minute and on window focus. There is no notifications
-  page, no pagination and no delete.
+  all read. Reads on load, on window focus, on opening, and after a navigation
+  once the last read is 30 seconds old; it does not poll (#725). There is no
+  notifications page, no pagination and no delete.
 - [x] Project events to the proposer: every status change, soft delete and
   restore, a non-internal comment on the project (a reply also notifies the
   parent comment's author), being made the proposer of a project by staff, and
