@@ -368,7 +368,17 @@ export async function listProjectCategoriesAs(
   if (!(project && canSeeProject(project, viewer))) {
     throw new Error("Forbidden");
   }
-  const rows = await db
+  return { rows: await projectCategoryRows(data.projectId) };
+}
+
+/**
+ * A project's category names, ungated. Only for a caller that has already
+ * applied `canSeeProject` to this project: `listProjectCategoriesAs` above,
+ * and `getProjectAs`, which returns them with the project so the detail page
+ * loads in one request (#726).
+ */
+export function projectCategoryRows(projectId: string) {
+  return db
     .select({
       id: categories.id,
       name: categories.name,
@@ -376,9 +386,8 @@ export async function listProjectCategoriesAs(
     })
     .from(projectCategories)
     .innerJoin(categories, eq(projectCategories.categoryId, categories.id))
-    .where(eq(projectCategories.projectId, data.projectId))
+    .where(eq(projectCategories.projectId, projectId))
     .orderBy(categories.type, categories.name);
-  return { rows };
 }
 
 export async function listProjectCategoriesImpl(data: { projectId: string }) {

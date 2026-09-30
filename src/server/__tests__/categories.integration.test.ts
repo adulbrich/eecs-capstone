@@ -22,6 +22,7 @@ import {
   updateCategoryAs,
 } from "#/server/_internal/categories";
 import { createProjectAs } from "#/server/_internal/projects";
+import { getProjectAs } from "#/server/_internal/projects-queries";
 
 async function makeUser(email: string, role: "user" | "admin") {
   await auth.api.createUser({
@@ -353,6 +354,23 @@ describe("listProjectCategoriesAs", () => {
       .where(eq(projects.id, projectId));
     const { rows } = await listProjectCategoriesAs(null, { projectId });
     expect(rows.map((r) => r.id)).toEqual([categoryId]);
+  });
+
+  // The detail page reads its categories from getProjectAs rather than from
+  // a second call (#726), so the same gate has to hold there.
+  it("getProjectAs carries the categories only for a viewer who can see the draft", async () => {
+    const { admin, proposer, projectId, categoryId } =
+      await draftWithCategory();
+    const stranger = await makeUser(`lpc-gp-${Date.now()}@x.com`, "user");
+    for (const viewer of [stranger, null]) {
+      const hidden = await getProjectAs(viewer, { id: projectId });
+      expect(hidden.project).toBeNull();
+      expect(hidden.categories).toEqual([]);
+    }
+    for (const viewer of [proposer, admin]) {
+      const seen = await getProjectAs(viewer, { id: projectId });
+      expect(seen.categories.map((r) => r.id)).toEqual([categoryId]);
+    }
   });
 
   it("refuses an unknown project id the same way", async () => {
