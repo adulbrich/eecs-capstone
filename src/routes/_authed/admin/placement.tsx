@@ -124,8 +124,10 @@ function PlacementPage() {
           value={tab}
         >
           {/* Five tabs are wider than a phone: the strip scrolls sideways
-              inside itself rather than widening the page (#717). */}
-          <TabsList className="overflow-x-auto [&>*]:shrink-0 [&>*]:whitespace-nowrap">
+              inside itself rather than widening the page (#717), and the
+              focus ring draws inside each tab, which the scroll box would
+              otherwise clip. */}
+          <TabsList className="overflow-x-auto [&>*]:shrink-0 [&>*]:whitespace-nowrap [&>*]:focus-visible:ring-inset">
             <TabsTrigger value="projects">
               Projects ({workspace.projects.length})
             </TabsTrigger>

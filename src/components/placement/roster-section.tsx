@@ -9,7 +9,7 @@ import { Button } from "#/components/ui/button";
 import { ROSTER_FORMAT } from "#/lib/placement/formats";
 import { removeStudents, type Workspace } from "#/lib/placement/workspace";
 
-const plural = (n: number, one: string, many: string) =>
+export const plural = (n: number, one: string, many: string) =>
   `${n} ${n === 1 ? one : many}`;
 
 /** How many emails a warning names before it says how many more. */

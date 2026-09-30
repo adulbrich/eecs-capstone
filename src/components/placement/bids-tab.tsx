@@ -12,6 +12,7 @@ import { CsvFormatHelp } from "#/components/placement/csv-format";
 import { FilePickerButton } from "#/components/placement/file-picker-button";
 import { ImportIssues } from "#/components/placement/import-issues";
 import { RemoveStudentButton } from "#/components/placement/removed-students";
+import { plural } from "#/components/placement/roster-section";
 import { TitleMatchesPanel } from "#/components/placement/title-matches";
 import type { PlacementWorkspace } from "#/components/placement/use-placement-workspace";
 import { Button } from "#/components/ui/button";
@@ -538,12 +539,6 @@ function bidsFromFile(
 }
 
 /**
- * Per student or per project; the choice lives in the URL. Built as
- * `ViewToggle` is: a segmented group whose pressed fill comes from
- * `aria-pressed` in the Button base class (UI-CONVENTIONS, "`className` on a
- * Button never restyles it").
- */
-/**
  * What the roster says about these bids, in one line pointing at the Roster
  * tab, where each of them is dealt with (#717). Nothing when it says nothing.
  */
@@ -558,11 +553,11 @@ function RosterPointer({
 }) {
   const parts = [
     rosterOnly > 0 &&
-      `${rosterOnly} ${rosterOnly === 1 ? "student on the roster has" : "students on the roster have"} no bids`,
+      `${plural(rosterOnly, "student on the roster has", "students on the roster have")} no bids`,
     notOnRoster > 0 &&
-      `${notOnRoster} ${notOnRoster === 1 ? "student who bid is" : "students who bid are"} not on the roster`,
+      `${plural(notOnRoster, "student who bid is", "students who bid are")} not on the roster`,
     removed > 0 &&
-      `${removed} ${removed === 1 ? "student is" : "students are"} removed from placement`,
+      `${plural(removed, "student is", "students are")} removed from placement`,
   ].filter((part): part is string => typeof part === "string");
   if (parts.length === 0) {
     return null;
@@ -574,7 +569,8 @@ function RosterPointer({
       : `${[first, ...rest.slice(0, -1)].join(", ")} and ${rest.at(-1)}`;
   return (
     <p className="mt-4 text-sm">
-      {sentence.charAt(0).toUpperCase() + sentence.slice(1)}. See the{" "}
+      {/* Each part starts with its count, so no capital is needed. */}
+      {sentence}. See the{" "}
       <Link
         className="text-brand-dark underline"
         from="/admin/placement"
@@ -588,6 +584,12 @@ function RosterPointer({
   );
 }
 
+/**
+ * Per student or per project; the choice lives in the URL. Built as
+ * `ViewToggle` is: a segmented group whose pressed fill comes from
+ * `aria-pressed` in the Button base class (UI-CONVENTIONS, "`className` on a
+ * Button never restyles it").
+ */
 function ViewSwitch({
   onView,
   view,
