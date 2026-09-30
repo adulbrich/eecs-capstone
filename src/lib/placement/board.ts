@@ -181,6 +181,51 @@ export function groupOpen(
   );
 }
 
+export interface UnsurveyedRow {
+  row: BoardRow;
+  /** Students on their team who answered the survey, themselves never. */
+  surveyed: number;
+  /** Everyone on their team, themselves included; 0 when unplaced. */
+  teamSize: number;
+}
+
+/**
+ * The roster students who did not answer the survey and whom the roster did
+ * not pre-approve (#714), in board order, each with how many on their team
+ * did answer it. A pre-approved student without bids did not answer either,
+ * so they count against a team's surveyed share without being listed.
+ * `preApproved` holds the roster's pre-approvals as they were before any
+ * board pin, which `applyPins` strips, replaced them: a student moved from
+ * the list stays on it.
+ */
+export function unsurveyedRows(
+  rows: readonly BoardRow[],
+  preApproved: ReadonlySet<string>
+): UnsurveyedRow[] {
+  const teams = new Map<string, { size: number; surveyed: number }>();
+  const teamOf = (row: BoardRow) => `${row.projectKey}\u0000${row.team}`;
+  for (const row of rows) {
+    if (row.projectKey !== null) {
+      const team = teams.get(teamOf(row)) ?? { size: 0, surveyed: 0 };
+      team.size++;
+      if (!row.rosterOnly) {
+        team.surveyed++;
+      }
+      teams.set(teamOf(row), team);
+    }
+  }
+  return rows
+    .filter((row) => row.rosterOnly && !preApproved.has(row.email))
+    .map((row) => {
+      const team = row.projectKey === null ? undefined : teams.get(teamOf(row));
+      return {
+        row,
+        surveyed: team?.surveyed ?? 0,
+        teamSize: team?.size ?? 0,
+      };
+    });
+}
+
 /** Projects allowed a team that the result formed none for, by title. */
 export function projectsWithoutTeam(
   result: StoredResult,

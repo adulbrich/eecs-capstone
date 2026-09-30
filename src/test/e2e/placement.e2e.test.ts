@@ -673,10 +673,35 @@ test.describe("placement workspace", () => {
     await expect(
       page.getByRole("row", { name: /Kim Lee.*Not in the survey/ })
     ).toBeVisible();
-    await page.getByRole("button", { name: "Approve Kim Lee here" }).click();
+    // Kim is listed on the card at the top (#714), with the board's actions,
+    // and stays there once pinned: a Move from the card pins too.
+    const card = page.getByRole("region", { name: /Not in the survey/ });
+    await expect(card).toContainText("1 student");
+    await expect(card.getByRole("row", { name: /Kim Lee/ })).toContainText(
+      /of \d/
+    );
+    await card.getByRole("button", { name: "Approve Kim Lee here" }).click();
     await expect(
       page.getByRole("row", { name: /Kim Lee.*Pinned, not in the survey/ })
     ).toBeVisible();
+    await expect(
+      card.getByRole("button", { name: "Unpin Kim Lee" })
+    ).toBeVisible();
+    await card.getByRole("combobox", { name: "Move Kim Lee" }).click();
+    const target = page.getByRole("option").first();
+    const targetTitle = (await target.textContent()) ?? "";
+    await target.click();
+    await expect(card.getByRole("row", { name: /Kim Lee/ })).toContainText(
+      targetTitle
+    );
+    await expect(
+      card.getByRole("button", { name: "Unpin Kim Lee" })
+    ).toBeVisible();
+    // The card folds, and opens again.
+    const fold = card.getByRole("button", { name: "Not in the survey" });
+    await fold.click();
+    await expect(card.getByRole("row")).toHaveCount(0);
+    await fold.click();
     await page.getByRole("button", { name: "Kim Lee, 0 bids" }).click();
     await expect(
       page.getByRole("region", { name: "Bids of Kim Lee" })
