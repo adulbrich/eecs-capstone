@@ -36,8 +36,9 @@ export interface BoardRow {
   /** The comment the student wrote for the project they are on. */
   comment: string;
   email: string;
-  /** Unplaced first, then projects by title, then teams in order. */
+  /** Unplaced first, then projects by title; teams order the rows inside. */
   groupKey: string;
+  /** "Unplaced", or the project's title. */
   groupLabel: string;
   name: string;
   pinned: boolean;
@@ -52,11 +53,11 @@ export interface BoardRow {
   unplacedReason: UnplacedReason | "not_in_run" | null;
 }
 
-const UNPLACED_GROUP = "0:unplaced";
+export const UNPLACED_GROUP = "0:unplaced";
 
 /**
  * One row per student, in the fixed order the grouped table renders: the
- * unplaced group first, then each project by title and each team in order.
+ * unplaced group first, then each project by title, its teams in order.
  * A student in the bids file but absent from the result (added after the
  * run) is unplaced too, so nobody goes missing from the board.
  */
@@ -103,11 +104,11 @@ export function boardRows(
       groupKey:
         projectKey === null
           ? UNPLACED_GROUP
-          : `1:${String(index).padStart(6, "0")}:${String(team).padStart(3, "0")}`,
+          : `1:${String(index).padStart(6, "0")}`,
       groupLabel:
         projectKey === null
           ? "Unplaced"
-          : `${titles.get(projectKey) ?? projectKey}, team ${team}`,
+          : (titles.get(projectKey) ?? projectKey),
     };
   };
 
@@ -126,9 +127,29 @@ export function boardRows(
   return rows.sort(
     (a, b) =>
       a.groupKey.localeCompare(b.groupKey) ||
+      (a.team ?? 0) - (b.team ?? 0) ||
       (a.priority ?? 99) - (b.priority ?? 99) ||
       (a.name || a.email).localeCompare(b.name || b.email)
   );
+}
+
+/**
+ * What a project's header on the board says: its teams, students and pins.
+ * Read from every row of the project, never from the rows a filter leaves.
+ */
+export function groupSummary(rows: readonly BoardRow[]): {
+  allPinned: boolean;
+  pinned: number;
+  students: number;
+  teams: number;
+} {
+  const pinned = rows.filter((r) => r.pinned).length;
+  return {
+    allPinned: rows.length > 0 && pinned === rows.length,
+    pinned,
+    students: rows.length,
+    teams: new Set(rows.map((r) => r.team)).size,
+  };
 }
 
 /** Projects allowed a team that the result formed none for, by title. */

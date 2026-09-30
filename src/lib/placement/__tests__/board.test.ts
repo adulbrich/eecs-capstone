@@ -6,6 +6,7 @@ import {
   bidsWithPinsCsv,
   boardRows,
   describeRun,
+  groupSummary,
   moveStudent,
   moveTargets,
   placementCsv,
@@ -92,7 +93,7 @@ describe("bidsWithPinsCsv", () => {
 });
 
 describe("boardRows", () => {
-  it("puts the unplaced first, then projects by title and teams in order", () => {
+  it("puts the unplaced first, then one group per project by title, teams in order inside", () => {
     const rows = boardRows(
       {
         ...RESULT,
@@ -104,12 +105,51 @@ describe("boardRows", () => {
       [...STUDENTS, { email: "x@example.edu", name: "Xi", bids: [] }],
       PROJECTS
     );
-    expect(rows.map((r) => [r.groupLabel, r.email])).toEqual([
-      ["Unplaced", "cy@example.edu"],
-      ["Robot Arm, team 1", "ben@example.edu"],
-      ["Tide Clock, team 1", "ada@example.edu"],
-      ["Tide Clock, team 2", "x@example.edu"],
+    expect(rows.map((r) => [r.groupLabel, r.team, r.email])).toEqual([
+      ["Unplaced", null, "cy@example.edu"],
+      ["Robot Arm", 1, "ben@example.edu"],
+      ["Tide Clock", 1, "ada@example.edu"],
+      ["Tide Clock", 2, "x@example.edu"],
     ]);
+    // Both Tide Clock teams are one group.
+    expect(new Set(rows.map((r) => r.groupKey)).size).toBe(3);
+  });
+
+  it("orders a project's rows by team before priority", () => {
+    const rows = boardRows(
+      {
+        ...RESULT,
+        placements: [
+          { email: "ada@example.edu", projectKey: "p1", team: 2, priority: 1 },
+          { email: "x@example.edu", projectKey: "p1", team: 1, priority: 3 },
+        ],
+      },
+      [...STUDENTS, { email: "x@example.edu", name: "Xi", bids: [] }],
+      PROJECTS
+    ).filter((r) => r.projectKey === "p1");
+    expect(rows.map((r) => [r.team, r.email])).toEqual([
+      [1, "x@example.edu"],
+      [2, "ada@example.edu"],
+    ]);
+  });
+});
+
+describe("groupSummary", () => {
+  const row = (team: number, pinned: boolean) =>
+    ({ team, pinned }) as Parameters<typeof groupSummary>[0][number];
+
+  it("counts teams, students and pins", () => {
+    expect(groupSummary([row(1, true), row(1, false), row(2, true)])).toEqual({
+      allPinned: false,
+      pinned: 2,
+      students: 3,
+      teams: 2,
+    });
+  });
+
+  it("is all pinned only when every student is, and never when empty", () => {
+    expect(groupSummary([row(1, true), row(2, true)]).allPinned).toBe(true);
+    expect(groupSummary([]).allPinned).toBe(false);
   });
 
   it("carries the comment for the project the student is on, and the pin", () => {

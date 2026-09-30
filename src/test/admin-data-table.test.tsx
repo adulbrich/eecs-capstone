@@ -1001,6 +1001,110 @@ describe("group", () => {
     expect(container.querySelector("th[scope=rowgroup]")).toBeNull();
     expect(screen.getByText("Nothing matches these filters.")).not.toBeNull();
   });
+
+  it("draws no chevron for a group without collapse", () => {
+    const { container } = renderGrouped();
+    // The header's only button is the group's own action.
+    expect(
+      [...container.querySelectorAll("th[scope=rowgroup] button")].map(
+        (b) => b.textContent
+      )
+    ).toEqual(["Approve 2", "Approve 2"]);
+  });
+
+  describe("collapse", () => {
+    const collapse = (open: Record<string, boolean>, onToggle = vi.fn()) => ({
+      ...group,
+      collapse: {
+        isOpen: (key: string) => open[key] ?? true,
+        label: (rows: GroupedRow[]) => `Batch ${rows[0].batch}`,
+        onToggle,
+      },
+    });
+
+    it("keeps a closed group's header and drops its rows and their detail", () => {
+      const { container } = renderGrouped({
+        detail: (row) => `About ${row.name}`,
+        group: collapse({ A: false }),
+      });
+      const [a, b] = [...container.querySelectorAll("tbody")];
+      expect(a.querySelector("[data-group-header]")).not.toBeNull();
+      expect(a.querySelectorAll("tr")).toHaveLength(1);
+      expect(a.querySelector("tr[data-row-detail]")).toBeNull();
+      expect(b.querySelectorAll("tr[data-row-detail]")).toHaveLength(2);
+    });
+
+    it("says in the chevron whether the group is open, and names the rows it controls only while open", () => {
+      const { container } = renderGrouped({ group: collapse({ A: false }) });
+      const closed = screen.getByRole("button", { name: "Batch A" });
+      const open = screen.getByRole("button", { name: "Batch B" });
+      expect(closed.getAttribute("aria-expanded")).toBe("false");
+      expect(closed.hasAttribute("aria-controls")).toBe(false);
+      expect(open.getAttribute("aria-expanded")).toBe("true");
+      const controlled = open.getAttribute("aria-controls") ?? "";
+      expect(
+        container
+          .querySelector(`[id="${controlled}"]`)
+          ?.getAttribute("data-group")
+      ).toBe("B");
+    });
+
+    it("hands the group's key to onToggle", () => {
+      const onToggle = vi.fn();
+      renderGrouped({ group: collapse({}, onToggle) });
+      fireEvent.click(screen.getByRole("button", { name: "Batch B" }));
+      expect(onToggle).toHaveBeenCalledWith("B");
+    });
+
+    it("moves the focus to the chevron when a control inside closes its own group", () => {
+      // Approving the last student of a project folds it: without this, the
+      // focused button is removed and the focus falls to the page body.
+      function Folding() {
+        const [open, setOpen] = useState(true);
+        return (
+          <AdminDataTable
+            caption="Grouped"
+            columns={[
+              ...GROUPED_COLUMNS,
+              {
+                cell: () => (
+                  <button onClick={() => setOpen(false)} type="button">
+                    Fold
+                  </button>
+                ),
+                header: "Actions",
+                id: "actions",
+              },
+            ]}
+            data={GROUPED}
+            defaultSort={GROUPED_SORT}
+            emptyMessage="Nothing here."
+            getRowId={(row) => row.id}
+            group={{
+              ...group,
+              collapse: {
+                isOpen: (key) => key !== "A" || open,
+                label: (rows) => `Batch ${rows[0].batch}`,
+                onToggle: vi.fn(),
+              },
+            }}
+            hidden={[]}
+            onHiddenChange={vi.fn()}
+            onSortChange={vi.fn()}
+            sort={GROUPED_SORT}
+            storageKey="grouped"
+          />
+        );
+      }
+      render(<Folding />);
+      const fold = screen.getAllByRole("button", { name: "Fold" })[0];
+      fold.focus();
+      fireEvent.click(fold);
+      expect(document.activeElement).toBe(
+        screen.getByRole("button", { name: "Batch A" })
+      );
+    });
+  });
 });
 
 describe("detail", () => {
