@@ -213,6 +213,15 @@ test.describe("placement workspace", () => {
       .click();
     await page.getByRole("tab", { name: /Projects/ }).click();
     await page.getByLabel("Min students per team, Robot Arm").fill("1");
+    await page.getByRole("tab", { name: "Parameters" }).click();
+    await page.getByLabel("Min students per team", { exact: true }).fill("1");
+    await page.getByRole("tab", { name: "Results" }).click();
+    await page.getByRole("button", { name: "Run placement" }).click();
+    await expect(placedFigure(page, "2 of 2")).toBeVisible({
+      timeout: 20_000,
+    });
+
+    await page.getByRole("tab", { name: /Projects/ }).click();
     await page.getByRole("button", { name: "More for Tide Clock" }).click();
     await page.getByRole("menuitem", { name: "Remove..." }).click();
     const confirm = page.getByRole("alertdialog", {
@@ -229,10 +238,12 @@ test.describe("placement workspace", () => {
       page.getByRole("row").filter({ hasText: "Tide Clock" })
     ).toHaveCount(0);
 
-    await page.getByRole("tab", { name: "Parameters" }).click();
-    await page.getByLabel("Min students per team", { exact: true }).fill("1");
+    // The run placed Ada on Tide Clock, so it goes with the project rather
+    // than show a project the list no longer has.
     await page.getByRole("tab", { name: "Results" }).click();
-    await page.getByRole("button", { name: "Run placement" }).click();
+    await page
+      .getByRole("button", { name: "Run placement", exact: true })
+      .click();
     await expect(placedFigure(page, "1 of 2")).toBeVisible({
       timeout: 20_000,
     });
@@ -240,6 +251,24 @@ test.describe("placement workspace", () => {
       page.getByRole("row", { name: /Ada Park/ }).first()
     ).toContainText("Pinned to a project with no teams.");
     await expect.poll(() => stored(page)).toContain('"addedByHand":true');
+  });
+
+  test("staff build a project list by hand from the empty tab (#716)", async ({
+    page,
+  }) => {
+    await page.goto("/admin/placement");
+    await waitForHydration(page);
+    await page.getByRole("button", { name: "Add project" }).click();
+    const dialog = page.getByRole("dialog", { name: "Add a project" });
+    await dialog.getByLabel("Title").fill("...");
+    await dialog.getByRole("button", { name: "Add project" }).click();
+    await expect(dialog).toContainText("Enter a title with letters or digits.");
+    await dialog.getByLabel("Title").fill("Moon Base");
+    await dialog.getByRole("button", { name: "Add project" }).click();
+    await expect(page.getByText("1 project, added by hand.")).toBeVisible();
+    await page.reload();
+    await waitForHydration(page);
+    await expect(page.getByText("1 project, added by hand.")).toBeVisible();
   });
 
   test("an exported workspace imports identically in a fresh browser", async ({

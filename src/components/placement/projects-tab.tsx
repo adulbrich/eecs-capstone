@@ -141,7 +141,7 @@ export function ProjectsTab({
         }}
         pasteIssues={pasteIssues}
         programs={programs}
-        state={state}
+        update={update}
         workspace={workspace}
       />
     );
@@ -156,11 +156,7 @@ export function ProjectsTab({
           {projectsLine(workspace.projects.length, byHand, source)}
         </p>
         <div className="flex flex-wrap items-center gap-2">
-          <AddProjectDialog
-            parameters={workspace.parameters}
-            update={update}
-            workspace={workspace}
-          />
+          <AddProjectDialog update={update} workspace={workspace} />
           <ConfirmDialog
             busyLabel="Removing..."
             confirmLabel="Remove"
@@ -206,7 +202,7 @@ function ProjectsImport({
   onText,
   pasteIssues,
   programs,
-  state,
+  update,
   workspace,
 }: {
   duplicates: string[];
@@ -220,7 +216,7 @@ function ProjectsImport({
   onText: (text: string, filename: string) => void;
   pasteIssues: ImportIssue[];
   programs: ProgramOption[];
-  state: PlacementWorkspace;
+  update: PlacementWorkspace["update"];
   workspace: Workspace;
 }) {
   const [programId, setProgramId] = useState("");
@@ -336,11 +332,7 @@ function ProjectsImport({
           One project at a time, with its limits and who to contact.
         </p>
         <div className="mt-2">
-          <AddProjectDialog
-            parameters={workspace.parameters}
-            update={state.update}
-            workspace={workspace}
-          />
+          <AddProjectDialog update={update} workspace={workspace} />
         </div>
       </section>
     </div>
@@ -357,7 +349,8 @@ function projectsLine(
   source: Workspace["projectSource"]
 ): string {
   const projects = `${total} ${total === 1 ? "project" : "projects"}`;
-  if (source?.kind === "manual") {
+  // Every project from the source removed leaves only the hand-added ones.
+  if (source?.kind === "manual" || byHand === total) {
     return `${projects}, added by hand.`;
   }
   const from =

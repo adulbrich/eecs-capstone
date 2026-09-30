@@ -36,7 +36,7 @@ const EMPTY = {
 type Draft = typeof EMPTY;
 
 /** Blank is the page default; anything else a whole number in range. */
-function count(
+function parseLimit(
   value: string,
   limits: { max: number; min: number }
 ): number | undefined | "invalid" {
@@ -57,14 +57,13 @@ const text = (value: string) => value.trim() || undefined;
  * library, as the other dialogs here are: nine fields, checked on submit.
  */
 export function AddProjectDialog({
-  parameters,
   update,
   workspace,
 }: {
-  parameters: Workspace["parameters"];
   update: PlacementWorkspace["update"];
   workspace: Workspace;
 }) {
+  const { parameters } = workspace;
   const [open, setOpen] = useState(false);
   const [draft, setDraft] = useState<Draft>(EMPTY);
   const [error, setError] = useState<string | null>(null);
@@ -90,9 +89,15 @@ export function AddProjectDialog({
       setError("Enter a title.");
       return;
     }
-    const maxTeams = count(draft.maxTeams, PARAMETER_LIMITS.maxTeams);
-    const minStudents = count(draft.minStudents, PARAMETER_LIMITS.students);
-    const maxStudents = count(draft.maxStudents, PARAMETER_LIMITS.students);
+    const maxTeams = parseLimit(draft.maxTeams, PARAMETER_LIMITS.maxTeams);
+    const minStudents = parseLimit(
+      draft.minStudents,
+      PARAMETER_LIMITS.students
+    );
+    const maxStudents = parseLimit(
+      draft.maxStudents,
+      PARAMETER_LIMITS.students
+    );
     if (maxTeams === "invalid") {
       setError(
         `Max teams must be a whole number from ${PARAMETER_LIMITS.maxTeams.min} to ${PARAMETER_LIMITS.maxTeams.max}, or blank.`
@@ -112,7 +117,7 @@ export function AddProjectDialog({
       setError("Min students per team is above max students per team.");
       return;
     }
-    const added = addProject(workspace, {
+    const project = {
       title,
       maxTeams,
       minStudents,
@@ -123,12 +128,18 @@ export function AddProjectDialog({
       proposerEmail: text(draft.proposerEmail),
       mentorName: text(draft.mentorName),
       mentorEmail: text(draft.mentorEmail),
-    });
-    if (!added.ok) {
-      setError(added.message);
+    };
+    // Checked against the workspace on screen for the message, then applied
+    // to the one current at the write, so nothing saved since is lost.
+    const checked = addProject(workspace, project);
+    if (!checked.ok) {
+      setError(checked.message);
       return;
     }
-    update(() => added.workspace);
+    update((w) => {
+      const added = addProject(w, project);
+      return added.ok ? added.workspace : w;
+    });
     onOpenChange(false);
   }
 
@@ -137,7 +148,7 @@ export function AddProjectDialog({
     label: string,
     props: React.ComponentProps<typeof Input> = {}
   ) => (
-    <div className="flex min-w-0 flex-col gap-1.5">
+    <div className="min-w-0 space-y-1.5">
       <Label htmlFor={`${id}-${key}`}>{label}</Label>
       <Input
         autoComplete="off"

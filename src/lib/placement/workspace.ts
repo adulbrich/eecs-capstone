@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { removeFromResult } from "#/lib/placement/board";
 import { type ImportIssue, normalizeTitle } from "#/lib/placement/csv";
-import { repointRosterPins } from "#/lib/placement/roster";
+import { repointRosterPins, rosterProjectKey } from "#/lib/placement/roster";
 import {
   DEFAULT_PLACEMENT_PARAMETERS,
   type PlacementInput,
@@ -543,56 +543,6 @@ export function isStale(
  * loads: a match to a project that left falls away, and its title shows as
  * unmatched again.
  */
-/**
- * The workspace with one project added by hand (#716), keyed by its
- * normalized title as a CSV project is, or the reason it cannot be: a listed
- * project already has that title. A project the roster added under the same
- * title becomes this one, and its pins follow. Pins and the last run stay;
- * the run is stale from here, as after any project change.
- */
-export function addProject(
-  workspace: Workspace,
-  project: Omit<WorkspaceProject, "key" | "addedByHand" | "fromRoster">
-): { ok: true; workspace: Workspace } | { ok: false; message: string } {
-  const key = normalizeTitle(project.title);
-  if (workspace.projects.some((p) => p.key === key)) {
-    return {
-      ok: false,
-      message: "A project with this title is already in the list.",
-    };
-  }
-  return {
-    ok: true,
-    workspace: {
-      ...workspace,
-      projects: [...workspace.projects, { ...project, key, addedByHand: true }],
-      projectSource:
-        workspace.projects.length === 0
-          ? { kind: "manual" }
-          : workspace.projectSource,
-      pins: repointRosterPins(workspace.pins, {
-        [key]: { projectKey: key },
-      }),
-    },
-  };
-}
-
-/**
- * The workspace without one project (#716). A title matched to it by hand
- * goes too, so its bids show as unmatched again; a pin to it stays, and the
- * next run reports it as a pin to a dropped project. The last run stays and
- * reads as stale.
- */
-export function removeProject(workspace: Workspace, key: string): Workspace {
-  const projects = workspace.projects.filter((p) => p.key !== key);
-  return {
-    ...workspace,
-    projects,
-    projectSource: projects.length === 0 ? null : workspace.projectSource,
-    titleMatches: pruneTitleMatches(workspace.titleMatches, projects),
-  };
-}
-
 export function pruneTitleMatches(
   matches: TitleMatches | undefined,
   projects: readonly Pick<WorkspaceProject, "key">[]
@@ -605,6 +555,78 @@ export function pruneTitleMatches(
     keys.has(m.projectKey)
   );
   return kept.length > 0 ? Object.fromEntries(kept) : undefined;
+}
+
+/**
+ * The workspace with one project added by hand (#716), keyed by its
+ * normalized title as a CSV project is, or the reason it cannot be: the
+ * title normalizes to nothing, or a listed project already has it, whatever
+ * that project's key. A project the roster added under the same title
+ * becomes this one, its pins and places in the last run with it, and a title
+ * matched by hand to another project gives way, since bids now name this one
+ * exactly. Pins and the last run otherwise stay; the run is stale from here.
+ */
+export function addProject(
+  workspace: Workspace,
+  project: Omit<WorkspaceProject, "key" | "addedByHand" | "fromRoster">
+): { ok: true; workspace: Workspace } | { ok: false; message: string } {
+  const key = normalizeTitle(project.title);
+  if (key === "" || key.startsWith(rosterProjectKey(""))) {
+    return { ok: false, message: "Enter a title with letters or digits." };
+  }
+  if (
+    workspace.projects.some(
+      (p) => p.key === key || normalizeTitle(p.title) === key
+    )
+  ) {
+    return {
+      ok: false,
+      message: "A project with this title is already in the list.",
+    };
+  }
+  const fromRoster = rosterProjectKey(key);
+  const { [key]: _matched, ...titleMatches } = workspace.titleMatches ?? {};
+  return {
+    ok: true,
+    workspace: {
+      ...workspace,
+      projects: [...workspace.projects, { ...project, key, addedByHand: true }],
+      projectSource:
+        workspace.projects.length === 0
+          ? { kind: "manual" }
+          : workspace.projectSource,
+      pins: repointRosterPins(workspace.pins, { [key]: { projectKey: key } }),
+      titleMatches:
+        Object.keys(titleMatches).length > 0 ? titleMatches : undefined,
+      result: workspace.result && {
+        ...workspace.result,
+        placements: workspace.result.placements.map((p) =>
+          p.projectKey === fromRoster ? { ...p, projectKey: key } : p
+        ),
+      },
+    },
+  };
+}
+
+/**
+ * The workspace without one project (#716). A title matched to it by hand
+ * goes too, so its bids show as unmatched again; a pin to it stays, and the
+ * next run reports it as a pin to a dropped project. The last run stays and
+ * reads as stale, unless it placed anyone on the project: a board naming a
+ * project the list no longer has would show its bare key, so that run goes.
+ */
+export function removeProject(workspace: Workspace, key: string): Workspace {
+  const projects = workspace.projects.filter((p) => p.key !== key);
+  const placedThere = workspace.result?.placements.some(
+    (p) => p.projectKey === key
+  );
+  return {
+    ...workspace,
+    projects,
+    projectSource: projects.length === 0 ? null : workspace.projectSource,
+    titleMatches: pruneTitleMatches(workspace.titleMatches, projects),
+    result: placedThere ? undefined : workspace.result,
+  };
 }
 
 /**

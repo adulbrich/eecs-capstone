@@ -517,7 +517,7 @@ describe("addProject", () => {
       addedByHand: true,
     });
     expect(added.workspace.pins).toEqual(withRun.pins);
-    expect(added.workspace.result).toBe(RESULT);
+    expect(added.workspace.result).toEqual(RESULT);
     expect(added.workspace.projectSource).toEqual(WORKSPACE.projectSource);
   });
 
@@ -556,7 +556,7 @@ describe("addProject", () => {
 });
 
 describe("removeProject", () => {
-  it("drops the project and the titles matched to it, keeping pins and the run", () => {
+  it("drops the project and the titles matched to it, keeping pins", () => {
     const workspace = {
       ...WORKSPACE,
       pins: { "ada@example.edu": "robot arm" },
@@ -575,12 +575,69 @@ describe("removeProject", () => {
       "tide clok": workspace.titleMatches["tide clok"],
     });
     expect(removed.pins).toEqual(workspace.pins);
-    expect(removed.result).toBe(RESULT);
     expect(removed.projectSource).toEqual(WORKSPACE.projectSource);
   });
 
   it("clears the source with the last project", () => {
     const one = removeProject(WORKSPACE, "robot arm");
     expect(removeProject(one, "tide clock").projectSource).toBe(null);
+  });
+});
+
+describe("addProject refuses", () => {
+  it("a title with no letters or digits, which would save an empty key", () => {
+    expect(
+      addProject(WORKSPACE, { title: "...", weightMultiplier: 1 })
+    ).toEqual({ ok: false, message: "Enter a title with letters or digits." });
+  });
+
+  it("a title a program's project has, whose key is an id", () => {
+    const portal = {
+      ...WORKSPACE,
+      projects: [{ key: "uuid-1", title: "Moon Base", weightMultiplier: 1 }],
+    };
+    expect(
+      addProject(portal, { title: "moon  base", weightMultiplier: 1 }).ok
+    ).toBe(false);
+  });
+});
+
+describe("addProject keeps what it touches consistent", () => {
+  it("drops a title match the new title now meets exactly, and moves the run's roster places", () => {
+    const added = addProject(
+      {
+        ...WORKSPACE,
+        titleMatches: {
+          "moon base": { projectKey: "robot arm", title: "Moon Base" },
+        },
+        result: {
+          ...RESULT,
+          placements: [
+            {
+              email: "kim@example.edu",
+              projectKey: "roster:moon base",
+              team: 1,
+              priority: null,
+            },
+          ],
+        },
+      },
+      { title: "Moon Base", weightMultiplier: 1 }
+    );
+    expect(added.ok).toBe(true);
+    if (added.ok) {
+      expect(added.workspace.titleMatches).toBe(undefined);
+      expect(added.workspace.result?.placements[0].projectKey).toBe(
+        "moon base"
+      );
+    }
+  });
+});
+
+describe("removeProject and the last run", () => {
+  it("drops a run that placed anyone on the project, and keeps one that did not", () => {
+    const withRun = { ...WORKSPACE, result: RESULT };
+    expect(removeProject(withRun, "robot arm").result).toBe(undefined);
+    expect(removeProject(withRun, "tide clock").result).toBe(RESULT);
   });
 });
