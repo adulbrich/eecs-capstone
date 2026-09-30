@@ -495,7 +495,9 @@ function ProjectsTable({
         A blank cell uses the default from the Parameters tab. Max teams is how
         many teams the project may form, and 0 leaves it out; min and max
         students apply to each of those teams. Weight multiplies every bid on
-        the project: 1 leaves it alone, 0.25 steers students away.
+        the project: 1 leaves it alone, 0.25 steers students away. Contact, from
+        the Columns menu, names the mentor for a student-proposed project and
+        the proposer for any other, or the other of the two when one is missing.
       </p>
       {noContacts && (
         <p className="mt-2 text-sm" role="status">
@@ -522,7 +524,7 @@ function Contact({ project }: { project: WorkspaceProject }) {
     return "-";
   }
   return (
-    <div className="wrap-anywhere min-w-0 md:max-w-xs md:whitespace-normal">
+    <div className="wrap-anywhere md:min-w-48 md:max-w-xs md:whitespace-normal">
       <div>{contact.name || contact.email}</div>
       <div className="text-muted-foreground text-xs">
         {contact.name && contact.email ? `${contact.email}, ` : ""}

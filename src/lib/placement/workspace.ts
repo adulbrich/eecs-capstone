@@ -412,13 +412,13 @@ export function contactFor(
 ): { email?: string; name?: string; role: "mentor" | "proposer" } | null {
   // A blank string, as a hand-edited workspace file can hold, is no name.
   const mentor = {
-    email: project.mentorEmail || undefined,
-    name: project.mentorName || undefined,
+    email: optionalText(project.mentorEmail),
+    name: optionalText(project.mentorName),
     role: "mentor" as const,
   };
   const proposer = {
-    email: project.proposerEmail || undefined,
-    name: project.proposerName || undefined,
+    email: optionalText(project.proposerEmail),
+    name: optionalText(project.proposerName),
     role: "proposer" as const,
   };
   const order = project.studentProposed

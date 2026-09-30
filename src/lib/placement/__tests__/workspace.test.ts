@@ -239,6 +239,16 @@ describe("contactFor", () => {
     expect(contactFor({})).toBe(null);
   });
 
+  it("reads a name of spaces as none, so a real proposer wins over it", () => {
+    expect(
+      contactFor({
+        studentProposed: true,
+        mentorName: "  ",
+        proposerName: "Jane Doe",
+      })
+    ).toEqual({ email: undefined, name: "Jane Doe", role: "proposer" });
+  });
+
   it("reads a blank name as none, so the email shows", () => {
     expect(contactFor({ proposerName: "", proposerEmail: "a@b.c" })).toEqual({
       email: "a@b.c",
