@@ -131,6 +131,18 @@ describe("notifications are scoped to their recipient", () => {
     expect(bobs.rows.map((r) => r.title)).toEqual(["bob unread"]);
   });
 
+  it("getMyNotificationsAs counts unread rows past the ten it returns", async () => {
+    const stamp = Date.now();
+    const carol = await makeUser(`n-get-c-${stamp}@x.com`);
+    for (let i = 0; i < 12; i++) {
+      await notify(carol.id, `carol ${i}`);
+    }
+
+    const mine = await getMyNotificationsAs(carol);
+    expect(mine.rows).toHaveLength(10);
+    expect(mine.count).toBe(12);
+  });
+
   it("markAllReadAs does not touch the other user's rows", async () => {
     const stamp = Date.now();
     const alice = await makeUser(`n-all-a-${stamp}@x.com`);
