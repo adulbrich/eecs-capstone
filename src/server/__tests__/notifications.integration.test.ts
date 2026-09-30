@@ -5,6 +5,7 @@ import { notifications, user } from "#/db/schema";
 import { auth } from "#/lib/auth";
 import type { NotificationType } from "#/lib/vocabularies";
 import {
+  getMyNotificationsAs,
   listMyNotificationsAs,
   markAllReadAs,
   markReadAs,
@@ -108,6 +109,26 @@ describe("notifications are scoped to their recipient", () => {
 
     expect((await unreadCountAs(alice)).count).toBe(2);
     expect((await unreadCountAs(bob)).count).toBe(1);
+  });
+
+  it("getMyNotificationsAs returns the viewer's own count and rows together", async () => {
+    const stamp = Date.now();
+    const alice = await makeUser(`n-get-a-${stamp}@x.com`);
+    const bob = await makeUser(`n-get-b-${stamp}@x.com`);
+    await notify(alice.id, "alice unread");
+    await notify(alice.id, "alice read", { read: true });
+    await notify(bob.id, "bob unread");
+
+    const mine = await getMyNotificationsAs(alice);
+    expect(mine.count).toBe(1);
+    expect(mine.rows.map((r) => r.title).sort()).toEqual([
+      "alice read",
+      "alice unread",
+    ]);
+
+    const bobs = await getMyNotificationsAs(bob);
+    expect(bobs.count).toBe(1);
+    expect(bobs.rows.map((r) => r.title)).toEqual(["bob unread"]);
   });
 
   it("markAllReadAs does not touch the other user's rows", async () => {

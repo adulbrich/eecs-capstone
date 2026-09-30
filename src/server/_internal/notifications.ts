@@ -24,11 +24,6 @@ export async function listMyNotificationsAs(viewer: AuthUser) {
   return { rows };
 }
 
-export async function listMyNotificationsForCurrentUser() {
-  const viewer = await requireUser();
-  return listMyNotificationsAs(viewer);
-}
-
 export async function unreadCountAs(viewer: AuthUser) {
   const [{ value }] = await db
     .select({ value: count() })
@@ -39,9 +34,21 @@ export async function unreadCountAs(viewer: AuthUser) {
   return { count: value };
 }
 
-export async function unreadCountForCurrentUser() {
+/**
+ * The count is its own query rather than derived from the rows, because the
+ * rows stop at ten and the count does not.
+ */
+export async function getMyNotificationsAs(viewer: AuthUser) {
+  const [unread, { rows }] = await Promise.all([
+    unreadCountAs(viewer),
+    listMyNotificationsAs(viewer),
+  ]);
+  return { count: unread.count, rows };
+}
+
+export async function getMyNotificationsForCurrentUser() {
   const viewer = await requireUser();
-  return unreadCountAs(viewer);
+  return getMyNotificationsAs(viewer);
 }
 
 export async function markReadAs(viewer: AuthUser, data: { id: string }) {

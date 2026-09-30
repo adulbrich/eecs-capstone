@@ -6,10 +6,9 @@ import { toast } from "sonner";
 import { useAction } from "#/lib/use-action";
 import { useSignedInUserId } from "#/lib/use-signed-in";
 import {
-  listMyNotifications,
+  getMyNotifications,
   markAllRead,
   markRead,
-  unreadCount,
 } from "#/server/notifications";
 import { LocalTime } from "./local-time";
 import { Button } from "./ui/button";
@@ -53,10 +52,7 @@ export function NotificationBell() {
     queryKey,
     queryFn: async () => {
       try {
-        const [{ count }, { rows }] = await Promise.all([
-          unreadCount(),
-          listMyNotifications(),
-        ]);
+        const { count, rows } = await getMyNotifications();
         return { count, rows: rows as Notification[] };
       } catch (error) {
         // The server ended the session (expiry, a ban) before this tab
@@ -72,8 +68,8 @@ export function NotificationBell() {
     enabled: userId !== undefined,
     refetchInterval: 60_000,
     refetchOnWindowFocus: true,
-    // The next tick is the retry; a failed read should cost the two requests
-    // once a minute, not four times each.
+    // The next tick is the retry; a failed read should cost one request a
+    // minute, not four.
     retry: false,
   });
   const unread = data?.count ?? 0;
