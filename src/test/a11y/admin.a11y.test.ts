@@ -356,6 +356,35 @@ test("admin placement, projects from a pasted list", async ({ page }) => {
   await checkA11y(page);
 });
 
+// Who to contact about each project, and the student-proposed badge (#715).
+for (const width of [1280, 375]) {
+  test(`admin placement, projects with contacts at ${width}`, async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width, height: 800 });
+    await page.goto("/admin/placement");
+    await waitForHydration(page);
+    await page.getByLabel("Projects CSV file").setInputFiles({
+      name: "projects.csv",
+      mimeType: "text/csv",
+      buffer: Buffer.from(
+        [
+          "title,proposer_name,proposer_email,mentor_name,mentor_email,student_proposed",
+          "Tide Clock,Jane Doe,jane.doe@example.com,,,",
+          "Robot Arm,Ada Park,parka@example.edu,Pat Lee,leep@example.edu,true",
+        ].join("\n")
+      ),
+    });
+    await page.getByRole("button", { name: "Columns" }).click();
+    await page.getByRole("menuitemcheckbox", { name: "Contact" }).click();
+    await closeMenu(page);
+    await expect(page.getByText("leep@example.edu, mentor")).toBeVisible();
+    await expect(page.getByText("Student proposed")).toBeVisible();
+    await checkA11y(page);
+    await expectNoHorizontalOverflow(page);
+  });
+}
+
 test("@smoke admin placement, projects and bids loaded", async ({ page }) => {
   await page.goto("/admin/placement");
   await waitForHydration(page);

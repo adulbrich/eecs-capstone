@@ -78,7 +78,8 @@ function PlacementPage() {
           <p className="mt-1 max-w-prose text-muted-foreground text-sm">
             Bids, placements and settings on this page stay in this browser and
             are never sent to the server. Export the workspace to move it to
-            another browser.
+            another browser; the file holds the students' emails and any project
+            contacts, so keep it as you would the class roster.
           </p>
         </div>
         {workspace && (

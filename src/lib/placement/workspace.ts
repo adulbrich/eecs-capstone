@@ -7,6 +7,7 @@ import {
   type PlacementParameters,
   type PlacementResult,
   type PlacementStudent,
+  type ProjectContact,
   type WorkspaceProject,
 } from "#/lib/placement/types";
 
@@ -125,6 +126,11 @@ const projectSchema = z.object({
     .number()
     .min(PARAMETER_LIMITS.multiplier.min)
     .max(PARAMETER_LIMITS.multiplier.max),
+  mentorEmail: z.string().optional(),
+  mentorName: z.string().optional(),
+  proposerEmail: z.string().optional(),
+  proposerName: z.string().optional(),
+  studentProposed: z.boolean().optional(),
 });
 
 const resultSchema = z.object({
@@ -364,7 +370,7 @@ export function toPlacementInput(
   const { maxTeams, ...parameters } = workspace.parameters;
   return {
     projects: projects.map((p) => ({
-      ...p,
+      ...withoutContact(p),
       maxTeams: p.maxTeams ?? maxTeams,
     })),
     students,
@@ -372,13 +378,69 @@ export function toPlacementInput(
   };
 }
 
+/** A project with its contact fields dropped: what a run reads of it. */
+export function withoutContact<P extends WorkspaceProject>(
+  project: P
+): Omit<P, keyof ProjectContact> {
+  const {
+    mentorEmail: _mentorEmail,
+    mentorName: _mentorName,
+    proposerEmail: _proposerEmail,
+    proposerName: _proposerName,
+    studentProposed: _studentProposed,
+    ...rest
+  } = project;
+  return rest;
+}
+
+/**
+ * Who staff ask about a project (#715): the mentor for a student-proposed
+ * one, the proposer otherwise, and the other of the two when that one is
+ * missing. Null when the project names nobody.
+ */
+export function contactFor(
+  project: ProjectContact
+): { email?: string; name?: string; role: "mentor" | "proposer" } | null {
+  const mentor = {
+    email: project.mentorEmail,
+    name: project.mentorName,
+    role: "mentor" as const,
+  };
+  const proposer = {
+    email: project.proposerEmail,
+    name: project.proposerName,
+    role: "proposer" as const,
+  };
+  const order = project.studentProposed
+    ? [mentor, proposer]
+    : [proposer, mentor];
+  return order.find((c) => c.email || c.name) ?? null;
+}
+
+/** Trimmed, or undefined when blank or missing. */
+const optionalText = (value: string | null | undefined) =>
+  value?.trim() || undefined;
+
 /**
  * Published projects from the portal, keyed by id. Two with the same title
  * would leave a bid unable to say which one it means, so the second is
- * reported and a bid naming that title goes to the first.
+ * reported and a bid naming that title goes to the first. The proposer
+ * falls back to the project's contact, which a project proposed before the
+ * proposer had an account may be all it has.
  */
 export function projectsFromPortal(
-  rows: readonly { id: string; teamsSupported: number; title: string }[]
+  rows: readonly {
+    contactEmail?: string | null;
+    contactName?: string | null;
+    id: string;
+    mentorEmail?: string | null;
+    mentorName?: string | null;
+    proposerEmail?: string | null;
+    proposerName?: string | null;
+    studentProposed?: boolean | null;
+    teamsSupported: number;
+    title: string;
+  }[]
 ): { duplicates: string[]; projects: WorkspaceProject[] } {
   const seen = new Set<string>();
   const duplicates: string[] = [];
@@ -391,12 +453,24 @@ export function projectsFromPortal(
   }
   return {
     duplicates,
-    projects: rows.map((row) => ({
-      key: row.id,
-      title: row.title,
-      maxTeams: row.teamsSupported,
-      weightMultiplier: 1,
-    })),
+    projects: rows.map((row) => {
+      const hasProposer = Boolean(row.proposerName || row.proposerEmail);
+      return {
+        key: row.id,
+        title: row.title,
+        maxTeams: row.teamsSupported,
+        weightMultiplier: 1,
+        mentorEmail: optionalText(row.mentorEmail),
+        mentorName: optionalText(row.mentorName),
+        proposerEmail: optionalText(
+          hasProposer ? row.proposerEmail : row.contactEmail
+        ),
+        proposerName: optionalText(
+          hasProposer ? row.proposerName : row.contactName
+        ),
+        studentProposed: row.studentProposed === true || undefined,
+      };
+    }),
   };
 }
 
@@ -416,7 +490,9 @@ export function inputFingerprint(
 ): string {
   const matches = workspace.titleMatches ?? {};
   const text = JSON.stringify([
-    workspace.projects,
+    // Without who to contact, which no run reads: loading it must not mark
+    // a run stale, and a project without it hashes as it always did.
+    workspace.projects.map(withoutContact),
     workspace.parameters,
     workspace.bids?.text ?? null,
     // Each only when present, so a run stored before it existed keeps its

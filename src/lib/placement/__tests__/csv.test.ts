@@ -202,6 +202,43 @@ describe("parseProjectsCsv", () => {
     ]);
   });
 
+  it("reads the contact columns, blanks left out, and says why a flag is unreadable", () => {
+    const result = parseProjectsCsv(
+      [
+        "title,proposer_name,proposer_email,mentor_name,mentor_email,student_proposed",
+        "Robot Arm,Ada Park,parka@example.edu,Pat Lee,leep@example.edu,Yes",
+        "Tide Clock,Jane Doe,,,,",
+        "Moon Base,,,,,maybe",
+      ].join("\n")
+    );
+    expect(result.projects.map((p) => JSON.parse(JSON.stringify(p)))).toEqual([
+      {
+        key: "robot arm",
+        title: "Robot Arm",
+        weightMultiplier: 1,
+        proposerName: "Ada Park",
+        proposerEmail: "parka@example.edu",
+        mentorName: "Pat Lee",
+        mentorEmail: "leep@example.edu",
+        studentProposed: true,
+      },
+      {
+        key: "tide clock",
+        title: "Tide Clock",
+        weightMultiplier: 1,
+        proposerName: "Jane Doe",
+      },
+    ]);
+    expect(result.issues).toEqual([
+      {
+        level: "error",
+        row: 4,
+        message:
+          "student_proposed must be true or false, yes or no, or 1 or 0.",
+      },
+    ]);
+  });
+
   it("accepts a one-column file", () => {
     expect(
       parseProjectsCsv("title\nRobot Arm\nTide Clock").projects

@@ -1,7 +1,16 @@
 import { readFile } from "node:fs/promises";
 import { expect, type Page, test } from "@playwright/test";
+import { eq } from "drizzle-orm";
+import { projectPrograms, projects } from "../../db/schema";
 import { waitForHydration } from "../shared/playwright";
 import { ADMIN_AUTH } from "./constants";
+import {
+  createFixtureProgram,
+  createFixtureProject,
+  fixtureName,
+  userIdByEmail,
+  withDb,
+} from "./fixtures";
 
 /**
  * The placement page keeps everything in the staff member's browser
@@ -88,6 +97,75 @@ test.describe("placement workspace", () => {
     for (const text of ["Sam from lab", "Ada Park", "Ben Ito", "clocks"]) {
       expect(sent.filter((r) => r.includes(text))).toEqual([]);
     }
+  });
+
+  test("a program's projects bring who to contact, and a student-proposed badge (#715)", async ({
+    page,
+  }) => {
+    const title = fixtureName("Placement contact");
+    const mentor = `mentor@${DOMAIN}`;
+    const program = await withDb(async (db) => {
+      const created = await createFixtureProgram(db);
+      const project = await createFixtureProject(db, {
+        title,
+        proposerId: await userIdByEmail(db, "user@example.com"),
+        status: "published",
+      });
+      await db
+        .update(projects)
+        .set({ studentProposed: true, mentorEmail: mentor })
+        .where(eq(projects.id, project.id));
+      await db
+        .insert(projectPrograms)
+        .values({ programId: created.id, projectId: project.id });
+      return created;
+    });
+
+    await page.goto("/admin/placement");
+    await waitForHydration(page);
+    await page.getByRole("combobox", { name: "Program" }).click();
+    await page
+      .getByRole("option", {
+        name: `${program.courseId} ${program.courseName}`,
+      })
+      .click();
+    await page.getByRole("button", { name: "Load published projects" }).click();
+    const row = page.getByRole("row").filter({ hasText: title });
+    await expect(row).toContainText("Student proposed");
+    // Hidden until asked for, and the mentor for a student-proposed project.
+    await expect(
+      page.getByRole("columnheader", { name: /Contact/ })
+    ).toHaveCount(0);
+    await page.getByRole("button", { name: "Columns" }).click();
+    await page.getByRole("menuitemcheckbox", { name: "Contact" }).click();
+    await page.keyboard.press("Escape");
+    await expect(row).toContainText(mentor);
+    await expect(row).toContainText("mentor");
+
+    // A projects CSV carries the same, and says why a flag is unreadable.
+    await page.getByRole("button", { name: "Remove projects" }).click();
+    await page
+      .getByRole("alertdialog")
+      .getByRole("button", { name: "Remove" })
+      .click();
+    await page.getByLabel("Projects CSV file").setInputFiles({
+      name: "projects.csv",
+      mimeType: "text/csv",
+      buffer: Buffer.from(
+        [
+          "title,proposer_name,proposer_email,student_proposed",
+          "Tide Clock,Jane Doe,jane@example.com,no",
+          "Moon Base,,,maybe",
+        ].join("\n")
+      ),
+    });
+    const tide = page.getByRole("row").filter({ hasText: "Tide Clock" });
+    await expect(tide).toContainText("Jane Doe");
+    await expect(tide).toContainText("jane@example.com, proposer");
+    await expect(tide).not.toContainText("Student proposed");
+    await expect(
+      page.getByText(/student_proposed must be true or false/)
+    ).toBeVisible();
   });
 
   test("an exported workspace imports identically in a fresh browser", async ({

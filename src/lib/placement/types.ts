@@ -25,13 +25,27 @@ export interface PlacementProject {
 }
 
 /**
+ * Who to ask about a project (#715): read by staff on the Projects tab and
+ * never by the solver, so no run depends on it. From a program's published
+ * projects, a CSV's optional columns, or nothing for a pasted list.
+ */
+export interface ProjectContact {
+  mentorEmail?: string;
+  mentorName?: string;
+  proposerEmail?: string;
+  proposerName?: string;
+  /** Proposed by students, so the mentor is who staff ask. */
+  studentProposed?: boolean;
+}
+
+/**
  * A project as the workspace holds it: a blank max teams means the page
  * default, resolved when a run starts, so changing the default reaches every
  * project that never set its own.
  */
 export type WorkspaceProject = Omit<PlacementProject, "maxTeams"> & {
   maxTeams?: number;
-};
+} & ProjectContact;
 
 export interface PlacementBid {
   comment: string;

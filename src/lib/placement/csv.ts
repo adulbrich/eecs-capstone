@@ -1,6 +1,10 @@
 import Papa from "papaparse";
 import { unguardCell } from "#/lib/csv";
-import type { PlacementStudent, WorkspaceProject } from "#/lib/placement/types";
+import type {
+  PlacementStudent,
+  ProjectContact,
+  WorkspaceProject,
+} from "#/lib/placement/types";
 
 /**
  * Parsing for the two files placement imports. Both run in the staff
@@ -126,10 +130,27 @@ function parseFlag(value: string): boolean | "invalid" {
   return FALSE_FLAGS.has(v) ? false : "invalid";
 }
 
+/** A projects row's contact columns, blanks left out, or an unreadable flag. */
+function contactCells(raw: Row): ProjectContact | "invalid" {
+  const studentProposed = parseFlag(cell(raw, "student_proposed"));
+  if (studentProposed === "invalid") {
+    return "invalid";
+  }
+  return {
+    mentorEmail: cell(raw, "mentor_email") || undefined,
+    mentorName: cell(raw, "mentor_name") || undefined,
+    proposerEmail: cell(raw, "proposer_email") || undefined,
+    proposerName: cell(raw, "proposer_name") || undefined,
+    studentProposed: studentProposed || undefined,
+  };
+}
+
 /**
- * `title, max_teams, min_students, max_students`. Only `title` is required,
- * and a blank number takes the page default. A CSV project is keyed by its
- * normalized title, which is also how bids find it.
+ * `title, max_teams, min_students, max_students`, and who to contact:
+ * `proposer_name, proposer_email, mentor_name, mentor_email,
+ * student_proposed` (#715). Only `title` is required, and a blank number
+ * takes the page default. A CSV project is keyed by its normalized title,
+ * which is also how bids find it.
  */
 export function parseProjectsCsv(text: string): {
   issues: ImportIssue[];
@@ -177,6 +198,11 @@ export function parseProjectsCsv(text: string): {
       error("min_students is above max_students.");
       return;
     }
+    const contact = contactCells(raw);
+    if (contact === "invalid") {
+      error("student_proposed must be true or false, yes or no, or 1 or 0.");
+      return;
+    }
     const key = normalizeTitle(title);
     const earlier = firstRow.get(key);
     if (earlier !== undefined) {
@@ -191,6 +217,7 @@ export function parseProjectsCsv(text: string): {
       minStudents,
       maxStudents,
       weightMultiplier: 1,
+      ...contact,
     });
   });
   return { projects, issues };

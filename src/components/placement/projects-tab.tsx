@@ -12,6 +12,7 @@ import { NumberInput } from "#/components/placement/number-input";
 import { PasteList } from "#/components/placement/paste-list";
 import { RosterProjects } from "#/components/placement/roster-projects";
 import type { PlacementWorkspace } from "#/components/placement/use-placement-workspace";
+import { ProjectBadges } from "#/components/project-badges";
 import { Button } from "#/components/ui/button";
 import { FieldError } from "#/components/ui/field";
 import { Label } from "#/components/ui/label";
@@ -30,6 +31,7 @@ import {
 import { PROJECTS_FORMAT } from "#/lib/placement/formats";
 import type { WorkspaceProject } from "#/lib/placement/types";
 import {
+  contactFor,
   PARAMETER_LIMITS,
   projectsFromPortal,
   pruneTitleMatches,
@@ -173,6 +175,7 @@ export function ProjectsTab({
       <ProjectsTable
         parameters={workspace.parameters}
         rows={rows}
+        source={source}
         update={update}
       />
       <RosterProjects state={state} />
@@ -356,10 +359,12 @@ function BoundsProblems({
 function ProjectsTable({
   parameters,
   rows,
+  source,
   update,
 }: {
   parameters: Workspace["parameters"];
   rows: Row[];
+  source: Workspace["projectSource"];
   update: PlacementWorkspace["update"];
 }) {
   const { navigate, search } = useLocalTableSearch();
@@ -406,10 +411,30 @@ function ProjectsTable({
       {
         accessorFn: (row) => row.title,
         cardHeader: true,
-        cell: ({ row }) => row.original.title,
+        cell: ({ row }) => (
+          <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+            {row.original.title}
+            <ProjectBadges
+              requiresNdaIp={false}
+              studentProposed={row.original.studentProposed === true}
+            />
+          </div>
+        ),
         enableHiding: false,
         header: "Project",
         id: "title",
+      },
+      {
+        accessorFn: (row) => {
+          const contact = contactFor(row);
+          return contact?.name ?? contact?.email;
+        },
+        cell: ({ row }) => <Contact project={row.original} />,
+        defaultHidden: true,
+        header: "Contact",
+        headerHint:
+          "The mentor for a student-proposed project, the proposer for any other.",
+        id: "contact",
       },
       {
         accessorFn: (row) => row.bidCount,
@@ -462,6 +487,9 @@ function ProjectsTable({
     search,
     storageKey: "placement-projects",
   });
+  const noContacts =
+    !tableProps.hidden.includes("contact") &&
+    rows.every((row) => contactFor(row) === null);
 
   return (
     <div className="mt-4">
@@ -471,6 +499,13 @@ function ProjectsTable({
         students apply to each of those teams. Weight multiplies every bid on
         the project: 1 leaves it alone, 0.25 steers students away.
       </p>
+      {noContacts && (
+        <p className="mt-2 text-sm" role="status">
+          {source?.kind === "portal"
+            ? "No project here names a contact. Projects loaded before placement kept contacts have none: load the program again to fill them, which replaces the list and clears any placement and pins."
+            : "No project here names a contact. A projects CSV can carry proposer_name, proposer_email, mentor_name, mentor_email and student_proposed columns."}
+        </p>
+      )}
       <AdminDataTable
         caption="Projects in this placement"
         data={rows}
@@ -478,6 +513,23 @@ function ProjectsTable({
         getRowId={(row) => row.key}
         {...tableProps}
       />
+    </div>
+  );
+}
+
+/** The contact's name over their email, and which of the two they are. */
+function Contact({ project }: { project: WorkspaceProject }) {
+  const contact = contactFor(project);
+  if (contact === null) {
+    return "-";
+  }
+  return (
+    <div className="min-w-0">
+      <div className="wrap-anywhere">{contact.name ?? contact.email}</div>
+      <div className="wrap-anywhere text-muted-foreground text-xs">
+        {contact.name && contact.email ? `${contact.email}, ` : ""}
+        {contact.role}
+      </div>
     </div>
   );
 }
