@@ -159,6 +159,13 @@ const CENSUS = new Map<string, { class: SeedClass; why: string }>([
   ],
   // Class D.
   [
+    "src/components/admin-data-table.tsx: useRef(open)",
+    {
+      class: "D",
+      why: "a group's open state on the previous render, to move the focus when it closes; the page's own state, not loader data",
+    },
+  ],
+  [
     "src/components/comment-thread.tsx: useState(comment.content)",
     {
       class: "D",
@@ -177,6 +184,13 @@ const CENSUS = new Map<string, { class: SeedClass; why: string }>([
     {
       class: "D",
       why: "display only: the server's text, replaced by an effect with the local one",
+    },
+  ],
+  [
+    "src/components/placement/results-tab.tsx: useState({at, open: NO_FOLDS})",
+    {
+      class: "D",
+      why: "which board projects were folded by hand, in component state, for the run whose time it holds; a new run starts over",
     },
   ],
   [

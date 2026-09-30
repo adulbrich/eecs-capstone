@@ -16,12 +16,21 @@ import {
 } from "@tanstack/react-table";
 import {
   ChevronDown,
+  ChevronRight,
   ChevronsUpDown,
   ChevronUp,
   Columns3,
   Info,
 } from "lucide-react";
-import { Fragment, type ReactNode, useEffect, useMemo, useRef } from "react";
+import {
+  Fragment,
+  type ReactNode,
+  useEffect,
+  useId,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+} from "react";
 import { EmptyState } from "#/components/empty-state";
 import { Button } from "#/components/ui/button";
 import {
@@ -174,15 +183,36 @@ interface AdminColumnExtras {
  * mode carries the request's identity on every line, the way the request
  * queue already carries the requester and the request date.
  *
- * One level only. The mode groups; it does not nest, collapse or sort within
- * a group. `docs/UI-CONVENTIONS.md`, "Grouping rows that arrived together",
- * is the reader's copy of these rules.
+ * One level only. The mode groups, and with `collapse` a group folds to its
+ * header; it does not nest or sort within a group. `docs/UI-CONVENTIONS.md`,
+ * "Grouping rows that arrived together", is the reader's copy of these rules.
  */
 export interface AdminTableGroup<T> {
   /** Controls on the right of the header, for a decision over the group. */
   actions?: (rows: T[]) => ReactNode;
+  /**
+   * Groups that fold to their header, from a chevron in front of it. The page
+   * holds which are open, as it holds which rows show their `detail`, so the
+   * table gains no state. Absent means every group is open with no chevron.
+   */
+  collapse?: AdminTableGroupCollapse<T>;
   header: (rows: T[]) => ReactNode;
   key: (row: T) => string;
+}
+
+export interface AdminTableGroupCollapse<T> {
+  /**
+   * Whether the group shows its rows. Given the key alone: a rule over the
+   * group's rows belongs to the page, which reads them from its own data
+   * rather than from the rows the table renders.
+   */
+  isOpen: (key: string) => boolean;
+  /**
+   * The chevron's accessible name, which names the group, such as "Robot
+   * Arm". Whether it is open is in its aria-expanded, not in the name.
+   */
+  label: (rows: T[]) => string;
+  onToggle: (key: string) => void;
 }
 
 /**
@@ -552,6 +582,108 @@ export function AdminTableControls<T extends RowData>({
 }
 
 /**
+ * One group's tbody: the rowgroup header, then its rows unless `collapse`
+ * says it is closed. A closed group keeps its header, so the chevron that
+ * reopens it stays where the reader left it.
+ */
+function GroupBody<T>({
+  bodyId,
+  children,
+  group,
+  groupKey,
+  originals,
+  visibleColumnCount,
+}: {
+  bodyId: string;
+  children: ReactNode;
+  group: AdminTableGroup<T>;
+  groupKey: string;
+  originals: T[];
+  visibleColumnCount: number;
+}) {
+  const { collapse } = group;
+  const open = collapse?.isOpen(groupKey) ?? true;
+  const toggle = useRef<HTMLButtonElement | null>(null);
+  const wasOpen = useRef(open);
+  // Whether the focus is on one of the group's rows. Kept from focus events
+  // because by the time the group has closed its rows are gone, and the focus
+  // with them. Removing a focused row sends no blur here, since React holds
+  // events back during a commit, so any blur that does arrive is the focus
+  // really leaving: to another element, or to nothing, as a click on blank
+  // space, a window switch, or a button click in Safari leaves it.
+  const focusInRows = useRef(false);
+  useLayoutEffect(() => {
+    // A control that closes its own group (approving a project's last
+    // student) would otherwise drop the focus to the page.
+    if (
+      wasOpen.current &&
+      !open &&
+      focusInRows.current &&
+      (document.activeElement === null ||
+        document.activeElement === document.body)
+    ) {
+      toggle.current?.focus();
+    }
+    if (!open) {
+      focusInRows.current = false;
+    }
+    wasOpen.current = open;
+  }, [open]);
+  const Chevron = open ? ChevronDown : ChevronRight;
+  return (
+    <TableBody
+      data-group={groupKey}
+      id={bodyId}
+      onBlur={(event) => {
+        if (!event.currentTarget.contains(event.relatedTarget)) {
+          focusInRows.current = false;
+        }
+      }}
+      onFocus={(event) => {
+        focusInRows.current =
+          event.target.closest("tr[data-group-header]") === null;
+      }}
+    >
+      {/*
+        A bare tr and th rather than TableRow and TableHead: their classes
+        (the hover tint, h-10, border-b) are for data rows and column
+        headers, and a group header is neither. `src/styles.css` styles it
+        through data-group-header under both breakpoints.
+      */}
+      <tr data-group-header="">
+        <th colSpan={visibleColumnCount} scope="rowgroup">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div className="flex min-w-0 items-center gap-1">
+              {collapse && (
+                <Button
+                  aria-controls={open ? bodyId : undefined}
+                  aria-expanded={open}
+                  aria-label={collapse.label(originals)}
+                  onClick={() => collapse.onToggle(groupKey)}
+                  ref={toggle}
+                  size="icon-xs"
+                  type="button"
+                  variant="ghost"
+                >
+                  <Chevron aria-hidden="true" />
+                </Button>
+              )}
+              <div className="min-w-0">{group.header(originals)}</div>
+            </div>
+            {group.actions && (
+              <div className="flex shrink-0 items-center gap-2">
+                {group.actions(originals)}
+              </div>
+            )}
+          </div>
+        </th>
+      </tr>
+      {open && children}
+    </TableBody>
+  );
+}
+
+/**
  * Insertion order over the sorted model: a group is placed where its first
  * row lands, and every later row with the same key joins it there.
  */
@@ -690,6 +822,7 @@ export function AdminDataTable<T extends RowData>({
       `AdminDataTable: cardHeader is set on more than one column (${tooManyCardHeaders}). At most one column may title the mobile card, so only the first is used.`
     );
   }, [tooManyCardHeaders]);
+  const groupIdPrefix = useId();
   const highlighted = useRef<HTMLTableRowElement | null>(null);
   // Scrolls once the highlighted row has rendered. Deliberately runs on mount
   // only: re-sorting or re-filtering should not yank the viewport back.
@@ -910,33 +1043,20 @@ export function AdminDataTable<T extends RowData>({
             </TooltipProvider>
           </TableHeader>
           {group && grouped && groups.length > 0 ? (
-            groups.map(({ key, rows: rowsOfGroup }) => {
-              const originals = rowsOfGroup.map((row) => row.original);
-              return (
-                <TableBody data-group={key} key={key}>
-                  {/*
-                    A bare tr and th rather than TableRow and TableHead: their
-                    classes (the hover tint, h-10, border-b) are for data rows
-                    and column headers, and a group header is neither.
-                    `src/styles.css` styles it through data-group-header under
-                    both breakpoints.
-                  */}
-                  <tr data-group-header="">
-                    <th colSpan={visibleColumnCount} scope="rowgroup">
-                      <div className="flex flex-wrap items-center justify-between gap-2">
-                        <div className="min-w-0">{group.header(originals)}</div>
-                        {group.actions && (
-                          <div className="flex shrink-0 items-center gap-2">
-                            {group.actions(originals)}
-                          </div>
-                        )}
-                      </div>
-                    </th>
-                  </tr>
-                  {rowsOfGroup.map(renderRow)}
-                </TableBody>
-              );
-            })
+            groups.map(({ key, rows: rowsOfGroup }, index) => (
+              <GroupBody
+                // By position: a key is the page's own string, which may hold
+                // anything an id cannot.
+                bodyId={`${groupIdPrefix}-group-${index}`}
+                group={group}
+                groupKey={key}
+                key={key}
+                originals={rowsOfGroup.map((row) => row.original)}
+                visibleColumnCount={visibleColumnCount}
+              >
+                {rowsOfGroup.map(renderRow)}
+              </GroupBody>
+            ))
           ) : (
             <TableBody>
               {rows.length === 0 && (

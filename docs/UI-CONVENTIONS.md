@@ -728,8 +728,21 @@ groups what the reader sees. `header(rows)` receives the group's rows and nothin
 else, which means whatever identifies the group is denormalized onto every row in
 it. `getRowId` and `highlightedRowId` keep addressing data rows, so a deep link
 still lands inside a group. On mobile the header renders as a strip above its
-cards rather than a card of its own. One level only: no nesting, collapsing or
-sorting within a group. CSV export is per-route and unaffected.
+cards rather than a card of its own. One level only: no nesting or sorting
+within a group. CSV export is per-route and unaffected.
+
+`collapse` folds a group to its header, from a chevron in front of the header
+that carries `aria-expanded`, and `aria-controls` naming the group's `tbody`
+while it is open. The page holds which groups are open, in component state as
+it holds open `detail` rows: `isOpen(key)` reads it, `onToggle(key)` changes
+it, and `label(rows)` names the group for the chevron. `isOpen` gets the key
+alone, so a rule over a group's rows, such as the placement board folding a
+project whose students are all pinned (#713), reads the page's own rows rather
+than the ones a filter left the table. When a control inside a group closes it,
+the focus moves to that group's chevron instead of falling to the page. A
+closed group renders no rows and no detail, so a highlighted row inside one is
+not shown until the page opens it. `collapse` is part of `group`, not a third
+extension: it folds what `group` draws and does nothing without it.
 
 ### A row's detail under it
 

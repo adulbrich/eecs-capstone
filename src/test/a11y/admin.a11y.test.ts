@@ -440,6 +440,13 @@ test("admin placement, a run on the results board", async ({ page }) => {
     timeout: 20_000,
   });
   await checkA11y(page);
+  // Projects fold to their headers (#713), which keep a chevron each.
+  await page.getByRole("button", { name: "Collapse all" }).click();
+  await expect(
+    page.getByRole("button", { name: "Robot Arm", expanded: false })
+  ).toBeVisible();
+  await checkA11y(page);
+  await page.getByRole("button", { name: "Expand all" }).click();
 
   // A student's bids open under their row (#687), with Move here on each.
   const bidsToggle = page.getByRole("button", { name: /, \d+ bids?$/ }).first();

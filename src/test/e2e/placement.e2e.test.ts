@@ -243,13 +243,26 @@ test.describe("placement workspace", () => {
     // One team per project: Ada on Tide Clock, pinned Ben on Robot Arm.
     await expect(figures(page).getByText("every team 1")).toBeVisible();
     await expect(page.getByText(/^Ran at /)).toBeVisible();
+    // Every student on Robot Arm is pinned, so it starts folded (#713).
+    const robotArm = page.getByRole("button", { name: "Robot Arm" });
+    const tideClock = page.getByRole("button", { name: "Tide Clock" });
+    await expect(robotArm).toHaveAttribute("aria-expanded", "false");
+    await expect(tideClock).toHaveAttribute("aria-expanded", "true");
 
+    // Approving Tide Clock's last student folds it, and the focus lands on
+    // its chevron rather than falling to the page.
     await page.getByRole("button", { name: "Approve Ada Park here" }).click();
+    await expect(tideClock).toHaveAttribute("aria-expanded", "false");
+    await expect(tideClock).toBeFocused();
+    await tideClock.click();
     await expect(
       page.getByRole("button", { name: "Unpin Ada Park" })
     ).toBeVisible();
     await page.reload();
     await waitForHydration(page);
+    // Which projects were opened by hand is not saved.
+    await expect(tideClock).toHaveAttribute("aria-expanded", "false");
+    await page.getByRole("button", { name: "Expand all" }).click();
     await expect(
       page.getByRole("button", { name: "Unpin Ada Park" })
     ).toBeVisible();
@@ -269,11 +282,11 @@ test.describe("placement workspace", () => {
     await expect(page.getByText(/moved by hand/)).toBeHidden({
       timeout: 20_000,
     });
+    // A new run starts every project over: Tide Clock is all pinned again.
+    await expect(tideClock).toHaveAttribute("aria-expanded", "false");
+    await tideClock.click();
     await expect(
-      page
-        .getByRole("rowgroup")
-        .filter({ hasText: "Tide Clock, team" })
-        .getByText("Ben Ito")
+      page.getByRole("rowgroup").filter({ has: tideClock }).getByText("Ben Ito")
     ).toBeVisible();
 
     const placement = page.waitForEvent("download");
@@ -305,6 +318,8 @@ test.describe("placement workspace", () => {
       timeout: 20_000,
     });
 
+    // Ben is pinned, so Robot Arm starts folded (#713).
+    await page.getByRole("button", { name: "Expand all" }).click();
     const toggle = page.getByRole("button", { name: "Ada Park, 2 bids" });
     await expect(toggle).toHaveAttribute("aria-expanded", "false");
     await toggle.click();
@@ -336,10 +351,14 @@ test.describe("placement workspace", () => {
     await expect(page.getByText(/moved by hand/)).toBeHidden({
       timeout: 20_000,
     });
+    // Ada and Ben are both pinned to Robot Arm now, which folds it.
+    const robotArm = page.getByRole("button", { name: "Robot Arm" });
+    await expect(robotArm).toHaveAttribute("aria-expanded", "false");
+    await robotArm.click();
     await expect(
       page
         .getByRole("rowgroup")
-        .filter({ hasText: "Robot Arm, team" })
+        .filter({ has: robotArm })
         .getByText("Ada Park", { exact: true })
     ).toBeVisible();
     // A project that forms no team offers no Move here, and the open list
@@ -368,6 +387,9 @@ test.describe("placement workspace", () => {
     // Both students are on Robot Arm, whose minimum is 2. Pinning Ada there
     // and Ben elsewhere leaves each pinned project short of its minimum.
     await page.getByRole("button", { name: "Approve Ada Park here" }).click();
+    // Ben's pin comes from the file, so Robot Arm is now all pinned and
+    // folds (#713).
+    await page.getByRole("button", { name: "Robot Arm" }).click();
     await page.getByRole("combobox", { name: "Move Ben Ito" }).click();
     await page.getByRole("option", { name: "Tide Clock" }).click();
     // An input change as well, as when a co-instructor lowered a project's
@@ -734,25 +756,32 @@ test.describe("placement workspace", () => {
     await expect(placedFigure(page, "4 of 4")).toBeVisible({
       timeout: 20_000,
     });
-    const group = (label: string) =>
-      page.getByRole("rowgroup").filter({ hasText: label });
+    // Every student is pre-approved, so every project starts folded.
     await expect(
-      group("Robot Arm, team").getByRole("row", {
+      page.getByRole("button", { name: "Robot Arm", expanded: false })
+    ).toBeVisible();
+    await page.getByRole("button", { name: "Expand all" }).click();
+    const group = (label: string) =>
+      page
+        .getByRole("rowgroup")
+        .filter({ has: page.getByRole("button", { name: label }) });
+    await expect(
+      group("Robot Arm").getByRole("row", {
         name: /Ada Park.*Pre-approved/,
       })
     ).toBeVisible();
     await expect(
-      group("Sponsor Lab, team 1").getByRole("row", {
+      group("Sponsor Lab").getByRole("row", {
         name: /Kim Lee.*Pre-approved/,
       })
     ).toBeVisible();
     await expect(
-      group("Tide Clock, team").getByRole("row", {
+      group("Tide Clock").getByRole("row", {
         name: /Lou Ma.*Pre-approved/,
       })
     ).toBeVisible();
     await expect(
-      group("Tide Clock, team").getByRole("row", {
+      group("Tide Clock").getByRole("row", {
         name: /Ben Ito.*Pre-approved/,
       })
     ).toBeVisible();
@@ -824,10 +853,11 @@ test.describe("placement workspace", () => {
     await expect(figures(page)).toBeVisible({
       timeout: 20_000,
     });
+    await page.getByRole("button", { name: "Expand all" }).click();
     await expect(
       page
         .getByRole("rowgroup")
-        .filter({ hasText: "Tide Clock, team" })
+        .filter({ has: page.getByRole("button", { name: "Tide Clock" }) })
         .getByRole("button", { name: "Unpin Ada Park" })
     ).toBeVisible();
     await page.getByRole("tab", { name: /Bids/ }).click();
@@ -938,10 +968,11 @@ test.describe("placement workspace", () => {
     await expect(placedFigure(page, "3 of 3")).toBeVisible({
       timeout: 20_000,
     });
+    await page.getByRole("button", { name: "Expand all" }).click();
     await expect(
       page
         .getByRole("rowgroup")
-        .filter({ hasText: "Team 3, team 1" })
+        .filter({ has: page.getByRole("button", { name: "Team 3" }) })
         .getByRole("row", { name: /Kim Lee.*Pre-approved/ })
     ).toBeVisible();
   });

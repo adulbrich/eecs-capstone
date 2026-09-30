@@ -4,11 +4,13 @@ import {
   ChevronRight,
   ChevronsUpDown,
   Download,
+  FoldVertical,
   Pin,
   PinOff,
   Play,
   Square,
   TriangleAlert,
+  UnfoldVertical,
 } from "lucide-react";
 import {
   createContext,
@@ -25,6 +27,7 @@ import {
 import { ErrorBanner } from "#/components/error-banner";
 import { StudentMenu } from "#/components/placement/removed-students";
 import type { PlacementWorkspace } from "#/components/placement/use-placement-workspace";
+import { Badge } from "#/components/ui/badge";
 import { Button } from "#/components/ui/button";
 import { Card } from "#/components/ui/card";
 import {
@@ -55,11 +58,15 @@ import {
   bidsWithPinsCsv,
   boardRows,
   describeRun,
+  foldKey,
+  groupOpen,
+  groupSummary,
   moveStudent,
   moveTargets,
   placementCsv,
   projectsWithoutTeam,
   removeFromResult,
+  UNPLACED_GROUP,
   unplacedReason,
 } from "#/lib/placement/board";
 import { downloadText } from "#/lib/placement/download";
@@ -81,6 +88,27 @@ import { useLocalTableSearch } from "#/lib/use-local-table-search";
 const DEFAULT_SORT: SortState = { desc: false, id: "student" };
 
 const WARNING_STYLE = { color: "var(--status-warning)" };
+
+const NO_FOLDS: ReadonlyMap<string, boolean> = new Map();
+
+/**
+ * The board groups opened or closed by hand (#713), by `foldKey`, for the run
+ * they were set on: a new run starts every project over from its pins. In
+ * component state only, never in the workspace.
+ */
+function useRunFolds(at: string) {
+  const [folds, setFolds] = useState({ at, open: NO_FOLDS });
+  const set = useCallback(
+    (change: (open: Map<string, boolean>) => void) =>
+      setFolds((prev) => {
+        const next = new Map(prev.at === at ? prev.open : NO_FOLDS);
+        change(next);
+        return { at, open: next };
+      }),
+    [at]
+  );
+  return [folds.at === at ? folds.open : NO_FOLDS, set] as const;
+}
 
 export function ResultsTab({
   state,
@@ -434,6 +462,25 @@ function Board({
     workspace.parameters.maxTeams
   );
   const sizes = teamSizes(rows);
+  // Each group's rows, from every row on the board: whether a project is all
+  // pinned never depends on what the table happens to render.
+  const groups = useMemo(() => {
+    const byKey = new Map<string, BoardRow[]>();
+    for (const row of rows) {
+      byKey.set(row.groupKey, [...(byKey.get(row.groupKey) ?? []), row]);
+    }
+    return byKey;
+  }, [rows]);
+  const [manual, setManual] = useRunFolds(result.at);
+  const isOpen = (key: string) => groupOpen(groups.get(key) ?? [], manual);
+  const setAll = (open: boolean) =>
+    setManual((next) => {
+      for (const [key, groupRows] of groups) {
+        if (key !== UNPLACED_GROUP) {
+          next.set(foldKey(groupRows[0]), open);
+        }
+      }
+    });
   const notes = [
     // After a failed run the heading above already carries the time.
     ...(failed ? [] : [`Ran at ${new Date(result.at).toLocaleString()}.`]),
@@ -463,8 +510,15 @@ function Board({
         result:
           w.result && moveStudent(w.result, row.email, projectKey, priority),
       }));
+      // The student lands where the reader can see them, with their bids if
+      // open, even when the move leaves every student there pinned. A Move is
+      // a hand choice about that project, as its chevron is, so it holds
+      // until the next run.
+      setManual((next) => {
+        next.set(projectKey, true);
+      });
     },
-    [byEmail, update]
+    [byEmail, update, setManual]
   );
 
   const columns = useMemo(() => {
@@ -509,6 +563,13 @@ function Board({
         enableSorting: false,
         header: "Student",
         id: "student",
+      },
+      {
+        accessorFn: (row) => row.team ?? undefined,
+        cell: ({ row }) => row.original.team ?? "-",
+        enableSorting: false,
+        header: "Team",
+        id: "team",
       },
       {
         accessorFn: (row) => priorityLabel(row),
@@ -584,12 +645,14 @@ function Board({
           tab does the same. Move puts the student on another project now and
           pins them there, so later runs keep them there. A student's name opens
           every project they bid on, under their row, with what they wrote for
-          it, and Move here does what Move does for that project. Unpin frees
-          the student from every pin, and the next run places them by their
-          bids. A pin changes the next run, not the placement shown here. Remove
-          from placement, in a row's More menu, takes the student off this board
-          and out of every run, not only their team, until you restore them on
-          the Bids tab.
+          it, and Move here does what Move does for that project. A project
+          whose students are all pinned folds to its header, since it needs
+          nothing more; its chevron, or Expand all, opens it again, and a new
+          run starts over. Unpin frees the student from every pin, and the next
+          run places them by their bids. A pin changes the next run, not the
+          placement shown here. Remove from placement, in a row's More menu,
+          takes the student off this board and out of every run, not only their
+          team, until you restore them on the Bids tab.
         </p>
         {empty.length > 0 && (
           <p className="mt-2 text-sm">
@@ -598,7 +661,7 @@ function Board({
         )}
         <div className="mt-4">
           <AdminDataTable
-            caption="Placement by team, unplaced students first"
+            caption="Placement by project, unplaced students first"
             data={rows}
             detail={(row) =>
               openBids.has(row.email) ? (
@@ -617,22 +680,67 @@ function Board({
             emptyMessage="Nobody to place."
             getRowId={(row) => row.email}
             group={{
-              header: (groupRows) => (
-                <span>
-                  {groupRows[0].groupLabel}
-                  <span className="ml-2 font-normal text-muted-foreground text-xs">
-                    {groupRows.length}{" "}
-                    {groupRows.length === 1 ? "student" : "students"}
-                  </span>
-                </span>
-              ),
+              collapse: {
+                isOpen,
+                label: (groupRows) => groupRows[0].groupLabel,
+                onToggle: (key) =>
+                  setManual((next) => {
+                    const [head] = groups.get(key) ?? [];
+                    if (head) {
+                      next.set(foldKey(head), !isOpen(key));
+                    }
+                  }),
+              },
+              header: (groupRows) => <GroupHeader rows={groupRows} />,
               key: (row) => row.groupKey,
             }}
+            toolbar={
+              <div className="flex flex-wrap gap-2">
+                <Button
+                  onClick={() => setAll(true)}
+                  type="button"
+                  variant="outline"
+                >
+                  <UnfoldVertical aria-hidden="true" />
+                  Expand all
+                </Button>
+                <Button
+                  onClick={() => setAll(false)}
+                  type="button"
+                  variant="outline"
+                >
+                  <FoldVertical aria-hidden="true" />
+                  Collapse all
+                </Button>
+              </div>
+            }
             {...tableProps}
           />
         </div>
       </div>
     </OpenBids.Provider>
+  );
+}
+
+/**
+ * A group's header: the project, then its teams, students and pins, or that
+ * every one of them is pinned. Unplaced gives its count alone.
+ */
+function GroupHeader({ rows }: { rows: BoardRow[] }) {
+  const { allPinned, pinned, students, teams } = groupSummary(rows);
+  const count = `${students} ${students === 1 ? "student" : "students"}`;
+  return (
+    <span className="flex flex-wrap items-center gap-x-2 gap-y-1">
+      {rows[0].groupLabel}
+      <span className="font-normal text-muted-foreground text-xs">
+        {rows[0].projectKey === null
+          ? count
+          : `${teams} ${teams === 1 ? "team" : "teams"}, ${count}${allPinned ? "" : `, ${pinned} pinned`}`}
+      </span>
+      {rows[0].projectKey !== null && allPinned && (
+        <Badge variant="outline">All pinned</Badge>
+      )}
+    </span>
   );
 }
 
