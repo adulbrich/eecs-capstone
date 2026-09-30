@@ -607,8 +607,10 @@ function GroupBody<T>({
   const wasOpen = useRef(open);
   // Whether the focus is on one of the group's rows. Kept from focus events
   // because by the time the group has closed its rows are gone, and the focus
-  // with them. A blur with nowhere to go is the row being removed, so it
-  // leaves this set; a move to anything else clears it.
+  // with them. Removing a focused row sends no blur here, since React holds
+  // events back during a commit, so any blur that does arrive is the focus
+  // really leaving: to another element, or to nothing, as a click on blank
+  // space, a window switch, or a button click in Safari leaves it.
   const focusInRows = useRef(false);
   useLayoutEffect(() => {
     // A control that closes its own group (approving a project's last
@@ -633,7 +635,7 @@ function GroupBody<T>({
       data-group={groupKey}
       id={bodyId}
       onBlur={(event) => {
-        if (event.relatedTarget !== null) {
+        if (!event.currentTarget.contains(event.relatedTarget)) {
           focusInRows.current = false;
         }
       }}

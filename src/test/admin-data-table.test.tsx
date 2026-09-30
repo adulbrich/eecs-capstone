@@ -1056,12 +1056,14 @@ describe("group", () => {
       expect(onToggle).toHaveBeenCalledWith("B");
     });
 
-    it("moves the focus to the chevron when a control inside closes its own group", () => {
-      // Approving the last student of a project folds it: without this, the
-      // focused button is removed and the focus falls to the page body.
-      function Folding() {
-        const [open, setOpen] = useState(true);
-        return (
+    // A group closed by a control inside it, or by one outside it.
+    function Folding() {
+      const [open, setOpen] = useState(true);
+      return (
+        <>
+          <button onClick={() => setOpen(false)} type="button">
+            Fold from outside
+          </button>
           <AdminDataTable
             caption="Grouped"
             columns={[
@@ -1094,14 +1096,34 @@ describe("group", () => {
             sort={GROUPED_SORT}
             storageKey="grouped"
           />
-        );
-      }
+        </>
+      );
+    }
+
+    it("moves the focus to the chevron when a control inside closes its own group", () => {
+      // Approving the last student of a project folds it: without this, the
+      // focused button is removed and the focus falls to the page body.
       render(<Folding />);
       const fold = screen.getAllByRole("button", { name: "Fold" })[0];
       fold.focus();
       fireEvent.click(fold);
       expect(document.activeElement).toBe(
         screen.getByRole("button", { name: "Batch A" })
+      );
+    });
+
+    it("leaves the focus alone when it had already left the group", () => {
+      // Safari does not focus a clicked button, so a focus that left a row
+      // for nothing must not be pulled back when something else closes it.
+      render(<Folding />);
+      const fold = screen.getAllByRole("button", { name: "Fold" })[0];
+      fold.focus();
+      fold.blur();
+      fireEvent.click(
+        screen.getByRole("button", { name: "Fold from outside" })
+      );
+      expect(screen.getByRole("button", { name: "Batch A" })).not.toBe(
+        document.activeElement
       );
     });
   });
