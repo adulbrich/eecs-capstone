@@ -16,6 +16,7 @@ import {
   createContext,
   useCallback,
   useContext,
+  useId,
   useMemo,
   useRef,
   useState,
@@ -66,8 +67,11 @@ import {
   placementCsv,
   projectsWithoutTeam,
   removeFromResult,
+  standingPreApprovals,
   UNPLACED_GROUP,
+  type UnsurveyedRow,
   unplacedReason,
+  unsurveyedRows,
 } from "#/lib/placement/board";
 import { downloadText } from "#/lib/placement/download";
 import { runPlacement } from "#/lib/placement/run-placement";
@@ -122,6 +126,12 @@ export function ResultsTab({
   const allProjects = state.placementProjects;
   const students = useMemo(
     () => applyPins(bids?.students ?? [], workspace.pins),
+    [bids, workspace.pins]
+  );
+  // The roster's pre-approvals no board pin has replaced, which keep a
+  // student off the not-in-the-survey list (#714).
+  const preApproved = useMemo(
+    () => standingPreApprovals(bids?.students ?? [], workspace.pins),
     [bids, workspace.pins]
   );
   const titles = useMemo(
@@ -310,6 +320,7 @@ export function ResultsTab({
         <Board
           failed={failure !== null}
           openBids={openBids}
+          preApproved={preApproved}
           projects={allProjects}
           result={result}
           rows={rows}
@@ -426,6 +437,7 @@ function RunReport({ lines }: { lines: string[] }) {
 function Board({
   failed,
   openBids,
+  preApproved,
   projects,
   result,
   rows,
@@ -439,6 +451,7 @@ function Board({
   /** The latest run failed, so this board is from an earlier one. */
   failed: boolean;
   openBids: ReadonlySet<string>;
+  preApproved: ReadonlySet<string>;
   projects: WorkspaceProject[];
   result: NonNullable<Workspace["result"]>;
   rows: BoardRow[];
@@ -521,9 +534,16 @@ function Board({
     [byEmail, update, setManual]
   );
 
+  const pin = useCallback(
+    (email: string, projectKey: string | null) =>
+      update((w) => ({ ...w, pins: { ...w.pins, [email]: projectKey } })),
+    [update]
+  );
+  const unsurveyed = useMemo(
+    () => unsurveyedRows(rows, preApproved),
+    [rows, preApproved]
+  );
   const columns = useMemo(() => {
-    const pin = (email: string, projectKey: string | null) =>
-      update((w) => ({ ...w, pins: { ...w.pins, [email]: projectKey } }));
     return defineAdminColumns<BoardRow>()([
       {
         accessorFn: (row) => row.name || row.email,
@@ -608,7 +628,7 @@ function Board({
         id: "actions",
       },
     ]);
-  }, [update, move, projects, workspace.parameters.maxTeams, byEmail]);
+  }, [update, move, pin, projects, workspace.parameters.maxTeams, byEmail]);
   const bidsState = useMemo(
     () => ({ open: openBids, toggle: toggleBids }),
     [openBids, toggleBids]
@@ -636,6 +656,16 @@ function Board({
           sizes={sizes}
           total={rows.length}
         />
+        {unsurveyed.length > 0 && (
+          <Unsurveyed
+            defaultMaxTeams={workspace.parameters.maxTeams}
+            onMove={move}
+            onPin={pin}
+            projects={projects}
+            unsurveyed={unsurveyed}
+            update={update}
+          />
+        )}
         {/* Empty after a failed re-run of a clean placement: the heading
             above carries the time, and nothing else needs saying. */}
         {notes.length > 0 && <RunReport lines={notes} />}
@@ -740,6 +770,168 @@ function GroupHeader({ rows }: { rows: BoardRow[] }) {
       {rows[0].projectKey !== null && allPinned && (
         <Badge variant="outline">All pinned</Badge>
       )}
+    </span>
+  );
+}
+
+const UNSURVEYED_SORT: SortState = { desc: false, id: "student" };
+
+/**
+ * The roster students who did not answer the survey and have no
+ * pre-approval (#714), in one place: where each is, how many on their team
+ * did answer, and the board's own actions. A team where one or none did is
+ * where a student placed without bids most needs a look.
+ */
+function Unsurveyed({
+  defaultMaxTeams,
+  onMove,
+  onPin,
+  projects,
+  unsurveyed,
+  update,
+}: {
+  defaultMaxTeams: number;
+  onMove: (row: BoardRow, projectKey: string) => void;
+  onPin: (email: string, projectKey: string | null) => void;
+  projects: WorkspaceProject[];
+  unsurveyed: UnsurveyedRow[];
+  update: PlacementWorkspace["update"];
+}) {
+  const [open, setOpen] = useState(true);
+  const { navigate, search } = useLocalTableSearch();
+  const bodyId = useId();
+  const columns = useMemo(
+    () =>
+      defineAdminColumns<UnsurveyedRow>()([
+        {
+          accessorFn: (u) => u.row.name || u.row.email,
+          cardHeader: true,
+          cell: ({ row }) => (
+            <div>
+              <div>{row.original.row.name || row.original.row.email}</div>
+              {row.original.row.name && (
+                <div className="text-muted-foreground text-xs">
+                  {row.original.row.email}
+                </div>
+              )}
+            </div>
+          ),
+          enableHiding: false,
+          enableSorting: false,
+          header: "Student",
+          id: "student",
+        },
+        {
+          accessorFn: (u) => placedOn(u.row),
+          cell: ({ row }) => placedOn(row.original.row),
+          enableHiding: false,
+          enableSorting: false,
+          header: "Placed on",
+          id: "placed",
+        },
+        {
+          accessorFn: (u) => u.surveyed,
+          cell: ({ row }) => <SurveyedCount unsurveyed={row.original} />,
+          enableHiding: false,
+          enableSorting: false,
+          header: "Surveyed on the team",
+          id: "surveyed",
+        },
+        {
+          cell: ({ row }) => (
+            <RowActions
+              defaultMaxTeams={defaultMaxTeams}
+              onMove={(key) => onMove(row.original.row, key)}
+              onPin={(key) => onPin(row.original.row.email, key)}
+              projects={projects}
+              row={row.original.row}
+              update={update}
+            />
+          ),
+          enableHiding: false,
+          enableSorting: false,
+          header: "Actions",
+          id: "actions",
+        },
+      ]),
+    [defaultMaxTeams, onMove, onPin, projects, update]
+  );
+  const { tableProps } = useAdminTable({
+    columns,
+    defaultSort: UNSURVEYED_SORT,
+    navigate,
+    search,
+    storageKey: "placement-unsurveyed",
+  });
+  const Chevron = open ? ChevronDown : ChevronRight;
+  return (
+    <Card className="mt-4 p-4">
+      <section aria-labelledby={`${bodyId}-heading`}>
+        <h2 className="font-medium" id={`${bodyId}-heading`}>
+          <Button
+            aria-controls={open ? bodyId : undefined}
+            aria-expanded={open}
+            className="font-medium"
+            onClick={() => setOpen((was) => !was)}
+            size="bare"
+            type="button"
+            variant="ghost"
+          >
+            <Chevron aria-hidden="true" />
+            Not in the survey
+          </Button>{" "}
+          <span className="font-normal text-muted-foreground text-sm">
+            {unsurveyed.length}{" "}
+            {unsurveyed.length === 1 ? "student" : "students"}
+          </span>
+        </h2>
+        {open && (
+          <div id={bodyId}>
+            <p className="mt-1 text-muted-foreground text-sm">
+              On the roster with no bids and no pre-approval, so the run placed
+              them where a team needed people. The count is how many on their
+              team answered the survey; one or none is marked, since that team
+              was formed with the least to go on. Approve, Move and Unpin work
+              as they do on the board, and a student stays here once pinned.
+            </p>
+            <AdminDataTable
+              caption="Students not in the survey, and where each is placed"
+              data={unsurveyed}
+              emptyMessage="Everyone answered the survey."
+              getRowId={(u) => u.row.email}
+              {...tableProps}
+            />
+          </div>
+        )}
+      </section>
+    </Card>
+  );
+}
+
+/** "Robot Arm, team 2", with ", pinned" once pinned there, or "Unplaced". */
+function placedOn(row: BoardRow): string {
+  if (row.projectKey === null) {
+    return "Unplaced";
+  }
+  return `${row.groupLabel}, team ${row.team}${row.pinned ? ", pinned" : ""}`;
+}
+
+function SurveyedCount({ unsurveyed }: { unsurveyed: UnsurveyedRow }) {
+  if (unsurveyed.teamSize === 0) {
+    return "-";
+  }
+  const text = `${unsurveyed.surveyed} of ${unsurveyed.teamSize}`;
+  if (unsurveyed.surveyed > 1) {
+    return text;
+  }
+  return (
+    <span className="inline-flex items-center gap-1" style={WARNING_STYLE}>
+      <TriangleAlert aria-hidden="true" className="size-3.5" />
+      {text}
+      <span className="sr-only">
+        , {unsurveyed.surveyed === 0 ? "nobody" : "only one"} on the team
+        answered the survey
+      </span>
     </span>
   );
 }

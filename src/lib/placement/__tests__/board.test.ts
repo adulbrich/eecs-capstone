@@ -13,7 +13,9 @@ import {
   moveTargets,
   placementCsv,
   projectsWithoutTeam,
+  standingPreApprovals,
   UNPLACED_GROUP,
+  unsurveyedRows,
 } from "#/lib/placement/board";
 import { parseBidsCsv } from "#/lib/placement/csv";
 import {
@@ -162,6 +164,80 @@ describe("boardRows for projects no longer listed", () => {
       PROJECTS
     );
     expect(new Set(rows.map((r) => r.groupKey)).size).toBe(2);
+  });
+});
+
+describe("standingPreApprovals", () => {
+  const students = [
+    {
+      email: "kim@example.edu",
+      name: "Kim",
+      bids: [],
+      pin: "p1",
+      preApproved: true,
+    },
+    {
+      email: "lou@example.edu",
+      name: "Lou",
+      bids: [],
+      pin: "p1",
+      preApproved: true,
+    },
+    { email: "ada@example.edu", name: "Ada", bids: [], pin: "p2" },
+  ];
+
+  it("ends a pre-approval at any board pin, a re-pin after an Unpin included", () => {
+    expect([...standingPreApprovals(students)]).toEqual([
+      "kim@example.edu",
+      "lou@example.edu",
+    ]);
+    expect([
+      ...standingPreApprovals(students, {
+        "kim@example.edu": "p2",
+        "lou@example.edu": null,
+      }),
+    ]).toEqual([]);
+    // Unpinned, then approved where the roster had put them: still staff's.
+    expect([
+      ...standingPreApprovals(students, { "lou@example.edu": "p1" }),
+    ]).toEqual(["kim@example.edu"]);
+  });
+});
+
+describe("unsurveyedRows", () => {
+  const row = (
+    email: string,
+    projectKey: string | null,
+    team: number | null,
+    rosterOnly: boolean
+  ) => ({ email, projectKey, team, rosterOnly }) as BoardRow;
+  const rows = [
+    row("lou@example.edu", null, null, true),
+    row("ada@example.edu", "p1", 1, false),
+    row("kim@example.edu", "p1", 1, true),
+    row("pre@example.edu", "p1", 1, true),
+    row("ben@example.edu", "p1", 2, false),
+    row("zed@example.edu", "p2", 1, true),
+  ];
+
+  it("lists the roster students with no bids and no pre-approval, in board order", () => {
+    expect(
+      unsurveyedRows(rows, new Set(["pre@example.edu"])).map((u) => u.row.email)
+    ).toEqual(["lou@example.edu", "kim@example.edu", "zed@example.edu"]);
+  });
+
+  it("counts who on the team answered, a pre-approved student without bids among those who did not", () => {
+    const byEmail = new Map(
+      unsurveyedRows(rows, new Set(["pre@example.edu"])).map((u) => [
+        u.row.email,
+        [u.surveyed, u.teamSize],
+      ])
+    );
+    // p1 team 1: Ada answered; Kim and the pre-approved student did not.
+    expect(byEmail.get("kim@example.edu")).toEqual([1, 3]);
+    // Alone on p2, and team 2 of p1 is another team.
+    expect(byEmail.get("zed@example.edu")).toEqual([0, 1]);
+    expect(byEmail.get("lou@example.edu")).toEqual([0, 0]);
   });
 });
 

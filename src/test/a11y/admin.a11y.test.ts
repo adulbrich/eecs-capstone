@@ -461,6 +461,11 @@ test("admin placement, a run on the results board", async ({ page }) => {
     mimeType: "text/csv",
     buffer: Buffer.from(PLACEMENT_BIDS_CSV),
   });
+  // Kim is on the roster and not in the survey, so the card lists them (#714).
+  await page
+    .getByLabel("Roster emails")
+    .fill("ada@example.edu\nben@example.edu\nkim@example.edu");
+  await page.getByRole("button", { name: "Use these emails" }).click();
   await page.getByRole("tab", { name: "Results" }).click();
   await page.getByRole("button", { name: "Run placement" }).click();
   await expect(
@@ -468,6 +473,9 @@ test("admin placement, a run on the results board", async ({ page }) => {
   ).toBeVisible({
     timeout: 20_000,
   });
+  await expect(
+    page.getByRole("region", { name: /Not in the survey/ })
+  ).toContainText("kim@example.edu");
   await checkA11y(page);
   // Projects fold to their headers (#713), which keep a chevron each.
   await page.getByRole("button", { name: "Collapse all" }).click();
