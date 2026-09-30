@@ -44,6 +44,19 @@ vi.mock("#/server/notifications", () => ({
   }),
 }));
 
+// The bell reads after each client navigation, which it hears as the
+// router's `onResolved`. `navigate()` below fires it for every subscriber.
+const resolvedListeners = new Set<() => void>();
+vi.mock("@tanstack/react-router", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@tanstack/react-router")>()),
+  useRouter: () => ({
+    subscribe: (_event: "onResolved", listener: () => void) => {
+      resolvedListeners.add(listener);
+      return () => resolvedListeners.delete(listener);
+    },
+  }),
+}));
+
 vi.mock("#/lib/auth-client", () => ({
   authClient: { useSession: () => ({ data: session, isPending: false }) },
 }));
@@ -68,7 +81,16 @@ afterEach(() => {
   focusManager.setFocused(undefined);
   session = null;
   unread = 2;
+  resolvedListeners.clear();
 });
+
+function navigate() {
+  act(() => {
+    for (const listener of resolvedListeners) {
+      listener();
+    }
+  });
+}
 
 // The header's two rows, one per breakpoint: CSS hides one, both mount.
 function twoBells(qc: QueryClient) {
@@ -106,22 +128,43 @@ describe("NotificationBell, mounted twice", () => {
     expect(mockedRead).toHaveBeenCalledTimes(1);
   });
 
-  it("makes one read per 60 second tick", async () => {
-    // Only the interval is faked, so waitFor keeps its real setTimeout.
+  it("makes no read on a timer while the tab stays on one page", async () => {
     vi.useFakeTimers({ toFake: ["setInterval", "clearInterval"] });
     session = { user: { id: "u1" } };
     renderTwoBells();
     await settledOnMount();
 
     await act(async () => {
-      vi.advanceTimersByTime(60_000);
+      vi.advanceTimersByTime(10 * 60_000);
     });
-    await waitFor(() => expect(mockedRead).toHaveBeenCalledTimes(2));
-
     await act(async () => {
-      vi.advanceTimersByTime(60_000);
+      await Promise.resolve();
     });
-    await waitFor(() => expect(mockedRead).toHaveBeenCalledTimes(3));
+    expect(mockedRead).toHaveBeenCalledTimes(1);
+  });
+
+  it("makes one read after a navigation once the last read is 30 s old", async () => {
+    // Only the clock is faked, so waitFor keeps its real setTimeout.
+    vi.useFakeTimers({ toFake: ["Date"] });
+    session = { user: { id: "u1" } };
+    renderTwoBells();
+    await settledOnMount();
+
+    // Fresh: a navigation straight after the mount's read reads nothing.
+    navigate();
+    await act(async () => {
+      await Promise.resolve();
+    });
+    expect(mockedRead).toHaveBeenCalledTimes(1);
+
+    // Both bells hear it, and the two subscriptions make one read.
+    vi.setSystemTime(Date.now() + 31_000);
+    navigate();
+    await waitFor(() => expect(mockedRead).toHaveBeenCalledTimes(2));
+    await act(async () => {
+      await Promise.resolve();
+    });
+    expect(mockedRead).toHaveBeenCalledTimes(2);
   });
 
   it("makes one read when the window regains focus", async () => {

@@ -1,7 +1,7 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { isRedirect } from "@tanstack/react-router";
+import { isRedirect, useRouter } from "@tanstack/react-router";
 import { Bell, BellRing } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { useAction } from "#/lib/use-action";
 import { useSignedInUserId } from "#/lib/use-signed-in";
@@ -26,19 +26,22 @@ interface Notification {
 
 const NOTIFICATIONS_KEY = ["notifications"] as const;
 
+/** A navigation reads again only once the last read is this old. */
+const NAVIGATION_READ_AFTER_MS = 30_000;
+
 /**
  * The header mounts this twice for a signed-in viewer, once per breakpoint
  * row, and CSS hides one. Both read one query key, so a mount, a focus or a
- * mark-read makes one read between them rather than one each (#634). Each
- * observer arms its own interval timer, but the first tick's fetch updates
- * every observer on the key and each re-arms its timer from there, so one tick
- * fires per minute.
+ * mark-read makes one read between them rather than one each (#634).
  *
- * The poll pauses while the tab is hidden, and Query's focus refetch fires when
- * it is shown again. That is narrower than the hand-rolled `focus` listener it
- * replaced: Query listens for `visibilitychange`, so switching back to a
- * browser window whose tab stayed visible no longer refetches, and the next
- * tick picks the change up instead.
+ * It does not poll (#725). It reads on mount, when the tab is shown again,
+ * when the popover opens, and after a client navigation once the last read is
+ * 30 s old. A minute's poll in every open signed-in tab was most of the
+ * app's traffic at term start, most of it from tabs sitting on one page. The
+ * cost is that a notification arriving while someone stays put badges on
+ * their next navigation, reload or return to the tab; the list itself is read
+ * fresh whenever the popover opens. A hover preload does not emit
+ * `onResolved`, so preloading reads nothing.
  *
  * The key carries the user id: see docs/QUIRKS.md, "A TanStack Query key for
  * the viewer's own data carries their user id".
@@ -47,6 +50,7 @@ export function NotificationBell() {
   const [open, setOpen] = useState(false);
   const userId = useSignedInUserId();
   const queryClient = useQueryClient();
+  const router = useRouter();
   const queryKey = [...NOTIFICATIONS_KEY, userId];
   const { data } = useQuery({
     queryKey,
@@ -66,12 +70,32 @@ export function NotificationBell() {
       }
     },
     enabled: userId !== undefined,
-    refetchInterval: 60_000,
-    refetchOnWindowFocus: true,
-    // The next tick is the retry; a failed read should cost one request a
-    // minute, not four.
+    staleTime: NAVIGATION_READ_AFTER_MS,
+    // Showing the tab reads whatever the age: it is the one signal that
+    // someone who stayed on a page is looking again.
+    refetchOnWindowFocus: "always",
+    // The next navigation or focus is the retry.
     retry: false,
   });
+
+  // Both bells subscribe, and `cancelRefetch: false` makes the second join
+  // the first one's read rather than cancel it and start another. The age is
+  // read from the clock (`isStaleByTime`) rather than the `stale` filter,
+  // which trusts a timer a background tab may not have run yet.
+  useEffect(() => {
+    if (userId === undefined) {
+      return;
+    }
+    return router.subscribe("onResolved", () => {
+      void queryClient.refetchQueries(
+        {
+          queryKey: [...NOTIFICATIONS_KEY, userId],
+          predicate: (query) => query.isStaleByTime(NAVIGATION_READ_AFTER_MS),
+        },
+        { cancelRefetch: false }
+      );
+    });
+  }, [router, queryClient, userId]);
   const unread = data?.count ?? 0;
   const rows = data?.rows ?? [];
 
