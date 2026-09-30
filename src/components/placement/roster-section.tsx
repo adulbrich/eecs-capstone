@@ -136,7 +136,13 @@ export function RosterSection({
           Canvas's Test Student is left out.
         </p>
       )}
-      <p className="mt-1">{rosterSummary(bids === null, notInSurvey)}</p>
+      <p className="mt-1">
+        {rosterSummary(
+          bids === null,
+          workspace.projects.length === 0,
+          notInSurvey
+        )}
+      </p>
       {preApproved > 0 && (
         <p className="mt-1">
           {preApproved === 1
@@ -197,7 +203,14 @@ export function RosterSection({
   );
 }
 
-function rosterSummary(noBids: boolean, notInSurvey: number): string {
+function rosterSummary(
+  noBids: boolean,
+  noProjects: boolean,
+  notInSurvey: number
+): string {
+  if (noProjects) {
+    return "Load the projects, then the bids, to match the roster against them.";
+  }
   if (noBids) {
     return "Upload the bids to match the roster against them.";
   }

@@ -828,6 +828,10 @@ test.describe("placement workspace", () => {
     await page.getByRole("button", { name: "Remove", exact: true }).click();
     await expect(page.getByRole("tab", { name: "Roster" })).toBeVisible();
     await page.getByRole("tab", { name: /Bids/ }).click();
+    // The panel first: a count of none passes before it renders.
+    await expect(
+      page.getByRole("rowheader", { name: /Ada Park/ })
+    ).toBeVisible();
     await expect(page.getByRole("rowheader", { name: /Kim Lee/ })).toHaveCount(
       0
     );
@@ -864,8 +868,11 @@ test.describe("placement workspace", () => {
     await page.getByRole("button", { name: "Use these emails" }).click();
     const roster = page.getByRole("region", { name: /Class roster/ });
     await expect(roster).toContainText("2 students from a pasted list");
+    await expect(
+      page.getByText(/matched once the projects are loaded/)
+    ).toBeVisible();
     await expect(roster).toContainText(
-      "Upload the bids to match the roster against them."
+      "Load the projects, then the bids, to match the roster against them."
     );
     await expect(page.getByRole("tab", { name: "Roster (2)" })).toBeVisible();
     await roster.getByRole("button", { name: "Remove roster" }).click();
