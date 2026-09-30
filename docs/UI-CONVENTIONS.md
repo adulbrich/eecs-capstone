@@ -1023,6 +1023,11 @@ brand-colored bottom border and the rest go muted, but that styling lives inside
 `tabs.tsx` now, keyed off Radix's `data-[state=active]`, rather than being
 hand-written at every call site.
 
+A strip with more tabs than a 375px screen fits scrolls sideways inside itself,
+with `className="overflow-x-auto [&>*]:shrink-0 [&>*]:whitespace-nowrap"` on
+`TabsList`, rather than wrapping each label onto two lines or widening the page.
+The placement page's five tabs are the case (#717).
+
 ### Pagination
 
 Use `<Pagination>` from `#/components/ui/pagination`, with `PaginationLink` for

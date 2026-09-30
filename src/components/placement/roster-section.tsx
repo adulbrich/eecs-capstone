@@ -16,9 +16,9 @@ const plural = (n: number, one: string, many: string) =>
 const SHOWN = 10;
 
 /**
- * The class roster on the Bids tab (#665): the whole class, so the students
- * who never answered the survey join the board and the run. It merges with
- * the bids on email and is kept when the bids are removed.
+ * The class roster, on the Roster tab (#665, #717): the whole class, so the
+ * students who never answered the survey join the board and the run. It
+ * merges with the bids on email and is kept when the bids are removed.
  */
 export function RosterSection({
   state,
@@ -57,7 +57,7 @@ export function RosterSection({
     return (
       <section
         aria-labelledby="placement-roster-heading"
-        className="mt-6 flex flex-col gap-3"
+        className="flex flex-col gap-3"
       >
         <div>
           <h2 className="font-medium" id="placement-roster-heading">
@@ -103,7 +103,7 @@ export function RosterSection({
   return (
     <section
       aria-labelledby="placement-roster-heading"
-      className="mt-6 rounded-md border px-3 py-2 text-sm"
+      className="rounded-md border px-3 py-2 text-sm"
     >
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h2 className="font-medium" id="placement-roster-heading">

@@ -682,7 +682,7 @@ function Board({
           run places them by their bids. A pin changes the next run, not the
           placement shown here. Remove from placement, in a row's More menu,
           takes the student off this board and out of every run, not only their
-          team, until you restore them on the Bids tab.
+          team, until you restore them on the Roster tab.
         </p>
         {empty.length > 0 && (
           <p className="mt-2 text-sm">

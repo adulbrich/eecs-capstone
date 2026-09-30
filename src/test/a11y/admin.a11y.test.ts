@@ -441,13 +441,13 @@ test("@smoke admin placement, projects and bids loaded", async ({ page }) => {
   await page.getByRole("switch", { name: "Pinned only" }).click();
   await page.getByRole("button", { name: "Per student" }).click();
 
+  // The roster has its own tab (#717).
+  await page.getByRole("tab", { name: /Roster/ }).click();
   await page
     .getByLabel("Roster emails")
     .fill("ada@example.edu\nkim@example.edu");
   await page.getByRole("button", { name: "Use these emails" }).click();
-  await expect(
-    page.getByRole("rowheader", { name: /not in the survey/ })
-  ).toBeVisible();
+  await expect(page.getByRole("tab", { name: "Roster (2)" })).toBeVisible();
   await checkA11y(page);
 
   // The survey students the roster lacks, removed from placement (#679).
@@ -457,6 +457,13 @@ test("@smoke admin placement, projects and bids loaded", async ({ page }) => {
   await expect(
     page.getByRole("region", { name: /Removed from placement/ })
   ).toBeVisible();
+  await checkA11y(page);
+
+  await page.getByRole("tab", { name: /Bids/ }).click();
+  await expect(
+    page.getByRole("rowheader", { name: /not in the survey/ })
+  ).toBeVisible();
+  await expect(page.getByRole("link", { name: "Roster tab" })).toBeVisible();
   await checkA11y(page);
 
   await page.getByRole("tab", { name: "Parameters" }).click();
