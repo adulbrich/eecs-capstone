@@ -182,17 +182,18 @@ export function groupOpen(
 }
 
 /**
- * The emails whose roster pre-approval still stands: read from the students
- * before `applyPins`, and ended by an Unpin (a null board pin), as any pin
- * is. A board pin to a project keeps it, even to another project.
+ * The emails whose roster pre-approval still stands: none has a board pin of
+ * any kind. A board pin replaces a pre-approval, as `applyPins` says and the
+ * board's Priority cell shows, whether it moves the student, re-pins them
+ * where the roster put them, or unpins them.
  */
 export function standingPreApprovals(
   students: readonly PlacementStudent[],
   pins: Readonly<Record<string, string | null>> = {}
 ): Set<string> {
   return new Set(
-    students
-      .filter((s) => s.preApproved && pins[s.email] !== null)
+    applyPins(students, pins)
+      .filter((s) => s.preApproved)
       .map((s) => s.email)
   );
 }
@@ -206,14 +207,13 @@ export interface UnsurveyedRow {
 }
 
 /**
- * The roster students who did not answer the survey and whom the roster did
- * not pre-approve (#714), in board order, each with how many on their team
- * did answer it. A pre-approved student without bids did not answer either,
- * so they count against a team's surveyed share without being listed.
- * `preApproved` is read from the students before `applyPins`, which strips
- * the flag from anyone with a board pin; otherwise a student moved from the
- * list would lose their pre-approval, and a pre-approved one moved on the
- * board would join the list.
+ * The roster students who did not answer the survey and have no standing
+ * pre-approval (#714), in board order, each with how many on their team did
+ * answer it. A pre-approved student without bids did not answer either, so
+ * they count against a team's surveyed share without being listed.
+ * `preApproved` is `standingPreApprovals`: once staff pin, move or unpin a
+ * pre-approved student, the placement is staff's, and the student joins the
+ * list, where they then stay whatever is pinned.
  */
 export function unsurveyedRows(
   rows: readonly BoardRow[],

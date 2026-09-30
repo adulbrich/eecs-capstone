@@ -186,12 +186,20 @@ describe("standingPreApprovals", () => {
     { email: "ada@example.edu", name: "Ada", bids: [], pin: "p2" },
   ];
 
-  it("keeps a pre-approval a board pin moved, ends one an Unpin cleared, and ignores other pins", () => {
+  it("ends a pre-approval at any board pin, a re-pin after an Unpin included", () => {
+    expect([...standingPreApprovals(students)]).toEqual([
+      "kim@example.edu",
+      "lou@example.edu",
+    ]);
     expect([
       ...standingPreApprovals(students, {
         "kim@example.edu": "p2",
         "lou@example.edu": null,
       }),
+    ]).toEqual([]);
+    // Unpinned, then approved where the roster had put them: still staff's.
+    expect([
+      ...standingPreApprovals(students, { "lou@example.edu": "p1" }),
     ]).toEqual(["kim@example.edu"]);
   });
 });

@@ -128,10 +128,8 @@ export function ResultsTab({
     () => applyPins(bids?.students ?? [], workspace.pins),
     [bids, workspace.pins]
   );
-  // The roster's pre-approvals still standing, which keep a student off the
-  // not-in-the-survey list (#714). Read before the pins, since a board pin
-  // strips the flag: a Move from the list is a pin and leaves them on it.
-  // An Unpin ends a pre-approval, as it ends any pin.
+  // The roster's pre-approvals no board pin has replaced, which keep a
+  // student off the not-in-the-survey list (#714).
   const preApproved = useMemo(
     () => standingPreApprovals(bids?.students ?? [], workspace.pins),
     [bids, workspace.pins]
