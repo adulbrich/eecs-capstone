@@ -26,20 +26,26 @@ interface Notification {
 
 const NOTIFICATIONS_KEY = ["notifications"] as const;
 
-/** A navigation reads again only once the last read is this old. */
-const NAVIGATION_READ_AFTER_MS = 30_000;
+/**
+ * How long a read stays fresh: a navigation or a remount within this reads
+ * nothing. Focus and opening the popover read whatever the age.
+ */
+const BELL_FRESH_FOR_MS = 30_000;
 
 /**
  * The header mounts this twice for a signed-in viewer, once per breakpoint
  * row, and CSS hides one. Both read one query key, so a mount, a focus or a
  * mark-read makes one read between them rather than one each (#634).
  *
- * It does not poll (#725). It reads on mount, when the tab is shown again,
- * when the popover opens, and after a client navigation once the last read is
- * 30 s old. A minute's poll in every open signed-in tab was most of the
+ * It does not poll (#725). It reads when it first mounts, when the tab is
+ * shown again, when the popover opens, and after a client navigation or a
+ * `router.invalidate()` (both emit `onResolved`) once the last read is 30 s
+ * old. A failed read leaves the age where it was, so the next navigation
+ * retries it. A minute's poll in every open signed-in tab was most of the
  * app's traffic at term start, most of it from tabs sitting on one page. The
  * cost is that a notification arriving while someone stays put badges on
- * their next navigation, reload or return to the tab; the list itself is read
+ * their next navigation more than 30 s after the last read, a reload or a
+ * return to the tab; the list itself is read
  * fresh whenever the popover opens. A hover preload does not emit
  * `onResolved`, so preloading reads nothing.
  *
@@ -62,7 +68,7 @@ export function NotificationBell() {
         // The server ended the session (expiry, a ban) before this tab
         // heard. `requireUser` refuses with a redirect, and the router's
         // query integration navigates on any redirect a query throws, which
-        // would carry a tab mid-edit to /sign-in on the next tick.
+        // would carry a tab mid-edit to /sign-in on the next read.
         if (isRedirect(error)) {
           return { count: 0, rows: [] };
         }
@@ -70,7 +76,7 @@ export function NotificationBell() {
       }
     },
     enabled: userId !== undefined,
-    staleTime: NAVIGATION_READ_AFTER_MS,
+    staleTime: BELL_FRESH_FOR_MS,
     // Showing the tab reads whatever the age: it is the one signal that
     // someone who stayed on a page is looking again.
     refetchOnWindowFocus: "always",
@@ -81,7 +87,9 @@ export function NotificationBell() {
   // Both bells subscribe, and `cancelRefetch: false` makes the second join
   // the first one's read rather than cancel it and start another. The age is
   // read from the clock (`isStaleByTime`) rather than the `stale` filter,
-  // which trusts a timer a background tab may not have run yet.
+  // which trusts a timer a background tab may not have run yet. The key is
+  // built here rather than taken from `queryKey`, a new array each render,
+  // which as a dependency would resubscribe on every render.
   useEffect(() => {
     if (userId === undefined) {
       return;
@@ -90,7 +98,7 @@ export function NotificationBell() {
       void queryClient.refetchQueries(
         {
           queryKey: [...NOTIFICATIONS_KEY, userId],
-          predicate: (query) => query.isStaleByTime(NAVIGATION_READ_AFTER_MS),
+          predicate: (query) => query.isStaleByTime(BELL_FRESH_FOR_MS),
         },
         { cancelRefetch: false }
       );

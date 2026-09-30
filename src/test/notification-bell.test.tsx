@@ -229,7 +229,7 @@ describe("NotificationBell, mounted twice", () => {
   it("clears the count, without a redirect, when the server has ended the session", async () => {
     // `requireUser` refuses with a redirect, and the router's query
     // integration navigates on any redirect that reaches the query cache's
-    // `onError`, so a tick would carry a tab mid-edit to /sign-in.
+    // `onError`, so the next read would carry a tab mid-edit to /sign-in.
     const onError = vi.fn();
     const qc = new QueryClient({ queryCache: new QueryCache({ onError }) });
     session = { user: { id: "u1" } };
