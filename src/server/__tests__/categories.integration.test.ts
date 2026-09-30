@@ -369,7 +369,13 @@ describe("listProjectCategoriesAs", () => {
     }
     for (const viewer of [proposer, admin]) {
       const seen = await getProjectAs(viewer, { id: projectId });
-      expect(seen.categories.map((r) => r.id)).toEqual([categoryId]);
+      expect(seen.categories).toEqual([
+        {
+          id: categoryId,
+          name: expect.stringMatching(/^Robotics /),
+          type: "technology",
+        },
+      ]);
     }
   });
 

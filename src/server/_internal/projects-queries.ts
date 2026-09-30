@@ -395,17 +395,7 @@ export async function getProjectAs(viewer: Viewer, data: { id: string }) {
     })
     .from(projects)
     .where(eq(projects.id, data.id));
-  if (!project) {
-    return {
-      project: null,
-      history: [],
-      categories: [],
-      canEdit: false,
-      viewerIsStaff: false,
-      viewerIsOwner: false,
-    };
-  }
-  if (!canSeeProject(project, viewer)) {
+  if (!(project && canSeeProject(project, viewer))) {
     return {
       project: null,
       history: [],

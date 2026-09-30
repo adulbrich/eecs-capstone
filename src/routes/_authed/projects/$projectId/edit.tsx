@@ -26,8 +26,9 @@ export const Route = createFileRoute("/_authed/projects/$projectId/edit")({
         params: { projectId: params.projectId },
       });
     }
-    // The proposer and the categories are not loaded here: the form has no
-    // staff-only control since #322, and both are set from the project page.
+    // The form has no staff-only control since #322: the proposer and the
+    // categories are set from the project page. `getProject` returns the
+    // categories anyway (#726), and this route ignores them.
     return data;
   },
   component: EditProject,
