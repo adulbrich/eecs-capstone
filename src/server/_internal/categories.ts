@@ -353,9 +353,10 @@ export async function listProjectCategoriesAs(
   data: { projectId: string }
 ) {
   // Same gate as listProjectCommentsAs: a draft's category names are visible
-  // to the people who can see the draft, and to nobody else. Both callers
-  // (the public detail page and the edit route) already load the project
-  // through a gated read, so this refuses only a call made with a bare id.
+  // to the people who can see the draft, and to nobody else. Its one caller,
+  // the staff categories section, sits on a page that already loaded the
+  // project through a gated read, so this refuses only a call made with a
+  // bare id. The detail page reads the same rows from getProjectAs (#726).
   const [project] = await db
     .select({
       id: projects.id,
