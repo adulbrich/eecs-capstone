@@ -162,33 +162,27 @@ resource "aws_cloudwatch_metric_alarm" "db_connections" {
 # default it would go to INSUFFICIENT_DATA and stay silent through exactly the
 # case it is named for.
 #
-# Read the deploy interaction before retuning this. `deployment_maximum_percent`
-# is 100 and `deployment_minimum_healthy_percent` is 50 (ADR-0043), so a rolling
-# deploy stops a task before starting its replacement and the fleet reads two of
-# three while that happens, three times in sequence. Whether that reaches three
-# CONSECUTIVE one-minute samples is not known and has not been watched: ADR-0043
-# measures a drain, a start and two health checks in wall clock, while this
-# counts tasks in RUNNING, which a replacement enters before it is healthy and a
-# draining task leaves as soon as it is stopping. So a deploy may trip this, may
-# not, or may oscillate across the sampling boundary and send several pairs. It
-# is left at the threshold #571 specified because the alternatives cost coverage
-# even against the worst of those: raising `datapoints_to_alarm` past the dip
-# also stops this catching a fleet that is down for the same minutes, alarming
-# on 0 misses two of three tasks crash-looping, and suppressing during a deploy
-# needs a second mechanism nobody would maintain. The first few deploys after
-# this applies are the measurement. If it mails every time, `evaluation_periods`
-# and `datapoints_to_alarm` are the two numbers to move, and ADR-0044 is what
-# says what moving them costs.
+# One below the floor, not the floor itself (ADR-0058, superseding ADR-0044).
+# `deployment_maximum_percent` is 100 and `deployment_minimum_healthy_percent`
+# is 50 (ADR-0043), so a rolling deploy stops a task before starting its
+# replacement and the fleet reads two of three for 7 to 10 minutes, flickering
+# between two and three. At the floor this mailed on 12 of 12 deploys and on
+# nothing else, and no sample count separates that dip from a real one. ECS
+# rounds 50% of three up to two, so a deploy never reads below two, while two
+# of three tasks crash-looping reads one and still fires. What this gives up is
+# one task of three staying down, which ECS replacement and the deployment
+# circuit breaker answer and the 5XX alarms still see. The `max` keeps the
+# alarm on a total outage if the floor is ever lowered to one.
 resource "aws_cloudwatch_metric_alarm" "fleet_below_floor" {
   alarm_name        = "${var.project}-fleet-below-floor"
-  alarm_description = "The app service ran fewer than ${var.app_min_tasks} tasks for three minutes running. A rolling deploy can cause this; an outage otherwise."
+  alarm_description = "The app service ran fewer than ${max(var.app_min_tasks - 1, 1)} tasks for three minutes running. A rolling deploy never goes that low, so this is an outage or a crash loop."
 
   namespace   = "ECS/ContainerInsights"
   metric_name = "RunningTaskCount"
   statistic   = "Minimum"
 
   comparison_operator = "LessThanThreshold"
-  threshold           = var.app_min_tasks
+  threshold           = max(var.app_min_tasks - 1, 1)
   period              = 60
   evaluation_periods  = 3
   datapoints_to_alarm = 3

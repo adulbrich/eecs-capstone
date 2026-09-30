@@ -1,5 +1,7 @@
 # The task-count alarm is left where a deploy may trip it
 
+Superseded by [ADR-0058](./0058-the-task-count-alarm-sits-one-below-the-floor.md) on 2026-09-30: every deploy tripped it and nothing else did, so the threshold moved to one below the floor.
+
 `infra/alarms.tf` alarms when `ECS/ContainerInsights` `RunningTaskCount` is
 below `var.app_min_tasks` for three consecutive one-minute periods, which is the
 threshold #571 specified, and it is left there although an ordinary deploy is
