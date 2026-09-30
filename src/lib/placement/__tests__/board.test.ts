@@ -2,15 +2,18 @@ import { describe, expect, it } from "vitest";
 import { teamSizes } from "#/lib/placement/analytics";
 import {
   applyPins,
+  type BoardRow,
   bidOptions,
   bidsWithPinsCsv,
   boardRows,
   describeRun,
+  groupOpen,
   groupSummary,
   moveStudent,
   moveTargets,
   placementCsv,
   projectsWithoutTeam,
+  UNPLACED_GROUP,
 } from "#/lib/placement/board";
 import { parseBidsCsv } from "#/lib/placement/csv";
 import {
@@ -131,6 +134,66 @@ describe("boardRows", () => {
       [1, "x@example.edu"],
       [2, "ada@example.edu"],
     ]);
+  });
+});
+
+describe("boardRows for projects no longer listed", () => {
+  it("keeps each in its own group", () => {
+    const rows = boardRows(
+      {
+        ...RESULT,
+        placements: [
+          {
+            email: "ada@example.edu",
+            projectKey: "gone1",
+            team: 1,
+            priority: 1,
+          },
+          {
+            email: "ben@example.edu",
+            projectKey: "gone2",
+            team: 1,
+            priority: 1,
+          },
+        ],
+        unplaced: [],
+      },
+      STUDENTS.slice(0, 2),
+      PROJECTS
+    );
+    expect(new Set(rows.map((r) => r.groupKey)).size).toBe(2);
+  });
+});
+
+describe("groupOpen", () => {
+  const row = (projectKey: string | null, pinned: boolean) =>
+    ({ projectKey, pinned, team: 1 }) as BoardRow;
+  const none = new Map<string, boolean>();
+
+  it("folds a project while every student is pinned, and opens it when one is not", () => {
+    expect(groupOpen([row("p1", true), row("p1", true)], none)).toBe(false);
+    expect(groupOpen([row("p1", true), row("p1", false)], none)).toBe(true);
+  });
+
+  it("never folds the unplaced on its own, pinned or not", () => {
+    expect(groupOpen([row(null, true)], none)).toBe(true);
+    expect(
+      groupOpen([row(null, true)], new Map([[UNPLACED_GROUP, false]]))
+    ).toBe(false);
+  });
+
+  it("lets a state set by hand win both ways, so Collapse all survives an unpin", () => {
+    const collapsed = new Map([["p1", false]]);
+    // An unpin after Collapse all: not all pinned, still folded.
+    expect(groupOpen([row("p1", true), row("p1", false)], collapsed)).toBe(
+      false
+    );
+    // Opened by hand, then its last student pinned: still open.
+    expect(
+      groupOpen([row("p1", true), row("p1", true)], new Map([["p1", true]]))
+    ).toBe(true);
+    // A state set on another project leaves this one to its pins.
+    expect(groupOpen([row("p1", true)], new Map([["p2", true]]))).toBe(false);
   });
 });
 

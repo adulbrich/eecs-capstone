@@ -104,7 +104,9 @@ export function boardRows(
       groupKey:
         projectKey === null
           ? UNPLACED_GROUP
-          : `1:${String(index).padStart(6, "0")}`,
+          : // The key too: every project missing from the list shares one
+            // index, and two of them must not merge into one group.
+            `1:${String(index).padStart(6, "0")}:${projectKey}`,
       groupLabel:
         projectKey === null
           ? "Unplaced"
@@ -150,6 +152,33 @@ export function groupSummary(rows: readonly BoardRow[]): {
     students: rows.length,
     teams: new Set(rows.map((r) => r.team)).size,
   };
+}
+
+/**
+ * The key a group's open state is kept under (#713): its project, which
+ * outlives the group's place in the title order, or the unplaced group.
+ */
+export const foldKey = (row: Pick<BoardRow, "projectKey">) =>
+  row.projectKey ?? UNPLACED_GROUP;
+
+/**
+ * Whether a board group shows its rows. A state set by hand wins, from its
+ * chevron or Expand all or Collapse all; otherwise a project folds while every
+ * student on it is pinned, and the unplaced never fold on their own, since
+ * they are what needs fixing first. `rows` is every row of the group.
+ */
+export function groupOpen(
+  rows: readonly BoardRow[],
+  manual: ReadonlyMap<string, boolean>
+): boolean {
+  const [first] = rows;
+  if (first === undefined) {
+    return true;
+  }
+  return (
+    manual.get(foldKey(first)) ??
+    (first.projectKey === null || !groupSummary(rows).allPinned)
+  );
 }
 
 /** Projects allowed a team that the result formed none for, by title. */

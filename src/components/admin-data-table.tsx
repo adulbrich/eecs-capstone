@@ -581,8 +581,6 @@ export function AdminTableControls<T extends RowData>({
   );
 }
 
-const WHITESPACE = /\s+/g;
-
 /**
  * One group's tbody: the rowgroup header, then its rows unless `collapse`
  * says it is closed. A closed group keeps its header, so the chevron that
@@ -605,30 +603,45 @@ function GroupBody<T>({
 }) {
   const { collapse } = group;
   const open = collapse?.isOpen(groupKey) ?? true;
-  const body = useRef<HTMLTableSectionElement | null>(null);
   const toggle = useRef<HTMLButtonElement | null>(null);
   const wasOpen = useRef(open);
-  const focusWasInside = useRef(false);
-  // Read while the closing render is computed, before the commit removes the
-  // rows: once they are gone the focus has already fallen to the body, and
-  // nothing can say it was in this group. A button that closes its own group
-  // (approving a project's last student) is the case this is for.
-  if (wasOpen.current && !open) {
-    focusWasInside.current =
-      typeof document !== "undefined" &&
-      body.current?.contains(document.activeElement) === true &&
-      toggle.current !== document.activeElement;
-  }
+  // Whether the focus is on one of the group's rows. Kept from focus events
+  // because by the time the group has closed its rows are gone, and the focus
+  // with them. A blur with nowhere to go is the row being removed, so it
+  // leaves this set; a move to anything else clears it.
+  const focusInRows = useRef(false);
   useLayoutEffect(() => {
-    if (wasOpen.current && !open && focusWasInside.current) {
+    // A control that closes its own group (approving a project's last
+    // student) would otherwise drop the focus to the page.
+    if (
+      wasOpen.current &&
+      !open &&
+      focusInRows.current &&
+      (document.activeElement === null ||
+        document.activeElement === document.body)
+    ) {
       toggle.current?.focus();
     }
-    focusWasInside.current = false;
+    if (!open) {
+      focusInRows.current = false;
+    }
     wasOpen.current = open;
   }, [open]);
   const Chevron = open ? ChevronDown : ChevronRight;
   return (
-    <TableBody data-group={groupKey} id={bodyId} ref={body}>
+    <TableBody
+      data-group={groupKey}
+      id={bodyId}
+      onBlur={(event) => {
+        if (event.relatedTarget !== null) {
+          focusInRows.current = false;
+        }
+      }}
+      onFocus={(event) => {
+        focusInRows.current =
+          event.target.closest("tr[data-group-header]") === null;
+      }}
+    >
       {/*
         A bare tr and th rather than TableRow and TableHead: their classes
         (the hover tint, h-10, border-b) are for data rows and column
@@ -1028,9 +1041,11 @@ export function AdminDataTable<T extends RowData>({
             </TooltipProvider>
           </TableHeader>
           {group && grouped && groups.length > 0 ? (
-            groups.map(({ key, rows: rowsOfGroup }) => (
+            groups.map(({ key, rows: rowsOfGroup }, index) => (
               <GroupBody
-                bodyId={`${groupIdPrefix}-${key.replace(WHITESPACE, "")}`}
+                // By position: a key is the page's own string, which may hold
+                // anything an id cannot.
+                bodyId={`${groupIdPrefix}-group-${index}`}
                 group={group}
                 groupKey={key}
                 key={key}

@@ -187,10 +187,10 @@ const CENSUS = new Map<string, { class: SeedClass; why: string }>([
     },
   ],
   [
-    "src/components/placement/results-tab.tsx: useState({at: result.at, open: NO_FOLDS})",
+    "src/components/placement/results-tab.tsx: useState({at, open: NO_FOLDS})",
     {
       class: "D",
-      why: "which board projects were folded by hand, keyed on the run in localStorage and reset whenever its time changes",
+      why: "which board projects were folded by hand, in component state, for the run whose time it holds; a new run starts over",
     },
   ],
   [

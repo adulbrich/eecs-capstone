@@ -2,14 +2,15 @@ import {
   ArrowRightLeft,
   ChevronDown,
   ChevronRight,
-  ChevronsDownUp,
   ChevronsUpDown,
   Download,
+  FoldVertical,
   Pin,
   PinOff,
   Play,
   Square,
   TriangleAlert,
+  UnfoldVertical,
 } from "lucide-react";
 import {
   createContext,
@@ -57,6 +58,8 @@ import {
   bidsWithPinsCsv,
   boardRows,
   describeRun,
+  foldKey,
+  groupOpen,
   groupSummary,
   moveStudent,
   moveTargets,
@@ -86,10 +89,26 @@ const DEFAULT_SORT: SortState = { desc: false, id: "student" };
 
 const WARNING_STYLE = { color: "var(--status-warning)" };
 
-/** Stands for the Unplaced group where a project key would go. */
-const UNPLACED = "";
-
 const NO_FOLDS: ReadonlyMap<string, boolean> = new Map();
+
+/**
+ * The board groups opened or closed by hand (#713), by `foldKey`, for the run
+ * they were set on: a new run starts every project over from its pins. In
+ * component state only, never in the workspace.
+ */
+function useRunFolds(at: string) {
+  const [folds, setFolds] = useState({ at, open: NO_FOLDS });
+  const set = useCallback(
+    (change: (open: Map<string, boolean>) => void) =>
+      setFolds((prev) => {
+        const next = new Map(prev.at === at ? prev.open : NO_FOLDS);
+        change(next);
+        return { at, open: next };
+      }),
+    [at]
+  );
+  return [folds.at === at ? folds.open : NO_FOLDS, set] as const;
+}
 
 export function ResultsTab({
   state,
@@ -452,41 +471,13 @@ function Board({
     }
     return byKey;
   }, [rows]);
-  // The groups opened or closed by hand, by project key (UNPLACED for the
-  // unplaced), for the run they were set on: a new run starts every project
-  // from whether it is all pinned again. Never in the workspace.
-  const [folds, setFolds] = useState<{
-    at: string;
-    open: ReadonlyMap<string, boolean>;
-  }>({ at: result.at, open: NO_FOLDS });
-  const manual = folds.at === result.at ? folds.open : NO_FOLDS;
-  const at = result.at;
-  const setManual = useCallback(
-    (change: (open: Map<string, boolean>) => void) =>
-      setFolds((prev) => {
-        const next = new Map(prev.at === at ? prev.open : NO_FOLDS);
-        change(next);
-        return { at, open: next };
-      }),
-    [at]
-  );
-  const projectOfGroup = (key: string) =>
-    groups.get(key)?.[0]?.projectKey ?? UNPLACED;
-  const isOpen = (key: string) => {
-    const set = manual.get(projectOfGroup(key));
-    if (set !== undefined) {
-      return set;
-    }
-    // Unplaced is what needs fixing first, so it never folds on its own.
-    return key === UNPLACED_GROUP
-      ? true
-      : !groupSummary(groups.get(key) ?? []).allPinned;
-  };
+  const [manual, setManual] = useRunFolds(result.at);
+  const isOpen = (key: string) => groupOpen(groups.get(key) ?? [], manual);
   const setAll = (open: boolean) =>
     setManual((next) => {
       for (const [key, groupRows] of groups) {
         if (key !== UNPLACED_GROUP) {
-          next.set(groupRows[0]?.projectKey ?? UNPLACED, open);
+          next.set(foldKey(groupRows[0]), open);
         }
       }
     });
@@ -519,8 +510,10 @@ function Board({
         result:
           w.result && moveStudent(w.result, row.email, projectKey, priority),
       }));
-      // The student lands where the reader can see them, even on a project
-      // that was folded, or that the move leaves all pinned.
+      // The student lands where the reader can see them, with their bids if
+      // open, even when the move leaves every student there pinned. A Move is
+      // a hand choice about that project, as its chevron is, so it holds
+      // until the next run.
       setManual((next) => {
         next.set(projectKey, true);
       });
@@ -692,34 +685,31 @@ function Board({
                 label: (groupRows) => groupRows[0].groupLabel,
                 onToggle: (key) =>
                   setManual((next) => {
-                    next.set(projectOfGroup(key), !isOpen(key));
+                    const [head] = groups.get(key) ?? [];
+                    if (head) {
+                      next.set(foldKey(head), !isOpen(key));
+                    }
                   }),
               },
-              header: (groupRows) => (
-                <GroupHeader
-                  rows={groups.get(groupRows[0].groupKey) ?? groupRows}
-                />
-              ),
+              header: (groupRows) => <GroupHeader rows={groupRows} />,
               key: (row) => row.groupKey,
             }}
             toolbar={
               <div className="flex flex-wrap gap-2">
                 <Button
                   onClick={() => setAll(true)}
-                  size="sm"
                   type="button"
                   variant="outline"
                 >
-                  <ChevronsUpDown aria-hidden="true" />
+                  <UnfoldVertical aria-hidden="true" />
                   Expand all
                 </Button>
                 <Button
                   onClick={() => setAll(false)}
-                  size="sm"
                   type="button"
                   variant="outline"
                 >
-                  <ChevronsDownUp aria-hidden="true" />
+                  <FoldVertical aria-hidden="true" />
                   Collapse all
                 </Button>
               </div>

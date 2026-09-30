@@ -741,7 +741,8 @@ project whose students are all pinned (#713), reads the page's own rows rather
 than the ones a filter left the table. When a control inside a group closes it,
 the focus moves to that group's chevron instead of falling to the page. A
 closed group renders no rows and no detail, so a highlighted row inside one is
-not shown until the page opens it.
+not shown until the page opens it. `collapse` is part of `group`, not a third
+extension: it folds what `group` draws and does nothing without it.
 
 ### A row's detail under it
 
