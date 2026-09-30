@@ -13,6 +13,7 @@ import {
   moveTargets,
   placementCsv,
   projectsWithoutTeam,
+  standingPreApprovals,
   UNPLACED_GROUP,
   unsurveyedRows,
 } from "#/lib/placement/board";
@@ -163,6 +164,35 @@ describe("boardRows for projects no longer listed", () => {
       PROJECTS
     );
     expect(new Set(rows.map((r) => r.groupKey)).size).toBe(2);
+  });
+});
+
+describe("standingPreApprovals", () => {
+  const students = [
+    {
+      email: "kim@example.edu",
+      name: "Kim",
+      bids: [],
+      pin: "p1",
+      preApproved: true,
+    },
+    {
+      email: "lou@example.edu",
+      name: "Lou",
+      bids: [],
+      pin: "p1",
+      preApproved: true,
+    },
+    { email: "ada@example.edu", name: "Ada", bids: [], pin: "p2" },
+  ];
+
+  it("keeps a pre-approval a board pin moved, ends one an Unpin cleared, and ignores other pins", () => {
+    expect([
+      ...standingPreApprovals(students, {
+        "kim@example.edu": "p2",
+        "lou@example.edu": null,
+      }),
+    ]).toEqual(["kim@example.edu"]);
   });
 });
 

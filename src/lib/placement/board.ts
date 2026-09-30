@@ -181,6 +181,22 @@ export function groupOpen(
   );
 }
 
+/**
+ * The emails whose roster pre-approval still stands: read from the students
+ * before `applyPins`, and ended by an Unpin (a null board pin), as any pin
+ * is. A board pin to a project keeps it, even to another project.
+ */
+export function standingPreApprovals(
+  students: readonly PlacementStudent[],
+  pins: Readonly<Record<string, string | null>> = {}
+): Set<string> {
+  return new Set(
+    students
+      .filter((s) => s.preApproved && pins[s.email] !== null)
+      .map((s) => s.email)
+  );
+}
+
 export interface UnsurveyedRow {
   row: BoardRow;
   /** Students on their team who answered the survey, themselves never. */
@@ -194,9 +210,10 @@ export interface UnsurveyedRow {
  * not pre-approve (#714), in board order, each with how many on their team
  * did answer it. A pre-approved student without bids did not answer either,
  * so they count against a team's surveyed share without being listed.
- * `preApproved` holds the roster's pre-approvals as they were before any
- * board pin, which `applyPins` strips, replaced them: a student moved from
- * the list stays on it.
+ * `preApproved` is read from the students before `applyPins`, which strips
+ * the flag from anyone with a board pin; otherwise a student moved from the
+ * list would lose their pre-approval, and a pre-approved one moved on the
+ * board would join the list.
  */
 export function unsurveyedRows(
   rows: readonly BoardRow[],

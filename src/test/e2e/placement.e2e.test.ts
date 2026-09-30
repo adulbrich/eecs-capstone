@@ -692,8 +692,15 @@ test.describe("placement workspace", () => {
     const targetTitle = (await target.textContent()) ?? "";
     await target.click();
     await expect(card.getByRole("row", { name: /Kim Lee/ })).toContainText(
-      targetTitle
+      `${targetTitle}, team 1, pinned`
     );
+    // The board follows the card.
+    await expect(
+      page
+        .getByRole("rowgroup")
+        .filter({ has: page.getByRole("button", { name: targetTitle }) })
+        .getByRole("row", { name: /Kim Lee/ })
+    ).toBeVisible();
     await expect(
       card.getByRole("button", { name: "Unpin Kim Lee" })
     ).toBeVisible();

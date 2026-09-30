@@ -67,6 +67,7 @@ import {
   placementCsv,
   projectsWithoutTeam,
   removeFromResult,
+  standingPreApprovals,
   UNPLACED_GROUP,
   type UnsurveyedRow,
   unplacedReason,
@@ -127,14 +128,13 @@ export function ResultsTab({
     () => applyPins(bids?.students ?? [], workspace.pins),
     [bids, workspace.pins]
   );
-  // Read before the pins: a board pin strips the flag, and a student the
-  // roster pre-approved is never on the not-in-the-survey list (#714).
+  // The roster's pre-approvals still standing, which keep a student off the
+  // not-in-the-survey list (#714). Read before the pins, since a board pin
+  // strips the flag: a Move from the list is a pin and leaves them on it.
+  // An Unpin ends a pre-approval, as it ends any pin.
   const preApproved = useMemo(
-    () =>
-      new Set(
-        (bids?.students ?? []).filter((s) => s.preApproved).map((s) => s.email)
-      ),
-    [bids]
+    () => standingPreApprovals(bids?.students ?? [], workspace.pins),
+    [bids, workspace.pins]
   );
   const titles = useMemo(
     () => new Map(allProjects.map((p) => [p.key, p.title])),
@@ -664,7 +664,6 @@ function Board({
             onMove={move}
             onPin={pin}
             projects={projects}
-            titles={titles}
             unsurveyed={unsurveyed}
             update={update}
           />
@@ -790,7 +789,6 @@ function Unsurveyed({
   onMove,
   onPin,
   projects,
-  titles,
   unsurveyed,
   update,
 }: {
@@ -798,7 +796,6 @@ function Unsurveyed({
   onMove: (row: BoardRow, projectKey: string) => void;
   onPin: (email: string, projectKey: string | null) => void;
   projects: WorkspaceProject[];
-  titles: Map<string, string>;
   unsurveyed: UnsurveyedRow[];
   update: PlacementWorkspace["update"];
 }) {
@@ -827,8 +824,8 @@ function Unsurveyed({
           id: "student",
         },
         {
-          accessorFn: (u) => placedOn(u.row, titles),
-          cell: ({ row }) => placedOn(row.original.row, titles),
+          accessorFn: (u) => placedOn(u.row),
+          cell: ({ row }) => placedOn(row.original.row),
           enableHiding: false,
           enableSorting: false,
           header: "Placed on",
@@ -859,7 +856,7 @@ function Unsurveyed({
           id: "actions",
         },
       ]),
-    [defaultMaxTeams, onMove, onPin, projects, titles, update]
+    [defaultMaxTeams, onMove, onPin, projects, update]
   );
   const { tableProps } = useAdminTable({
     columns,
@@ -897,7 +894,7 @@ function Unsurveyed({
               them where a team needed people. The count is how many on their
               team answered the survey; one or none is marked, since that team
               was formed with the least to go on. Approve, Move and Unpin work
-              as they do on the board.
+              as they do on the board, and a student stays here once pinned.
             </p>
             <AdminDataTable
               caption="Students not in the survey, and where each is placed"
@@ -913,11 +910,12 @@ function Unsurveyed({
   );
 }
 
-/** "Robot Arm, team 2", or "Unplaced". */
-function placedOn(row: BoardRow, titles: Map<string, string>): string {
-  return row.projectKey === null
-    ? "Unplaced"
-    : `${titles.get(row.projectKey) ?? row.projectKey}, team ${row.team}`;
+/** "Robot Arm, team 2", with ", pinned" once pinned there, or "Unplaced". */
+function placedOn(row: BoardRow): string {
+  if (row.projectKey === null) {
+    return "Unplaced";
+  }
+  return `${row.groupLabel}, team ${row.team}${row.pinned ? ", pinned" : ""}`;
 }
 
 function SurveyedCount({ unsurveyed }: { unsurveyed: UnsurveyedRow }) {
