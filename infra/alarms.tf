@@ -154,35 +154,42 @@ resource "aws_cloudwatch_metric_alarm" "db_connections" {
   tags = { Name = "${var.project}-db-connections" }
 }
 
-# The fleet below its floor. Container Insights is already enabled on the
-# cluster (`ecs.tf`), which is what publishes this.
+# The fleet below what a deploy keeps running. Container Insights is already
+# enabled on the cluster (`ecs.tf`), which is what publishes this.
 #
 # `treat_missing_data = "breaching"` because a service at zero tasks publishes
 # nothing at all, and that is the outage this alarm exists for. Under the
 # default it would go to INSUFFICIENT_DATA and stay silent through exactly the
 # case it is named for.
 #
-# One below the floor, not the floor itself (ADR-0058, superseding ADR-0044).
-# `deployment_maximum_percent` is 100 and `deployment_minimum_healthy_percent`
-# is 50 (ADR-0043), so a rolling deploy stops a task before starting its
-# replacement and the fleet reads two of three for 7 to 10 minutes, flickering
-# between two and three. At the floor this mailed on 12 of 12 deploys and on
-# nothing else, and no sample count separates that dip from a real one. ECS
-# rounds 50% of three up to two, so a deploy never reads below two, while two
-# of three tasks crash-looping reads one and still fires. What this gives up is
-# one task of three staying down, which ECS replacement and the deployment
-# circuit breaker answer and the 5XX alarms still see. The `max` keeps the
-# alarm on a total outage if the floor is ever lowered to one.
+# Below the deploy's healthy minimum, not below the floor (ADR-0058,
+# superseding ADR-0044). A rolling deploy stops tasks down to
+# `deployment_minimum_healthy_percent` of the desired count, rounded up, before
+# starting replacements (ADR-0043): two of three, or two of four. At the floor
+# this mailed on 12 of 12 deploys and on nothing else, and no sample count
+# separates that dip from a real one, so the threshold is the dip itself, read
+# from the service so the two cannot drift. Two of three tasks exiting as they
+# start reads one and fires; two that hang stay RUNNING through their failed
+# health checks and may not, which ADR-0058 records. What this gives up is the
+# fleet short of the floor by what a deploy stops, which ECS replacement and
+# the deployment circuit breaker answer and the 5XX alarms still see.
+locals {
+  fleet_alarm_threshold = max(
+    ceil(var.app_min_tasks * aws_ecs_service.app.deployment_minimum_healthy_percent / 100),
+    1
+  )
+}
+
 resource "aws_cloudwatch_metric_alarm" "fleet_below_floor" {
   alarm_name        = "${var.project}-fleet-below-floor"
-  alarm_description = "The app service ran fewer than ${max(var.app_min_tasks - 1, 1)} tasks for three minutes running. A rolling deploy never goes that low, so this is an outage or a crash loop."
+  alarm_description = "The app service ran fewer than ${local.fleet_alarm_threshold} tasks for three minutes running. A rolling deploy keeps at least that many, so this is an outage or a crash loop."
 
   namespace   = "ECS/ContainerInsights"
   metric_name = "RunningTaskCount"
   statistic   = "Minimum"
 
   comparison_operator = "LessThanThreshold"
-  threshold           = max(var.app_min_tasks - 1, 1)
+  threshold           = local.fleet_alarm_threshold
   period              = 60
   evaluation_periods  = 3
   datapoints_to_alarm = 3

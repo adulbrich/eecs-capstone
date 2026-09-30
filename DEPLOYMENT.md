@@ -1336,7 +1336,7 @@ Six alarms exist, all on the one topic:
 | `eecs-capstone-alb-5xx` | The load balancer returned more than 5 5XX in five minutes |
 | `eecs-capstone-app-5xx` | The app returned more than 5 5XX in five minutes |
 | `eecs-capstone-db-connections` | RDS held more than 100 connections for two minutes running |
-| `eecs-capstone-fleet-below-floor` | The service ran fewer than `app_min_tasks - 1` tasks (two, today) for three minutes running |
+| `eecs-capstone-fleet-below-floor` | The service ran fewer tasks than a deploy keeps running (two, today) for three minutes running |
 | `eecs-capstone-db-pool-waiting` | A request queued for a database connection in each of two consecutive minutes |
 | `eecs-capstone-ai-write-failures` | Automatic AI writes (project embedding, social summary, interest embedding) failed at least twice in three hours |
 
@@ -1368,9 +1368,10 @@ that is the alarms reaching a state for the first time.
 
 **A deploy does not mail.** A rolling deploy stops a task before starting its
 replacement (ADR-0043), so the fleet reads two of three for several minutes.
-`eecs-capstone-fleet-below-floor` alarms below two, so that dip stays silent
-and a mail from it means tasks are down or crash-looping. ADR-0058 records the
-12 deploys that settled this and what the threshold gives up.
+`eecs-capstone-fleet-below-floor` alarms only below what a deploy keeps
+running, so that dip stays silent and a mail from it means tasks are down or
+crash-looping. ADR-0058 records the 12 deploys that settled this and what the
+threshold gives up.
 
 ### Run a migration manually
 
