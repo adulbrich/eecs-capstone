@@ -9,16 +9,16 @@ import { Button } from "#/components/ui/button";
 import { ROSTER_FORMAT } from "#/lib/placement/formats";
 import { removeStudents, type Workspace } from "#/lib/placement/workspace";
 
-const plural = (n: number, one: string, many: string) =>
+export const plural = (n: number, one: string, many: string) =>
   `${n} ${n === 1 ? one : many}`;
 
 /** How many emails a warning names before it says how many more. */
 const SHOWN = 10;
 
 /**
- * The class roster on the Bids tab (#665): the whole class, so the students
- * who never answered the survey join the board and the run. It merges with
- * the bids on email and is kept when the bids are removed.
+ * The class roster, on the Roster tab (#665, #717): the whole class, so the
+ * students who never answered the survey join the board and the run. It
+ * merges with the bids on email and is kept when the bids are removed.
  */
 export function RosterSection({
   state,
@@ -57,7 +57,7 @@ export function RosterSection({
     return (
       <section
         aria-labelledby="placement-roster-heading"
-        className="mt-6 flex flex-col gap-3"
+        className="flex flex-col gap-3"
       >
         <div>
           <h2 className="font-medium" id="placement-roster-heading">
@@ -103,7 +103,7 @@ export function RosterSection({
   return (
     <section
       aria-labelledby="placement-roster-heading"
-      className="mt-6 rounded-md border px-3 py-2 text-sm"
+      className="rounded-md border px-3 py-2 text-sm"
     >
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h2 className="font-medium" id="placement-roster-heading">
@@ -136,7 +136,13 @@ export function RosterSection({
           Canvas's Test Student is left out.
         </p>
       )}
-      <p className="mt-1">{rosterSummary(bids === null, notInSurvey)}</p>
+      <p className="mt-1">
+        {rosterSummary(
+          bids === null,
+          workspace.projects.length === 0,
+          notInSurvey
+        )}
+      </p>
       {preApproved > 0 && (
         <p className="mt-1">
           {preApproved === 1
@@ -197,7 +203,14 @@ export function RosterSection({
   );
 }
 
-function rosterSummary(noBids: boolean, notInSurvey: number): string {
+function rosterSummary(
+  noBids: boolean,
+  noProjects: boolean,
+  notInSurvey: number
+): string {
+  if (noProjects) {
+    return "Load the projects, then the bids, to match the roster against them.";
+  }
   if (noBids) {
     return "Upload the bids to match the roster against them.";
   }

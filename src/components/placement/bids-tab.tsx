@@ -1,3 +1,4 @@
+import { Link } from "@tanstack/react-router";
 import { Download, Trash2, TriangleAlert } from "lucide-react";
 import { useId, useMemo } from "react";
 import {
@@ -10,11 +11,8 @@ import { BidsByProject } from "#/components/placement/bids-by-project";
 import { CsvFormatHelp } from "#/components/placement/csv-format";
 import { FilePickerButton } from "#/components/placement/file-picker-button";
 import { ImportIssues } from "#/components/placement/import-issues";
-import {
-  RemovedStudents,
-  RemoveStudentButton,
-} from "#/components/placement/removed-students";
-import { RosterSection } from "#/components/placement/roster-section";
+import { RemoveStudentButton } from "#/components/placement/removed-students";
+import { plural } from "#/components/placement/roster-section";
 import { TitleMatchesPanel } from "#/components/placement/title-matches";
 import type { PlacementWorkspace } from "#/components/placement/use-placement-workspace";
 import { Button } from "#/components/ui/button";
@@ -90,7 +88,6 @@ export function BidsTab({
           Upload bids CSV
         </FilePickerButton>
         <CsvFormatHelp format={BIDS_FORMAT} label="bids" />
-        <RosterSection state={state} workspace={workspace} />
       </div>
     );
   }
@@ -194,8 +191,11 @@ export function BidsTab({
       {!workspace.bids.conversionIssues?.some((i) => i.wholeFile) && (
         <ImportIssues issues={bids.issues} label="bids" />
       )}
-      <RosterSection state={state} workspace={workspace} />
-      <RemovedStudents removed={bids.removed} update={update} />
+      <RosterPointer
+        notOnRoster={bids.notOnRoster.length}
+        removed={bids.removed.length}
+        rosterOnly={rosterOnly}
+      />
       <div className="mt-6 flex flex-wrap items-center gap-x-6 gap-y-2">
         <ViewSwitch onView={onView} view={view} />
         {view === "project" && (
@@ -212,7 +212,7 @@ export function BidsTab({
           ? 'Pin here does what Approve does on the Results tab: every run keeps the student on that project until you unpin them, over any pin from the bids file or the roster. Unpin frees them from all of these. A pin changes the next run; the Results tab shows the last run until then. Each project lists who is pinned there and how, and after a run how many the run placed there, each marked Placed here with their team, including anyone placed outside their bids; "(before your changes)" means the projects, parameters or bids changed since. A student pinned since the run shows their pin, not where the run put them, and leaves that count. On a row marked Pinned elsewhere, Pin here moves their pin to this project; the header of the other project lists who is pinned there. Pinned only shows the pinned students alone.'
           : "Pinned rows show every pin in effect: the bids file's, the roster's, and those set here or on the Results tab, which win over the other two. Each student says where they stand: a pinned student stays on their pin in every run, so only the pin shows; anyone else shows where the last run placed them, marked in their rows."}{" "}
         Remove from placement takes a student out of every run, and off the
-        board at once, until you restore them from the removed list above.
+        board at once, until you restore them on the Roster tab.
       </p>
       {view === "project" ? (
         <BidsByProject
@@ -536,6 +536,52 @@ function bidsFromFile(
     convertedFrom: filename,
     conversionIssues: converted.issues,
   };
+}
+
+/**
+ * What the roster says about these bids, in one line pointing at the Roster
+ * tab, where each of them is dealt with (#717). Nothing when it says nothing.
+ */
+function RosterPointer({
+  notOnRoster,
+  removed,
+  rosterOnly,
+}: {
+  notOnRoster: number;
+  removed: number;
+  rosterOnly: number;
+}) {
+  const parts = [
+    rosterOnly > 0 &&
+      `${plural(rosterOnly, "student on the roster has", "students on the roster have")} no bids`,
+    notOnRoster > 0 &&
+      `${plural(notOnRoster, "student who bid is", "students who bid are")} not on the roster`,
+    removed > 0 &&
+      `${plural(removed, "student is", "students are")} removed from placement`,
+  ].filter((part): part is string => typeof part === "string");
+  if (parts.length === 0) {
+    return null;
+  }
+  const [first, ...rest] = parts;
+  const sentence =
+    rest.length === 0
+      ? first
+      : `${[first, ...rest.slice(0, -1)].join(", ")} and ${rest.at(-1)}`;
+  return (
+    <p className="mt-4 text-sm">
+      {/* Each part starts with its count, so no capital is needed. */}
+      {sentence}. See the{" "}
+      <Link
+        className="text-brand-dark underline"
+        from="/admin/placement"
+        search={(prev) => ({ ...prev, tab: "roster" as const })}
+        to="."
+      >
+        Roster tab
+      </Link>
+      .
+    </p>
+  );
 }
 
 /**

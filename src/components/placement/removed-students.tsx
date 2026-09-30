@@ -75,7 +75,7 @@ export function StudentMenu({
         <ConfirmDialog
           busyLabel="Removing..."
           confirmLabel="Remove from placement"
-          description={`${who} leaves every run, this board, the analytics and both downloads, not only this team. Restore brings them back from the "Removed from placement" list on the Bids tab.`}
+          description={`${who} leaves every run, this board, the analytics and both downloads, not only this team. Restore brings them back from the "Removed from placement" list on the Roster tab.`}
           onConfirm={() => update((w) => removeStudents(w, [email]))}
           title={`Remove ${who} from placement?`}
         >

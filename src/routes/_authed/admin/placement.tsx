@@ -5,6 +5,7 @@ import { BidsTab } from "#/components/placement/bids-tab";
 import { ParametersTab } from "#/components/placement/parameters-tab";
 import { ProjectsTab } from "#/components/placement/projects-tab";
 import { ResultsTab } from "#/components/placement/results-tab";
+import { RosterTab } from "#/components/placement/roster-tab";
 import { usePlacementWorkspace } from "#/components/placement/use-placement-workspace";
 import { WorkspaceActions } from "#/components/placement/workspace-actions";
 import {
@@ -21,7 +22,7 @@ import { requireStaff } from "#/lib/access-denied";
 import { pageTitle } from "#/lib/page-title";
 import { listPrograms } from "#/server/programs";
 
-const TABS = ["projects", "bids", "parameters", "results"] as const;
+const TABS = ["projects", "roster", "bids", "parameters", "results"] as const;
 type Tab = (typeof TABS)[number];
 const BIDS_VIEWS = ["student", "project"] as const;
 
@@ -51,7 +52,7 @@ function PlacementPage() {
   const { pinnedOnly, tab, view } = Route.useSearch();
   const navigate = useNavigate({ from: "/admin/placement" });
   const state = usePlacementWorkspace();
-  const { workspace, bids } = state;
+  const { workspace, bids, roster } = state;
   const programs = rows.map((p) => ({
     id: p.id,
     label: `${p.courseId} ${p.courseName}`,
@@ -122,9 +123,16 @@ function PlacementPage() {
           }
           value={tab}
         >
-          <TabsList>
+          {/* Five tabs are wider than a phone: the strip scrolls sideways
+              inside itself rather than widening the page (#717), and the
+              focus ring draws inside each tab, which the scroll box would
+              otherwise clip. */}
+          <TabsList className="overflow-x-auto [&>*]:shrink-0 [&>*]:whitespace-nowrap [&>*]:focus-visible:ring-inset">
             <TabsTrigger value="projects">
               Projects ({workspace.projects.length})
+            </TabsTrigger>
+            <TabsTrigger value="roster">
+              {roster ? `Roster (${roster.entries.length})` : "Roster"}
             </TabsTrigger>
             <TabsTrigger value="bids">
               Bids ({bids?.students.length ?? 0})
@@ -138,6 +146,9 @@ function PlacementPage() {
               state={state}
               workspace={workspace}
             />
+          </TabsContent>
+          <TabsContent value="roster">
+            <RosterTab state={state} workspace={workspace} />
           </TabsContent>
           <TabsContent value="bids">
             <BidsTab

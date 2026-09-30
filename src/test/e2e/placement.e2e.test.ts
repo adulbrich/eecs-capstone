@@ -791,6 +791,7 @@ test.describe("placement workspace", () => {
     await waitForHydration(page);
     await importFiles(page);
 
+    await page.getByRole("tab", { name: /Roster/ }).click();
     await page.getByLabel("Roster CSV file").setInputFiles({
       name: "roster.csv",
       mimeType: "text/csv",
@@ -805,17 +806,37 @@ test.describe("placement workspace", () => {
     );
     // Ben answered the survey but is not on this roster.
     await expect(roster).toContainText(`ben@${DOMAIN}`);
+    await expect(page.getByRole("tab", { name: "Roster (2)" })).toBeVisible();
+    await page.getByRole("tab", { name: /Bids/ }).click();
     await expect(
       page.getByText("and 1 more from the roster with no bids")
+    ).toBeVisible();
+    // The Bids tab points at the roster rather than holding it (#717).
+    await expect(
+      page.getByText(
+        "1 student on the roster has no bids and 1 student who bid is not on the roster. See the Roster tab."
+      )
     ).toBeVisible();
     await expect(
       page.getByRole("rowheader", { name: /Kim Lee.*not in the survey/ })
     ).toBeVisible();
     await expect.poll(() => stored(page)).toContain('"roster"');
 
+    await page.getByRole("link", { name: "Roster tab" }).click();
+    await expect(page).toHaveURL(/tab=roster/);
     await roster.getByRole("button", { name: "Remove roster" }).click();
     await page.getByRole("button", { name: "Remove", exact: true }).click();
-    await expect(page.getByText("Kim Lee")).toHaveCount(0);
+    await expect(page.getByRole("tab", { name: "Roster" })).toBeVisible();
+    await page.getByRole("tab", { name: /Bids/ }).click();
+    // The panel first: a count of none passes before it renders.
+    await expect(
+      page.getByRole("rowheader", { name: /Ada Park/ })
+    ).toBeVisible();
+    await expect(page.getByRole("rowheader", { name: /Kim Lee/ })).toHaveCount(
+      0
+    );
+    await expect(page.getByRole("link", { name: "Roster tab" })).toHaveCount(0);
+    await page.getByRole("tab", { name: /Roster/ }).click();
 
     await page
       .getByLabel("Roster emails")
@@ -826,9 +847,37 @@ test.describe("placement workspace", () => {
       page.getByRole("region", { name: "Problems in the pasted roster" })
     ).toContainText('Line 3: "nobody" is not an email.');
     await expect(roster).not.toContainText("not on the roster");
+    await page.getByRole("tab", { name: /Bids/ }).click();
     await expect(
       page.getByRole("rowheader", { name: /Kim Lee.*not in the survey/ })
     ).toBeVisible();
+  });
+
+  test("the Roster tab opens from its URL and takes a roster before any bids (#717)", async ({
+    page,
+  }) => {
+    await page.goto("/admin/placement?tab=roster");
+    await waitForHydration(page);
+    await expect(page.getByRole("tab", { name: "Roster" })).toHaveAttribute(
+      "aria-selected",
+      "true"
+    );
+    await page
+      .getByLabel("Roster emails")
+      .fill(`ada@${DOMAIN}\nKim Lee <kim@${DOMAIN}>`);
+    await page.getByRole("button", { name: "Use these emails" }).click();
+    const roster = page.getByRole("region", { name: /Class roster/ });
+    await expect(roster).toContainText("2 students from a pasted list");
+    await expect(
+      page.getByText(/matched once the projects are loaded/)
+    ).toBeVisible();
+    await expect(roster).toContainText(
+      "Load the projects, then the bids, to match the roster against them."
+    );
+    await expect(page.getByRole("tab", { name: "Roster (2)" })).toBeVisible();
+    await roster.getByRole("button", { name: "Remove roster" }).click();
+    await page.getByRole("button", { name: "Remove", exact: true }).click();
+    await expect(page.getByLabel("Roster emails")).toBeVisible();
   });
 
   test("a run places a roster student who did not answer the survey", async ({
@@ -837,6 +886,7 @@ test.describe("placement workspace", () => {
     await page.goto("/admin/placement");
     await waitForHydration(page);
     await importFiles(page);
+    await page.getByRole("tab", { name: /Roster/ }).click();
     await page
       .getByLabel("Roster emails")
       .fill(`ada@${DOMAIN}\nben@${DOMAIN}\nKim Lee <kim@${DOMAIN}>`);
@@ -906,7 +956,7 @@ test.describe("placement workspace", () => {
 
     // Removing the roster takes Kim out of the run, so the run goes too
     // rather than leaving Kim's placement to vanish from the board.
-    await page.getByRole("tab", { name: /Bids/ }).click();
+    await page.getByRole("tab", { name: /Roster/ }).click();
     await page.getByRole("button", { name: "Remove roster" }).click();
     await page.getByRole("button", { name: "Remove", exact: true }).click();
     await page.getByRole("tab", { name: "Results" }).click();
@@ -922,6 +972,7 @@ test.describe("placement workspace", () => {
     await page.goto("/admin/placement");
     await waitForHydration(page);
     await importFiles(page);
+    await page.getByRole("tab", { name: /Roster/ }).click();
     await page.getByLabel("Roster CSV file").setInputFiles({
       name: "roster.csv",
       mimeType: "text/csv",
@@ -943,6 +994,7 @@ test.describe("placement workspace", () => {
     ).toContainText(
       `ben@${DOMAIN} is pre-approved for Tide Clock, over the bids file's pin to Robot Arm.`
     );
+    await page.getByRole("tab", { name: /Bids/ }).click();
     await expect(
       page.getByRole("rowheader", {
         name: /Ada Park.*pre-approved for Robot Arm/,
@@ -1147,6 +1199,7 @@ test.describe("placement workspace", () => {
     await page.goto("/admin/placement");
     await waitForHydration(page);
     await importFiles(page);
+    await page.getByRole("tab", { name: /Roster/ }).click();
     await page.getByLabel("Roster CSV file").setInputFiles({
       name: "canvas-groups.csv",
       mimeType: "text/csv",
@@ -1198,6 +1251,7 @@ test.describe("placement workspace", () => {
     await importFiles(page);
     // Kim is pre-approved for a project the list lacks, and Ben answered the
     // survey but is not on the roster, as a student who transferred out is.
+    await page.getByRole("tab", { name: /Roster/ }).click();
     await page.getByLabel("Roster CSV file").setInputFiles({
       name: "roster.csv",
       mimeType: "text/csv",
@@ -1211,6 +1265,8 @@ test.describe("placement workspace", () => {
       name: /Removed from placement/,
     });
     await expect(removed).toContainText(`Ben Ito (ben@${DOMAIN})`);
+    await page.getByRole("tab", { name: /Bids/ }).click();
+    await expect(page.getByText("Ada Park")).not.toHaveCount(0);
     await expect(page.getByRole("rowheader", { name: /Ben Ito/ })).toHaveCount(
       0
     );
@@ -1223,7 +1279,11 @@ test.describe("placement workspace", () => {
     await page
       .getByRole("button", { name: "Remove Kim Lee from placement" })
       .click();
-    await expect(removed).toContainText("2 students");
+    await expect(
+      page.getByText(
+        /2 students are removed from placement\. See the Roster tab/
+      )
+    ).toBeVisible();
     await page.getByRole("tab", { name: /Projects/ }).click();
     // The tab's own table first: a count of none passes before it renders.
     await expect(
@@ -1268,21 +1328,27 @@ test.describe("placement workspace", () => {
     // The figures drop her without a run (#701).
     await expect(placedFigure(page, "0 of 0")).toBeVisible();
 
-    // New bids keep the removals.
+    // New bids keep the removals, and with no bids the Roster tab still
+    // lists them, named from the roster.
     await page.getByRole("tab", { name: /Bids/ }).click();
     await page.getByRole("button", { name: "Remove bids" }).click();
     await page.getByRole("button", { name: "Remove", exact: true }).click();
+    await page.getByRole("tab", { name: /Roster/ }).click();
+    await expect(removed).toContainText("Kim Lee");
+    await page.getByRole("tab", { name: /Bids/ }).click();
     await page.getByLabel("Bids CSV file").setInputFiles({
       name: "bids.csv",
       mimeType: "text/csv",
       buffer: Buffer.from(BIDS_CSV),
     });
+    await page.getByRole("tab", { name: /Roster/ }).click();
     await expect(removed).toContainText("3 students");
     await removed.getByRole("button", { name: "Restore Ben Ito" }).click();
+    await expect(removed).toContainText("2 students");
+    await page.getByRole("tab", { name: /Bids/ }).click();
     await expect(
       page.getByRole("rowheader", { name: /Ben Ito/ })
     ).toBeVisible();
-    await expect(removed).toContainText("2 students");
   });
 
   test("clearing all data empties the stored workspace after a confirmation", async ({
