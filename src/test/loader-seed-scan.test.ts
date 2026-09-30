@@ -166,6 +166,13 @@ const CENSUS = new Map<string, { class: SeedClass; why: string }>([
     },
   ],
   [
+    "src/components/placement/add-project-dialog.tsx: useState(EMPTY)",
+    {
+      class: "D",
+      why: "a blank new project, a module constant; reset to it whenever the dialog closes",
+    },
+  ],
+  [
     "src/components/comment-thread.tsx: useState(comment.content)",
     {
       class: "D",

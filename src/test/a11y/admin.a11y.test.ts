@@ -382,6 +382,21 @@ for (const width of [1280, 375]) {
     await expect(page.getByText("Student proposed")).toBeVisible();
     await checkA11y(page);
     await expectNoHorizontalOverflow(page);
+
+    // Add a project by hand, and a row's menu with Remove (#716).
+    await page.getByRole("button", { name: "Add project" }).click();
+    const dialog = page.getByRole("dialog", { name: "Add a project" });
+    await waitForSurfaceSettled(dialog);
+    await dialog.getByRole("button", { name: "Add project" }).click();
+    await expect(dialog).toContainText("Enter a title.");
+    await checkA11y(page);
+    await dialog.getByRole("button", { name: "Cancel" }).click();
+    await expect(dialog).toHaveCount(0);
+    await page.getByRole("button", { name: "More for Robot Arm" }).click();
+    const menu = page.locator('[data-slot="dropdown-menu-content"]');
+    await waitForSurfaceSettled(menu);
+    await checkA11y(page);
+    await closeMenu(page);
   });
 }
 
@@ -393,7 +408,9 @@ test("@smoke admin placement, projects and bids loaded", async ({ page }) => {
     mimeType: "text/csv",
     buffer: Buffer.from(PLACEMENT_PROJECTS_CSV),
   });
-  await expect(page.getByRole("cell", { name: "Tide Clock" })).toBeVisible();
+  await expect(
+    page.getByRole("cell", { name: "Tide Clock", exact: true })
+  ).toBeVisible();
   await checkA11y(page);
 
   await page.getByRole("tab", { name: /Bids/ }).click();

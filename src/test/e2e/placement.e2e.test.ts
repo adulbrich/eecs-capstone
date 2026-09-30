@@ -45,7 +45,9 @@ async function importFiles(page: Page) {
     mimeType: "text/csv",
     buffer: Buffer.from(PROJECTS_CSV),
   });
-  await expect(page.getByRole("cell", { name: "Tide Clock" })).toBeVisible();
+  await expect(
+    page.getByRole("cell", { name: "Tide Clock", exact: true })
+  ).toBeVisible();
   await page.getByRole("tab", { name: /Bids/ }).click();
   await page.getByLabel("Bids CSV file").setInputFiles({
     name: "bids.csv",
@@ -166,6 +168,107 @@ test.describe("placement workspace", () => {
     await expect(
       page.getByText(/student_proposed must be true or false/)
     ).toBeVisible();
+  });
+
+  test("staff add a project by hand and remove one from the list (#716)", async ({
+    page,
+  }) => {
+    await page.goto("/admin/placement");
+    await waitForHydration(page);
+    await importFiles(page);
+    await page.getByRole("tab", { name: /Projects/ }).click();
+
+    const addProject = async (title: string) => {
+      await page.getByRole("button", { name: "Add project" }).click();
+      const dialog = page.getByRole("dialog", { name: "Add a project" });
+      await dialog.getByLabel("Title").fill(title);
+      await dialog.getByLabel("Max teams").fill("1");
+      await dialog.getByLabel("Student proposed").click();
+      await dialog.getByLabel("Mentor email").fill(`mentor@${DOMAIN}`);
+      await dialog.getByRole("button", { name: "Add project" }).click();
+      return dialog;
+    };
+    // A title already listed is refused, and the dialog stays open.
+    const refused = await addProject("tide  CLOCK");
+    await expect(refused).toContainText(
+      "A project with this title is already in the list."
+    );
+    await refused.getByRole("button", { name: "Cancel" }).click();
+
+    const added = await addProject("Moon Base");
+    await expect(added).toHaveCount(0);
+    const moon = page.getByRole("row").filter({ hasText: "Moon Base" });
+    await expect(moon).toContainText("Added by hand");
+    await expect(moon).toContainText("Student proposed");
+    await expect(
+      page.getByText("3 projects from projects.csv, 1 of them added by hand.")
+    ).toBeVisible();
+
+    // A pin set on this page to a project that then goes stays, and the run
+    // leaves that student unplaced rather than guessing.
+    await page.getByRole("tab", { name: /Bids/ }).click();
+    await page.getByRole("button", { name: "Per project" }).click();
+    await page
+      .getByRole("button", { name: /^Pin Ada Park to Tide Clock/ })
+      .click();
+    await page.getByRole("tab", { name: /Projects/ }).click();
+    await page.getByLabel("Min students per team, Robot Arm").fill("1");
+    await page.getByRole("tab", { name: "Parameters" }).click();
+    await page.getByLabel("Min students per team", { exact: true }).fill("1");
+    await page.getByRole("tab", { name: "Results" }).click();
+    await page.getByRole("button", { name: "Run placement" }).click();
+    await expect(placedFigure(page, "2 of 2")).toBeVisible({
+      timeout: 20_000,
+    });
+
+    await page.getByRole("tab", { name: /Projects/ }).click();
+    await page.getByRole("button", { name: "More for Tide Clock" }).click();
+    await page.getByRole("menuitem", { name: "Remove..." }).click();
+    const confirm = page.getByRole("alertdialog", {
+      name: "Remove Tide Clock?",
+    });
+    await expect(confirm).toContainText(
+      "The 1 bid on it shows as an unmatched title again."
+    );
+    await confirm.getByRole("button", { name: "Remove" }).click();
+    await expect(
+      page.getByRole("cell", { name: "Robot Arm", exact: true })
+    ).toBeVisible();
+    await expect(
+      page.getByRole("row").filter({ hasText: "Tide Clock" })
+    ).toHaveCount(0);
+
+    // The run placed Ada on Tide Clock, so it goes with the project rather
+    // than show a project the list no longer has.
+    await page.getByRole("tab", { name: "Results" }).click();
+    await page
+      .getByRole("button", { name: "Run placement", exact: true })
+      .click();
+    await expect(placedFigure(page, "1 of 2")).toBeVisible({
+      timeout: 20_000,
+    });
+    await expect(
+      page.getByRole("row", { name: /Ada Park/ }).first()
+    ).toContainText("Pinned to a project with no teams.");
+    await expect.poll(() => stored(page)).toContain('"addedByHand":true');
+  });
+
+  test("staff build a project list by hand from the empty tab (#716)", async ({
+    page,
+  }) => {
+    await page.goto("/admin/placement");
+    await waitForHydration(page);
+    await page.getByRole("button", { name: "Add project" }).click();
+    const dialog = page.getByRole("dialog", { name: "Add a project" });
+    await dialog.getByLabel("Title").fill("...");
+    await dialog.getByRole("button", { name: "Add project" }).click();
+    await expect(dialog).toContainText("Enter a title with letters or digits.");
+    await dialog.getByLabel("Title").fill("Moon Base");
+    await dialog.getByRole("button", { name: "Add project" }).click();
+    await expect(page.getByText("1 project, added by hand.")).toBeVisible();
+    await page.reload();
+    await waitForHydration(page);
+    await expect(page.getByText("1 project, added by hand.")).toBeVisible();
   });
 
   test("an exported workspace imports identically in a fresh browser", async ({
@@ -1123,7 +1226,9 @@ test.describe("placement workspace", () => {
     await expect(removed).toContainText("2 students");
     await page.getByRole("tab", { name: /Projects/ }).click();
     // The tab's own table first: a count of none passes before it renders.
-    await expect(page.getByRole("cell", { name: "Tide Clock" })).toBeVisible();
+    await expect(
+      page.getByRole("cell", { name: "Tide Clock", exact: true })
+    ).toBeVisible();
     await expect(added).toHaveCount(0);
 
     const parameters = page.getByRole("tab", { name: "Parameters" });

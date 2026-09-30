@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { removeFromResult } from "#/lib/placement/board";
 import { type ImportIssue, normalizeTitle } from "#/lib/placement/csv";
+import { repointRosterPins, rosterProjectKey } from "#/lib/placement/roster";
 import {
   DEFAULT_PLACEMENT_PARAMETERS,
   type PlacementInput,
@@ -28,7 +29,9 @@ export interface WorkspaceParameters extends PlacementParameters {
 export type ProjectSource =
   | { kind: "portal"; programId: string; programLabel: string }
   | { kind: "csv"; filename: string }
-  | { kind: "pasted" };
+  | { kind: "pasted" }
+  /** Every project added one at a time on the Projects tab (#716). */
+  | { kind: "manual" };
 
 export interface Workspace {
   bids: {
@@ -131,6 +134,7 @@ const projectSchema = z.object({
   proposerEmail: z.string().optional(),
   proposerName: z.string().optional(),
   studentProposed: z.boolean().optional(),
+  addedByHand: z.boolean().optional(),
 });
 
 const resultSchema = z.object({
@@ -186,6 +190,7 @@ const workspaceSchema = z
         }),
         z.object({ kind: z.literal("csv"), filename: z.string() }),
         z.object({ kind: z.literal("pasted") }),
+        z.object({ kind: z.literal("manual") }),
       ])
       .nullable(),
     projects: z.array(projectSchema),
@@ -550,6 +555,122 @@ export function pruneTitleMatches(
     keys.has(m.projectKey)
   );
   return kept.length > 0 ? Object.fromEntries(kept) : undefined;
+}
+
+const ROSTER_KEY = /^roster:\S/;
+
+/** Every project key a run names: its placements and its diagnostics. */
+function resultKeys(result: StoredResult): Set<string> {
+  const d = result.diagnostics;
+  return new Set([
+    ...result.placements.map((p) => p.projectKey),
+    ...d.projectsBelowMin,
+    ...d.pinnedProjectsBelowMin,
+    ...d.pinOverflow.map((o) => o.projectKey),
+  ]);
+}
+
+/** The run with one project key renamed wherever it names it. */
+function renameInResult(
+  result: StoredResult,
+  from: string,
+  to: string
+): StoredResult {
+  const rename = (key: string) => (key === from ? to : key);
+  const d = result.diagnostics;
+  return {
+    ...result,
+    placements: result.placements.map((p) => ({
+      ...p,
+      projectKey: rename(p.projectKey),
+    })),
+    diagnostics: {
+      ...d,
+      projectsBelowMin: d.projectsBelowMin.map(rename),
+      pinnedProjectsBelowMin: d.pinnedProjectsBelowMin.map(rename),
+      pinOverflow: d.pinOverflow.map((o) => ({
+        ...o,
+        projectKey: rename(o.projectKey),
+      })),
+    },
+  };
+}
+
+/**
+ * The workspace with one project added by hand (#716), keyed by its
+ * normalized title as a CSV project is, or the reason it cannot be: the
+ * title normalizes to nothing, or a listed project already has it, whatever
+ * that project's key. A project the roster added under the same title
+ * becomes this one, its pins and places in the last run with it, and a title
+ * matched by hand to another project gives way, since bids now name this one
+ * exactly. Pins and the last run otherwise stay; the run is stale from here.
+ */
+export function addProject(
+  workspace: Workspace,
+  project: Omit<WorkspaceProject, "key" | "addedByHand" | "fromRoster">
+): { ok: true; workspace: Workspace } | { ok: false; message: string } {
+  const key = normalizeTitle(project.title);
+  if (key === "") {
+    return { ok: false, message: "Enter a title with letters or digits." };
+  }
+  // The roster's own projects are keyed "roster:<title>", with no space
+  // after the colon; "Roster: Lab Tools" keeps its space and never collides.
+  if (ROSTER_KEY.test(key)) {
+    return {
+      ok: false,
+      message:
+        'A title cannot start with "roster:" followed directly by a letter or digit; projects the roster adds are named that way.',
+    };
+  }
+  if (
+    workspace.projects.some(
+      (p) => p.key === key || normalizeTitle(p.title) === key
+    )
+  ) {
+    return {
+      ok: false,
+      message: "A project with this title is already in the list.",
+    };
+  }
+  const fromRoster = rosterProjectKey(key);
+  const { [key]: _matched, ...titleMatches } = workspace.titleMatches ?? {};
+  return {
+    ok: true,
+    workspace: {
+      ...workspace,
+      projects: [...workspace.projects, { ...project, key, addedByHand: true }],
+      projectSource:
+        workspace.projects.length === 0
+          ? { kind: "manual" }
+          : workspace.projectSource,
+      pins: repointRosterPins(workspace.pins, { [key]: { projectKey: key } }),
+      titleMatches:
+        Object.keys(titleMatches).length > 0 ? titleMatches : undefined,
+      result:
+        workspace.result && renameInResult(workspace.result, fromRoster, key),
+    },
+  };
+}
+
+/**
+ * The workspace without one project (#716). A title matched to it by hand
+ * goes too, so its bids show as unmatched again; a pin to it stays, and the
+ * next run reports it as a pin to a dropped project. The last run stays and
+ * reads as stale, unless it names the project, by a placement or in what it
+ * says about the run: a board naming a project the list no longer has would
+ * show its bare key, so that run goes.
+ */
+export function removeProject(workspace: Workspace, key: string): Workspace {
+  const projects = workspace.projects.filter((p) => p.key !== key);
+  const placedThere =
+    workspace.result !== undefined && resultKeys(workspace.result).has(key);
+  return {
+    ...workspace,
+    projects,
+    projectSource: projects.length === 0 ? null : workspace.projectSource,
+    titleMatches: pruneTitleMatches(workspace.titleMatches, projects),
+    result: placedThere ? undefined : workspace.result,
+  };
 }
 
 /**
