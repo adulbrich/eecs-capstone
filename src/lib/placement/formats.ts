@@ -50,10 +50,62 @@ export const PROJECTS_FORMAT: CsvFormat = {
       meaning: "Most students on a team. Blank uses the page default.",
       example: "4",
     },
+    {
+      name: "proposer_name",
+      required: false,
+      meaning: "Who proposed the project, shown in the Contact column.",
+      example: "Jane Doe",
+    },
+    {
+      name: "proposer_email",
+      required: false,
+      meaning: "The proposer's email address.",
+      example: "jane.doe@example.com",
+    },
+    {
+      name: "mentor_name",
+      required: false,
+      meaning:
+        "The project's mentor, who is the contact for a student-proposed project.",
+      example: "Pat Lee",
+    },
+    {
+      name: "mentor_email",
+      required: false,
+      meaning: "The mentor's email address.",
+      example: "leep@oregonstate.edu",
+    },
+    {
+      name: "student_proposed",
+      required: false,
+      meaning:
+        "true when students proposed the project, as yes or 1 also say. Blank means false.",
+      example: "true",
+    },
   ],
   templateRows: [
-    { title: "Tide Clock", max_teams: "2", min_students: "", max_students: "" },
-    { title: "Robot Arm", max_teams: "", min_students: "2", max_students: "3" },
+    {
+      title: "Tide Clock",
+      max_teams: "2",
+      min_students: "",
+      max_students: "",
+      proposer_name: "Jane Doe",
+      proposer_email: "jane.doe@example.com",
+      mentor_name: "",
+      mentor_email: "",
+      student_proposed: "",
+    },
+    {
+      title: "Robot Arm",
+      max_teams: "",
+      min_students: "2",
+      max_students: "3",
+      proposer_name: "Ada Park",
+      proposer_email: "parka@oregonstate.edu",
+      mentor_name: "Pat Lee",
+      mentor_email: "leep@oregonstate.edu",
+      student_proposed: "true",
+    },
   ],
 };
 

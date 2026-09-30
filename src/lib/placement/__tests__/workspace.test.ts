@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
+import type { WorkspaceProject } from "#/lib/placement/types";
 import {
+  contactFor,
   EMPTY_WORKSPACE,
   inputFingerprint,
   isEmptyWorkspace,
@@ -14,6 +16,7 @@ import {
   setAsideRemoved,
   toPlacementInput,
   type Workspace,
+  withoutContact,
 } from "#/lib/placement/workspace";
 
 // Invented data only (#648).
@@ -144,6 +147,158 @@ describe("projectsFromPortal", () => {
       ["c", 1],
     ]);
     expect(result.duplicates).toEqual(["tide  clock"]);
+  });
+
+  it("carries the proposer, the mentor and student proposed, falling back to the contact for a missing proposer", () => {
+    const { projects } = projectsFromPortal([
+      {
+        id: "a",
+        title: "Tide Clock",
+        teamsSupported: 1,
+        proposerName: "Jane Doe",
+        proposerEmail: "jane@example.com",
+        contactName: "Front Desk",
+        contactEmail: "desk@example.com",
+        mentorName: null,
+        mentorEmail: " ",
+        studentProposed: false,
+      },
+      {
+        id: "b",
+        title: "Robot Arm",
+        teamsSupported: 1,
+        proposerName: null,
+        proposerEmail: null,
+        contactName: "Front Desk",
+        contactEmail: "desk@example.com",
+        mentorName: "Pat Lee",
+        mentorEmail: "leep@example.edu",
+        studentProposed: true,
+      },
+    ]);
+    const blank = projectsFromPortal([
+      {
+        id: "c",
+        title: "Moon Base",
+        teamsSupported: 1,
+        proposerName: " ",
+        proposerEmail: null,
+        contactName: "Front Desk",
+        contactEmail: null,
+      },
+    ]);
+    // A proposer that trims to nothing is no proposer.
+    expect(blank.projects[0].proposerName).toBe("Front Desk");
+    expect(projects.map(contactFields)).toEqual([
+      { proposerName: "Jane Doe", proposerEmail: "jane@example.com" },
+      {
+        proposerName: "Front Desk",
+        proposerEmail: "desk@example.com",
+        mentorName: "Pat Lee",
+        mentorEmail: "leep@example.edu",
+        studentProposed: true,
+      },
+    ]);
+  });
+});
+
+/** The contact fields that are set, as a saved workspace keeps them. */
+const contactFields = (p: WorkspaceProject) =>
+  JSON.parse(
+    JSON.stringify({
+      proposerName: p.proposerName,
+      proposerEmail: p.proposerEmail,
+      mentorName: p.mentorName,
+      mentorEmail: p.mentorEmail,
+      studentProposed: p.studentProposed,
+    })
+  );
+
+describe("contactFor", () => {
+  const both = {
+    proposerName: "Jane Doe",
+    proposerEmail: "jane@example.com",
+    mentorName: "Pat Lee",
+    mentorEmail: "leep@example.edu",
+  };
+
+  it("names the proposer, or the mentor for a student-proposed project", () => {
+    expect(contactFor(both)).toEqual({
+      name: "Jane Doe",
+      email: "jane@example.com",
+      role: "proposer",
+    });
+    expect(contactFor({ ...both, studentProposed: true })?.role).toBe("mentor");
+  });
+
+  it("falls back to the other when the preferred one is missing, and is null for neither", () => {
+    expect(
+      contactFor({ studentProposed: true, proposerEmail: "jane@example.com" })
+    ).toEqual({ email: "jane@example.com", name: undefined, role: "proposer" });
+    expect(contactFor({ mentorName: "Pat Lee" })?.role).toBe("mentor");
+    expect(contactFor({})).toBe(null);
+  });
+
+  it("reads a name of spaces as none, so a real proposer wins over it", () => {
+    expect(
+      contactFor({
+        studentProposed: true,
+        mentorName: "  ",
+        proposerName: "Jane Doe",
+      })
+    ).toEqual({ email: undefined, name: "Jane Doe", role: "proposer" });
+  });
+
+  it("reads a blank name as none, so the email shows", () => {
+    expect(contactFor({ proposerName: "", proposerEmail: "a@b.c" })).toEqual({
+      email: "a@b.c",
+      name: undefined,
+      role: "proposer",
+    });
+  });
+});
+
+describe("contact fields", () => {
+  const contact = {
+    proposerName: "Jane Doe",
+    proposerEmail: "jane@example.com",
+    studentProposed: true,
+  };
+
+  it("never change the fingerprint, so loading them leaves a run current", () => {
+    const base = { ...WORKSPACE, titleMatches: undefined, roster: undefined };
+    const withContact = {
+      ...base,
+      projects: base.projects.map((p) => ({ ...p, ...contact })),
+    };
+    expect(inputFingerprint(withContact)).toBe(inputFingerprint(base));
+  });
+
+  it("leave a project without them hashing to the same text as before", () => {
+    // The fingerprint stringifies each project after dropping the contact
+    // fields; a project that never had any must serialize byte for byte as
+    // it did, or every saved run would go stale on upgrade.
+    for (const project of WORKSPACE.projects) {
+      expect(JSON.stringify(withoutContact(project))).toBe(
+        JSON.stringify(project)
+      );
+    }
+  });
+
+  it("round-trip through a saved workspace and stay out of a run's input", () => {
+    const workspace = {
+      ...WORKSPACE,
+      projects: WORKSPACE.projects.map((p) => ({ ...p, ...contact })),
+    };
+    expect(parseWorkspace(serializeWorkspace(workspace))).toEqual({
+      ok: true,
+      workspace,
+    });
+    const input = toPlacementInput(workspace, [], workspace.projects);
+    for (const project of input.projects) {
+      expect(project).not.toHaveProperty("proposerEmail");
+      expect(project).not.toHaveProperty("studentProposed");
+    }
   });
 });
 
