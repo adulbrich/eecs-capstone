@@ -427,13 +427,11 @@ function ProjectsTable({
       {
         accessorFn: (row) => {
           const contact = contactFor(row);
-          return contact?.name ?? contact?.email;
+          return contact?.name || contact?.email;
         },
         cell: ({ row }) => <Contact project={row.original} />,
         defaultHidden: true,
         header: "Contact",
-        headerHint:
-          "The mentor for a student-proposed project, the proposer for any other.",
         id: "contact",
       },
       {
@@ -502,7 +500,7 @@ function ProjectsTable({
       {noContacts && (
         <p className="mt-2 text-sm" role="status">
           {source?.kind === "portal"
-            ? "No project here names a contact. Projects loaded before placement kept contacts have none: load the program again to fill them, which replaces the list and clears any placement and pins."
+            ? "No project here names a contact. Projects loaded from a program before contacts were kept have none; to fill them, remove the projects and load the program again, which clears any placement and pins."
             : "No project here names a contact. A projects CSV can carry proposer_name, proposer_email, mentor_name, mentor_email and student_proposed columns."}
         </p>
       )}
@@ -524,9 +522,9 @@ function Contact({ project }: { project: WorkspaceProject }) {
     return "-";
   }
   return (
-    <div className="min-w-0">
-      <div className="wrap-anywhere">{contact.name ?? contact.email}</div>
-      <div className="wrap-anywhere text-muted-foreground text-xs">
+    <div className="wrap-anywhere min-w-0 md:max-w-xs md:whitespace-normal">
+      <div>{contact.name || contact.email}</div>
+      <div className="text-muted-foreground text-xs">
         {contact.name && contact.email ? `${contact.email}, ` : ""}
         {contact.role}
       </div>

@@ -378,19 +378,28 @@ export function toPlacementInput(
   };
 }
 
+/**
+ * Every contact field. A record over the keys rather than a list, so a field
+ * added to `ProjectContact` fails to compile here until it is named, instead
+ * of reaching the fingerprint and marking every saved run stale.
+ */
+const CONTACT_FIELDS: Record<keyof ProjectContact, true> = {
+  mentorEmail: true,
+  mentorName: true,
+  proposerEmail: true,
+  proposerName: true,
+  studentProposed: true,
+};
+
 /** A project with its contact fields dropped: what a run reads of it. */
 export function withoutContact<P extends WorkspaceProject>(
   project: P
 ): Omit<P, keyof ProjectContact> {
-  const {
-    mentorEmail: _mentorEmail,
-    mentorName: _mentorName,
-    proposerEmail: _proposerEmail,
-    proposerName: _proposerName,
-    studentProposed: _studentProposed,
-    ...rest
-  } = project;
-  return rest;
+  return Object.fromEntries(
+    Object.entries(project).filter(
+      ([key]) => !Object.hasOwn(CONTACT_FIELDS, key)
+    )
+  ) as Omit<P, keyof ProjectContact>;
 }
 
 /**
@@ -401,14 +410,15 @@ export function withoutContact<P extends WorkspaceProject>(
 export function contactFor(
   project: ProjectContact
 ): { email?: string; name?: string; role: "mentor" | "proposer" } | null {
+  // A blank string, as a hand-edited workspace file can hold, is no name.
   const mentor = {
-    email: project.mentorEmail,
-    name: project.mentorName,
+    email: project.mentorEmail || undefined,
+    name: project.mentorName || undefined,
     role: "mentor" as const,
   };
   const proposer = {
-    email: project.proposerEmail,
-    name: project.proposerName,
+    email: project.proposerEmail || undefined,
+    name: project.proposerName || undefined,
     role: "proposer" as const,
   };
   const order = project.studentProposed
@@ -454,7 +464,9 @@ export function projectsFromPortal(
   return {
     duplicates,
     projects: rows.map((row) => {
-      const hasProposer = Boolean(row.proposerName || row.proposerEmail);
+      const hasProposer = Boolean(
+        optionalText(row.proposerName) || optionalText(row.proposerEmail)
+      );
       return {
         key: row.id,
         title: row.title,

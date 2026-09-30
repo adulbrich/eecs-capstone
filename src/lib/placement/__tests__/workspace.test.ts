@@ -176,6 +176,19 @@ describe("projectsFromPortal", () => {
         studentProposed: true,
       },
     ]);
+    const blank = projectsFromPortal([
+      {
+        id: "c",
+        title: "Moon Base",
+        teamsSupported: 1,
+        proposerName: " ",
+        proposerEmail: null,
+        contactName: "Front Desk",
+        contactEmail: null,
+      },
+    ]);
+    // A proposer that trims to nothing is no proposer.
+    expect(blank.projects[0].proposerName).toBe("Front Desk");
     expect(projects.map(contactFields)).toEqual([
       { proposerName: "Jane Doe", proposerEmail: "jane@example.com" },
       {
@@ -224,6 +237,14 @@ describe("contactFor", () => {
     ).toEqual({ email: "jane@example.com", name: undefined, role: "proposer" });
     expect(contactFor({ mentorName: "Pat Lee" })?.role).toBe("mentor");
     expect(contactFor({})).toBe(null);
+  });
+
+  it("reads a blank name as none, so the email shows", () => {
+    expect(contactFor({ proposerName: "", proposerEmail: "a@b.c" })).toEqual({
+      email: "a@b.c",
+      name: undefined,
+      role: "proposer",
+    });
   });
 });
 
