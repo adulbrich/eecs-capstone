@@ -114,7 +114,7 @@ export const ACCESS_CONTRACT: Record<string, AccessDeclaration> = {
   },
   "server/categories.ts:listProjectCategories": {
     level: "public",
-    note: "canSeeProject gates the project inside listProjectCategoriesAs, so a draft's category names reach staff and the proposer only; published and archived are public. Its one caller, the staff categories section, sits on a page that loaded the project through a gated read, so the guard refuses only a bare id. The project page reads the same rows from getProject.",
+    note: "canSeeProject gates the project inside listProjectCategoriesAs, so a draft's category names reach staff and the proposer only; published and archived are public. Its one caller, the staff categories section, sits on a page that loaded the project through a gated read, so the guard refuses a bare id, or a draft deleted after the page loaded. The project page reads the same rows from getProject.",
   },
   "server/categories.ts:setProjectCategories": {
     level: "staff",
