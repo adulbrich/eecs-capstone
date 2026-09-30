@@ -44,6 +44,8 @@ export interface ProjectContact {
  * project that never set its own.
  */
 export type WorkspaceProject = Omit<PlacementProject, "maxTeams"> & {
+  /** Added one at a time on the Projects tab (#716), not from a source. */
+  addedByHand?: boolean;
   maxTeams?: number;
 } & ProjectContact;
 

@@ -1,10 +1,11 @@
-import { Trash2 } from "lucide-react";
+import { Ellipsis, Trash2 } from "lucide-react";
 import { useMemo, useState } from "react";
 import {
   AdminDataTable,
   defineAdminColumns,
 } from "#/components/admin-data-table";
 import { ConfirmDialog } from "#/components/confirm-dialog";
+import { AddProjectDialog } from "#/components/placement/add-project-dialog";
 import { CsvFormatHelp } from "#/components/placement/csv-format";
 import { FilePickerButton } from "#/components/placement/file-picker-button";
 import { ImportIssues } from "#/components/placement/import-issues";
@@ -13,7 +14,14 @@ import { PasteList } from "#/components/placement/paste-list";
 import { RosterProjects } from "#/components/placement/roster-projects";
 import type { PlacementWorkspace } from "#/components/placement/use-placement-workspace";
 import { ProjectBadges } from "#/components/project-badges";
+import { Badge } from "#/components/ui/badge";
 import { Button } from "#/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "#/components/ui/dropdown-menu";
 import { FieldError } from "#/components/ui/field";
 import { Label } from "#/components/ui/label";
 import {
@@ -35,6 +43,7 @@ import {
   PARAMETER_LIMITS,
   projectsFromPortal,
   pruneTitleMatches,
+  removeProject,
   type Workspace,
 } from "#/lib/placement/workspace";
 import type { SortState } from "#/lib/table-state";
@@ -132,38 +141,44 @@ export function ProjectsTab({
         }}
         pasteIssues={pasteIssues}
         programs={programs}
+        state={state}
+        workspace={workspace}
       />
     );
   }
 
   const source = workspace.projectSource;
+  const byHand = workspace.projects.filter((p) => p.addedByHand).length;
   return (
     <div>
       <div className="flex flex-wrap items-center justify-between gap-2">
         <p className="text-sm">
-          {workspace.projects.length} projects from{" "}
-          {source?.kind === "portal"
-            ? `the published projects in ${source.programLabel}`
-            : projectSourceLabel(source)}
-          .
+          {projectsLine(workspace.projects.length, byHand, source)}
         </p>
-        <ConfirmDialog
-          busyLabel="Removing..."
-          confirmLabel="Remove"
-          description="The projects and their settings leave this workspace, and with them any placement and the pins set on it. The bids stay, and are matched again by title when new projects load."
-          onConfirm={() => {
-            setIssues([]);
-            setPasteIssues([]);
-            setDuplicates([]);
-            setProjects([], null);
-          }}
-          title={`Remove the ${workspace.projects.length} projects?`}
-        >
-          <Button size="sm" type="button" variant="ghost">
-            <Trash2 aria-hidden="true" />
-            Remove projects
-          </Button>
-        </ConfirmDialog>
+        <div className="flex flex-wrap items-center gap-2">
+          <AddProjectDialog
+            parameters={workspace.parameters}
+            update={update}
+            workspace={workspace}
+          />
+          <ConfirmDialog
+            busyLabel="Removing..."
+            confirmLabel="Remove"
+            description="The projects and their settings leave this workspace, and with them any placement and the pins set on it. The bids stay, and are matched again by title when new projects load."
+            onConfirm={() => {
+              setIssues([]);
+              setPasteIssues([]);
+              setDuplicates([]);
+              setProjects([], null);
+            }}
+            title={`Remove the ${workspace.projects.length} projects?`}
+          >
+            <Button size="sm" type="button" variant="ghost">
+              <Trash2 aria-hidden="true" />
+              Remove projects
+            </Button>
+          </ConfirmDialog>
+        </div>
       </div>
       <DuplicateTitles titles={duplicates} />
       <ImportIssues issues={issues} label="projects" />
@@ -191,6 +206,8 @@ function ProjectsImport({
   onText,
   pasteIssues,
   programs,
+  state,
+  workspace,
 }: {
   duplicates: string[];
   issues: ImportIssue[];
@@ -203,6 +220,8 @@ function ProjectsImport({
   onText: (text: string, filename: string) => void;
   pasteIssues: ImportIssue[];
   programs: ProgramOption[];
+  state: PlacementWorkspace;
+  workspace: Workspace;
 }) {
   const [programId, setProgramId] = useState("");
   const { busy, error, run } = useAction({
@@ -309,8 +328,45 @@ function ProjectsImport({
         </div>
         <ImportIssues issues={pasteIssues} label="project titles" unit="line" />
       </section>
+      <section aria-labelledby="placement-projects-hand-heading">
+        <h2 className="font-medium" id="placement-projects-hand-heading">
+          By hand
+        </h2>
+        <p className="text-muted-foreground text-sm">
+          One project at a time, with its limits and who to contact.
+        </p>
+        <div className="mt-2">
+          <AddProjectDialog
+            parameters={workspace.parameters}
+            update={state.update}
+            workspace={workspace}
+          />
+        </div>
+      </section>
     </div>
   );
+}
+
+/**
+ * "12 projects from roster.csv, 2 of them added by hand." A list built by
+ * hand from empty says only that.
+ */
+function projectsLine(
+  total: number,
+  byHand: number,
+  source: Workspace["projectSource"]
+): string {
+  const projects = `${total} ${total === 1 ? "project" : "projects"}`;
+  if (source?.kind === "manual") {
+    return `${projects}, added by hand.`;
+  }
+  const from =
+    source?.kind === "portal"
+      ? `the published projects in ${source.programLabel}`
+      : projectSourceLabel(source);
+  return byHand === 0
+    ? `${projects} from ${from}.`
+    : `${projects} from ${from}, ${byHand} of them added by hand.`;
 }
 
 function projectSourceLabel(source: Workspace["projectSource"]): string {
@@ -417,7 +473,11 @@ function ProjectsTable({
             <ProjectBadges
               requiresNdaIp={false}
               studentProposed={row.original.studentProposed === true}
-            />
+            >
+              {row.original.addedByHand && (
+                <Badge variant="outline">Added by hand</Badge>
+              )}
+            </ProjectBadges>
           </div>
         ),
         enableHiding: false,
@@ -475,6 +535,20 @@ function ProjectsTable({
         id: "weightMultiplier",
         sortFn: "basic",
       },
+      {
+        cell: ({ row }) => (
+          <ProjectMenu
+            bidCount={row.original.bidCount}
+            projectKey={row.original.key}
+            title={row.original.title}
+            update={update}
+          />
+        ),
+        enableHiding: false,
+        enableSorting: false,
+        header: "Actions",
+        id: "actions",
+      },
     ]);
   }, [parameters, update]);
 
@@ -531,5 +605,61 @@ function Contact({ project }: { project: WorkspaceProject }) {
         {contact.role}
       </div>
     </div>
+  );
+}
+
+/**
+ * One project's actions (#716). Remove sits in a menu and asks first, as the
+ * board's Remove from placement does: a list loses a project for good, where
+ * Max teams 0 only leaves it out of the run.
+ */
+function ProjectMenu({
+  bidCount,
+  projectKey,
+  title,
+  update,
+}: {
+  bidCount: number;
+  projectKey: string;
+  title: string;
+  update: PlacementWorkspace["update"];
+}) {
+  let bids = `The ${bidCount} bids on it show as unmatched titles again.`;
+  if (bidCount === 0) {
+    bids = "No bids name it.";
+  } else if (bidCount === 1) {
+    bids = "The 1 bid on it shows as an unmatched title again.";
+  }
+  return (
+    // Not modal, as the Columns menu is not: a modal menu hides the rest of
+    // the page from assistive tech while it is open.
+    <DropdownMenu modal={false}>
+      <DropdownMenuTrigger asChild>
+        <Button
+          aria-label={`More for ${title}`}
+          size="icon-sm"
+          type="button"
+          variant="ghost"
+        >
+          <Ellipsis aria-hidden="true" />
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end">
+        <ConfirmDialog
+          busyLabel="Removing..."
+          confirmLabel="Remove"
+          description={`${title} leaves the list. ${bids} A student pinned to it here stays pinned, and the next run leaves them unplaced until you move them; to keep the project and leave it out of runs, set its Max teams to 0 instead.`}
+          onConfirm={() => update((w) => removeProject(w, projectKey))}
+          title={`Remove ${title}?`}
+        >
+          {/* Kept open on select, so the dialog it opens is not unmounted
+              with the menu. */}
+          <DropdownMenuItem onSelect={(event) => event.preventDefault()}>
+            <Trash2 aria-hidden="true" />
+            Remove...
+          </DropdownMenuItem>
+        </ConfirmDialog>
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 }

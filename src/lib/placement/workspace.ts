@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { removeFromResult } from "#/lib/placement/board";
 import { type ImportIssue, normalizeTitle } from "#/lib/placement/csv";
+import { repointRosterPins } from "#/lib/placement/roster";
 import {
   DEFAULT_PLACEMENT_PARAMETERS,
   type PlacementInput,
@@ -28,7 +29,9 @@ export interface WorkspaceParameters extends PlacementParameters {
 export type ProjectSource =
   | { kind: "portal"; programId: string; programLabel: string }
   | { kind: "csv"; filename: string }
-  | { kind: "pasted" };
+  | { kind: "pasted" }
+  /** Every project added one at a time on the Projects tab (#716). */
+  | { kind: "manual" };
 
 export interface Workspace {
   bids: {
@@ -131,6 +134,7 @@ const projectSchema = z.object({
   proposerEmail: z.string().optional(),
   proposerName: z.string().optional(),
   studentProposed: z.boolean().optional(),
+  addedByHand: z.boolean().optional(),
 });
 
 const resultSchema = z.object({
@@ -186,6 +190,7 @@ const workspaceSchema = z
         }),
         z.object({ kind: z.literal("csv"), filename: z.string() }),
         z.object({ kind: z.literal("pasted") }),
+        z.object({ kind: z.literal("manual") }),
       ])
       .nullable(),
     projects: z.array(projectSchema),
@@ -538,6 +543,56 @@ export function isStale(
  * loads: a match to a project that left falls away, and its title shows as
  * unmatched again.
  */
+/**
+ * The workspace with one project added by hand (#716), keyed by its
+ * normalized title as a CSV project is, or the reason it cannot be: a listed
+ * project already has that title. A project the roster added under the same
+ * title becomes this one, and its pins follow. Pins and the last run stay;
+ * the run is stale from here, as after any project change.
+ */
+export function addProject(
+  workspace: Workspace,
+  project: Omit<WorkspaceProject, "key" | "addedByHand" | "fromRoster">
+): { ok: true; workspace: Workspace } | { ok: false; message: string } {
+  const key = normalizeTitle(project.title);
+  if (workspace.projects.some((p) => p.key === key)) {
+    return {
+      ok: false,
+      message: "A project with this title is already in the list.",
+    };
+  }
+  return {
+    ok: true,
+    workspace: {
+      ...workspace,
+      projects: [...workspace.projects, { ...project, key, addedByHand: true }],
+      projectSource:
+        workspace.projects.length === 0
+          ? { kind: "manual" }
+          : workspace.projectSource,
+      pins: repointRosterPins(workspace.pins, {
+        [key]: { projectKey: key },
+      }),
+    },
+  };
+}
+
+/**
+ * The workspace without one project (#716). A title matched to it by hand
+ * goes too, so its bids show as unmatched again; a pin to it stays, and the
+ * next run reports it as a pin to a dropped project. The last run stays and
+ * reads as stale.
+ */
+export function removeProject(workspace: Workspace, key: string): Workspace {
+  const projects = workspace.projects.filter((p) => p.key !== key);
+  return {
+    ...workspace,
+    projects,
+    projectSource: projects.length === 0 ? null : workspace.projectSource,
+    titleMatches: pruneTitleMatches(workspace.titleMatches, projects),
+  };
+}
+
 export function pruneTitleMatches(
   matches: TitleMatches | undefined,
   projects: readonly Pick<WorkspaceProject, "key">[]

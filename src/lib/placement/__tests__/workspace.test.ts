@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { WorkspaceProject } from "#/lib/placement/types";
 import {
+  addProject,
   contactFor,
   EMPTY_WORKSPACE,
   inputFingerprint,
@@ -9,6 +10,7 @@ import {
   parseWorkspace,
   projectsFromPortal,
   pruneTitleMatches,
+  removeProject,
   removeStudents,
   restoreStudent,
   type StoredResult,
@@ -472,5 +474,113 @@ describe("isStale", () => {
     expect(isStale(undefined, "abc")).toBe(false);
     expect(isStale(result, "abc")).toBe(false);
     expect(isStale(result, "abd")).toBe(true);
+  });
+});
+
+const RESULT: StoredResult = {
+  at: "2026-09-29T10:00:00.000Z",
+  fingerprint: "f",
+  status: "optimal",
+  gap: null,
+  objective: 100,
+  placements: [
+    { email: "ada@example.edu", projectKey: "robot arm", team: 1, priority: 1 },
+  ],
+  unplaced: [],
+  diagnostics: {
+    pinnedProjectsBelowMin: [],
+    pinOverflow: [],
+    projectsBelowMin: [],
+    requiredSeatShortfall: null,
+    seatShortfall: null,
+  },
+};
+
+describe("addProject", () => {
+  const moon = { title: "Moon  Base", weightMultiplier: 1 };
+
+  it("adds a project keyed by its normalized title, marked as added by hand, keeping pins and the run", () => {
+    const withRun = {
+      ...WORKSPACE,
+      pins: { "ada@example.edu": "robot arm" },
+      result: RESULT,
+    };
+    const added = addProject(withRun, moon);
+    expect(added.ok).toBe(true);
+    if (!added.ok) {
+      return;
+    }
+    expect(added.workspace.projects.at(-1)).toEqual({
+      key: "moon base",
+      title: "Moon  Base",
+      weightMultiplier: 1,
+      addedByHand: true,
+    });
+    expect(added.workspace.pins).toEqual(withRun.pins);
+    expect(added.workspace.result).toBe(RESULT);
+    expect(added.workspace.projectSource).toEqual(WORKSPACE.projectSource);
+  });
+
+  it("refuses a title a listed project has", () => {
+    expect(addProject(WORKSPACE, { ...moon, title: "robot ARM" })).toEqual({
+      ok: false,
+      message: "A project with this title is already in the list.",
+    });
+  });
+
+  it("names a list built from empty as added by hand, and saves it", () => {
+    const added = addProject(
+      { ...WORKSPACE, projects: [], projectSource: null },
+      moon
+    );
+    expect(added.ok && added.workspace.projectSource).toEqual({
+      kind: "manual",
+    });
+    if (added.ok) {
+      expect(parseWorkspace(serializeWorkspace(added.workspace))).toEqual({
+        ok: true,
+        workspace: added.workspace,
+      });
+    }
+  });
+
+  it("takes over a project the roster added under the same title, pins included", () => {
+    const added = addProject(
+      { ...WORKSPACE, pins: { "kim@example.edu": "roster:moon base" } },
+      moon
+    );
+    expect(added.ok && added.workspace.pins).toEqual({
+      "kim@example.edu": "moon base",
+    });
+  });
+});
+
+describe("removeProject", () => {
+  it("drops the project and the titles matched to it, keeping pins and the run", () => {
+    const workspace = {
+      ...WORKSPACE,
+      pins: { "ada@example.edu": "robot arm" },
+      result: RESULT,
+      titleMatches: {
+        "robot arm contoller": {
+          projectKey: "robot arm",
+          title: "Robot Arm Contoller",
+        },
+        "tide clok": { projectKey: "tide clock", title: "Tide Clok" },
+      },
+    };
+    const removed = removeProject(workspace, "robot arm");
+    expect(removed.projects.map((p) => p.key)).toEqual(["tide clock"]);
+    expect(removed.titleMatches).toEqual({
+      "tide clok": workspace.titleMatches["tide clok"],
+    });
+    expect(removed.pins).toEqual(workspace.pins);
+    expect(removed.result).toBe(RESULT);
+    expect(removed.projectSource).toEqual(WORKSPACE.projectSource);
+  });
+
+  it("clears the source with the last project", () => {
+    const one = removeProject(WORKSPACE, "robot arm");
+    expect(removeProject(one, "tide clock").projectSource).toBe(null);
   });
 });
