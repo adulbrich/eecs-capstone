@@ -501,6 +501,22 @@ test("admin placement, a run on the results board", async ({ page }) => {
   await expect(
     page.getByRole("region", { name: /Not in the survey/ })
   ).toContainText("kim@example.edu");
+  // The pointer is still parked where "Run placement" was, and that button
+  // re-renders as "Run placement again" under it. Its hover background is
+  // `bg-primary/90`, which axe scores against the page and fails, so park the
+  // pointer off it and wait out the fade back before scanning. The frame
+  // comes first because the transition does not exist until the next style
+  // recalc.
+  await page.mouse.move(0, 0);
+  const again = page.getByRole("button", { name: "Run placement again" });
+  await expect
+    .poll(() =>
+      again.evaluate(async (el) => {
+        await new Promise(requestAnimationFrame);
+        return el.getAnimations().length;
+      })
+    )
+    .toBe(0);
   await checkA11y(page);
   // Projects fold to their headers (#713), which keep a chevron each.
   await page.getByRole("button", { name: "Collapse all" }).click();
