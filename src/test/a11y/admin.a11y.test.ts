@@ -502,8 +502,19 @@ test("admin placement, a run on the results board", async ({ page }) => {
     page.getByRole("region", { name: /Not in the survey/ })
   ).toContainText("kim@example.edu");
   // Scan the primary button hovered: its hover background once failed AA,
-  // and a scan at rest cannot see that.
-  await page.getByRole("button", { name: "Run placement again" }).hover();
+  // and a scan at rest cannot see that. Wait out the 180ms fade first, or axe
+  // can sample a colour partway there. The frame comes first because the
+  // transition does not exist until the next style recalc.
+  const again = page.getByRole("button", { name: "Run placement again" });
+  await again.hover();
+  await expect
+    .poll(() =>
+      again.evaluate(async (el) => {
+        await new Promise(requestAnimationFrame);
+        return el.getAnimations().length;
+      })
+    )
+    .toBe(0);
   await checkA11y(page);
   // Projects fold to their headers (#713), which keep a chevron each.
   await page.getByRole("button", { name: "Collapse all" }).click();
