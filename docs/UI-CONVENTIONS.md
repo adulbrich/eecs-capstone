@@ -135,9 +135,11 @@ variant was two different buttons depending on the element underneath it.
 token; `link` is the one variant that is meant to read as a link and keeps
 `text-brand-dark`.
 
+### A filled variant hovers to a solid colour
+
 `default` hovers to `bg-primary-hover`, a solid token, not upstream's
 `bg-primary/90`. Beaver Orange carries white at 4.56:1, so the 90% blend with
-the light page under it drops to 4.05:1 and fails AA while the pointer is on
+the light page under it drops to 4.0:1 and fails AA while the pointer is on
 the button. `destructive` keeps its `/90`, which measures 4.92 in light mode
 and 6.33 in dark.
 

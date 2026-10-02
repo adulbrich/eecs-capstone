@@ -59,7 +59,7 @@
   --popover-foreground:          var(--text-primary);
   --primary:                     var(--brand-primary);
   --primary-foreground:          var(--brand-on-primary);
-  /* Solid, not --primary at 90%: white on that blend over the page is 4.05:1,
+  /* Solid, not --primary at 90%: white on that blend over the page is 4.0:1,
      under AA. The brand's own hover colour is 6.0:1. */
   --primary-hover:               var(--brand-primary-dark);
   --secondary:                   var(--surface-sunken);
@@ -144,7 +144,8 @@
   --primary:                     #C04300;
   --primary-foreground:          #FFFFFF;
   /* Not --brand-primary-dark, which is retuned light for links here. A step
-     darker than --primary, as the old 90% blend over a dark page was: 6.7:1. */
+     darker than --primary, as upstream's 90% blend over a dark page is.
+     White on it is 6.7:1. */
   --primary-hover:               #A33900;
   --secondary:                   var(--surface-sunken);
   --secondary-foreground:        var(--text-primary);
