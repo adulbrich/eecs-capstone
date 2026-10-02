@@ -59,6 +59,9 @@
   --popover-foreground:          var(--text-primary);
   --primary:                     var(--brand-primary);
   --primary-foreground:          var(--brand-on-primary);
+  /* Solid, not --primary at 90%: white on that blend over the page is 4.05:1,
+     under AA. The brand's own hover colour is 6.0:1. */
+  --primary-hover:               var(--brand-primary-dark);
   --secondary:                   var(--surface-sunken);
   --secondary-foreground:        var(--text-primary);
   --muted:                       var(--surface-sunken);
@@ -140,6 +143,9 @@
   --popover-foreground:          var(--text-primary);
   --primary:                     #C04300;
   --primary-foreground:          #FFFFFF;
+  /* Not --brand-primary-dark, which is retuned light for links here. A step
+     darker than --primary, as the old 90% blend over a dark page was: 6.7:1. */
+  --primary-hover:               #A33900;
   --secondary:                   var(--surface-sunken);
   --secondary-foreground:        var(--text-primary);
   --muted:                       var(--surface-sunken);
@@ -195,6 +201,7 @@
   --color-popover-foreground:          var(--popover-foreground);
   --color-primary:                     var(--primary);
   --color-primary-foreground:          var(--primary-foreground);
+  --color-primary-hover:               var(--primary-hover);
   --color-secondary:                   var(--secondary);
   --color-secondary-foreground:        var(--secondary-foreground);
   --color-muted:                       var(--muted);
@@ -292,16 +299,15 @@ pre code {
 
 .island-shell {
   border: 1px solid var(--line);
-  background: linear-gradient(165deg, color-mix(in oklab, var(--surface-raised) 94%, white 6%), var(--surface-base));
+  background: var(--surface-raised);
   box-shadow:
     0 1px 0 var(--inset-glint) inset,
     0 22px 44px rgba(26, 17, 0, 0.08),
     0 6px 18px rgba(26, 17, 0, 0.06);
-  backdrop-filter: blur(4px);
 }
 
 .feature-card {
-  background: linear-gradient(165deg, color-mix(in oklab, var(--surface-raised) 93%, white 7%), var(--surface-base));
+  background: var(--surface-raised);
   box-shadow:
     0 1px 0 var(--inset-glint) inset,
     0 18px 34px rgba(26, 17, 0, 0.08),

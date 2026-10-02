@@ -16,7 +16,9 @@ const buttonVariants = cva(
   {
     variants: {
       variant: {
-        default: "bg-primary text-primary-foreground hover:bg-primary/90",
+        // A solid hover token rather than upstream's bg-primary/90: white on
+        // that blend over the light page is 4.05:1 (src/styles.css).
+        default: "bg-primary text-primary-foreground hover:bg-primary-hover",
         // The foreground token rather than upstream's text-white, and no
         // dark:bg-destructive/60: white on the dark coral fails AA, and the 60%
         // blend upstream uses to rescue it drops the dark ink the token now
