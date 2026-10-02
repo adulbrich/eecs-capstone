@@ -38,10 +38,6 @@
   --chip-bg:              rgba(255, 255, 255, 0.85);
   --chip-line:            rgba(215, 63, 9, 0.18);
 
-  /* Hero gradient anchors */
-  --hero-a:               rgba(215, 63, 9, 0.18);
-  --hero-b:               rgba(26, 17, 0, 0.08);
-
   /* Status */
   --status-success:       #1B5E20;
   --status-success-bg:    rgba(46, 125, 50, 0.10);
@@ -100,7 +96,7 @@
   --brand-primary-dark:   #FF8C5A;
   --brand-primary-tint:   rgba(239, 87, 19, 0.12);
 
-  /* Surfaces: deeper base gives more range for the gradient */
+  /* Surfaces */
   --surface-base:         #111111;
   --surface-raised:       #1C1C1C;
   --surface-sunken:       #242424;
@@ -118,8 +114,6 @@
   --header-bg:            rgba(17, 17, 17, 0.88);
   --chip-bg:              rgba(28, 28, 28, 0.92);
   --chip-line:            rgba(239, 87, 19, 0.22);
-  --hero-a:               rgba(239, 87, 19, 0.10);
-  --hero-b:               rgba(0, 0, 0, 0.55);
 
   /* Status: all override `:root` values that fail on dark surfaces */
   --status-success:       #66BB6A;
@@ -170,28 +164,6 @@
   --sidebar-accent-foreground:   var(--text-primary);
   --sidebar-border:              rgba(245, 241, 238, 0.18);
   --sidebar-ring:                var(--focus-ring);
-}
-
-/* Background: directional gradient replaces the light-bleed color-mix() */
-body {
-  background:
-    radial-gradient(1100px 620px at -8% -10%, var(--hero-a), transparent 58%),
-    radial-gradient(1050px 620px at 112% -12%, var(--hero-b), transparent 62%),
-    linear-gradient(160deg, #090909 0%, #171717 55%, #111111 100%);
-}
-
-/* Tone down the light blobs, which are distracting on dark */
-body::before {
-  opacity: 0.12;
-  background:
-    radial-gradient(circle at 20% 15%, rgba(255, 255, 255, 0.04), transparent 34%),
-    radial-gradient(circle at 78% 26%, rgba(239, 87, 19, 0.08), transparent 42%),
-    radial-gradient(circle at 42% 82%, rgba(0, 0, 0, 0.20), transparent 36%);
-}
-
-/* Subtle grid: opacity pulled back so it does not compete with content */
-body::after {
-  opacity: 0.05;
 }
 
 /* Link decoration matches the lighter orange */
@@ -264,41 +236,9 @@ body {
   color: var(--text-primary);
   font-family: var(--font-sans);
   background-color: var(--surface-base);
-  background:
-    radial-gradient(1100px 620px at -8% -10%, var(--hero-a), transparent 58%),
-    radial-gradient(1050px 620px at 112% -12%, var(--hero-b), transparent 62%),
-    radial-gradient(720px 380px at 50% 115%, rgba(215, 63, 9, 0.06), transparent 68%),
-    linear-gradient(180deg, color-mix(in oklab, var(--surface-base) 68%, white) 0%, var(--surface-raised) 44%, var(--surface-base) 100%);
   overflow-x: hidden;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-}
-
-body::before {
-  content: '';
-  position: fixed;
-  inset: 0;
-  pointer-events: none;
-  z-index: -1;
-  opacity: 0.28;
-  background:
-    radial-gradient(circle at 20% 15%, rgba(255, 255, 255, 0.8), transparent 34%),
-    radial-gradient(circle at 78% 26%, rgba(215, 63, 9, 0.12), transparent 42%),
-    radial-gradient(circle at 42% 82%, rgba(26, 17, 0, 0.08), transparent 36%);
-}
-
-body::after {
-  content: '';
-  position: fixed;
-  inset: 0;
-  pointer-events: none;
-  z-index: -1;
-  opacity: 0.14;
-  background-image:
-    linear-gradient(rgba(255, 255, 255, 0.07) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(255, 255, 255, 0.06) 1px, transparent 1px);
-  background-size: 28px 28px;
-  mask-image: radial-gradient(circle at 50% 30%, black, transparent 78%);
 }
 
 @layer base {

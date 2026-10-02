@@ -16,9 +16,8 @@ import { cn } from "#/lib/utils";
  * 5. The wrapper takes its own `containerClassName`. Upstream hardcodes the
  *    wrapper's classes and routes `className` to the inner `table`, which
  *    leaves callers unable to give the container a surface or a border. That
- *    is exactly what an admin table needs: without a background of its own it
- *    sits directly on the page gradient, which is lightest and orange-tinted
- *    near the top of the page, and orange links on it lose contrast.
+ *    is exactly what an admin table needs to read as one card, like the rest
+ *    of the app's bordered surfaces.
  */
 function Table({
   className,

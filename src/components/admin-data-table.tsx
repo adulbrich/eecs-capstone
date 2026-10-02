@@ -991,10 +991,8 @@ export function AdminDataTable<T extends RowData>({
       {/*
         The container carries the surface, not the table: at md and up the
         admin table reads as one card, matching the rest of the app's
-        bordered, rounded surfaces. Without a background of its own it sits on
-        the page gradient, which is lightest and orange-tinted near the top of
-        the page, so orange title links lose contrast there. Below md this is
-        skipped, because `src/styles.css` already gives each row its own card.
+        bordered, rounded surfaces. Below md this is skipped, because
+        `src/styles.css` already gives each row its own card.
       */}
       {showTable ? (
         <Table
