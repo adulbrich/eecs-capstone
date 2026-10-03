@@ -12,13 +12,7 @@ export function ImageOrFallback({
     return <img alt="" className={className} loading="lazy" src={src} />;
   }
   return (
-    <div
-      className={cn(className, "flex items-center justify-center")}
-      style={{
-        background:
-          "linear-gradient(135deg, var(--surface-sunken), var(--surface-base))",
-      }}
-    >
+    <div className={cn(className, "flex items-center justify-center bg-muted")}>
       <ImageIcon
         aria-hidden
         className="size-8 text-[var(--text-secondary)] opacity-30"
