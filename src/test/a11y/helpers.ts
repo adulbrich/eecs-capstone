@@ -5,11 +5,9 @@ import { expect } from "@playwright/test";
 /**
  * A link inside running text is underlined at rest (UI-CONVENTIONS, "A link
  * inside running text"). axe has a rule for this, `link-in-text-block`, and
- * the scan runs it, but it cannot fail on ours: a link longer than the words
- * beside it is not "in text" by its heuristic, and where it does match, the
- * body's gradient makes the result "undeterminable", which lands in
- * `incomplete` and `checkA11y` reads `violations` alone. So the line is
- * asserted on the computed style instead. Call it before anything hovers or
+ * the scan runs it, but it misses most of ours: a link longer than the words
+ * beside it is not "in text" by its heuristic. So the line is asserted on the
+ * computed style instead. Call it before anything hovers or
  * focuses the link; `hover:underline` would pass afterwards.
  */
 export async function expectUnderlinedAtRest(link: Locator): Promise<void> {
