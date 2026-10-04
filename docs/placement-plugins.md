@@ -52,8 +52,8 @@ required column present), then each file plugin in the order `PLUGINS` lists the
 with "Read as", which stores the choice as `readAs`: the plugin id, or `null` for
 the standard format, and nothing when the choice is what detection picks anyway.
 A stored id no plugin has any more is detected again. A plugin that throws is
-reported as a problem with the whole file rather than breaking the page, but
-report what you can as issues instead.
+reported as a problem with the whole file rather than breaking the page. Report
+what you can as issues instead, so staff see which row to fix.
 
 ## Adding one
 

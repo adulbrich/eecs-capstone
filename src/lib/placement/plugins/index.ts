@@ -92,6 +92,8 @@ export function readAsChoice(
     : choice;
 }
 
+const TRAILING_STOP = /\.$/;
+
 /**
  * The text as standard CSV: through `plugin`, or as it is when null. A
  * plugin that throws is reported as a problem with the whole file, because
@@ -115,7 +117,7 @@ export function toStandard(
         {
           level: "error",
           row: 1,
-          message: `The ${plugin.label} could not be read: ${error instanceof Error ? error.message : String(error)}.`,
+          message: `The ${plugin.label} could not be read: ${(error instanceof Error ? error.message : String(error)).replace(TRAILING_STOP, "")}.`,
           wholeFile: true,
         },
       ],

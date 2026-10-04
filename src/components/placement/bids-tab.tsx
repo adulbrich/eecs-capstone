@@ -166,6 +166,7 @@ export function BidsTab({
         }
         parseIssues={bids.issues}
         plugin={source?.plugin ?? null}
+        readAs={workspace.bids.readAs}
       />
       <TitleMatchesPanel
         matches={workspace.titleMatches}

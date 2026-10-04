@@ -140,6 +140,7 @@ export function RosterSection({
         }
         parseIssues={roster.issues}
         plugin={roster.plugin}
+        readAs={stored.readAs}
       />
       <p className="mt-1">
         {rosterSummary(

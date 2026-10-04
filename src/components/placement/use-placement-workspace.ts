@@ -87,6 +87,8 @@ export function usePlacementWorkspace() {
       storedRoster.source.kind === "pasted"
         ? pastedRoster
         : resolveFilePlugin("roster", storedRoster.text, storedRoster.readAs);
+    // Every plugin gets the project list, as the contract says, though no
+    // roster plugin reads it yet; a roster is small enough to re-read.
     const conversion = toStandard(plugin, storedRoster.text, {
       projects: projects ?? [],
     });

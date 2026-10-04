@@ -446,6 +446,9 @@ test.describe("placement workspace", () => {
         name: "Problems in the Qualtrics export file",
       })
     ).toContainText("A survey preview, not a response; skipped.");
+    // Converted text is read by no plugin again, so there is nothing to
+    // choose.
+    await expect(page.getByLabel("Read as")).toHaveCount(0);
   });
 
   test("staff run, approve, move, re-run and download a placement", async ({
@@ -1271,6 +1274,8 @@ test.describe("placement workspace", () => {
     await expect(
       roster.getByRole("region", { name: "Problems in the roster file" })
     ).toContainText('The file has no "email" column.');
+    // Staff chose the format, so the page does not say nothing matched.
+    await expect(roster).not.toContainText("No format on this page recognized");
     await roster.getByLabel("Read as").click();
     await page.getByRole("option", { name: "Canvas roster export" }).click();
     await expect(roster).toContainText("2 students are pre-approved");

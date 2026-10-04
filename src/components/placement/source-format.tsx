@@ -17,7 +17,7 @@ import {
   type PlacementDataset,
   STANDARD_FORMATS,
 } from "#/lib/placement/formats";
-import { filePlugins } from "#/lib/placement/plugins";
+import { filePlugins, type ReadAs } from "#/lib/placement/plugins";
 import type {
   Conversion,
   PlacementPlugin,
@@ -75,6 +75,7 @@ export function SourceFormat({
   onReadAs,
   parseIssues,
   plugin,
+  readAs,
 }: {
   conversion: Conversion;
   dataset: PlacementDataset;
@@ -89,45 +90,54 @@ export function SourceFormat({
   onReadAs: (readAs: string | null) => void;
   parseIssues: readonly ImportIssue[];
   plugin: PlacementPlugin | null;
+  /** The stored choice: undefined while the file is read as detected. */
+  readAs: ReadAs;
 }) {
   const id = useId();
   const plugins = filePlugins(dataset);
   const conversionStopped = conversion.issues.some((i) => i.wholeFile);
+  // Only when detection found nothing: staff who chose the standard format
+  // for a file a plugin claims know what it is.
   const unrecognized =
     plugin === null &&
+    readAs === undefined &&
     legacyConvertedFrom === undefined &&
     parseIssues.some((i) => i.wholeFile);
   return (
     <div className="mt-2 flex flex-col gap-2 text-sm">
-      {filename !== null && plugins.length > 0 && (
-        <div className="flex flex-wrap items-center gap-2">
-          <Label htmlFor={id}>Read as</Label>
-          <Select
-            onValueChange={(value) =>
-              onReadAs(value === STANDARD ? null : value)
-            }
-            value={plugin?.id ?? STANDARD}
-          >
-            <SelectTrigger className="w-64" id={id} size="sm">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value={STANDARD}>
-                {STANDARD_LABELS[dataset]}
-              </SelectItem>
-              {plugins.map((p) => (
-                <SelectItem key={p.id} value={p.id}>
-                  {p.label}
+      {/* A legacy workspace holds converted text, which no plugin reads
+          again, so it has no Read as. */}
+      {filename !== null &&
+        legacyConvertedFrom === undefined &&
+        plugins.length > 0 && (
+          <div className="flex flex-wrap items-center gap-2">
+            <Label htmlFor={id}>Read as</Label>
+            <Select
+              onValueChange={(value) =>
+                onReadAs(value === STANDARD ? null : value)
+              }
+              value={plugin?.id ?? STANDARD}
+            >
+              <SelectTrigger className="w-64" id={id} size="sm">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value={STANDARD}>
+                  {STANDARD_LABELS[dataset]}
                 </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <span className="text-muted-foreground">
-            Changing it reads the file again. Pins stay, and the last run stays
-            on the Results tab, marked as before your changes.
-          </span>
-        </div>
-      )}
+                {plugins.map((p) => (
+                  <SelectItem key={p.id} value={p.id}>
+                    {p.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <span className="text-muted-foreground">
+              Changing it reads the file again. Pins stay, and the last run
+              stays on the Results tab, marked as before your changes.
+            </span>
+          </div>
+        )}
       {filename !== null &&
         (plugin !== null || legacyConvertedFrom !== undefined) && (
           <div className="flex flex-wrap items-center gap-2">

@@ -3,9 +3,6 @@ import { PROJECTS_FORMAT, writeFormat } from "#/lib/placement/formats";
 import type { PastePlugin } from "#/lib/placement/plugins/types";
 import { parseRosterList, rosterCsv } from "#/lib/placement/roster";
 
-// A paste plugin's label follows "the pasted" on the page, as in "Problems in
-// the pasted roster".
-
 /** Emails pasted into the Roster tab's box (#665): no projects, ever. */
 export const pastedRoster: PastePlugin = {
   id: "paste-roster",
