@@ -358,8 +358,10 @@ export const qualtricsBids: FilePlugin = {
   dataset: "bids",
   input: "file",
   detect: isQualtricsExport,
-  // Converted on every read, so a pre-assigned answer naming a project
-  // added after the upload still pins its student.
+  // Converted on every read, so a pre-assigned answer naming a project added
+  // to the Projects tab after the upload still pins its student. Only the
+  // listed titles count: a project only the roster adds, or a title matched
+  // by hand, still pins nobody from here.
   toStandard: (text, { projects }) => {
     const { csv, issues } = convertQualtrics(text, projects);
     return { text: csv, issues };

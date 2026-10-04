@@ -2,7 +2,7 @@ import type { WorkspaceProject } from "#/lib/placement/types";
 
 /**
  * One source per registered plugin, by plugin id, for the contract test in
- * `plugins.test.ts`. Invented names and `example.edu` addresses only. Kept
+ * `plugins.contract.test.ts`. Invented names and `example.edu` addresses only. Kept
  * out of the plugin modules so test data never reaches the page's bundle.
  */
 

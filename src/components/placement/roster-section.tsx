@@ -2,12 +2,12 @@ import { Trash2, UserMinus } from "lucide-react";
 import { ConfirmDialog } from "#/components/confirm-dialog";
 import { CsvFormatHelp } from "#/components/placement/csv-format";
 import { FilePickerButton } from "#/components/placement/file-picker-button";
-import { ImportIssues } from "#/components/placement/import-issues";
 import { PasteList } from "#/components/placement/paste-list";
 import { SourceFormat } from "#/components/placement/source-format";
 import type { PlacementWorkspace } from "#/components/placement/use-placement-workspace";
 import { Button } from "#/components/ui/button";
 import { ROSTER_FORMAT } from "#/lib/placement/formats";
+import { readAsChoice } from "#/lib/placement/plugins";
 import { removeStudents, type Workspace } from "#/lib/placement/workspace";
 
 export const plural = (n: number, one: string, many: string) =>
@@ -92,7 +92,6 @@ export function RosterSection({
     );
   }
 
-  const unit = stored.source.kind === "csv" ? "row" : "line";
   const from =
     stored.source.kind === "csv" ? stored.source.filename : "a pasted list";
   const notInSurvey = bids?.students.filter((s) => s.rosterOnly).length ?? 0;
@@ -126,21 +125,22 @@ export function RosterSection({
           </Button>
         </ConfirmDialog>
       </div>
-      {stored.source.kind === "csv" && (
-        <SourceFormat
-          dataset="roster"
-          filename={stored.source.filename}
-          onReadAs={(pluginId) =>
-            update((w) => ({
-              ...w,
-              roster: w.roster && { ...w.roster, pluginId },
-            }))
-          }
-          plugin={roster.plugin}
-          standardLabel="Roster CSV"
-          standardText={roster.standardText}
-        />
-      )}
+      <SourceFormat
+        conversion={roster.conversion}
+        dataset="roster"
+        filename={stored.source.kind === "csv" ? stored.source.filename : null}
+        onReadAs={(choice) =>
+          update((w) => ({
+            ...w,
+            roster: w.roster && {
+              ...w.roster,
+              readAs: readAsChoice("roster", w.roster.text, choice),
+            },
+          }))
+        }
+        parseIssues={roster.issues}
+        plugin={roster.plugin}
+      />
       <p className="mt-1">
         {rosterSummary(
           bids === null,
@@ -202,19 +202,6 @@ export function RosterSection({
               : `Remove these ${notOnRoster.length} students`}
           </Button>
         </div>
-      )}
-      {/* What the plugin noticed, in the source's own rows or lines, then
-          anything the roster parser found in what it wrote. */}
-      <ImportIssues
-        issues={roster.conversionIssues}
-        label={roster.plugin?.label ?? "roster"}
-        unit={unit}
-      />
-      {!roster.conversionIssues.some((i) => i.wholeFile) && (
-        <ImportIssues
-          issues={roster.issues}
-          label={roster.plugin ? "converted roster" : "roster"}
-        />
       )}
     </section>
   );

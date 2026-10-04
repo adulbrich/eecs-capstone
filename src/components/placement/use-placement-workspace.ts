@@ -86,19 +86,14 @@ export function usePlacementWorkspace() {
     const plugin =
       storedRoster.source.kind === "pasted"
         ? pastedRoster
-        : resolveFilePlugin("roster", storedRoster.text, storedRoster.pluginId);
+        : resolveFilePlugin("roster", storedRoster.text, storedRoster.readAs);
     const conversion = toStandard(plugin, storedRoster.text, {
-      projects: [],
+      projects: projects ?? [],
     });
-    return {
-      ...parseRosterCsv(conversion.text),
-      plugin,
-      standardText: conversion.text,
-      conversionIssues: conversion.issues,
-    };
-  }, [storedRoster]);
+    return { ...parseRosterCsv(conversion.text), plugin, conversion };
+  }, [storedRoster, projects]);
   // The bids converted again on every read, so a plugin that names projects
-  // (a Qualtrics pre-assignment) sees the project list as it is now.
+  // (a survey answer that pins its student) sees the list as it is now.
   const bidsSource = useMemo(() => {
     if (!storedBids || projects === undefined) {
       return null;
@@ -106,7 +101,7 @@ export function usePlacementWorkspace() {
     const plugin = resolveFilePlugin(
       "bids",
       storedBids.text,
-      storedBids.pluginId
+      storedBids.readAs
     );
     return { plugin, ...toStandard(plugin, storedBids.text, { projects }) };
   }, [storedBids, projects]);

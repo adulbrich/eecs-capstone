@@ -404,6 +404,50 @@ test.describe("placement workspace", () => {
     await expect(page.getByText("Robots, mostly")).toBeVisible();
   });
 
+  test("a workspace saved before plugins converted on read still shows its conversion", async ({
+    page,
+  }) => {
+    await page.goto("/admin/placement");
+    await waitForHydration(page);
+    await importFiles(page);
+    // What the build before #733 saved for a Qualtrics upload: the converted
+    // CSV as the text, the export's name and what converting it noticed.
+    await page.evaluate(
+      ([key, text]) => {
+        const workspace = JSON.parse(window.localStorage.getItem(key) ?? "{}");
+        workspace.bids = {
+          filename: "survey (converted).csv",
+          text,
+          convertedFrom: "survey.csv",
+          conversionIssues: [
+            {
+              level: "warning",
+              row: 4,
+              message: "A survey preview, not a response; skipped.",
+            },
+          ],
+        };
+        window.localStorage.setItem(key, JSON.stringify(workspace));
+      },
+      [STORAGE_KEY, BIDS_CSV] as const
+    );
+    await page.reload();
+    await waitForHydration(page);
+    await page.getByRole("tab", { name: /Bids/ }).click();
+    await expect(page.getByText("2 students and 3 bids")).toBeVisible();
+    await expect(
+      page.getByText("Converted from the Qualtrics export survey.csv.")
+    ).toBeVisible();
+    await expect(
+      page.getByRole("button", { name: "Download converted CSV" })
+    ).toBeVisible();
+    await expect(
+      page.getByRole("region", {
+        name: "Problems in the Qualtrics export file",
+      })
+    ).toContainText("A survey preview, not a response; skipped.");
+  });
+
   test("staff run, approve, move, re-run and download a placement", async ({
     page,
   }) => {

@@ -78,17 +78,19 @@ const NEEDS_QUOTING = /["\r\n,]/;
  * export in Excel and having a formula execute from data another user
  * typed, the guard stays unconditional for every listed lead character,
  * `-` included.
+ *
+ * The lead-in counts after any run of apostrophes, so a value that already
+ * starts "'-" is guarded once more and reading one apostrophe back off
+ * restores it exactly, where it used to come back as "-" (#733).
  */
-const FORMULA_LEAD = /^[=+\-@\t\r]/;
+const GUARDED = /^'*[=+\-@\t\r]/;
 
 /**
  * Reverses the guard on a cell read back from one of this app's own files:
- * an apostrophe followed by a formula lead-in is the guard, not the data.
+ * the first apostrophe before a formula lead-in is the guard, not the data.
  */
 export function unguardCell(text: string): string {
-  return text.startsWith("'") && FORMULA_LEAD.test(text.slice(1))
-    ? text.slice(1)
-    : text;
+  return text.startsWith("'") && GUARDED.test(text) ? text.slice(1) : text;
 }
 
 function serialize(value: unknown): string {
@@ -108,7 +110,7 @@ function escapeCell(value: unknown): string {
   const text = serialize(value);
   // The guard goes on before the quoting, so the apostrophe ends up inside
   // the quotes where the spreadsheet will see it.
-  const guarded = FORMULA_LEAD.test(text) ? `'${text}` : text;
+  const guarded = GUARDED.test(text) ? `'${text}` : text;
   if (!NEEDS_QUOTING.test(guarded)) {
     return guarded;
   }

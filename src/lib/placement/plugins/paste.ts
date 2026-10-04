@@ -3,10 +3,13 @@ import { PROJECTS_FORMAT, writeFormat } from "#/lib/placement/formats";
 import type { PastePlugin } from "#/lib/placement/plugins/types";
 import { parseRosterList, rosterCsv } from "#/lib/placement/roster";
 
+// A paste plugin's label follows "the pasted" on the page, as in "Problems in
+// the pasted roster".
+
 /** Emails pasted into the Roster tab's box (#665): no projects, ever. */
 export const pastedRoster: PastePlugin = {
   id: "paste-roster",
-  label: "pasted list",
+  label: "roster",
   dataset: "roster",
   input: "paste",
   toStandard: (text) => {
@@ -18,7 +21,7 @@ export const pastedRoster: PastePlugin = {
 /** A column of project titles pasted into the Projects tab (#664). */
 export const pastedTitles: PastePlugin = {
   id: "paste-titles",
-  label: "pasted list",
+  label: "project titles",
   dataset: "projects",
   input: "paste",
   toStandard: (text) => {

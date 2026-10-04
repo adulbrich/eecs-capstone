@@ -10,7 +10,6 @@ import { FilterSwitch } from "#/components/filter-switch";
 import { BidsByProject } from "#/components/placement/bids-by-project";
 import { CsvFormatHelp } from "#/components/placement/csv-format";
 import { FilePickerButton } from "#/components/placement/file-picker-button";
-import { ImportIssues } from "#/components/placement/import-issues";
 import { RemoveStudentButton } from "#/components/placement/removed-students";
 import { plural } from "#/components/placement/roster-section";
 import { SourceFormat } from "#/components/placement/source-format";
@@ -20,6 +19,7 @@ import { Button } from "#/components/ui/button";
 import { standingText, studentStanding } from "#/lib/placement/bids-view";
 import { applyPins } from "#/lib/placement/board";
 import { BIDS_FORMAT } from "#/lib/placement/formats";
+import { readAsChoice } from "#/lib/placement/plugins";
 import { repointRosterPins } from "#/lib/placement/roster";
 import type { PlacementStudent } from "#/lib/placement/types";
 import {
@@ -142,30 +142,30 @@ export function BidsTab({
           </Button>
         </ConfirmDialog>
       </div>
-      {/* A workspace saved before plugins converted on read (#733) holds
-          the converted text, and its conversion's issues, as it was. */}
-      {workspace.bids.convertedFrom === undefined ? (
-        <SourceFormat
-          dataset="bids"
-          filename={workspace.bids.filename}
-          onReadAs={(pluginId) =>
-            update((w) => ({
-              ...w,
-              bids: w.bids === null ? null : { ...w.bids, pluginId },
-            }))
-          }
-          plugin={source?.plugin ?? null}
-          standardLabel="Bids CSV"
-          standardText={source?.text ?? ""}
-        />
-      ) : (
-        <p className="mt-2 text-sm">
-          Converted from the Qualtrics export {workspace.bids.convertedFrom}.
-        </p>
-      )}
-      <ImportIssues
-        issues={conversionIssues}
-        label={source?.plugin?.label ?? "Qualtrics export"}
+      <SourceFormat
+        conversion={{
+          text: source?.text ?? workspace.bids.text,
+          issues: conversionIssues,
+        }}
+        dataset="bids"
+        filename={workspace.bids.filename}
+        // A workspace saved before plugins converted on read (#733) holds
+        // the converted text, and its conversion's issues, as they were.
+        legacyConvertedFrom={workspace.bids.convertedFrom}
+        onReadAs={(choice) =>
+          update((w) => ({
+            ...w,
+            bids:
+              w.bids === null
+                ? null
+                : {
+                    ...w.bids,
+                    readAs: readAsChoice("bids", w.bids.text, choice),
+                  },
+          }))
+        }
+        parseIssues={bids.issues}
+        plugin={source?.plugin ?? null}
       />
       <TitleMatchesPanel
         matches={workspace.titleMatches}
@@ -188,14 +188,6 @@ export function BidsTab({
         projects={workspace.projects}
         unmatched={bids.unmatched}
       />
-      {/* A survey export that could not be converted leaves an empty file,
-          whose missing columns would only repeat that (#681). */}
-      {!conversionIssues.some((i) => i.wholeFile) && (
-        <ImportIssues
-          issues={bids.issues}
-          label={source?.plugin ? "converted bids" : "bids"}
-        />
-      )}
       <RosterPointer
         notOnRoster={bids.notOnRoster.length}
         removed={bids.removed.length}

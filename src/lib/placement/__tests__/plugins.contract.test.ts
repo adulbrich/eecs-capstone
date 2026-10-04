@@ -17,10 +17,14 @@ import {
   detectPlugin,
   PLUGINS,
   pluginById,
+  readAsChoice,
   resolveFilePlugin,
+  toStandard,
 } from "#/lib/placement/plugins";
 import { canvasRoster } from "#/lib/placement/plugins/canvas";
+import { pastedTitles } from "#/lib/placement/plugins/paste";
 import { qualtricsBids } from "#/lib/placement/plugins/qualtrics";
+import type { FilePlugin } from "#/lib/placement/plugins/types";
 import { parseRosterCsv } from "#/lib/placement/roster";
 
 /** The one parser of each dataset's standard CSV. */
@@ -104,5 +108,47 @@ describe("reading a stored file", () => {
       canvasRoster
     );
     expect(pluginById("gone")).toBeUndefined();
+  });
+
+  it("stores nothing for the choice detection would make anyway", () => {
+    const standard = formatTemplate(STANDARD_FORMATS.roster);
+    expect(readAsChoice("roster", canvas, "canvas-roster")).toBeUndefined();
+    expect(readAsChoice("roster", canvas, null)).toBeNull();
+    expect(readAsChoice("roster", standard, null)).toBeUndefined();
+    expect(readAsChoice("roster", standard, "canvas-roster")).toBe(
+      "canvas-roster"
+    );
+  });
+
+  it("reports a plugin that throws as a problem with the whole file", () => {
+    const broken: FilePlugin = {
+      ...canvasRoster,
+      toStandard: () => {
+        throw new Error("out of cheese");
+      },
+    };
+    expect(toStandard(broken, canvas, { projects: [] })).toEqual({
+      text: "",
+      issues: [
+        {
+          level: "error",
+          row: 1,
+          message: "The Canvas roster export could not be read: out of cheese.",
+          wholeFile: true,
+        },
+      ],
+    });
+  });
+});
+
+describe("a value that looks like a spreadsheet guard (#733)", () => {
+  it("keeps its apostrophe through a plugin and the parser", () => {
+    const { text } = pastedTitles.toStandard("'-Minus\n'=cmd", {
+      projects: [],
+    });
+    expect(parseProjectsCsv(text).projects.map((p) => p.title)).toEqual([
+      "'-Minus",
+      "'=cmd",
+    ]);
   });
 });

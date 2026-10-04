@@ -66,13 +66,12 @@ describe("a file converted on read (#733)", () => {
     expect(result.current.bids?.students[0].pin).toBe("lantern map");
   });
 
-  it("reads a workspace saved with the converted text as it was", async () => {
-    const converted = qualtricsBids.toStandard(PRE_ASSIGNED, {
-      projects: [project("Tide Clock")],
-    });
-    const { result } = await loaded({
+  it("reads a workspace saved with the converted text to the same students", async () => {
+    const projects = [project("Tide Clock"), project("Robot Arm")];
+    const converted = qualtricsBids.toStandard(PRE_ASSIGNED, { projects });
+    const legacy = await loaded({
       ...EMPTY_WORKSPACE,
-      projects: [project("Tide Clock"), project("Robot Arm")],
+      projects,
       bids: {
         filename: "survey (converted).csv",
         text: converted.text,
@@ -80,10 +79,18 @@ describe("a file converted on read (#733)", () => {
         conversionIssues: converted.issues,
       },
     });
-    expect(result.current.bidsSource?.plugin).toBeNull();
-    expect(result.current.bids?.students.map((s) => s.bids.length)).toEqual([
-      2,
-    ]);
+    const legacyStudents = legacy.result.current.bids?.students;
+    expect(legacy.result.current.bidsSource?.plugin).toBeNull();
+    legacy.unmount();
+    localStorage.clear();
+    // The same export uploaded by this build: stored raw, converted on read.
+    const fresh = await loaded({
+      ...EMPTY_WORKSPACE,
+      projects,
+      bids: { filename: "survey.csv", text: PRE_ASSIGNED },
+    });
+    expect(legacyStudents?.[0].bids).toHaveLength(2);
+    expect(fresh.result.current.bids?.students).toEqual(legacyStudents);
   });
 
   it("reads a saved Canvas roster, which has no plugin id, as Canvas", async () => {
@@ -112,7 +119,7 @@ describe("a file converted on read (#733)", () => {
     act(() =>
       result.current.update((w) => ({
         ...w,
-        roster: w.roster && { ...w.roster, pluginId: null },
+        roster: w.roster && { ...w.roster, readAs: null },
       }))
     );
     expect(result.current.roster?.plugin).toBeNull();

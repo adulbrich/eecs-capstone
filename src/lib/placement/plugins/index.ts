@@ -77,13 +77,48 @@ export function resolveFilePlugin(
     : detectPlugin(dataset, text);
 }
 
-/** The text as standard CSV: through `plugin`, or as it is when null. */
+/**
+ * What to store for staff's Read as choice: nothing when it is what detection
+ * picks anyway, so switching away and back leaves the workspace, and the
+ * last run's fingerprint, as they were.
+ */
+export function readAsChoice(
+  dataset: PlacementDataset,
+  text: string,
+  choice: string | null
+): ReadAs {
+  return (detectPlugin(dataset, text)?.id ?? null) === choice
+    ? undefined
+    : choice;
+}
+
+/**
+ * The text as standard CSV: through `plugin`, or as it is when null. A
+ * plugin that throws is reported as a problem with the whole file, because
+ * the file stays stored and is read again on every load: an exception here
+ * would otherwise break the page until staff cleared their browser.
+ */
 export function toStandard(
   plugin: PlacementPlugin | null,
   text: string,
   context: PluginContext
 ): Conversion {
-  return plugin === null
-    ? { text, issues: [] }
-    : plugin.toStandard(text, context);
+  if (plugin === null) {
+    return { text, issues: [] };
+  }
+  try {
+    return plugin.toStandard(text, context);
+  } catch (error) {
+    return {
+      text: "",
+      issues: [
+        {
+          level: "error",
+          row: 1,
+          message: `The ${plugin.label} could not be read: ${error instanceof Error ? error.message : String(error)}.`,
+          wholeFile: true,
+        },
+      ],
+    };
+  }
 }

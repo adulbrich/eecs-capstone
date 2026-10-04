@@ -48,7 +48,7 @@ export interface Workspace {
     convertedFrom?: string;
     filename: string;
     /** How the file is read: see `ReadAs`. Absent means detected. */
-    pluginId?: ReadAs;
+    readAs?: ReadAs;
     /** The file as it was uploaded, converted on every read. */
     text: string;
   } | null;
@@ -86,7 +86,7 @@ export type TitleMatches = Record<string, TitleMatch>;
 
 export interface StoredRoster {
   /** How a CSV is read: see `ReadAs`. A pasted list has one way. */
-  pluginId?: ReadAs;
+  readAs?: ReadAs;
   source: { kind: "csv"; filename: string } | { kind: "pasted" };
   text: string;
 }
@@ -210,7 +210,7 @@ const workspaceSchema = z
       .object({
         filename: z.string(),
         text: z.string(),
-        pluginId: z.string().nullable().optional(),
+        readAs: z.string().nullable().optional(),
         convertedFrom: z.string().optional(),
         conversionIssues: z
           .array(
@@ -237,7 +237,7 @@ const workspaceSchema = z
           z.object({ kind: z.literal("pasted") }),
         ]),
         text: z.string(),
-        pluginId: z.string().nullable().optional(),
+        readAs: z.string().nullable().optional(),
       })
       .optional(),
     titleMatches: z
@@ -532,16 +532,16 @@ export function inputFingerprint(
     ...(workspace.roster === undefined
       ? []
       : [
-          workspace.roster.pluginId === undefined
+          workspace.roster.readAs === undefined
             ? { roster: workspace.roster.text }
             : {
                 roster: workspace.roster.text,
-                readAs: workspace.roster.pluginId,
+                readAs: workspace.roster.readAs,
               },
         ]),
-    ...(workspace.bids?.pluginId === undefined
+    ...(workspace.bids?.readAs === undefined
       ? []
-      : [{ bidsReadAs: workspace.bids.pluginId }]),
+      : [{ bidsReadAs: workspace.bids.readAs }]),
   ]);
   // djb2 in plain arithmetic, kept below 2^32 so it stays exact.
   let hash = 5381;

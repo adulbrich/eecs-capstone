@@ -358,9 +358,9 @@ describe("how a file is read (#733)", () => {
     // files were detected stays current.
     expect(before).toBe("385:ltcu53");
     const chosen = [
-      { ...base, roster: { ...roster, pluginId: null } },
-      { ...base, roster: { ...roster, pluginId: "canvas-roster" } },
-      { ...base, bids: { ...base.bids, pluginId: null } },
+      { ...base, roster: { ...roster, readAs: null } },
+      { ...base, roster: { ...roster, readAs: "canvas-roster" } },
+      { ...base, bids: { ...base.bids, readAs: null } },
     ].map(inputFingerprint);
     for (const hash of chosen) {
       expect(hash).not.toBe(before);
@@ -371,8 +371,8 @@ describe("how a file is read (#733)", () => {
   it("round-trips a chosen plugin id, and null for the standard format", () => {
     const workspace: Workspace = {
       ...EMPTY_WORKSPACE,
-      bids: { filename: "survey.csv", text: "x", pluginId: "qualtrics-bids" },
-      roster: { ...roster, pluginId: null },
+      bids: { filename: "survey.csv", text: "x", readAs: "qualtrics-bids" },
+      roster: { ...roster, readAs: null },
     };
     expect(parseWorkspace(serializeWorkspace(workspace))).toEqual({
       ok: true,

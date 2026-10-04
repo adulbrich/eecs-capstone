@@ -33,7 +33,10 @@ interface PluginBase {
   description?: string;
   /** Stable: a workspace stores it, so renaming one breaks saved choices. */
   id: string;
-  /** The source's name in the UI, as in "Converted from the <label> x.csv". */
+  /**
+   * The source's name on the page: "Converted from the <label> x.csv" for a
+   * file, "Problems in the pasted <label>" for pasted text.
+   */
   label: string;
   /**
    * The source as standard CSV. Rows it reports an error on are left out,

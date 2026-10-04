@@ -49,8 +49,11 @@ network request.
 For an uploaded file the page tries the dataset's standard format first (every
 required column present), then each file plugin in the order `PLUGINS` lists them in
 `src/lib/placement/plugins/index.ts`; the first match reads it. Staff can change it
-with "Read as", which stores the plugin id, or `null` for the standard format.
-A stored id no plugin has any more is detected again.
+with "Read as", which stores the choice as `readAs`: the plugin id, or `null` for
+the standard format, and nothing when the choice is what detection picks anyway.
+A stored id no plugin has any more is detected again. A plugin that throws is
+reported as a problem with the whole file rather than breaking the page, but
+report what you can as issues instead.
 
 ## Adding one
 
@@ -59,7 +62,7 @@ A stored id no plugin has any more is detected again.
    unambiguous.
 3. Add a fixture under its id to `src/lib/placement/__tests__/plugin-fixtures.ts`:
    invented people and `example.edu` addresses only.
-4. Run `npx vitest run src/lib/placement`. `plugins.test.ts` runs the contract on
+4. Run `npx vitest run src/lib/placement`. `plugins.contract.test.ts` runs the contract on
    every registered plugin: it has a fixture, converts it without an error, writes
    CSV the standard parser reads without an issue, claims its own fixture over the
    standard format, and claims no standard template and no other plugin's fixture.
