@@ -73,7 +73,7 @@ export const PROJECTS_FORMAT: CsvFormat = {
       name: "mentor_email",
       required: false,
       meaning: "The mentor's email address.",
-      example: "leep@oregonstate.edu",
+      example: "pat.lee@example.edu",
     },
     {
       name: "student_proposed",
@@ -101,9 +101,9 @@ export const PROJECTS_FORMAT: CsvFormat = {
       min_students: "2",
       max_students: "3",
       proposer_name: "Ada Park",
-      proposer_email: "parka@oregonstate.edu",
+      proposer_email: "ada.park@example.edu",
       mentor_name: "Pat Lee",
-      mentor_email: "leep@oregonstate.edu",
+      mentor_email: "pat.lee@example.edu",
       student_proposed: "true",
     },
   ],
@@ -111,7 +111,7 @@ export const PROJECTS_FORMAT: CsvFormat = {
 
 export const BIDS_FORMAT: CsvFormat = {
   filename: "placement-bids-template",
-  note: "The bidding survey's Qualtrics export also works as it comes: it is recognized by its three header rows and converted to this format on upload.",
+  note: "The bidding survey's Qualtrics export also works as it comes: it is recognized by its header rows and converted to this format. Once a file is up, Read as changes how it is read.",
   columns: [
     {
       name: "email",
@@ -181,19 +181,30 @@ export const BIDS_FORMAT: CsvFormat = {
   ],
 };
 
-export function formatTemplate(format: CsvFormat): string {
+/**
+ * Rows written in a format's own columns and order, with a blank for any
+ * column a row lacks: how a template is made, and how a plugin writes what
+ * it read.
+ */
+export function writeFormat(
+  format: CsvFormat,
+  rows: Record<string, string>[]
+): string {
   return toCsv(
     format.columns.map((c) => ({
       header: c.name,
       value: (row: Record<string, string>) => row[c.name] ?? "",
     })),
-    format.templateRows
+    rows
   );
 }
 
+export const formatTemplate = (format: CsvFormat): string =>
+  writeFormat(format, format.templateRows);
+
 export const ROSTER_FORMAT: CsvFormat = {
   filename: "placement-roster-template",
-  note: "Canvas's roster and groups export also works as it comes: login_id is read as the email and group_name as the project. A file with an email column is read as the format above, even if it also has login_id. Or paste the emails in the box instead: one per line, or separated by commas, semicolons or spaces. Pre-approvals come only from a file.",
+  note: "Canvas's roster and groups export also works as it comes: login_id is read as the email and group_name as the project. A file with an email column is read as the format above, even if it also has login_id; once a file is up, Read as changes how it is read. Or paste the emails in the box instead: one per line, or separated by commas, semicolons or spaces. Pre-approvals come only from a file.",
   columns: [
     {
       name: "email",
@@ -222,3 +233,12 @@ export const ROSTER_FORMAT: CsvFormat = {
     { email: "kim@example.edu", name: "Kim Lee", project: "Tide Clock" },
   ],
 };
+
+/** The one standard format of each dataset, which every plugin writes. */
+export const STANDARD_FORMATS = {
+  projects: PROJECTS_FORMAT,
+  roster: ROSTER_FORMAT,
+  bids: BIDS_FORMAT,
+} as const satisfies Record<string, CsvFormat>;
+
+export type PlacementDataset = keyof typeof STANDARD_FORMATS;

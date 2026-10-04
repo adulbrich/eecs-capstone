@@ -20,7 +20,6 @@ describe("parseRosterCsv", () => {
         { email: "kim@example.edu", name: "" },
       ],
       issues: [],
-      format: "roster",
     });
   });
 
@@ -100,7 +99,6 @@ describe("parseRosterList", () => {
         { email: "ben@example.edu", name: "" },
       ],
       issues: [],
-      format: "roster",
     });
   });
 
@@ -114,7 +112,6 @@ describe("parseRosterList", () => {
     expect(parseRosterList(" \n ,; \n")).toEqual({
       entries: [],
       issues: [],
-      format: "roster",
     });
   });
 });
@@ -286,108 +283,5 @@ describe("pre-approval edge cases (#670)", () => {
       "cy@example.edu": null,
     });
     expect(repointRosterPins(undefined, {})).toBeUndefined();
-  });
-});
-
-describe("the Canvas roster and groups export (#674)", () => {
-  const HEADER =
-    "name,canvas_user_id,user_id,login_id,sections,group_name,canvas_group_id,group_id";
-
-  it("reads login_id as the email and group_name as the project", () => {
-    const canvas = parseRosterCsv(
-      [
-        HEADER,
-        "Ada Park,101,9001,Ada@Example.edu,CS 461,Tide Clock,55,7",
-        "Kim Lee,102,9002,kim@example.edu,CS 461,,,",
-        "Test Student,103,,,CS 461,,,",
-        "Lou Ma,104,9004,lmau,CS 461,Team 3,56,8",
-      ].join("\n")
-    );
-    expect(canvas.format).toBe("canvas");
-    expect(canvas.entries).toEqual(
-      parseRosterCsv(
-        "email,name,project\nada@example.edu,Ada Park,Tide Clock\nkim@example.edu,Kim Lee,\n"
-      ).entries
-    );
-    expect(canvas.issues).toEqual([
-      {
-        level: "warning",
-        row: 4,
-        message: "Canvas's Test Student has no login_id, and is left out.",
-      },
-      { level: "error", row: 5, message: '"lmau" is not an email.' },
-    ]);
-  });
-
-  it("credits a group to the row it came from when a student is listed three times", () => {
-    const canvas = parseRosterCsv(
-      [
-        HEADER,
-        "Ada Park,101,9001,ada@example.edu,CS 461,,,",
-        "Ada Park,101,9001,ada@example.edu,Lab 1,Team A,55,7",
-        "Ada Park,101,9001,ada@example.edu,Lab 2,Team B,56,8",
-      ].join("\n")
-    );
-    expect(canvas.entries).toEqual([
-      { email: "ada@example.edu", name: "Ada Park", project: "Team A" },
-    ]);
-    expect(canvas.issues.at(-1)?.message).toBe(
-      'ada@example.edu already has "Team A" from row 3; "Team B" here is ignored.'
-    );
-  });
-
-  it("takes a later group when the first row has none, and names a second group it ignores", () => {
-    const canvas = parseRosterCsv(
-      [
-        HEADER,
-        "Ada Park,101,9001,ada@example.edu,CS 461,,,",
-        "Ada Park,101,9001,ada@example.edu,CS 461 lab,Tide Clock,55,7",
-        "Kim Lee,102,9002,kim@example.edu,CS 461,Sponsor Lab,56,8",
-        "Kim Lee,102,9002,kim@example.edu,CS 461 lab,Robot Arm,57,9",
-        "Lou Ma,103,,,CS 461,,,",
-      ].join("\n")
-    );
-    expect(canvas.entries).toEqual([
-      { email: "ada@example.edu", name: "Ada Park", project: "Tide Clock" },
-      { email: "kim@example.edu", name: "Kim Lee", project: "Sponsor Lab" },
-    ]);
-    expect(canvas.issues).toEqual([
-      {
-        level: "warning",
-        row: 3,
-        message:
-          'ada@example.edu is already on row 2, with no project; taking "Tide Clock" from this row.',
-      },
-      {
-        level: "warning",
-        row: 5,
-        message:
-          'kim@example.edu already has "Sponsor Lab" from row 4; "Robot Arm" here is ignored.',
-      },
-      // Only Canvas's own Test Student gets the gentler message.
-      { level: "error", row: 6, message: "The row has no login_id." },
-    ]);
-  });
-
-  it("reads a header with login_id as Canvas, and asks for email when neither is there", () => {
-    expect(parseRosterCsv("name,login_id\n").format).toBe("canvas");
-    expect(parseRosterCsv("name,group_name\nAda,Team 1").issues).toEqual([
-      {
-        level: "error",
-        row: 1,
-        message: 'The file has no "email" column.',
-        wholeFile: true,
-      },
-    ]);
-  });
-
-  it("reads email, not login_id, when a file has both", () => {
-    const both = parseRosterCsv(
-      "email,login_id,project\nada@example.edu,other@example.edu,Tide Clock"
-    );
-    expect(both.format).toBe("roster");
-    expect(both.entries).toEqual([
-      { email: "ada@example.edu", name: "", project: "Tide Clock" },
-    ]);
   });
 });

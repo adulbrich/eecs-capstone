@@ -1,5 +1,5 @@
 import { Link } from "@tanstack/react-router";
-import { Download, Trash2, TriangleAlert } from "lucide-react";
+import { Trash2, TriangleAlert } from "lucide-react";
 import { useId, useMemo } from "react";
 import {
   AdminDataTable,
@@ -13,14 +13,13 @@ import { FilePickerButton } from "#/components/placement/file-picker-button";
 import { ImportIssues } from "#/components/placement/import-issues";
 import { RemoveStudentButton } from "#/components/placement/removed-students";
 import { plural } from "#/components/placement/roster-section";
+import { SourceFormat } from "#/components/placement/source-format";
 import { TitleMatchesPanel } from "#/components/placement/title-matches";
 import type { PlacementWorkspace } from "#/components/placement/use-placement-workspace";
 import { Button } from "#/components/ui/button";
 import { standingText, studentStanding } from "#/lib/placement/bids-view";
 import { applyPins } from "#/lib/placement/board";
-import { downloadText } from "#/lib/placement/download";
 import { BIDS_FORMAT } from "#/lib/placement/formats";
-import { convertQualtrics, isQualtricsExport } from "#/lib/placement/qualtrics";
 import { repointRosterPins } from "#/lib/placement/roster";
 import type { PlacementStudent } from "#/lib/placement/types";
 import {
@@ -69,7 +68,7 @@ export function BidsTab({
       <div className="flex flex-col items-start gap-2">
         <p className="text-muted-foreground text-sm">
           One row per bid, or the bidding survey's Qualtrics export as it comes,
-          which is converted to one row per bid on upload.
+          which is converted to one row per bid.
         </p>
         <FilePickerButton
           accept=".csv,text/csv"
@@ -79,7 +78,7 @@ export function BidsTab({
             // were about the students of the old one.
             update((w) => ({
               ...w,
-              bids: bidsFromFile(text, filename, w.projects),
+              bids: { filename, text },
               pins: undefined,
               result: undefined,
             }))
@@ -92,6 +91,10 @@ export function BidsTab({
     );
   }
 
+  const source = state.bidsSource;
+  const conversionIssues = source?.plugin
+    ? source.issues
+    : (workspace.bids.conversionIssues ?? []);
   const { students } = bids;
   const bidCount = students.reduce((sum, s) => sum + s.bids.length, 0);
   // Both views and the count show every pin in effect, the board's
@@ -139,31 +142,30 @@ export function BidsTab({
           </Button>
         </ConfirmDialog>
       </div>
-      {workspace.bids.convertedFrom !== undefined && (
-        <div className="mt-2 flex flex-wrap items-center gap-2 text-sm">
-          <span>
-            Converted from the Qualtrics export {workspace.bids.convertedFrom}.
-          </span>
-          <Button
-            onClick={() =>
-              downloadText(
-                workspace.bids?.filename ?? "bids.csv",
-                workspace.bids?.text ?? "",
-                "text/csv"
-              )
-            }
-            size="sm"
-            type="button"
-            variant="outline"
-          >
-            <Download aria-hidden="true" />
-            Download converted CSV
-          </Button>
-        </div>
+      {/* A workspace saved before plugins converted on read (#733) holds
+          the converted text, and its conversion's issues, as it was. */}
+      {workspace.bids.convertedFrom === undefined ? (
+        <SourceFormat
+          dataset="bids"
+          filename={workspace.bids.filename}
+          onReadAs={(pluginId) =>
+            update((w) => ({
+              ...w,
+              bids: w.bids === null ? null : { ...w.bids, pluginId },
+            }))
+          }
+          plugin={source?.plugin ?? null}
+          standardLabel="Bids CSV"
+          standardText={source?.text ?? ""}
+        />
+      ) : (
+        <p className="mt-2 text-sm">
+          Converted from the Qualtrics export {workspace.bids.convertedFrom}.
+        </p>
       )}
       <ImportIssues
-        issues={workspace.bids.conversionIssues ?? []}
-        label="survey export"
+        issues={conversionIssues}
+        label={source?.plugin?.label ?? "Qualtrics export"}
       />
       <TitleMatchesPanel
         matches={workspace.titleMatches}
@@ -188,8 +190,11 @@ export function BidsTab({
       />
       {/* A survey export that could not be converted leaves an empty file,
           whose missing columns would only repeat that (#681). */}
-      {!workspace.bids.conversionIssues?.some((i) => i.wholeFile) && (
-        <ImportIssues issues={bids.issues} label="bids" />
+      {!conversionIssues.some((i) => i.wholeFile) && (
+        <ImportIssues
+          issues={bids.issues}
+          label={source?.plugin ? "converted bids" : "bids"}
+        />
       )}
       <RosterPointer
         notOnRoster={bids.notOnRoster.length}
@@ -512,30 +517,6 @@ function StudentsTable({
       />
     </div>
   );
-}
-
-const CSV_EXTENSION = /(\.csv)?$/i;
-
-/**
- * What the workspace keeps for an uploaded bids file: the file as it came,
- * or, for a Qualtrics export, the long CSV it converts to plus what the
- * conversion noticed (#656).
- */
-function bidsFromFile(
-  text: string,
-  filename: string,
-  projects: Workspace["projects"]
-): NonNullable<Workspace["bids"]> {
-  if (!isQualtricsExport(text)) {
-    return { filename, text };
-  }
-  const converted = convertQualtrics(text, projects);
-  return {
-    filename: filename.replace(CSV_EXTENSION, " (converted).csv"),
-    text: converted.csv,
-    convertedFrom: filename,
-    conversionIssues: converted.issues,
-  };
 }
 
 /**

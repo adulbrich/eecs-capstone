@@ -4,6 +4,7 @@ import { CsvFormatHelp } from "#/components/placement/csv-format";
 import { FilePickerButton } from "#/components/placement/file-picker-button";
 import { ImportIssues } from "#/components/placement/import-issues";
 import { PasteList } from "#/components/placement/paste-list";
+import { SourceFormat } from "#/components/placement/source-format";
 import type { PlacementWorkspace } from "#/components/placement/use-placement-workspace";
 import { Button } from "#/components/ui/button";
 import { ROSTER_FORMAT } from "#/lib/placement/formats";
@@ -125,16 +126,20 @@ export function RosterSection({
           </Button>
         </ConfirmDialog>
       </div>
-      {roster.format === "canvas" && (
-        <p className="mt-1">
-          Read as a Canvas roster and groups export: login_id is the email, and
-          each student's group_name is the project they are pre-approved for. A
-          group named like a project on the Projects tab joins it; any other
-          group becomes a project of its own holding just that group. A student
-          in no group is not pre-approved. A student listed twice keeps their
-          first group, and the problems list names any other it ignored.
-          Canvas's Test Student is left out.
-        </p>
+      {stored.source.kind === "csv" && (
+        <SourceFormat
+          dataset="roster"
+          filename={stored.source.filename}
+          onReadAs={(pluginId) =>
+            update((w) => ({
+              ...w,
+              roster: w.roster && { ...w.roster, pluginId },
+            }))
+          }
+          plugin={roster.plugin}
+          standardLabel="Roster CSV"
+          standardText={roster.standardText}
+        />
       )}
       <p className="mt-1">
         {rosterSummary(
@@ -198,7 +203,19 @@ export function RosterSection({
           </Button>
         </div>
       )}
-      <ImportIssues issues={roster.issues} label="roster" unit={unit} />
+      {/* What the plugin noticed, in the source's own rows or lines, then
+          anything the roster parser found in what it wrote. */}
+      <ImportIssues
+        issues={roster.conversionIssues}
+        label={roster.plugin?.label ?? "roster"}
+        unit={unit}
+      />
+      {!roster.conversionIssues.some((i) => i.wholeFile) && (
+        <ImportIssues
+          issues={roster.issues}
+          label={roster.plugin ? "converted roster" : "roster"}
+        />
+      )}
     </section>
   );
 }

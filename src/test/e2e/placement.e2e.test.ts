@@ -663,9 +663,11 @@ test.describe("placement workspace", () => {
       ),
     });
     const problems = page.getByRole("region", {
-      name: "Problems in the survey export file",
+      name: "Problems in the Qualtrics export file",
     });
-    await expect(problems).toContainText("The survey export file was not read");
+    await expect(problems).toContainText(
+      "The Qualtrics export file was not read"
+    );
     await expect(problems).toContainText(
       "The export has no Recipient Email column"
     );
@@ -1216,6 +1218,17 @@ test.describe("placement workspace", () => {
     await expect(roster).toContainText(
       "Read as a Canvas roster and groups export"
     );
+    await expect(roster).toContainText("2 students are pre-approved");
+
+    // Read as the roster's own format, the file has no email column; back
+    // to Canvas, it reads as before (#733).
+    await roster.getByLabel("Read as").click();
+    await page.getByRole("option", { name: "Roster CSV" }).click();
+    await expect(
+      roster.getByRole("region", { name: "Problems in the roster file" })
+    ).toContainText('The file has no "email" column.');
+    await roster.getByLabel("Read as").click();
+    await page.getByRole("option", { name: "Canvas roster export" }).click();
     await expect(roster).toContainText("2 students are pre-approved");
     await page.getByRole("tab", { name: /Projects/ }).click();
     await expect(

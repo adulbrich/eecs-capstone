@@ -1,7 +1,7 @@
 import Papa from "papaparse";
-import { toCsv } from "#/lib/csv";
 import { type ImportIssue, normalizeTitle } from "#/lib/placement/csv";
-import { BIDS_FORMAT } from "#/lib/placement/formats";
+import { BIDS_FORMAT, writeFormat } from "#/lib/placement/formats";
+import type { FilePlugin } from "#/lib/placement/plugins/types";
 import type { WorkspaceProject } from "#/lib/placement/types";
 
 /**
@@ -277,13 +277,7 @@ export function convertQualtrics(
     rows.push(...responseRows(values, row, columns, known, issues));
   }
 
-  const csv = toCsv(
-    BIDS_FORMAT.columns.map((c) => ({
-      header: c.name,
-      value: (r: LongRow) => r[c.name] ?? "",
-    })),
-    rows
-  );
+  const csv = writeFormat(BIDS_FORMAT, rows);
   return { csv, issues: issues.sort((a, b) => a.row - b.row) };
 }
 
@@ -357,3 +351,17 @@ function responseRows(
     { ...student, priority: "", project: typed, comment: "", override: "true" },
   ];
 }
+
+export const qualtricsBids: FilePlugin = {
+  id: "qualtrics-bids",
+  label: "Qualtrics export",
+  dataset: "bids",
+  input: "file",
+  detect: isQualtricsExport,
+  // Converted on every read, so a pre-assigned answer naming a project
+  // added after the upload still pins its student.
+  toStandard: (text, { projects }) => {
+    const { csv, issues } = convertQualtrics(text, projects);
+    return { text: csv, issues };
+  },
+};

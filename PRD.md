@@ -611,6 +611,18 @@ catalogue that decided the matrix below; #288 shipped it.
   download the placement and the bids with pins as CSV (#649).
 - [x] Analytics in a Sheet: bids per project, priority distribution, unplaced
   students, projects with no team formed (#650).
+- [x] A class roster, uploaded or pasted, so students who did not answer the
+  survey are placed too (#665), with pre-approvals that pin a student to a
+  project (#670), read from Canvas's roster and groups export as it comes
+  (#674).
+- [x] One standard CSV per dataset, and plugins that convert other sources into
+  it: Canvas, Qualtrics and pasted text, detected by content and changeable with
+  Read as; a contributor adds one by pull request
+  ([ADR-0059](./docs/adr/0059-placement-plugins-convert-to-the-standard-csv.md),
+  #698, #733).
+- [ ] Download the placement as a Canvas group-set import (#734).
+- [ ] Map an unrecognized file's columns to the standard format (#735), and
+  read a wide bids file through that mapping (#736).
 
 ## 18. Analytics Dashboard
 
