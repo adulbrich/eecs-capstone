@@ -97,10 +97,11 @@ export function SourceFormat({
   const plugins = filePlugins(dataset);
   const conversionStopped = conversion.issues.some((i) => i.wholeFile);
   // Only when detection found nothing: staff who chose the standard format
-  // for a file a plugin claims know what it is.
+  // for a file a plugin claims know what it is. A stored id no plugin has
+  // any more was detected again, so it counts as detection.
   const unrecognized =
     plugin === null &&
-    readAs === undefined &&
+    readAs !== null &&
     legacyConvertedFrom === undefined &&
     parseIssues.some((i) => i.wholeFile);
   return (
