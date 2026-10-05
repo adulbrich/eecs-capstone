@@ -572,8 +572,8 @@ export function ColumnMappingEditor({
           missing.
         </p>
       )}
-      {/* Every column the prefix or the ticks took, by its letter, so one
-          staff did not mean to read is in sight before Apply. */}
+      {/* Every column the prefix or the ticks took, by its letter, so staff
+          see a column they did not mean to include before they apply. */}
       {read.projects !== undefined && (
         <p>
           {read.projects.length === 1
