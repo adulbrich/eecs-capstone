@@ -21,7 +21,8 @@ const latestByProject = new Map<string, Promise<void>>();
  * Refreshes for one project run one after another, in the order they are
  * started just after each commit, and each reads the row when it runs, so the
  * last one reads the last committed text. Each logs one line with both
- * outcomes, which is the only record that a refresh applied.
+ * outcomes, and each writer records its own as the project's last attempt
+ * for the staff panel (ADR-0060).
  */
 export function refreshProjectInBackground(
   projectId: string,

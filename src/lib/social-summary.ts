@@ -3,6 +3,7 @@
 // No AWS, no DB, no node built-ins here.
 
 import { z } from "zod";
+import type { AiRefreshAttempt } from "./ai-refresh";
 
 /**
  * Capped in the schema rather than only asked for in the prompt, the way
@@ -85,10 +86,20 @@ export type SocialSummaryResult = z.infer<typeof socialSummarySchema>;
  * whether a human wrote it. `stale` is deliberately absent, unlike
  * `ScopeAssessmentView`: a stale summary regenerates by itself on the next
  * edit or transition, so there is nothing for staff to act on.
+ *
+ * Beside it, the last attempt at writing it (#631), already passed through
+ * `currentAttempt`, so null means "no attempt since what is stored" and, with
+ * nothing stored, "no attempt on record". `refreshable` says whether the
+ * project's status is one the automatic refresh writes for at all, and
+ * `automaticEnabled` whether the kill switch lets it, since a switched-off
+ * refresh skips every project without recording anything.
  */
 export interface SocialSummaryView {
+  automaticEnabled: boolean;
   isManual: boolean;
+  refreshable: boolean;
   summary: string | null;
+  summaryAttempt: AiRefreshAttempt | null;
   updatedAt: Date | null;
 }
 

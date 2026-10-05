@@ -727,6 +727,10 @@ The metric filter in `infra/alarms.tf` matches exact, case-sensitive wording at 
 
 The error can carry signed values, so each `*-core.ts` logs it through `redactQueryError` and gives the user a fixed message. Diagnose from the log.
 
+### A failure the panel shows can be older than the output beside it
+
+`project_ai_refreshes` holds the last attempt, not the last write (ADR-0060). A staff Save and the production `.mjs` sweeps write outputs without recording, so `currentAttempt` (`src/lib/ai-refresh.ts`) drops an attempt older than the stored output's `*_updated_at`. A new writer of either output either records through `recordAiRefresh` or stamps that column, or staff see a stale failure. The record keeps the later stamp, and `unchanged` deletes a failure stamped before the writer started.
+
 ### A social summary staff wrote is never overwritten, and a hash cannot express that
 
 A hash detects change, not intent, so both writers test `social_summary_is_manual` before the hash; the parity test pins both.

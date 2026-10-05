@@ -28,6 +28,7 @@ import { type EditLogEntry, EditLogList } from "./edit-log-list";
 import { Panel, PanelHeader, PanelNote, PanelSection } from "./panel";
 import { ScopeAssessmentSection } from "./scope-assessment-section";
 import { EMAIL_SKIP_HINT, SendEmailCheckbox } from "./send-email-checkbox";
+import { SimilaritySection } from "./similarity-section";
 import { SocialPreviewSection } from "./social-preview-section";
 import { StaffCategoriesSection } from "./staff-categories-section";
 import { StaffMentorshipSection } from "./staff-mentorship-section";
@@ -484,6 +485,12 @@ export function StaffProjectPanel({
           loaded by a staff-gated read rather than from the project payload. */}
       <PanelSection title="Social preview">
         <SocialPreviewSection projectId={project.id} />
+      </PanelSection>
+
+      {/* Only staff, for the same reason: whether the embedding is stored
+          and the last attempt at it are not in the project payload (#631). */}
+      <PanelSection title="Similarity">
+        <SimilaritySection projectId={project.id} />
       </PanelSection>
 
       <PanelSection title="Edit log">

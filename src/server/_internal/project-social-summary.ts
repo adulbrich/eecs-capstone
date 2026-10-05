@@ -9,6 +9,7 @@ import {
   type SocialSummarySourceProject,
   socialSummaryHash,
 } from "#/lib/social-summary-source";
+import { recordAiRefresh } from "./project-ai-refreshes";
 import { isEmbeddableStatus, rowStillReads } from "./project-embeddings";
 import {
   buildSocialSummaryConfig,
@@ -77,8 +78,28 @@ export const SUMMARY_GUARD_COLUMNS = [
  * and a restore starts one for whatever changed while the row was deleted. A
  * caller that writes project prose WITHOUT calling this afterwards would strand
  * the stale pairing, since nothing else recomputes the hash.
+ *
+ * Records the outcome as the project's last summary attempt (#631), as
+ * `refreshProjectEmbedding` does for the vector. Always `automatic`: the
+ * staff path is Regenerate, which records its own.
  */
 export async function refreshSocialSummary(
+  projectId: string,
+  invoke?: ResponsesFn
+): Promise<SocialSummaryOutcome> {
+  const startedAt = new Date();
+  const outcome = await writeSocialSummary(projectId, invoke);
+  await recordAiRefresh(
+    projectId,
+    "social_summary",
+    "automatic",
+    outcome,
+    startedAt
+  );
+  return outcome;
+}
+
+async function writeSocialSummary(
   projectId: string,
   invoke?: ResponsesFn
 ): Promise<SocialSummaryOutcome> {

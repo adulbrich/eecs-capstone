@@ -31,16 +31,25 @@ beforeEach(() => {
 
 const AUTOMATIC: SocialSummaryView = {
   isManual: false,
+  automaticEnabled: true,
+  refreshable: true,
+  summaryAttempt: null,
   summary: "A rover that streams sensor data from a greenhouse.",
   updatedAt: new Date("2026-09-01T10:00:00Z"),
 };
 const MANUAL: SocialSummaryView = {
   isManual: true,
+  automaticEnabled: true,
+  refreshable: true,
+  summaryAttempt: null,
   summary: "Wording staff chose.",
   updatedAt: new Date("2026-09-02T10:00:00Z"),
 };
 const NONE: SocialSummaryView = {
   isManual: false,
+  automaticEnabled: true,
+  refreshable: true,
+  summaryAttempt: null,
   summary: null,
   updatedAt: null,
 };
@@ -55,6 +64,9 @@ const REWRITTEN: RegenerateSocialSummaryResult = {
  */
 const RACED: RegenerateSocialSummaryResult = {
   isManual: true,
+  automaticEnabled: true,
+  refreshable: true,
+  summaryAttempt: null,
   summary: "Wording a colleague saved mid-flight.",
   updatedAt: new Date("2026-09-03T10:00:00Z"),
   outcome: "changed",
@@ -275,5 +287,124 @@ describe("SocialPreviewSection actions", () => {
     expect(regenerateButton().hasAttribute("disabled")).toBe(false);
     expect(screen.queryByRole("button", { name: "Try again" })).toBeNull();
     expect(screen.queryByText(/Could not load the stored summary/)).toBeNull();
+  });
+});
+
+const FAILED_AT = new Date("2026-10-05T10:02:00Z");
+
+/**
+ * The last rewrite (#631): staff must tell "never attempted" from "failed",
+ * and a failure must leave them a button rather than a dead end.
+ */
+describe("SocialPreviewSection last rewrite", () => {
+  it("says no attempt has run on a published project with nothing stored", async () => {
+    await renderWith(NONE);
+    expect(
+      screen.getByText("No automatic attempt on record yet.")
+    ).toBeDefined();
+    expect(screen.queryByText(/failed/)).toBeNull();
+  });
+
+  it("says the automatic path is off rather than that it has not run yet", async () => {
+    // With the kill switch off every refresh skips and records nothing, so
+    // "not yet" would be a promise nothing keeps.
+    await renderWith({ ...NONE, automaticEnabled: false });
+    expect(
+      screen.getByText(/Automatic summaries are switched off/)
+    ).toBeDefined();
+    expect(screen.queryByText(/No automatic attempt/)).toBeNull();
+  });
+
+  it("says when one will run on a project that is not published yet", async () => {
+    await renderWith({ ...NONE, refreshable: false });
+    expect(
+      screen.getByText("Written automatically once the project is published.")
+    ).toBeDefined();
+  });
+
+  it("tells a failure apart from never attempted, and offers Regenerate", async () => {
+    await renderWith({
+      ...NONE,
+      summaryAttempt: {
+        at: FAILED_AT,
+        outcome: "failed",
+        trigger: "automatic",
+      },
+    });
+    expect(
+      screen.getByText(/The last rewrite failed automatically/)
+    ).toBeDefined();
+    expect(screen.getByText(/previews use the start/)).toBeDefined();
+    expect(
+      screen.queryByText("No automatic attempt on record yet.")
+    ).toBeNull();
+    expect(regenerateButton().hasAttribute("disabled")).toBe(false);
+  });
+
+  it("offers Regenerate when the rewrite of a stored summary failed", async () => {
+    // The dead end this closes: a summary of older text, a failure beside it,
+    // and Regenerate off because the row is neither manual nor empty.
+    await renderWith({
+      ...AUTOMATIC,
+      summaryAttempt: {
+        at: FAILED_AT,
+        outcome: "failed",
+        trigger: "automatic",
+      },
+    });
+    expect(screen.getByText(/the last one written/)).toBeDefined();
+    expect(regenerateButton().hasAttribute("disabled")).toBe(false);
+  });
+
+  it("names the button when the failed attempt was a staff Regenerate", async () => {
+    await renderWith({
+      ...AUTOMATIC,
+      summaryAttempt: { at: FAILED_AT, outcome: "failed", trigger: "staff" },
+    });
+    expect(
+      screen.getByText(/The last rewrite failed from Regenerate/)
+    ).toBeDefined();
+  });
+
+  it("says a superseded rewrite was dropped, without calling it a failure", async () => {
+    await renderWith({
+      ...AUTOMATIC,
+      summaryAttempt: {
+        at: FAILED_AT,
+        outcome: "superseded",
+        trigger: "automatic",
+      },
+    });
+    expect(
+      screen.getByText(/was dropped because the project changed/)
+    ).toBeDefined();
+    expect(regenerateButton().hasAttribute("disabled")).toBe(true);
+  });
+
+  it("adds nothing beside a summary that was written", async () => {
+    await renderWith({
+      ...AUTOMATIC,
+      summaryAttempt: {
+        at: FAILED_AT,
+        outcome: "updated",
+        trigger: "automatic",
+      },
+    });
+    expect(screen.queryByText(/last rewrite/)).toBeNull();
+    expect(screen.queryByText(/No automatic attempt/)).toBeNull();
+  });
+
+  it("hides the automatic status on a summary staff wrote", async () => {
+    // The automatic path never touches a manual summary, so its old failure
+    // says nothing about what is stored.
+    await renderWith({
+      ...MANUAL,
+      summaryAttempt: {
+        at: FAILED_AT,
+        outcome: "failed",
+        trigger: "automatic",
+      },
+    });
+    expect(screen.queryByText(/last rewrite/)).toBeNull();
   });
 });

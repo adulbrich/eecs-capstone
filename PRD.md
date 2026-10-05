@@ -252,6 +252,11 @@ Each project carries:
   accept applicants and share a program with the one being viewed, nearest by
   embedding; a sticky aside from `xl`, a collapsible floating card between `md`
   and `xl`, and a bottom sheet behind an icon button on a phone (#614).
+- [x] Staff see each project's similarity in its own staff panel section: whether
+  it is computed, when, and the last attempt with its outcome, so a failure
+  reads differently from never attempted; Recompute retries after a failure
+  ([ADR-0060](./docs/adr/0060-the-last-ai-attempt-is-recorded-per-project.md),
+  #631).
 - [x] Bookmarks: bookmark button on project detail and a toggle on every row of
   the public listing (authed), and a `/my/bookmarks` view.
 
@@ -585,7 +590,9 @@ catalogue that decided the matrix below; #288 shipped it.
   title, description and problem statement at the same two call sites as the
   embedding, with its own kill switch and its own usage limit pair.
 - [x] Staff read and correct that summary in a Social preview panel section, and
-  a corrected one is never overwritten by the automatic path.
+  a corrected one is never overwritten by the automatic path. The section says
+  when the last rewrite failed or never ran, and Regenerate is offered after a
+  failure (#631).
 - [x] `og:description` falls back through the summary, the description, the
   problem statement and a site sentence, so a page unfurls correctly with no
   model involved at all.

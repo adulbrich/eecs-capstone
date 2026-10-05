@@ -21,6 +21,11 @@ import {
 // The vocabularies live in src/lib so the client-safe modules can derive
 // their unions from them without importing this file, and therefore without
 // pulling drizzle-orm into the client bundle (#102).
+import type {
+  AiRefreshKind,
+  AiRefreshOutcome,
+  AiRefreshTrigger,
+} from "#/lib/ai-refresh";
 import {
   INVENTORY_CUSTOM_LINE_STATUSES,
   INVENTORY_ITEM_STATUSES,
@@ -852,6 +857,35 @@ export const aiReviewUsage = pgTable(
   },
   // The only shape the limiter queries: this user, within a time window.
   (t) => [index("ai_review_usage_user_idx").on(t.userId, t.createdAt)]
+);
+
+/**
+ * The last attempt to write each of a project's AI outputs, and how it ended
+ * (#631), so staff can tell "failed" from "no attempt on record". One row per
+ * project and kind, overwritten by each attempt; the last success is the
+ * output's own `*_updated_at` on `projects`.
+ *
+ * Not `ai_review_usage`, which counts model calls for the limiter: a
+ * `superseded` write is a successful call that stored nothing, and a failed
+ * row write is a failure with no failed call. Written by
+ * `recordAiRefresh` in `src/server/_internal/project-ai-refreshes.ts`, which
+ * says which outcomes are recorded and why. No user column: who pressed
+ * Regenerate is already in `ai_review_usage`.
+ */
+export const projectAiRefreshes = pgTable(
+  "project_ai_refreshes",
+  {
+    projectId: uuid("project_id")
+      .references(() => projects.id, { onDelete: "cascade" })
+      .notNull(),
+    kind: text("kind").$type<AiRefreshKind>().notNull(),
+    trigger: text("trigger").$type<AiRefreshTrigger>().notNull(),
+    outcome: text("outcome").$type<AiRefreshOutcome>().notNull(),
+    attemptedAt: timestamp("attempted_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => [primaryKey({ columns: [t.projectId, t.kind] })]
 );
 
 /**

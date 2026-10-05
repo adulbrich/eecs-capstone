@@ -219,6 +219,13 @@ viewer, so not a recommendation, and absent when the viewed project has no
 embedding or no program.
 _Avoid_: related projects, suggested projects, more like this
 
+**Similarity**:
+What a project's embedding is for, as staff see it: the computed reading of its text
+that places it under other projects' similar projects and orders it in the
+recommendation. The staff panel's Similarity section says whether it is computed and
+lets staff recompute it after a failure. Staff copy never says "embedding".
+_Avoid_: embedding (in copy), vector, matching, semantic index
+
 **Staff inbox**:
 The one staff mailbox every email addressed to staff goes to, set by
 `EMAIL_STAFF_INBOX`: a project submitted or resubmitted, a borrow list or custom

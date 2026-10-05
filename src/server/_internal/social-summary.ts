@@ -6,6 +6,8 @@ import {
   mantleResponses,
   type ResponsesFn,
 } from "#/lib/_internal/bedrock-mantle";
+import { socialSummariesEnabled } from "#/lib/_internal/social-summary-flag";
+import { currentAttempt } from "#/lib/ai-refresh";
 import {
   type RegenerateSocialSummaryResult,
   SOCIAL_SUMMARY_TOO_LONG_MESSAGE,
@@ -22,7 +24,8 @@ import type {
   SocialSummaryInput,
 } from "../social-summary";
 import { assertWithinLimit, recordReviewUsage } from "./ai-review-usage";
-import { rowStillReads } from "./project-embeddings";
+import { readAiRefresh, recordAiRefresh } from "./project-ai-refreshes";
+import { isRefreshable, rowStillReads } from "./project-embeddings";
 import { SUMMARY_GUARD_COLUMNS } from "./project-social-summary";
 import {
   buildSocialSummaryConfig,
@@ -47,11 +50,30 @@ async function loadProject(projectId: string) {
   return project;
 }
 
-function toView(project: typeof projects.$inferSelect): SocialSummaryView {
+type ProjectRow = typeof projects.$inferSelect;
+
+/**
+ * The last-attempt half of the view (#631). `summaryStoredAt` is passed
+ * rather than read off the row, because Save and Regenerate return the time
+ * they just wrote, which the row they loaded beforehand does not carry yet.
+ */
+async function aiStatus(project: ProjectRow, summaryStoredAt: Date | null) {
+  return {
+    summaryAttempt: currentAttempt(
+      await readAiRefresh(project.id, "social_summary"),
+      summaryStoredAt
+    ),
+    refreshable: isRefreshable(project),
+    automaticEnabled: socialSummariesEnabled(),
+  };
+}
+
+async function toView(project: ProjectRow): Promise<SocialSummaryView> {
   return {
     summary: project.socialSummary,
     updatedAt: project.socialSummaryUpdatedAt,
     isManual: project.socialSummaryIsManual,
+    ...(await aiStatus(project, project.socialSummaryUpdatedAt)),
   };
 }
 
@@ -116,7 +138,12 @@ export async function saveSocialSummaryAs(
       socialSummaryUpdatedAt: updatedAt,
     })
     .where(eq(projects.id, project.id));
-  return { summary, updatedAt, isManual: true };
+  return {
+    summary,
+    updatedAt,
+    isManual: true,
+    ...(await aiStatus(project, updatedAt)),
+  };
 }
 
 export async function saveSocialSummaryForCurrentUser(
@@ -181,6 +208,7 @@ export async function regenerateSocialSummaryAs(
   invoke: ResponsesFn = mantleResponses
 ): Promise<RegenerateSocialSummaryResult> {
   assertStaff(viewer);
+  const startedAt = new Date();
   const project = await loadProject(data.projectId);
   const source = buildSocialSummarySource(project);
   if (!source) {
@@ -219,6 +247,15 @@ export async function regenerateSocialSummaryAs(
   if (!run.result) {
     // Thrown, not swallowed, and the stored summary is left untouched: staff
     // keep whatever was there rather than losing it to a failed attempt.
+    // Recorded first, so the panel's status line agrees with the error staff
+    // were just shown (#631).
+    await recordAiRefresh(
+      project.id,
+      "social_summary",
+      "staff",
+      "failed",
+      startedAt
+    );
     throw new Error(run.error ?? "Social summary failed");
   }
   const updatedAt = new Date();
@@ -237,17 +274,28 @@ export async function regenerateSocialSummaryAs(
       )
     )
     .returning({ id: projects.id });
+  await recordAiRefresh(
+    project.id,
+    "social_summary",
+    "staff",
+    written.length > 0 ? "updated" : "superseded",
+    startedAt
+  );
   if (written.length === 0) {
     // Losing the race means writing nothing and saying so. The row is re-read
     // rather than assumed, so the panel shows the wording that is actually
     // stored instead of the text the model produced and nobody kept.
-    return { ...toView(await loadProject(project.id)), outcome: "changed" };
+    return {
+      ...(await toView(await loadProject(project.id))),
+      outcome: "changed",
+    };
   }
   return {
     summary: run.result,
     updatedAt,
     isManual: false,
     outcome: "rewritten",
+    ...(await aiStatus(project, updatedAt)),
   };
 }
 
