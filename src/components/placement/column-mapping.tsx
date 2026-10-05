@@ -19,6 +19,7 @@ import {
 } from "#/lib/placement/formats";
 import {
   type ColumnMapping,
+  droppedColumns,
   fileHeaders,
   fitToDataset,
   mapRows,
@@ -97,19 +98,27 @@ function seed(
 const missingLine = (mapping: ColumnMapping, headers: readonly string[]) =>
   headers.map((h) => `"${h}" (${mapping.columns[h]})`).join(", ");
 
-/** What Apply waits for, or that it is ready. */
-function applyStatus(
+/**
+ * What Apply waits for, or that it is ready, after any pair the column
+ * mapping lost to fit this dataset.
+ */
+export function applyStatus(
   dataset: PlacementDataset,
   unmapped: readonly string[],
-  unreadable: readonly ImportIssue[]
+  unreadable: readonly ImportIssue[],
+  dropped: readonly string[] = []
 ): string {
+  const lost =
+    dropped.length === 0
+      ? ""
+      : `${dropped.join(", ")} ${dropped.length === 1 ? "is" : "are"} not in the ${dataset} format, so the column mapping leaves ${dropped.length === 1 ? "it" : "them"} out. `;
   if (unreadable.length > 0) {
-    return `${unreadable.map((i) => i.message).join(" ")} Fix the file and upload it again.`;
+    return `${lost}${unreadable.map((i) => i.message).join(" ")} Fix the file and upload it again.`;
   }
   if (unmapped.length > 0) {
-    return `Map ${quoted(unmapped)} to apply: the ${dataset} format requires ${unmapped.length === 1 ? "it" : "them"}.`;
+    return `${lost}Map ${quoted(unmapped)} to apply: the ${dataset} format requires ${unmapped.length === 1 ? "it" : "them"}.`;
   }
-  return "Every required column is mapped.";
+  return `${lost}Every required column is mapped.`;
 }
 
 /**
@@ -150,6 +159,11 @@ export function ColumnMappingEditor({
   const [mapping, setMapping] = useState(() =>
     seed(initial ?? suggestMapping(dataset, headers), dataset, headers)
   );
+  // The pairs the stored column mapping lost to fit this dataset, until
+  // another is loaded.
+  const [dropped, setDropped] = useState(() =>
+    initial === undefined ? [] : droppedColumns(initial, dataset)
+  );
   const [loadError, setLoadError] = useState<string | null>(null);
 
   const picker = useFilePicker({
@@ -168,6 +182,7 @@ export function ColumnMappingEditor({
         return;
       }
       setLoadError(null);
+      setDropped([]);
       setMapping(seed(parsed.mapping, dataset, headers));
     },
   });
@@ -312,7 +327,7 @@ export function ColumnMappingEditor({
           </table>
         </div>
       )}
-      <p id={statusId}>{applyStatus(dataset, unmapped, unreadable)}</p>
+      <p id={statusId}>{applyStatus(dataset, unmapped, unreadable, dropped)}</p>
       <div className="flex flex-wrap items-center gap-2">
         <Button
           aria-describedby={statusId}

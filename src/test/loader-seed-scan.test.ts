@@ -180,6 +180,13 @@ const CENSUS = new Map<string, { class: SeedClass; why: string }>([
     },
   ],
   [
+    "src/components/placement/column-mapping.tsx: useState(() => initial === undefined ? [] : droppedColumns(initial, dataset))",
+    {
+      class: "D",
+      why: "what the stored column mapping lost to fit the editor's dataset, from the workspace in this browser, never loader data; the editor mounts when opened",
+    },
+  ],
+  [
     "src/components/placement/download-as.tsx: useState(STANDARD_OPTION)",
     {
       class: "D",

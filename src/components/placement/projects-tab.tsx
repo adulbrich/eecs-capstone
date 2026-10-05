@@ -118,8 +118,8 @@ export function ProjectsTab({
     bidCount: bidCounts.get(p.key) ?? 0,
   }));
 
-  // Projects are stored parsed, so the column mapping runs once, here, and is not
-  // kept: the editor says so.
+  // Projects are stored parsed, so the column mapping runs once, here, and
+  // is not kept: the editor says so.
   const readMapped = (mapping: ColumnMapping) => {
     if (unread === null) {
       return;

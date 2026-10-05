@@ -9,9 +9,11 @@ import {
 } from "#/lib/placement/roster";
 import {
   clearStoredWorkspace,
+  currentNotices,
   EMPTY_WORKSPACE,
   inputFingerprint,
   isEmptyWorkspace,
+  type MappingNotice,
   readStoredWorkspace,
   setAsideRemoved,
   WORKSPACE_STORAGE_KEY,
@@ -31,9 +33,9 @@ export function usePlacementWorkspace() {
   const [saveFailed, setSaveFailed] = useState(false);
   const [unreadable, setUnreadable] = useState(false);
   const [changedElsewhere, setChangedElsewhere] = useState(false);
-  // What reading the workspace set aside, as a column mapping it could not
-  // read (#735), until the next import or clear.
-  const [notices, setNotices] = useState<string[]>([]);
+  // Column mappings reading the workspace removed (#735). One shows while
+  // its file is still there with no column mapping: see `currentNotices`.
+  const [notices, setNotices] = useState<MappingNotice[]>([]);
 
   // The storage event fires only in the other tabs, so this one learns that
   // a second copy of the page wrote the workspace it is about to overwrite.
@@ -74,8 +76,8 @@ export function usePlacementWorkspace() {
   }, []);
 
   const replace = useCallback(
-    (next: Workspace, setAside: readonly string[] = []) => {
-      setNotices([...setAside]);
+    (next: Workspace, lost: readonly MappingNotice[] = []) => {
+      setNotices([...lost]);
       setWorkspace(next);
     },
     []
@@ -210,8 +212,8 @@ export function usePlacementWorkspace() {
     placementProjects: allProjects,
     saveFailed,
     unreadable,
-    /** What reading the workspace set aside, to say on the page. */
-    notices,
+    /** The column mappings reading the workspace removed, to say so. */
+    notices: currentNotices(notices, workspace),
     changedElsewhere,
     update,
     replace,

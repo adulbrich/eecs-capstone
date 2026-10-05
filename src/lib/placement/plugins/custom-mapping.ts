@@ -208,6 +208,20 @@ export function fitToDataset(
 }
 
 /**
+ * The pairs `fitToDataset` leaves out, as '"Rank" (priority)': a column the
+ * dataset's format lacks, or a second header for one column.
+ */
+export function droppedColumns(
+  mapping: ColumnMapping,
+  dataset: PlacementDataset
+): string[] {
+  const kept = fitToDataset(mapping, dataset).columns;
+  return Object.entries(mapping.columns)
+    .filter(([header]) => !Object.hasOwn(kept, header))
+    .map(([header, column]) => `"${header}" (${column})`);
+}
+
+/**
  * The pairs whose header the file has, spelled as the file spells it: what
  * Apply stores and the preview reads.
  */
@@ -273,10 +287,14 @@ const stopped = (message: string): ImportIssue => ({
 export function mapRows(
   text: string,
   mapping: ColumnMapping
-): { issues: ImportIssue[]; rows: Record<string, string>[] } {
-  const { fields, issues, rows } = parseRows(text);
+): {
+  firstRecordRow: number;
+  issues: ImportIssue[];
+  rows: Record<string, string>[];
+} {
+  const { fields, firstRecordRow, issues, rows } = parseRows(text);
   if (issues.some((i) => i.wholeFile)) {
-    return { issues, rows: [] };
+    return { firstRecordRow, issues, rows: [] };
   }
   const missing = missingHeaders(mapping, fields);
   if (missing.length > 0) {
@@ -286,6 +304,7 @@ export function mapRows(
           `The file has no "${header}" column, which the column mapping reads as ${mapping.columns[header]}.`
         )
       ),
+      firstRecordRow,
       rows: [],
     };
   }
@@ -293,6 +312,7 @@ export function mapRows(
     ([header, column]) => [normalizeHeader(header), column] as const
   );
   return {
+    firstRecordRow,
     issues,
     rows: rows.map((raw) =>
       Object.fromEntries(
@@ -339,8 +359,13 @@ function convert(
       `The column mapping leaves ${quoted(unmapped)} unmapped, which the ${dataset} format requires.`
     );
   }
-  const { issues, rows } = mapRows(text, mapping);
-  return { text: writeFormat(format, rows), issues };
+  const { firstRecordRow, issues, rows } = mapRows(text, mapping);
+  // The file's blank lines before its header go first, so the parser names
+  // each converted row by its row in the uploaded file.
+  return {
+    text: "\r\n".repeat(firstRecordRow - 2) + writeFormat(format, rows),
+    issues,
+  };
 }
 
 /** Custom mapping's id for `dataset`, as a workspace stores it in `readAs`. */

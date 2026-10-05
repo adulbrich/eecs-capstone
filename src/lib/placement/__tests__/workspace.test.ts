@@ -4,6 +4,7 @@ import type { WorkspaceProject } from "#/lib/placement/types";
 import {
   addProject,
   contactFor,
+  currentNotices,
   EMPTY_WORKSPACE,
   inputFingerprint,
   isEmptyWorkspace,
@@ -492,7 +493,7 @@ describe("a column mapping (#735)", () => {
   const imported = (entry: Record<string, unknown>) =>
     parseWorkspace(JSON.stringify({ ...EMPTY_WORKSPACE, roster: entry }));
 
-  it("sets aside a mapping for another dataset or of the wrong shape, and reads the file as detected", () => {
+  it("removes a mapping for another dataset or of the wrong shape, and reads the file as detected", () => {
     expect(
       imported({ ...roster, mapping: { ...mapping, dataset: "bids" } })
     ).toEqual({
@@ -502,7 +503,12 @@ describe("a column mapping (#735)", () => {
         roster: { source: roster.source, text: roster.text },
       },
       notices: [
-        "The column mapping saved with the roster was set aside, and the file is read as detected. It is for the bids, not the roster. Map its columns again to read it that way.",
+        {
+          source: "roster",
+          text: roster.text,
+          message:
+            "The column mapping saved with the roster could not be read, so it was removed from this workspace and the file is read as detected. It is for the bids, not the roster. Map its columns again to read it that way.",
+        },
       ],
     });
     expect(
@@ -513,14 +519,16 @@ describe("a column mapping (#735)", () => {
     ).toMatchObject({
       ok: true,
       notices: [
-        expect.stringContaining(
-          "It could not be read: team is not a column of the roster format."
-        ),
+        expect.objectContaining({
+          message: expect.stringContaining(
+            "Its shape is wrong: team is not a column of the roster format."
+          ),
+        }),
       ],
     });
   });
 
-  it("sets aside a later version, keeping a Read as that did not use it", () => {
+  it("removes a later version, keeping a Read as that did not use it", () => {
     const result = imported({
       ...roster,
       readAs: null,
@@ -533,9 +541,61 @@ describe("a column mapping (#735)", () => {
         roster: { source: roster.source, text: roster.text, readAs: null },
       },
       notices: [
-        "The column mapping saved with the roster was set aside. The column mapping is version 2, and this page reads version 1. Map its columns again to read it that way.",
+        {
+          source: "roster",
+          text: roster.text,
+          message:
+            "The column mapping saved with the roster could not be read, so it was removed from this workspace. The column mapping is version 2, and this page reads version 1. Map its columns again to read it that way.",
+        },
       ],
     });
+  });
+
+  it("says so only while the file is there with no new column mapping", () => {
+    const result = imported({ ...roster, mapping: { ...mapping, version: 2 } });
+    if (!result.ok) {
+      throw new Error(result.message);
+    }
+    const notices = result.notices ?? [];
+    expect(currentNotices(notices, result.workspace)).toHaveLength(1);
+    expect(
+      currentNotices(
+        notices,
+        setColumnMapping(result.workspace, "roster", mapping)
+      )
+    ).toEqual([]);
+    expect(
+      currentNotices(notices, {
+        ...result.workspace,
+        roster: {
+          ...roster,
+          readAs: undefined,
+          text: "email\nkim@example.edu",
+        },
+      })
+    ).toEqual([]);
+    expect(
+      currentNotices(notices, { ...result.workspace, roster: undefined })
+    ).toEqual([]);
+  });
+
+  it("refuses a Read as that is no way to read the dataset, and another dataset's mapping", () => {
+    const mapped = setColumnMapping(base, "roster", mapping);
+    expect(setReadAs(mapped, "roster", "custom-mapping-bids")).toBe(mapped);
+    expect(setReadAs(mapped, "roster", "qualtrics-bids")).toBe(mapped);
+    expect(setReadAs(mapped, "roster", "paste-roster")).toBe(mapped);
+    expect(setReadAs(mapped, "roster", "gone")).toBe(mapped);
+    expect(setReadAs(mapped, "roster", "canvas-roster").roster?.readAs).toBe(
+      "canvas-roster"
+    );
+    expect(
+      setColumnMapping(mapped, "roster", { ...mapping, dataset: "bids" })
+    ).toBe(mapped);
+    const bids = {
+      ...base,
+      bids: { filename: "bids.csv", text: "x", readAs: undefined },
+    };
+    expect(setColumnMapping(bids, "bids", mapping)).toBe(bids);
   });
 });
 

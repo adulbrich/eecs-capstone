@@ -450,6 +450,50 @@ for (const width of [1280, 375]) {
   });
 }
 
+// A saved workspace holding a column mapping this page cannot read (#735):
+// the page loads and says the column mapping was removed.
+for (const width of [1280, 375]) {
+  test(`admin placement, a removed column mapping at ${width}`, async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width, height: 800 });
+    await page.goto("/admin/placement?tab=roster");
+    await waitForHydration(page);
+    await page.getByLabel("Roster CSV file").setInputFiles({
+      name: "roster.csv",
+      mimeType: "text/csv",
+      buffer: Buffer.from("Student Email,Full Name\nada@example.edu,Ada Park"),
+    });
+    await expect(
+      page.getByRole("button", { name: "Map columns" })
+    ).toBeVisible();
+    // What a later build could save: a version 2 column mapping in use.
+    await page.evaluate(() => {
+      const key = "cs-capstone:placement:v1";
+      const workspace = JSON.parse(window.localStorage.getItem(key) ?? "{}");
+      workspace.roster.readAs = "custom-mapping-roster";
+      workspace.roster.mapping = {
+        version: 2,
+        dataset: "roster",
+        columns: { "Student Email": "email" },
+      };
+      window.localStorage.setItem(key, JSON.stringify(workspace));
+    });
+    await page.reload();
+    await waitForHydration(page);
+    await expect(
+      page
+        .getByRole("status")
+        .filter({ hasText: "so it was removed from this workspace" })
+    ).toContainText("version 2");
+    await expect(
+      page.getByRole("button", { name: "Map columns" })
+    ).toBeVisible();
+    await checkA11y(page);
+    await expectNoHorizontalOverflow(page);
+  });
+}
+
 // The projects and bids column mappings (#735): one editor each, opened from
 // a file nothing recognizes.
 for (const width of [1280, 375]) {

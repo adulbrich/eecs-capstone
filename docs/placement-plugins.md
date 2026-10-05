@@ -113,9 +113,14 @@ header, and the page keeps saying so until that column takes another header;
 Apply leaves out a missing optional column. Reading a stored file through such a
 column mapping reports it as a problem with the whole file. A stored or imported
 workspace whose column mapping cannot be read (another version, another dataset,
-or the wrong shape) is still read: that column mapping is set aside, the file is
-detected again if it was read through it, and the page says so. A column mapping
-never reaches the server (ADR-0056).
+or the wrong shape) is still read: that column mapping is removed from the
+workspace, the file is detected again if it was read through it, and the page says
+why until the file is replaced or given a new column mapping. The next save drops
+it from storage too, so a tab on an older build deletes a newer build's column
+mapping; staff map the columns again. Issue rows name the uploaded file's rows
+even after blank lines before its header, which a column-mapped file keeps ahead
+of its converted header for that reason. A column mapping never reaches the server
+(ADR-0056).
 
 ## Adding one
 

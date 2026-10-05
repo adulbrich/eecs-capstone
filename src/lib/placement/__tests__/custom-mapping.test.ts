@@ -1,8 +1,10 @@
 import { describe, expect, it } from "vitest";
+import { applyStatus } from "#/components/placement/column-mapping";
 import { toStandard } from "#/lib/placement/plugins";
 import {
   type ColumnMapping,
   CUSTOM_MAPPINGS,
+  droppedColumns,
   fileHeaders,
   fitToDataset,
   parseMapping,
@@ -126,8 +128,22 @@ describe("custom mapping (#735)", () => {
 
 describe("reading a file through a column mapping (#735)", () => {
   it("reads a file that starts with blank lines", () => {
-    expect(read(`\n\n${FILE}`, MAPPING)).toEqual(read(FILE, MAPPING));
-    expect(read(`\n${FILE}`, MAPPING).text).toContain("ada@example.edu");
+    const blank = read(`\n\n${FILE}`, MAPPING);
+    expect(blank.issues).toEqual([]);
+    // The blank lines stay ahead of the header, so rows keep their numbers.
+    expect(blank.text).toBe(`\r\n\r\n${read(FILE, MAPPING).text}`);
+    expect(parseRosterCsv(blank.text).entries).toEqual(
+      parseRosterCsv(read(FILE, MAPPING).text).entries
+    );
+  });
+
+  it("keeps the file's row numbers through leading blank lines", () => {
+    const { text } = read(
+      "\n\nStudent Email,Full Name\nada@example.edu,Ada\nada@example.edu,Ada\n",
+      { ...MAPPING, columns: { "Student Email": "email", "Full Name": "name" } }
+    );
+    // The repeated student is line 5 of the uploaded file.
+    expect(parseRosterCsv(text).issues.map((i) => i.row)).toEqual([5]);
   });
 
   it("refuses two headers filling one column, rather than keep the last", () => {
@@ -148,6 +164,20 @@ describe("reading a file through a column mapping (#735)", () => {
 });
 
 describe("fitting a column mapping to a slot", () => {
+  it("names what it leaves out, and the editor's status says so", () => {
+    const bids: ColumnMapping = {
+      version: 1,
+      dataset: "bids",
+      columns: { Mail: "email", Rank: "priority", Other: "email" },
+    };
+    const dropped = droppedColumns(bids, "roster");
+    expect(dropped).toEqual(['"Rank" (priority)', '"Other" (email)']);
+    expect(applyStatus("roster", [], [], dropped)).toBe(
+      '"Rank" (priority), "Other" (email) are not in the roster format, so the column mapping leaves them out. Every required column is mapped.'
+    );
+    expect(droppedColumns(MAPPING, "roster")).toEqual([]);
+  });
+
   it("keeps only its dataset's columns, the first header for each, stamped with the slot", () => {
     expect(
       fitToDataset(

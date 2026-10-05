@@ -100,11 +100,11 @@ function PlacementPage() {
       {state.notices.map((notice) => (
         <p
           className="mt-2 text-sm"
-          key={notice}
+          key={notice.source}
           role="status"
           style={{ color: "var(--status-warning)" }}
         >
-          {notice}
+          {notice.message}
         </p>
       ))}
       <FieldError
