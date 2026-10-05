@@ -134,6 +134,7 @@ if (existsSync(`${root}/scripts/check-workspace.mjs`)) {
   lines.push(
     ...workspace.workspaceLines({
       gone: branches.branches,
+      goneHere: branches.here,
       servers: ports.servers,
       unchecked: ports.unchecked,
       unreadable: [

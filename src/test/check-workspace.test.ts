@@ -48,6 +48,47 @@ function repoWithRemote() {
   return { base, dir, remote };
 }
 
+/**
+ * Branches pushed with an upstream and then deleted on the remote, which is
+ * what a merge with `--delete-branch` leaves behind.
+ */
+function goneOnRemote(dir: string, remote: string, names: string[]) {
+  for (const name of names) {
+    run(dir, "branch", name);
+  }
+  run(dir, "push", "-q", "-u", "origin", ...names);
+  for (const name of names) {
+    spawnSync("git", ["-C", remote, "update-ref", "-d", `refs/heads/${name}`], {
+      env,
+    });
+  }
+  run(dir, "fetch", "-q", "--prune", "origin");
+}
+
+/** The review and delete commands the leftover-branch line hands the user. */
+function commandsIn(line: string) {
+  const review = line.split("review them with `")[1]?.split("`")[0] ?? "";
+  const remove = line.split("then delete them with: ")[1] ?? "";
+  return { remove, review };
+}
+
+/**
+ * What a shell command prints, one line each, sorted. Blank lines are kept, so
+ * a list padded with them fails the comparison rather than passing it.
+ */
+function listed(dir: string, command: string) {
+  const out = spawnSync("sh", ["-c", command], {
+    cwd: dir,
+    encoding: "utf8",
+    env,
+  }).stdout;
+  return out.replace(/\n$/, "").split("\n").sort();
+}
+
+function branchesIn(dir: string) {
+  return listed(dir, "git branch --format='%(refname:short)'");
+}
+
 /** The report for `dir`. The port probe is off unless a case asks for it. */
 function report(dir: string, ...extra: string[]) {
   const result = spawnSync(
@@ -105,27 +146,64 @@ describe("check-workspace", () => {
     expect(report(dir).stdout).toContain("Leftovers: none");
   });
 
-  it("names a branch whose upstream is gone, with the command that removes it", () => {
+  it("counts the branches whose upstream is gone in one line, with one command that removes them", () => {
+    // The names used to be listed, 26 of them on one day, in every session's
+    // context. Twenty is enough to show the line does not grow with them.
     const { dir, remote } = repoWithRemote();
-    run(dir, "checkout", "-q", "-b", "feat/merged");
-    run(dir, "push", "-q", "-u", "origin", "feat/merged");
-    run(dir, "checkout", "-q", "main");
-    spawnSync(
-      "git",
-      ["-C", remote, "update-ref", "-d", "refs/heads/feat/merged"],
-      {
-        env,
-      }
-    );
-    run(dir, "fetch", "-q", "--prune", "origin");
+    const names = Array.from({ length: 20 }, (_, i) => `feat/merged-${i}`);
+    goneOnRemote(dir, remote, names);
+    run(dir, "branch", "wip/never-pushed");
 
-    const result = report(dir);
-    expect(result.stdout).toContain("feat/merged");
+    const lines = report(dir).stdout.trim().split("\n");
+    expect(lines).toHaveLength(1);
+    expect(lines[0]).toContain("Leftover branches: 20");
+    expect(lines[0]).not.toContain("feat/merged");
+
+    // Run both commands as the user would, so a typo in the format string
+    // fails here rather than in somebody's terminal. The review step lists
+    // exactly what the delete removes.
+    const { review, remove } = commandsIn(lines[0]);
+    expect(listed(dir, review)).toEqual([...names].sort());
     // Force, because a squash merge leaves the branch "not fully merged" and
-    // plain -d refuses it. The report says so rather than leaving the reader
-    // to find out.
-    expect(result.stdout).toContain("git branch -D");
-  });
+    // plain -d refuses it.
+    expect(remove).toMatch(/^git branch -D /);
+    expect(spawnSync("sh", ["-c", remove], { cwd: dir, env }).status).toBe(0);
+    expect(branchesIn(dir)).toEqual(["main", "wip/never-pushed"]);
+  }, 60_000);
+
+  it("leaves out a gone branch that a worktree has checked out, from the count and the command", () => {
+    // `git branch -D` refuses a branch a worktree holds, so counting one would
+    // promise a delete the command cannot do, and the command would exit 1
+    // partway. The checkout itself is a worktree too.
+    const { base, dir, remote } = repoWithRemote();
+    goneOnRemote(dir, remote, ["feat/held", "feat/current", "feat/free"]);
+    run(dir, "worktree", "add", "-q", join(base, "held"), "feat/held");
+    run(dir, "checkout", "-q", "feat/current");
+
+    const line = report(dir)
+      .stdout.split("\n")
+      .find((l) => l.startsWith("Leftover branches"));
+    expect(line).toContain("Leftover branches: 1 ");
+
+    const { review, remove } = commandsIn(line ?? "");
+    expect(listed(dir, review)).toEqual(["feat/free"]);
+    expect(spawnSync("sh", ["-c", remove], { cwd: dir, env }).status).toBe(0);
+    expect(branchesIn(dir)).toEqual(["feat/current", "feat/held", "main"]);
+  }, 60_000);
+
+  it("says so when the checkout itself is on a branch whose upstream is gone", () => {
+    // Left out of the count because `-D` refuses it, and the worktree lines
+    // skip the checkout itself, so without its own line a session on a merged
+    // branch would hear nothing about it.
+    const { dir, remote } = repoWithRemote();
+    goneOnRemote(dir, remote, ["feat/current"]);
+    run(dir, "checkout", "-q", "feat/current");
+
+    const lines = report(dir).stdout.trim().split("\n");
+    expect(lines).toEqual([
+      "This checkout is on feat/current, whose remote is already deleted: switch to main, then delete it.",
+    ]);
+  }, 60_000);
 
   it("names a server on a probed port whose directory is not this checkout", async () => {
     const { dir } = repoWithRemote();

@@ -6,12 +6,11 @@ section of `docs/QUIRKS.md` says why).
 
 ## What an issue is here
 
-**The issue is the spec.** There is no separate spec document for ordinary work: an
+**The issue is the spec**, for all work. There is no separate spec document: an
 issue in `ready-for-agent` carries an agent brief (current behavior, desired
 behavior, key interfaces, acceptance criteria, out of scope) and the pull request
-that closes it is the plan. The superpowers brainstorm, spec and plan workflow under
-`docs/superpowers/` is reserved for a few large new features; `CONTRIBUTING.md` says
-which.
+that closes it is the plan. `docs/superpowers/` holds the specs and plans of
+features built before 2026-10, kept for reference.
 
 Two local deltas from the default agent-brief guidance:
 
