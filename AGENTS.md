@@ -8,208 +8,97 @@ Drizzle ORM on PostgreSQL with pgvector; Better Auth; shadcn/ui on Radix; Tailwi
 S3-compatible object storage (RustFS locally, S3 in AWS); Amazon Bedrock for project
 review and embeddings.
 
-This file is the entry point. It carries the rules that bind every turn and points at
-the reference docs for everything else.
-
-`CLAUDE.md` in the repo root is a symlink to this file, and it is load-bearing:
-Claude Code auto-loads `CLAUDE.md` and does not read `AGENTS.md` on its own, so
-deleting the symlink leaves it with no project instructions at all. Keep both names
-pointing at this one file rather than maintaining a second copy.
+`CLAUDE.md` is a symlink to this file and is load-bearing: Claude Code reads
+`CLAUDE.md`, not `AGENTS.md`. Keep the symlink; never keep a second copy.
 
 ## Before you commit
 
 ```bash
-npm run check      # ultracite check (Biome). Use npm run format to auto-fix.
-npm run typecheck  # tsc --noEmit
-npm test           # unit tests only
+npm run check      # Biome via ultracite; npm run format auto-fixes
+npm run typecheck
+npm test           # unit suite only
 ```
 
-All three must be clean, because a red local run is a red PR. lefthook runs Biome and
-the prose check on the staged files at commit, and typecheck and the unit suite at
-push, so most of the time a red one is caught before it leaves your machine.
-[`CONTRIBUTING.md`](./CONTRIBUTING.md) has the table of every gate, where each runs,
-and what catches a skip; `.github/workflows/ci.yml` is what CI actually does.
-
-`npm test` says nothing about the integration, smoke or accessibility suites, and
-all three block a merge. "Which suites to run yourself" in CONTRIBUTING.md says
-which one a change to the database layer, a covered flow or a scanned page needs
-before the PR, and what each needs running.
+All three clean. The integration, smoke and accessibility suites also block a merge;
+"Which suites to run yourself" in `CONTRIBUTING.md` says which one your change needs.
 
 ## Always
 
-- **Prose contains no emdashes and no emojis.** This covers commit messages, code
-  comments, string literals, docs, and chat replies. Use commas, colons, semicolons,
-  parens, or a new sentence. A `--` standing in for a sentence dash is the same
-  violation; hyphens inside compound words like `read-only` are fine. Emojis only
-  when the user asks for one. `scripts/check-prose.mjs` enforces the two characters
-  at commit, in CI and on every edit; the `--` case is yours. The one exception is
-  the footer the harness appends to a PR body, which the check strips before it
-  looks.
-- **Commit messages use Conventional Commits with a lowercase imperative subject:**
-  `fix(projects): stop the proposer field lying about pending changes`. The types in
-  use are `feat`, `fix`, `docs`, `test`, `refactor`, `style`, `perf`, `build`,
-  `ci` and `chore`. Put the affected area in parens. Bare subjects exist in the
-  history and are not the pattern to copy, same as the long bodies below. A
-  breaking change takes a `!` before the colon, as in
-  `feat(inventory)!: give items many categories`. Dependabot lands `chore(deps)`
-  and `build(deps)`. `scripts/check-commit-message.mjs` enforces the subject at
-  `commit-msg`, in CI, and on the pull request title, which a squash merge turns
-  into the `main` subject.
-- **Keep the body short, or leave it out.** A sentence or two on why, and only when
-  the subject does not already carry it. Cut anything that does not change what a
-  reader will do or understand. Commits before 2026-08-09 run to several paragraphs;
-  they are history, not the pattern to copy. Use a HEREDOC when a body needs more
-  than one line.
-- **Keep the `Co-Authored-By` trailer** your harness supplies on assistant-authored
-  commits. Do not pin a model version in these docs; the harness fills in whichever
-  model wrote the commit.
-- **Never publish a `claude.ai/code/session` link.** Not in a commit message, a PR
-  body, an issue, or a comment. Some harnesses append a `Claude-Session:` trailer to
-  commits and a session link to PR bodies; this rule overrides that instruction.
-  Keep `Co-Authored-By`, drop the session link. The reason it is a hard rule rather
-  than a preference: this repo is public and mirrors to GitLab, so a published link
-  is on two remotes at once, and taking it back costs a history rewrite against a
-  protected branch plus a force sync of the mirror. The commit check and the
-  `.claude/hooks/guard-gh.mjs` hook refuse the text before it reaches a remote; if
-  you are in a harness without them, grep for it yourself.
-- **Stage files by name.** Never `git add -A` or `git add .`, which sweeps up
-  unrelated work in progress. `.claude/hooks/guard-git.mjs` refuses both, and
-  `git commit -a` with them.
-- **Never commit to `main`.** A branch ruleset rejects direct pushes, including the
-  user's, and the pre-commit hook refuses the commit. Fetch, branch from
-  `origin/main`, push, open a PR, and let the required checks go green. GitHub
-  asks for no approving review, so nothing but the rule below stops a PR merging
-  unread.
-- **Run `mattpocock-skills:code-review` on every PR before merging, then again after
-  addressing what it found, until a pass raises nothing you have not already
-  answered.** A PR that draws no findings meets that after one pass. Answered
-  covers a finding you fixed and one you declined in writing alike, so a reviewer
-  repeating a point you argued against does not restart the loop, and a pass whose
-  findings you all declined without editing a line is itself the pass that ends it.
-  Every pass after the first exists for the code the previous pass caused you to
-  write, which otherwise reaches `main` reviewed by nobody. Green CI is not a
-  review: it says nothing broke that was already covered, and new code with no new
-  tests is the part it cannot speak to. Verify a finding before acting on it. A
-  review agent reads a branch, not your intent, and will sometimes be confidently
-  wrong about what exists. Record the pass count and any declined finding in the
-  PR, where the template asks for it.
+A tool enforces the first five, so a refusal names the rule you hit.
 
-  `.claude/settings.json` declares the marketplace and enables the plugin, so nobody
-  has to add either by hand. Claude Code still asks each operator once whether to
-  trust the marketplace, so a fresh clone answers a prompt, not a setup step. Every
-  PR goes through this, Dependabot's included: a bump that draws no findings clears
-  the rule in a single pass, which is cheaper than arguing about the exception. If
-  you are an agent that cannot run a Claude Code plugin, say so in the PR and review
-  the diff against this file and `docs/QUIRKS.md` yourself. That is a fallback for a
-  harness that lacks the tool, not a choice between equals.
-
-- **Run `correctness-review` beside it on every PR that changes behaviour.** The
-  code-review pass checks conformance, not correctness. This skill lives under
-  `.claude/skills/` and asks what breaks the diff, with the input or sequence that
-  triggers each finding. Run it on the first pass, and again on a later pass
-  whenever the fixes since the last one changed behaviour rather than wording. It follows the loop rule above: a finding is fixed or declined in writing,
-  and the PR records the pass count and any decline. A PR whose diff touches only
-  documentation files, code comments or the PR template, or a dependency bump with
-  no source change, is exempt, because there is no behaviour in the diff for it to
-  read; say so in the PR. A prompt or a string literal under `src/` is behaviour.
-  The conformance pass cannot stand in for it: code that follows every rule here
-  can still double-submit, drop a row or leak a redirect, and that is what shipped
-  when only one pass ran.
-
-  `app-security-review` stays optional. It covers the security classes a generic
-  security review excludes by policy, for a diff under `src/server`, `src/lib`,
-  `infra` or any prompt or logger. Run your harness's generic security review beside
-  it, or cover its categories by hand when the harness has none.
-- **Check the docs for the fast-moving libraries with the context7 MCP server**
-  rather than recalling them, for TanStack Start, TanStack Router, Better Auth and
-  Drizzle above all: those four are what training data is most likely to be wrong
-  about. Do not write down a version, a release cadence or a maturity level here;
-  `package.json` carries the versions and cannot go stale; cadence and maturity are
-  not facts this repo should be recording at all. Naming a major line is fine where
-  it identifies the thing, as "Tailwind v4" does. `docs/QUIRKS.md` outranks upstream
-  docs wherever the two disagree about this codebase.
-- **Import `createServerFn` from `@tanstack/react-start`.** The bare
-  `@tanstack/start` package is not what this project uses.
+- **No emdash and no emoji** in commits, comments, string literals, docs or chat.
+  `scripts/check-prose.mjs` (commit, CI) and `after-edit.mjs` (every edit). Not
+  enforced, and the same violation: `--` as a sentence dash. Hyphenated compounds are
+  fine; emojis only when the user asks; the harness footer on a PR body is exempt.
+- **Conventional Commits, lowercase imperative subject, area in parens:**
+  `fix(projects): stop the proposer field lying about pending changes`. Types: `feat`,
+  `fix`, `docs`, `test`, `refactor`, `style`, `perf`, `build`, `ci`, `chore`; `!`
+  before the colon for a breaking change; Dependabot's `chore(deps)` and `build(deps)`
+  pass as they come. `scripts/check-commit-message.mjs`
+  (commit-msg, CI, PR title).
+- **Never publish a `claude.ai/code/session` link** in a commit, PR, issue or comment,
+  even when the harness appends one. The repo is public and mirrored to GitLab, so
+  removing one costs a protected-branch history rewrite. `guard-gh.mjs` and the commit
+  check; without them, grep for it yourself.
+- **Stage files by name**, never `git add -A`, `git add .` or `git commit -a`.
+  `guard-git.mjs`.
+- **Never commit to `main`.** Fetch, branch from `origin/main`, push, open a PR, let the
+  required checks go green. Pre-commit hook, `guard-git.mjs`, branch ruleset.
+- **Commit body:** a sentence or two on why, or none. Use a HEREDOC for more than one
+  line. Long bodies before 2026-08-09 are history, not the pattern.
+- **Keep the `Co-Authored-By` trailer** the harness supplies. Never pin a model
+  version in these docs.
+- **Review loop on every PR, Dependabot's included.** GitHub requires no approving
+  review, and green CI is not one, so this is the review. Run `mattpocock-skills:code-review` (conformance) and,
+  on a PR that changes behaviour, `correctness-review` (what breaks) beside it. Repeat
+  until a pass raises nothing you have not answered; answered means fixed or declined
+  in writing, so a pass whose findings you all declined ends it. Later passes review
+  the code earlier ones made you write; rerun correctness when those fixes changed
+  behaviour. Verify a finding before acting: reviewers are sometimes confidently wrong.
+  Record each pass count and every decline in the PR. Correctness is skipped, saying so
+  in the PR, for a diff of only docs, comments or the PR template, or a dependency bump
+  with no source change; a prompt or string literal under `src/` is behaviour. A
+  harness that cannot run the plugin says so in the PR and reviews the diff against
+  this file and `docs/QUIRKS.md` by hand. `app-security-review` is optional for a diff
+  under `src/server`, `src/lib`, `infra` or any prompt or logger, beside the harness's
+  generic security review.
+- **Check context7** for TanStack Start, TanStack Router, Better Auth and Drizzle
+  rather than recalling them. Write no version, release cadence or maturity level into
+  these docs; `package.json` has the versions. `docs/QUIRKS.md` outranks upstream docs
+  about this codebase.
+- **Import `createServerFn` from `@tanstack/react-start`**, not `@tanstack/start`.
 
 ## Agent skills
 
-The mattpocock engineering skills read three files about this repo before they act.
-
-### Issue tracker
-
-GitHub issues on this repo, driven with `gh`; the issue is the spec, and briefs name
-file paths on purpose. See [`docs/agents/issue-tracker.md`](./docs/agents/issue-tracker.md).
-
-### Triage labels
-
-The five canonical roles under their own names, plus `p0-now`, `p1-next` and
-`p2-later`. See [`docs/agents/triage-labels.md`](./docs/agents/triage-labels.md).
-
-### Domain docs
-
-Single context: the glossary is `CONTEXT.md` at the root and the decisions are one
-paragraph each under `docs/adr/`. See
-[`docs/agents/domain.md`](./docs/agents/domain.md).
-
-### Code review
-
-One delta: a UI change carries screenshots at both widths, and the reviewer checks
-for the second one. See [`docs/agents/code-review.md`](./docs/agents/code-review.md).
+- Issue tracker: GitHub issues via `gh`; the issue is the spec, and briefs name file
+  paths on purpose. `docs/agents/issue-tracker.md`.
+- Triage labels: the five canonical roles plus `p0-now`, `p1-next`, `p2-later`.
+  `docs/agents/triage-labels.md`.
+- Domain: `CONTEXT.md` glossary, one-paragraph decisions in `docs/adr/`.
+  `docs/agents/domain.md`.
+- Code review: the standards sources, and screenshots at both widths for a UI change.
+  `docs/agents/code-review.md`.
 
 ## Reference docs
 
-Read the matching doc before you start; each one is the source of truth for its area.
+Grep for the section your task needs; do not read a doc whole. `docs/QUIRKS.md` alone
+is over 200 KB.
 
-- **[`CONTRIBUTING.md`](./CONTRIBUTING.md)** is the process: pick up, branch, commit,
-  push, pull request, review loop, merge, and the table of every gate and where it
-  runs. It is also where a new developer or instructor starts.
-
-- **[`CONTEXT.md`](./CONTEXT.md)** is the glossary: one definition per term for
-  projects, inventory, and the people and roles around them, each with the synonyms
-  the codebase does not use. Use its words in issue titles, test names and copy.
-
-- **[`docs/adr/`](./docs/adr/)** holds the decisions, one paragraph each, numbered.
-  Read the ones that touch your area, and say so before contradicting one.
-
-- **[`docs/QUIRKS.md`](./docs/QUIRKS.md)** is the ground truth for how this codebase
-  actually behaves, and the first stop when something that should work does not. It
-  covers `createServerFn` and the server/client boundary, route layouts and search
-  params, TanStack Form validators, Better Auth sessions and bans, Drizzle tsvector
-  columns and FK rules, Vitest and integration-test setup, Sharp and S3 storage keys,
-  which Biome rules are relaxed and why, the path-by-path layout of `src/`, the
-  workflow conventions, Amazon Bedrock, and the gotchas in the inventory and project
-  modules that the ADRs and the glossary do not carry.
-
-- **[`docs/UI-CONVENTIONS.md`](./docs/UI-CONVENTIONS.md)** is the design system:
-  brand tokens and why hex codes never go in a component, `Button` variants and
-  sizes, `asChild` for links, shadcn form inputs, semantic color classes, border
-  radius, mobile-first breakpoints and page padding, the `Sheet` mobile nav, and
-  `AdminDataTable` for responsive admin tables, the shared component patterns, and
-  the confirmation rules for destructive actions.
-
-- **[`README.md`](./README.md)** covers install, docker compose, seeding, and
-  running the dev server. Its "Known issues and roadmap" section is a pointer at
-  GitHub Issues rather than a list; check the issues before assuming something is
-  unreported.
-
-- **[`PRD.md`](./PRD.md)** is the exhaustive feature list, built and planned. Check it
-  before assuming a feature is missing.
-
-- **[`DEPLOYMENT.md`](./DEPLOYMENT.md)** and **[`infra/`](./infra/)** cover the AWS
-  deployment, Terraform, and environment variables.
-
-- **[`docs/ONID-SSO.md`](./docs/ONID-SSO.md)** covers ONID sign-in: how it works, how
-  to operate it, and what is still open with UIT. It is OIDC through Better Auth's
-  `genericOAuth`, not SAML, and it shipped; UIT registered the app as a relying party
-  on 2026-08-24.
+- `CONTRIBUTING.md`: the process, the table of gates, which suites to run.
+- `CONTEXT.md`: the glossary. Use its words in issue titles, test names and copy.
+- `docs/adr/`: the decisions. Say so before contradicting one.
+- `docs/QUIRKS.md`: how this codebase actually behaves, by subsystem, and the layout
+  of `src/`. First stop when something that should work does not.
+- `docs/UI-CONVENTIONS.md`: the design system.
+- `README.md`: install, docker compose, seeding, the dev server. Known issues are in
+  GitHub Issues.
+- `PRD.md`: every feature, built and planned. Check before assuming one is missing.
+- `DEPLOYMENT.md` and `infra/`: AWS, Terraform, environment variables.
+- `docs/ONID-SSO.md`: ONID sign-in, OIDC through Better Auth's `genericOAuth`.
 
 ## Adding to these docs
 
-A new gotcha goes in `docs/QUIRKS.md` under the subsystem it belongs to, following the
-pattern in its "When you add a quirk" section. A decision (hard to reverse,
-surprising without context, the result of a trade-off) goes in `docs/adr/` as one
-paragraph with the next number. A term goes in `CONTEXT.md`, with the synonyms to
-avoid. A new design system rule goes in `docs/UI-CONVENTIONS.md`. A change to the
-process or a gate goes in `CONTRIBUTING.md`.
-Add to this file only when the rule binds every turn regardless of what is being
-worked on.
+A gotcha goes in `docs/QUIRKS.md` under its subsystem; a decision in `docs/adr/` as
+one paragraph with the next number; a term in `CONTEXT.md` with the synonyms to avoid;
+a design rule in `docs/UI-CONVENTIONS.md`; a process or gate change in
+`CONTRIBUTING.md`. Add here only a rule that binds every turn.

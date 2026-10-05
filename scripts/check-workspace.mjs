@@ -23,7 +23,7 @@
  * is mid-suite on would be a worse bug than the one being prevented. The
  * branch case is the hard one on top of that: deleting a merged branch here
  * means force-deleting it, and `.claude/hooks/guard-git.mjs` reserves that for
- * the user on purpose.
+ * the user on purpose, so the report gives the count and the one command.
  *
  * What it cannot see: a leftover made after the report ran. The SessionStart
  * hook calls this once, at the first message, so it catches what the last
@@ -219,6 +219,15 @@ export function foreignServers(root, ports) {
   return { servers: found, unchecked: [] };
 }
 
+/**
+ * The one command that removes every gone branch, by count rather than by
+ * name. The list was 26 names long on 2026-10-03 and went into every session's
+ * context; the command finds the same set `goneBranches` does when it runs,
+ * so the report never has to carry it.
+ */
+const DELETE_GONE =
+  "git branch -D $(git for-each-ref --format='%(if:equals=[gone])%(upstream:track)%(then)%(refname:short)%(end)' refs/heads/)";
+
 /** The report, as lines. Pure, so the shapes above are what the tests drive. */
 export function workspaceLines({ worktrees, gone, servers, unchecked, unreadable }) {
   const lines = [];
@@ -229,10 +238,7 @@ export function workspaceLines({ worktrees, gone, servers, unchecked, unreadable
   }
   if (gone.length > 0) {
     lines.push(
-      `Leftover branches (${gone.length}), remote already deleted: ${gone.join(", ")}.`
-    );
-    lines.push(
-      `  A squash merge leaves each one "not fully merged", so \`git branch -d\` refuses it. Ask the user to run: git branch -D ${gone.join(" ")}`
+      `Leftover branches: ${gone.length} with the remote already deleted. A squash merge leaves each "not fully merged", so \`git branch -d\` refuses it. Ask the user to run: ${DELETE_GONE}`
     );
   }
   for (const s of servers) {

@@ -105,27 +105,44 @@ describe("check-workspace", () => {
     expect(report(dir).stdout).toContain("Leftovers: none");
   });
 
-  it("names a branch whose upstream is gone, with the command that removes it", () => {
+  it("counts the branches whose upstream is gone in one line, with one command that removes them", () => {
+    // The names used to be listed, 26 of them on one day, in every session's
+    // context. Twenty is enough to show the line does not grow with them.
     const { dir, remote } = repoWithRemote();
-    run(dir, "checkout", "-q", "-b", "feat/merged");
-    run(dir, "push", "-q", "-u", "origin", "feat/merged");
-    run(dir, "checkout", "-q", "main");
-    spawnSync(
-      "git",
-      ["-C", remote, "update-ref", "-d", "refs/heads/feat/merged"],
-      {
-        env,
-      }
-    );
+    const names = Array.from({ length: 20 }, (_, i) => `feat/merged-${i}`);
+    for (const name of names) {
+      run(dir, "branch", name);
+    }
+    run(dir, "push", "-q", "-u", "origin", ...names);
+    for (const name of names) {
+      spawnSync(
+        "git",
+        ["-C", remote, "update-ref", "-d", `refs/heads/${name}`],
+        {
+          env,
+        }
+      );
+    }
     run(dir, "fetch", "-q", "--prune", "origin");
+    run(dir, "branch", "wip/never-pushed");
 
-    const result = report(dir);
-    expect(result.stdout).toContain("feat/merged");
+    const lines = report(dir).stdout.trim().split("\n");
+    expect(lines).toHaveLength(1);
+    expect(lines[0]).toContain("Leftover branches: 20");
+    expect(lines[0]).not.toContain("feat/merged");
+
     // Force, because a squash merge leaves the branch "not fully merged" and
-    // plain -d refuses it. The report says so rather than leaving the reader
-    // to find out.
-    expect(result.stdout).toContain("git branch -D");
-  });
+    // plain -d refuses it. Run the command as the user would, so a typo in its
+    // format string fails here rather than in somebody's terminal.
+    const command = lines[0].split("Ask the user to run: ")[1];
+    expect(command).toMatch(/^git branch -D /);
+    spawnSync("sh", ["-c", command], { cwd: dir, env });
+    const left = run(dir, "branch", "--format=%(refname:short)").stdout;
+    expect(left.split("\n").filter(Boolean).sort()).toEqual([
+      "main",
+      "wip/never-pushed",
+    ]);
+  }, 60_000);
 
   it("names a server on a probed port whose directory is not this checkout", async () => {
     const { dir } = repoWithRemote();
