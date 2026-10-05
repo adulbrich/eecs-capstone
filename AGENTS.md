@@ -64,7 +64,8 @@ A tool enforces the first five, so a refusal names the rule you hit.
   generic security review.
 - **Check context7** for TanStack Start, TanStack Router, Better Auth and Drizzle
   rather than recalling them. Write no version, release cadence or maturity level into
-  these docs; `package.json` has the versions. `docs/QUIRKS.md` outranks upstream docs
+  these docs; `package.json` has the versions. Naming a major line is fine where it
+  identifies the thing, as "Tailwind v4" does. `docs/QUIRKS.md` outranks upstream docs
   about this codebase.
 - **Import `createServerFn` from `@tanstack/react-start`**, not `@tanstack/start`.
 
