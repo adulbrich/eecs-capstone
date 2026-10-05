@@ -157,7 +157,7 @@ export function toSqlVector(values: number[]): string {
  * behind on a workstation, `scripts/backfill-embeddings.mjs` in production.
  *
  * Records the outcome as the project's last embedding attempt (#631), so the
- * staff panel can tell "never attempted" from "failed". `trigger` is
+ * staff panel can tell "failed" from "no attempt on record". `trigger` is
  * `automatic` for the background refresh and the workstation sweep, `staff`
  * for the panel's retry. The `.mjs` sweep re-spells this in SQL and records
  * nothing.
@@ -167,8 +167,9 @@ export async function refreshProjectEmbedding(
   embed: EmbedFn = bedrockEmbed,
   trigger: AiRefreshTrigger = "automatic"
 ): Promise<ProjectRefreshOutcome> {
+  const startedAt = new Date();
   const outcome = await writeProjectEmbedding(projectId, embed);
-  await recordAiRefresh(projectId, "embedding", trigger, outcome);
+  await recordAiRefresh(projectId, "embedding", trigger, outcome, startedAt);
   return outcome;
 }
 

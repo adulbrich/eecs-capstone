@@ -72,18 +72,20 @@ function SummaryAttemptStatus({ view }: { view: SocialSummaryView }) {
   if (attempt || view.summary !== null) {
     return null;
   }
-  if (!view.refreshable) {
+  // The switch first: with it off, "once published" would promise a write
+  // nothing will make.
+  if (!view.automaticEnabled) {
     return (
       <AttemptNote>
-        Written automatically once the project is published.
+        Automatic summaries are switched off. Regenerate with AI still works.
       </AttemptNote>
     );
   }
   return (
     <AttemptNote>
-      {view.automaticEnabled
+      {view.refreshable
         ? "No automatic attempt on record yet."
-        : "Automatic summaries are switched off. Regenerate with AI still works."}
+        : "Written automatically once the project is published."}
     </AttemptNote>
   );
 }

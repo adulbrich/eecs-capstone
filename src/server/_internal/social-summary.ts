@@ -208,6 +208,7 @@ export async function regenerateSocialSummaryAs(
   invoke: ResponsesFn = mantleResponses
 ): Promise<RegenerateSocialSummaryResult> {
   assertStaff(viewer);
+  const startedAt = new Date();
   const project = await loadProject(data.projectId);
   const source = buildSocialSummarySource(project);
   if (!source) {
@@ -248,7 +249,13 @@ export async function regenerateSocialSummaryAs(
     // keep whatever was there rather than losing it to a failed attempt.
     // Recorded first, so the panel's status line agrees with the error staff
     // were just shown (#631).
-    await recordAiRefresh(project.id, "social_summary", "staff", "failed");
+    await recordAiRefresh(
+      project.id,
+      "social_summary",
+      "staff",
+      "failed",
+      startedAt
+    );
     throw new Error(run.error ?? "Social summary failed");
   }
   const updatedAt = new Date();
@@ -271,7 +278,8 @@ export async function regenerateSocialSummaryAs(
     project.id,
     "social_summary",
     "staff",
-    written.length > 0 ? "updated" : "superseded"
+    written.length > 0 ? "updated" : "superseded",
+    startedAt
   );
   if (written.length === 0) {
     // Losing the race means writing nothing and saying so. The row is re-read

@@ -861,7 +861,7 @@ export const aiReviewUsage = pgTable(
 
 /**
  * The last attempt to write each of a project's AI outputs, and how it ended
- * (#631), so staff can tell "never attempted" from "failed". One row per
+ * (#631), so staff can tell "failed" from "no attempt on record". One row per
  * project and kind, overwritten by each attempt; the last success is the
  * output's own `*_updated_at` on `projects`.
  *

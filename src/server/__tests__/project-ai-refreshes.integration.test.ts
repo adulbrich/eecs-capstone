@@ -14,6 +14,7 @@ import type { ResponsesFn } from "#/lib/_internal/bedrock-mantle";
 import { redactQueryError } from "#/lib/_internal/redact-query-error";
 import type { AiRefreshKind } from "#/lib/ai-refresh";
 import { auth } from "#/lib/auth";
+import { recordAiRefresh } from "../_internal/project-ai-refreshes";
 import { refreshProjectEmbedding } from "../_internal/project-embeddings";
 import { refreshSocialSummary } from "../_internal/project-social-summary";
 import {
@@ -220,6 +221,40 @@ describe("the automatic writers record their attempts", () => {
     expect(
       await refreshProjectEmbedding(project.id, () => Promise.resolve(VECTOR))
     ).toBe("unchanged");
+    expect(await readAttempt(project.id, "embedding")).toBeNull();
+  });
+
+  it("keeps a failure stamped after an unchanged check started", async () => {
+    // A staff attempt can fail between the automatic writer reading the row
+    // and its cleanup; that failure is newer than the check and must stay.
+    const project = await makeProject();
+    const failedAt = new Date();
+    await db.insert(projectAiRefreshes).values({
+      projectId: project.id,
+      kind: "embedding",
+      trigger: "staff",
+      outcome: "failed",
+      attemptedAt: failedAt,
+    });
+
+    await recordAiRefresh(
+      project.id,
+      "embedding",
+      "automatic",
+      "unchanged",
+      new Date(failedAt.getTime() - 1000)
+    );
+    expect(await readAttempt(project.id, "embedding")).toMatchObject({
+      outcome: "failed",
+    });
+
+    await recordAiRefresh(
+      project.id,
+      "embedding",
+      "automatic",
+      "unchanged",
+      new Date(failedAt.getTime() + 1000)
+    );
     expect(await readAttempt(project.id, "embedding")).toBeNull();
   });
 

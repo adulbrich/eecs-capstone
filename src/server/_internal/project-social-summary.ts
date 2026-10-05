@@ -87,8 +87,15 @@ export async function refreshSocialSummary(
   projectId: string,
   invoke?: ResponsesFn
 ): Promise<SocialSummaryOutcome> {
+  const startedAt = new Date();
   const outcome = await writeSocialSummary(projectId, invoke);
-  await recordAiRefresh(projectId, "social_summary", "automatic", outcome);
+  await recordAiRefresh(
+    projectId,
+    "social_summary",
+    "automatic",
+    outcome,
+    startedAt
+  );
   return outcome;
 }
 

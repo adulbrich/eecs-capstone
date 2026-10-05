@@ -729,7 +729,7 @@ The error can carry signed values, so each `*-core.ts` logs it through `redactQu
 
 ### A failure the panel shows can be older than the output beside it
 
-`project_ai_refreshes` holds the last attempt, not the last write (ADR-0060). A staff Save and the production `.mjs` sweeps write outputs without recording, so `currentAttempt` (`src/lib/ai-refresh.ts`) drops an attempt older than the stored output's `*_updated_at`. A new writer of either output either records through `recordAiRefresh` or stamps that column, or staff see a stale failure.
+`project_ai_refreshes` holds the last attempt, not the last write (ADR-0060). A staff Save and the production `.mjs` sweeps write outputs without recording, so `currentAttempt` (`src/lib/ai-refresh.ts`) drops an attempt older than the stored output's `*_updated_at`. A new writer of either output either records through `recordAiRefresh` or stamps that column, or staff see a stale failure. The record keeps the later stamp, and `unchanged` deletes a failure stamped before the writer started.
 
 ### A social summary staff wrote is never overwritten, and a hash cannot express that
 

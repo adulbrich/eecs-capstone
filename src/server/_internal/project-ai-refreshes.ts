@@ -1,4 +1,4 @@
-import { and, eq, inArray, lte, sql } from "drizzle-orm";
+import { and, eq, inArray, lt, lte, sql } from "drizzle-orm";
 import { db } from "#/db";
 import { projectAiRefreshes } from "#/db/schema";
 import { redactQueryError } from "#/lib/_internal/redact-query-error";
@@ -20,9 +20,10 @@ import {
  * not "never attempted": a record write that fails below is logged and lost.
  *
  * `unchanged` is not recorded either, but it does retire a `failed` or
- * `superseded` row: it means the stored output already matches the current
- * text, as when an edit is reverted after a failed attempt, and a failure
- * left beside it would offer a retry that has nothing to do.
+ * `superseded` row stamped before `startedAt`, the moment the writer read the
+ * row: the stored output already matches the current text, as when an edit is
+ * reverted after a failed attempt, and a failure left beside it would offer a
+ * retry that has nothing to do.
  *
  * The upsert keeps the later stamp. A staff Recompute or Regenerate does not
  * share the background queue, so two attempts can commit in either order.
@@ -36,17 +37,21 @@ export async function recordAiRefresh(
   projectId: string,
   kind: AiRefreshKind,
   trigger: AiRefreshTrigger,
-  writerOutcome: string
+  writerOutcome: string,
+  startedAt: Date
 ): Promise<void> {
   try {
     if (writerOutcome === "unchanged") {
+      // Only rows stamped before this writer read the row: a staff attempt
+      // that failed while it ran is newer than the check and stays.
       await db
         .delete(projectAiRefreshes)
         .where(
           and(
             eq(projectAiRefreshes.projectId, projectId),
             eq(projectAiRefreshes.kind, kind),
-            inArray(projectAiRefreshes.outcome, ["failed", "superseded"])
+            inArray(projectAiRefreshes.outcome, ["failed", "superseded"]),
+            lt(projectAiRefreshes.attemptedAt, startedAt)
           )
         );
       return;
