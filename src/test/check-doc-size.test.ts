@@ -38,13 +38,25 @@ function tree(files: Record<string, string>) {
   return Object.keys(files);
 }
 
-function run(paths: string[]) {
+function run(paths: string[], cwd = root) {
   const result = spawnSync(process.execPath, [script, ...paths], {
-    cwd: root,
+    cwd,
     encoding: "utf8",
     env,
   });
-  return { status: result.status, stderr: result.stderr };
+  return {
+    status: result.status,
+    stderr: result.stderr,
+    stdout: result.stdout,
+  };
+}
+
+/** Make the fixture tree a repository with every file in the index. */
+function indexed() {
+  const git = (...args: string[]) =>
+    spawnSync("git", ["-C", root, ...args], { encoding: "utf8", env });
+  git("init", "-q", "-b", "main");
+  git("add", "--", ".");
 }
 
 /**
@@ -134,5 +146,98 @@ describe("check-doc-size", () => {
   it("leaves a Markdown file with no cap alone", () => {
     const paths = tree({ "docs/OTHER.md": entry("### Long", QUIRK_CAP * 3) });
     expect(run(paths).status).toBe(0);
+  });
+
+  it("finds the docs from a subdirectory of the repository", () => {
+    // Paths are the repository's, not the working directory's: run from
+    // `docs/`, `--all` used to find nothing and pass.
+    tree({
+      "docs/QUIRKS.md": `# Quirks\n\n${entry("### Too long", QUIRK_CAP + 1)}`,
+      "docs/adr/0001-fine.md": adr(10),
+    });
+    indexed();
+    const fromDocs = join(root, "docs");
+    expect(run(["--all"], fromDocs).stderr).toContain(
+      `docs/QUIRKS.md:3: ### Too long: ${QUIRK_CAP + 1} bytes`
+    );
+    expect(run(["QUIRKS.md"], fromDocs).status).toBe(1);
+  });
+
+  it("fails --all when it finds no capped doc to check", () => {
+    tree({ "README.md": "# Nothing capped\n" });
+    indexed();
+    const result = run(["--all"]);
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain("nothing was checked");
+  });
+
+  it("counts only the files it read", () => {
+    // A staged deletion is still named by lefthook; it is skipped, not checked.
+    tree({ "docs/adr/0001-here.md": adr(10) });
+    const result = run(["docs/adr/0001-here.md", "docs/adr/0002-deleted.md"]);
+    expect(result.status).toBe(0);
+    expect(result.stdout).toContain("1 file within the caps");
+  });
+
+  it("measures CRLF line endings as LF", () => {
+    const crlf = (text: string) => text.replaceAll("\n", "\r\n");
+    const paths = tree({
+      "docs/QUIRKS.md": crlf(
+        `# Quirks\n\n${entry("### At the cap", QUIRK_CAP)}${entry("### Over", QUIRK_CAP + 1)}`
+      ),
+      "docs/adr/0001-at-the-cap.md": crlf(adr(ADR_CAP)),
+    });
+    const result = run(paths);
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain(
+      `### Over: ${QUIRK_CAP + 1} bytes, cap ${QUIRK_CAP}`
+    );
+    expect(result.stderr).not.toContain("At the cap");
+    expect(result.stderr).not.toContain("\r");
+  });
+
+  it("closes a fence only on the same character, at least as long", () => {
+    // A ``` line inside a ~~~ block, and ```js inside a ```` block, are
+    // content. Closing on either would count the rest of the block as prose.
+    const tilde = `~~~md\n\`\`\`\n${"y".repeat(QUIRK_CAP)}\n~~~\n`;
+    const longer = `\`\`\`\`md\n\`\`\`js\n${"y".repeat(QUIRK_CAP)}\n\`\`\`\`\n`;
+    const paths = tree({
+      "docs/QUIRKS.md": `# Quirks\n\n${entry("### Tilde", 100)}\n${tilde}\n${entry("### Longer", 100)}\n${longer}`,
+    });
+    const result = run(paths);
+    expect(result.stderr).toBe("");
+    expect(result.status).toBe(0);
+  });
+
+  it("fails a file with a fence that never closes, naming its line", () => {
+    // Otherwise the rest of the file is code, and nothing in it is measured.
+    const paths = tree({
+      "docs/QUIRKS.md": `# Quirks\n\n### A\n\n\`\`\`ts\nconst a = 1;\n\n${entry("### B", QUIRK_CAP * 5)}`,
+    });
+    const result = run(paths);
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain(
+      "docs/QUIRKS.md:5: this code fence never closes"
+    );
+  });
+
+  it("charges a #### subsection to the quirk above it", () => {
+    const paths = tree({
+      "docs/QUIRKS.md": `# Quirks\n\n${entry("### Parent", QUIRK_CAP - 10)}\n#### Child\n\n${"x".repeat(50)}\n`,
+    });
+    const result = run(paths);
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain("### Parent:");
+  });
+
+  it("fails an ADR whose first line is not its title", () => {
+    const paths = tree({
+      "docs/adr/0003-untitled.md": "Body first.\n\n# Late title\n",
+    });
+    const result = run(paths);
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain(
+      "docs/adr/0003-untitled.md:1: an ADR starts with its `# ` title line"
+    );
   });
 });

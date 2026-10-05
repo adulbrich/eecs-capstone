@@ -13,10 +13,10 @@ import { describe, expect, it } from "vitest";
  * tabbed through keeps the values it held at that first touch (QUIRKS, TanStack
  * Form). One seeded from loader data keeps whatever frame it mounted on, so it
  * is correct only while `src/router.tsx` blocks on a stale reload (#474, #499),
- * which the router tests at the end hold. ADR-0029 names the four classes
- * and says why the unkeyed ones rely on that option by decision; `CENSUS`
- * sorts every seed into one, and is the part that is enforced, in the style
- * of `error-text-scan.test.ts`. A rule in a doc is remembered: the first version
+ * which the router tests at the end hold. ADR-0029 says why the unkeyed ones
+ * rely on that option by decision; the four classes are defined above
+ * `SeedClass` below, and `CENSUS` sorts every seed into one. That is the part
+ * that is enforced, in the style of `error-text-scan.test.ts`. A rule in a doc is remembered: the first version
  * of that ADR said the routes seeding from loader data were keyed, and a sweep
  * found six that were not.
  *
@@ -28,7 +28,8 @@ import { describe, expect, it } from "vitest";
  */
 
 /**
- * The four classes, as ADR-0029 names them.
+ * The four classes. This is their definition; ADR-0029 records the decision
+ * class A rests on and points here.
  *
  * - A: seeded from loader data, no key, no resync of its own. Correct because
  *   the router blocks, by decision. The two forms here resync while untouched,
@@ -674,10 +675,11 @@ describe("once-only seeds", () => {
       "A once-only initializer that is not a plain literal is not in the\n" +
         "census. It is read at mount (a form's until a field is touched), so\n" +
         "one seeded from loader data keeps whatever frame it mounted on. Read\n" +
-        "the classes in docs/adr/0029-a-revisit-waits-for-its-loader.md,\n" +
-        "then classify each site below as A, B, C or D in CENSUS in this\n" +
-        "file, with the reason. A site whose initializer was edited appears\n" +
-        "here under its new text; move its entry.\n\n" +
+        "the classes in the comment above `SeedClass` in\n" +
+        "src/test/loader-seed-scan.test.ts, then classify each site below as\n" +
+        "A, B, C or D in CENSUS there, with the reason. A site whose\n" +
+        "initializer was edited appears here under its new text; move its\n" +
+        "entry.\n\n" +
         unclassified.join("\n")
     ).toEqual([]);
 
