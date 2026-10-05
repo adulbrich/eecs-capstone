@@ -255,7 +255,7 @@ function convert(
   const unmapped = unmappedRequired(mapping);
   if (unmapped.length > 0) {
     return stop(
-      `The column mapping leaves ${quoted(unmapped)} unmapped, which the ${dataset} need.`
+      `The column mapping leaves ${quoted(unmapped)} unmapped, which the ${dataset} format requires.`
     );
   }
   const { issues, rows } = mapRows(text, mapping);

@@ -141,6 +141,8 @@ function MappingControls({
       )}
       <span className="text-muted-foreground">
         The mapping is saved with this workspace and travels in its export.
+        Choosing another format in Read as drops it, so download it first to
+        keep it.
       </span>
     </div>
   );

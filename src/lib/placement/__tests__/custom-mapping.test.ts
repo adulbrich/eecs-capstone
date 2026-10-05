@@ -80,7 +80,7 @@ describe("custom mapping (#735)", () => {
         level: "error",
         row: 1,
         message:
-          'The column mapping leaves "priority", "project" unmapped, which the bids need.',
+          'The column mapping leaves "priority", "project" unmapped, which the bids format requires.',
         wholeFile: true,
       },
     ]);

@@ -10,6 +10,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "#/components/ui/select";
+import type { ImportIssue } from "#/lib/placement/csv";
 import { downloadText } from "#/lib/placement/download";
 import {
   type PlacementDataset,
@@ -66,6 +67,21 @@ function fitToFile(
 
 const quoted = (names: readonly string[]) =>
   names.map((n) => `"${n}"`).join(", ");
+
+/** What Apply waits for, or that it is ready. */
+function applyStatus(
+  dataset: PlacementDataset,
+  unmapped: readonly string[],
+  unreadable: readonly ImportIssue[]
+): string {
+  if (unreadable.length > 0) {
+    return `${unreadable.map((i) => i.message).join(" ")} Fix the file and upload it again.`;
+  }
+  if (unmapped.length > 0) {
+    return `Map ${quoted(unmapped)} to apply: the ${dataset} format requires ${unmapped.length === 1 ? "it" : "them"}.`;
+  }
+  return "Every required column is mapped.";
+}
 
 /**
  * Column mapping (#735): beside each standard column of the dataset, a
@@ -148,10 +164,11 @@ export function ColumnMappingEditor({
     Object.entries(mapping.columns).find(([, c]) => c === column)?.[0];
   const unmapped = unmappedRequired(mapping);
   const mapped = format.columns.filter((c) => headerFor(c.name) !== undefined);
-  const preview = useMemo(
-    () => mapRows(text, mapping).rows.slice(0, PREVIEW_ROWS),
-    [text, mapping]
-  );
+  const read = useMemo(() => mapRows(text, mapping), [text, mapping]);
+  const preview = read.rows.slice(0, PREVIEW_ROWS);
+  // A file whose header cannot be read at all, as one naming a column
+  // twice: no mapping reads it, so Apply waits for a new file.
+  const unreadable = read.issues.filter((i) => i.wholeFile);
   const statusId = `${id}-status`;
 
   return (
@@ -257,15 +274,11 @@ export function ColumnMappingEditor({
           </table>
         </div>
       )}
-      <p id={statusId}>
-        {unmapped.length === 0
-          ? "Every required column is mapped."
-          : `Map ${quoted(unmapped)} to apply: the ${dataset} need ${unmapped.length === 1 ? "it" : "them"}.`}
-      </p>
+      <p id={statusId}>{applyStatus(dataset, unmapped, unreadable)}</p>
       <div className="flex flex-wrap items-center gap-2">
         <Button
           aria-describedby={statusId}
-          disabled={unmapped.length > 0}
+          disabled={unmapped.length > 0 || unreadable.length > 0}
           onClick={() =>
             onApply({
               version: MAPPING_VERSION,
