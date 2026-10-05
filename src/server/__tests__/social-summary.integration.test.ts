@@ -142,6 +142,8 @@ describe("the staff summary endpoints are staff only", () => {
       summary: "Stored wording.",
       updatedAt: null,
       isManual: false,
+      refreshable: true,
+      summaryAttempt: null,
     });
   });
 });

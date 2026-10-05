@@ -11,6 +11,7 @@ import {
   regenerateSocialSummary,
   saveSocialSummary,
 } from "#/server/social-summary";
+import { AttemptFailed, AttemptNote, triggerPhrase } from "./ai-attempt";
 import { LocalTime } from "./local-time";
 import { Button } from "./ui/button";
 import { FieldError } from "./ui/field";
@@ -21,6 +22,64 @@ const LOAD_FAILED =
 
 const RACE_LOST =
   "The project or its summary changed while the rewrite was running, so the rewrite was thrown away. The box shows what is stored now.";
+
+/**
+ * Regenerate is enabled when staff own the wording, when there is none at
+ * all, and when the last rewrite failed. The second and third are the
+ * Bedrock outage: without them the panel would show an empty box, or a
+ * summary of older text beside a failure (#631), with two dead buttons and no
+ * way out.
+ */
+function canRegenerate(view: SocialSummaryView): boolean {
+  return (
+    view.isManual ||
+    view.summary === null ||
+    view.summaryAttempt?.outcome === "failed"
+  );
+}
+
+/**
+ * The last automatic or staff rewrite, when it says something the meta line
+ * does not (#631). Nothing for a manual summary, which the automatic path
+ * never touches, and nothing for a success, which the meta line's
+ * "Generated" time already shows.
+ */
+function SummaryAttemptStatus({ view }: { view: SocialSummaryView }) {
+  if (view.isManual) {
+    return null;
+  }
+  const attempt = view.summaryAttempt;
+  if (attempt?.outcome === "failed") {
+    return (
+      <AttemptFailed>
+        The last rewrite failed {triggerPhrase(attempt.trigger, "Regenerate")},{" "}
+        <LocalTime value={attempt.at} />.{" "}
+        {view.summary === null
+          ? "Until one succeeds, previews use the start of the project's description."
+          : "The summary above is the last one written."}{" "}
+        Regenerate with AI tries again.
+      </AttemptFailed>
+    );
+  }
+  if (attempt?.outcome === "superseded") {
+    return (
+      <AttemptNote>
+        The last rewrite, <LocalTime value={attempt.at} />, was dropped because
+        the project changed while it ran.
+      </AttemptNote>
+    );
+  }
+  if (attempt || view.summary !== null) {
+    return null;
+  }
+  return (
+    <AttemptNote>
+      {view.refreshable
+        ? "No automatic attempt yet."
+        : "Written automatically once the project is published."}
+    </AttemptNote>
+  );
+}
 
 /**
  * The staff view of a project's social summary (#498), beside the categories
@@ -86,13 +145,9 @@ export function SocialPreviewSection({ projectId }: { projectId: string }) {
   const length = socialSummaryLength(trimmed);
   const tooLong = length > SOCIAL_SUMMARY_MAX_LENGTH;
   const canSave = !!loaded && edited && length > 0 && !tooLong;
-  // Enabled when staff own the wording, and when there is none at all. The
-  // second case is the Bedrock outage: without it the panel would show an
-  // empty box with two dead buttons and no way out. `loaded` is null while the
-  // load is in flight and after it failed, so neither state offers either
-  // button.
-  const canRegenerate =
-    !!loaded && (loaded.isManual || loaded.summary === null);
+  // `loaded` is null while the load is in flight and after it failed, so
+  // neither state offers either button.
+  const regenerateAllowed = !!loaded && canRegenerate(loaded);
 
   function save() {
     return run(async () => {
@@ -163,6 +218,7 @@ export function SocialPreviewSection({ projectId }: { projectId: string }) {
           )}
         </p>
       </div>
+      {loaded && <SummaryAttemptStatus view={loaded} />}
       {tooLong && <FieldError message={SOCIAL_SUMMARY_TOO_LONG_MESSAGE} />}
       {failed && <FieldError message={LOAD_FAILED} />}
       <FieldError message={error} />
@@ -187,7 +243,7 @@ export function SocialPreviewSection({ projectId }: { projectId: string }) {
           {busy ? "Working..." : "Save"}
         </Button>
         <Button
-          disabled={busy || !canRegenerate}
+          disabled={busy || !regenerateAllowed}
           onClick={() => void regenerate()}
           size="sm"
           type="button"

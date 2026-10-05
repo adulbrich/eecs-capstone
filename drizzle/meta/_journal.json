@@ -281,6 +281,13 @@
       "when": 1790375145849,
       "tag": "0039_drop_bid_tables",
       "breakpoints": true
+    },
+    {
+      "idx": 40,
+      "version": "7",
+      "when": 1791230002974,
+      "tag": "0040_add_project_ai_refreshes",
+      "breakpoints": true
     }
   ]
 }

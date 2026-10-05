@@ -95,10 +95,22 @@ vi.mock("#/server/scope-assessment", () => ({
 
 vi.mock("#/server/social-summary", () => ({
   getSocialSummary: vi.fn(() =>
-    Promise.resolve({ isManual: false, summary: null, updatedAt: null })
+    Promise.resolve({
+      isManual: false,
+      refreshable: false,
+      summary: null,
+      summaryAttempt: null,
+      updatedAt: null,
+    })
   ),
   regenerateSocialSummary: vi.fn(),
   saveSocialSummary: vi.fn(),
+}));
+vi.mock("#/server/similarity", () => ({
+  getSimilarity: vi.fn(() =>
+    Promise.resolve({ attempt: null, computedAt: null, refreshable: false })
+  ),
+  recomputeSimilarity: vi.fn(),
 }));
 const PROGRAM_A = "00000000-0000-0000-0000-00000000pg01";
 
@@ -220,7 +232,7 @@ function confirmDialog(title: string) {
 }
 
 describe("StaffProjectPanel section order", () => {
-  it("shows the nine sections in the order #322, #450 and #498 asked for", async () => {
+  it("shows the ten sections in the order #322, #450, #498 and #631 asked for", async () => {
     renderPanel("submitted");
     await screen.findByLabelText("Proposer email");
     const titles = Array.from(document.querySelectorAll("h3")).map(
@@ -239,6 +251,10 @@ describe("StaffProjectPanel section order", () => {
       // before a project goes out, and the only section about how the project
       // looks to someone who never opens the page.
       "Social preview",
+      // Beside the preview, the other AI output, which is not about the
+      // preview: what places the project in Similar projects and Recommended
+      // for you (#631).
+      "Similarity",
       "Edit log",
       "Danger zone",
     ]);

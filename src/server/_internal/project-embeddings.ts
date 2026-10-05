@@ -30,6 +30,7 @@ import {
   type EmbedFn,
 } from "#/lib/_internal/bedrock-embed";
 import { redactQueryError } from "#/lib/_internal/redact-query-error";
+import type { AiRefreshTrigger } from "#/lib/ai-refresh";
 import {
   buildInterestsEmbeddingSource,
   buildProjectEmbeddingSource,
@@ -38,6 +39,7 @@ import {
 } from "#/lib/embedding-source";
 import type { SocialSummarySourceProject } from "#/lib/social-summary-source";
 import type { ProjectStatus } from "#/lib/vocabularies";
+import { recordAiRefresh } from "./project-ai-refreshes";
 
 export type RefreshOutcome =
   | "skipped"
@@ -46,6 +48,9 @@ export type RefreshOutcome =
   | "superseded"
   | "cleared"
   | "failed";
+
+/** `cleared` is the interests writer's alone. */
+export type ProjectRefreshOutcome = Exclude<RefreshOutcome, "cleared">;
 
 type GuardedColumn =
   | keyof EmbeddableProject
@@ -123,6 +128,18 @@ export function isEmbeddableStatus(status: ProjectStatus): boolean {
   return EMBEDDABLE_STATUSES.includes(status);
 }
 
+/**
+ * Whether the automatic refresh writes for this project at all: the gate
+ * both writers open with. A project outside it has no attempt to show
+ * because none will be made, which the staff panel says rather than "not
+ * yet" (#631).
+ */
+export function isRefreshable(
+  project: Pick<typeof projects.$inferSelect, "deletedAt" | "status">
+): boolean {
+  return !project.deletedAt && isEmbeddableStatus(project.status);
+}
+
 /** pgvector's text input format, e.g. `[0.1,0.2]`. */
 export function toSqlVector(values: number[]): string {
   return `[${values.join(",")}]`;
@@ -138,11 +155,27 @@ export function toSqlVector(values: number[]): string {
  * Bedrock outage leaves the vector null or stale and the user's action still
  * succeeds. `scripts/backfill-embeddings.ts` sweeps up whatever this leaves
  * behind on a workstation, `scripts/backfill-embeddings.mjs` in production.
+ *
+ * Records the outcome as the project's last embedding attempt (#631), so the
+ * staff panel can tell "never attempted" from "failed". `trigger` is
+ * `automatic` for the background refresh and the workstation sweep, `staff`
+ * for the panel's retry. The `.mjs` sweep re-spells this in SQL and records
+ * nothing.
  */
 export async function refreshProjectEmbedding(
   projectId: string,
-  embed: EmbedFn = bedrockEmbed
-): Promise<RefreshOutcome> {
+  embed: EmbedFn = bedrockEmbed,
+  trigger: AiRefreshTrigger = "automatic"
+): Promise<ProjectRefreshOutcome> {
+  const outcome = await writeProjectEmbedding(projectId, embed);
+  await recordAiRefresh(projectId, "embedding", trigger, outcome);
+  return outcome;
+}
+
+async function writeProjectEmbedding(
+  projectId: string,
+  embed: EmbedFn
+): Promise<ProjectRefreshOutcome> {
   try {
     const [project] = await db
       .select()
