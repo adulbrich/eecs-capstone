@@ -27,8 +27,9 @@
  * it would otherwise go unmeasured.
  *
  * One implementation, two callers: lefthook runs it on staged files at
- * pre-commit, and CI runs it over every capped doc (`--all`). Paths resolve
- * against the repository root, so either works from any directory in it.
+ * pre-commit, and CI runs it over every capped doc (`--all`). Named paths are
+ * relative to the working directory, as a shell gives them; `--all` finds the
+ * repository root itself, so it works from any directory in the repository.
  *
  * Usage:
  *   node scripts/check-doc-size.mjs <file>...   check the named files
@@ -43,8 +44,13 @@ export const ADR_CAP = 1300;
 export const UI_CAP = 2000;
 
 const HEADING = /^(#{1,6})\s/;
-const FENCE_OPEN = /^\s*(`{3,}|~{3,})/;
-const FENCE_CLOSE = /^\s*(`{3,}|~{3,})\s*$/;
+/**
+ * A fence is indented by at most three spaces. Four spaces or a tab make an
+ * indented code block in CommonMark, so a line like that is not a fence, and
+ * reading it as one would hide every entry until the next fence line.
+ */
+const FENCE_OPEN = /^ {0,3}(`{3,}|~{3,})/;
+const FENCE_CLOSE = /^ {0,3}(`{3,}|~{3,})\s*$/;
 const TABLE_ROW = /^\s*\|/;
 const ADR_PATH = /^docs\/adr\/\d{4}-[^/]+\.md$/;
 const ADR_TITLE = /^# \S/;

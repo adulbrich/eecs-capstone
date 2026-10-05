@@ -209,6 +209,17 @@ describe("check-doc-size", () => {
     expect(result.status).toBe(0);
   });
 
+  it("does not read a fence indented four spaces as a fence", () => {
+    // CommonMark makes it an indented code block. Read as a fence, it opened
+    // one that the next real fence closed, and `### B` went unmeasured.
+    const paths = tree({
+      "docs/QUIRKS.md": `### A\n\n    \`\`\`\n\n### B\n${"x".repeat(1500)}\n\`\`\`sh\nls\n\`\`\`\n`,
+    });
+    const result = run(paths);
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain("### B: ");
+  });
+
   it("fails a file with a fence that never closes, naming its line", () => {
     // Otherwise the rest of the file is code, and nothing in it is measured.
     const paths = tree({
