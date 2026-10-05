@@ -575,7 +575,8 @@ function wideRows(
  * per filled project cell. Nothing more is checked here; the dataset's
  * parser reads the result, as it reads a standard file, and the page shows
  * the first few rows as they come. `problems` says why the column mapping
- * cannot read this file wide, as sentences, with no rows.
+ * cannot read this file wide, as sentences, with no rows; read wide,
+ * `titles` names the project columns found, in the file's order.
  */
 export function mapRows(
   text: string,
@@ -585,6 +586,7 @@ export function mapRows(
   issues: ImportIssue[];
   problems: string[];
   rows: Record<string, string>[];
+  titles?: string[];
 } {
   const { fields, firstRecordRow, issues, rows } = parseRows(text);
   if (issues.some((i) => i.wholeFile)) {
@@ -614,6 +616,7 @@ export function mapRows(
       issues: [...issues, ...read.issues],
       problems: [],
       rows: read.rows,
+      titles: projects.columns.map((p) => p.title),
     };
   }
   const pairs = Object.entries(mapping.columns).map(
@@ -632,7 +635,7 @@ export function mapRows(
 }
 
 /** "with one column per project, ..." as a sentence. */
-const sentence = (phrase: string) =>
+export const asSentence = (phrase: string) =>
   `${phrase.charAt(0).toUpperCase()}${phrase.slice(1)}.`;
 
 function convert(
@@ -657,7 +660,7 @@ function convert(
   }
   const wrong = wideProblems(mapping);
   if (wrong.length > 0) {
-    return stop(...wrong.map(sentence));
+    return stop(...wrong.map(asSentence));
   }
   // One header per column, as the schema has it: otherwise the last header
   // would fill the column and the others vanish without a word.

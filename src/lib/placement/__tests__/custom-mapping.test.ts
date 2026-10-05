@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { applyStatus } from "#/components/placement/column-mapping";
+import {
+  applyStatus,
+  editedMapping,
+  wideDraft,
+} from "#/components/placement/column-mapping";
 import { parseBidsCsv } from "#/lib/placement/csv";
 import { toStandard } from "#/lib/placement/plugins";
 import {
@@ -465,6 +469,73 @@ describe("wide reading of a bids file (#736)", () => {
       dataset: "roster",
       columns: { "Email Address": "email", "Your name": "name" },
     });
+  });
+});
+
+describe("the editor's wide reading (#736)", () => {
+  const columns = {
+    "Email Address": "email",
+    Rank: "priority",
+    "Your name": "name",
+  };
+
+  it("starts off, with Qualtrics' separator, or from a stored column mapping", () => {
+    expect(wideDraft(undefined)).toEqual({
+      on: false,
+      by: "prefix",
+      prefix: "",
+      headers: [],
+      titleBy: "separator",
+      separator: " - ",
+    });
+    expect(
+      wideDraft({
+        projectColumns: { by: "headers", headers: ["Rank [A]"] },
+        title: { by: "brackets" },
+      })
+    ).toEqual({
+      on: true,
+      by: "headers",
+      prefix: "",
+      headers: ["Rank [A]"],
+      titleBy: "brackets",
+      separator: " - ",
+    });
+  });
+
+  it("stores only the student columns and the choice in use, at version 2", () => {
+    const draft = {
+      ...wideDraft(undefined),
+      on: true,
+      prefix: "Rank the projects",
+      headers: ["Rank [A]"],
+      titleBy: "brackets" as const,
+    };
+    expect(editedMapping("bids", columns, draft)).toEqual({
+      version: 2,
+      dataset: "bids",
+      columns: { "Email Address": "email", "Your name": "name" },
+      wide: {
+        projectColumns: { by: "prefix", prefix: "Rank the projects" },
+        title: { by: "brackets" },
+      },
+    });
+    // Off, the columns come back as they were, and nothing is wide.
+    expect(editedMapping("bids", columns, { ...draft, on: false })).toEqual({
+      version: 1,
+      dataset: "bids",
+      columns,
+    });
+    // Only the bids read wide.
+    expect(editedMapping("roster", columns, draft).wide).toBeUndefined();
+  });
+
+  it("says what stops Apply and how to fix it", () => {
+    expect(
+      applyStatus("bids", [], [], [], ["The title separator is blank."])
+    ).toBe(
+      "The title separator is blank. Change the column mapping to apply it."
+    );
   });
 });
 

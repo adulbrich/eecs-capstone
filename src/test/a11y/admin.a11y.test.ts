@@ -467,13 +467,13 @@ for (const width of [1280, 375]) {
     await expect(
       page.getByRole("button", { name: "Map columns" })
     ).toBeVisible();
-    // What a later build could save: a version 2 column mapping in use.
+    // What a later build could save: a version 3 column mapping in use.
     await page.evaluate(() => {
       const key = "cs-capstone:placement:v1";
       const workspace = JSON.parse(window.localStorage.getItem(key) ?? "{}");
       workspace.roster.readAs = "custom-mapping-roster";
       workspace.roster.mapping = {
-        version: 2,
+        version: 3,
         dataset: "roster",
         columns: { "Student Email": "email" },
       };
@@ -485,7 +485,7 @@ for (const width of [1280, 375]) {
       page
         .getByRole("status")
         .filter({ hasText: "so it was removed from this workspace" })
-    ).toContainText("version 2");
+    ).toContainText("version 3");
     await expect(
       page.getByRole("button", { name: "Map columns" })
     ).toBeVisible();
@@ -543,6 +543,70 @@ for (const width of [1280, 375]) {
     await expect(
       bids.getByRole("button", { name: "Apply column mapping" })
     ).toBeDisabled();
+    await checkA11y(page);
+    await expectNoHorizontalOverflow(page);
+  });
+}
+
+// A bids file read wide, one column per project (#736): the layout choice,
+// the project columns by prefix and by ticking, the title choice, and the
+// preview of the bids it gives.
+for (const width of [1280, 375]) {
+  test(`admin placement, a wide bids column mapping at ${width}`, async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width, height: 800 });
+    await page.goto("/admin/placement");
+    await waitForHydration(page);
+    await page.getByLabel("Project titles").fill("Tide Clock\nRobot Arm");
+    await page.getByRole("button", { name: "Use these titles" }).click();
+    await page.getByRole("tab", { name: /Bids/ }).click();
+    await page.getByLabel("Bids CSV file").setInputFiles({
+      name: "form.csv",
+      mimeType: "text/csv",
+      buffer: Buffer.from(
+        [
+          "Timestamp,Email Address,Your name,Rank the projects [Tide Clock],Rank the projects [Robot Arm]",
+          "2026-09-28 10:00,ada@example.edu,Ada Park,2,1",
+          "2026-09-28 10:05,kim@example.edu,Kim Lee,,1",
+        ].join("\n")
+      ),
+    });
+    await page.getByRole("button", { name: "Map columns" }).click();
+    const editor = page.getByRole("region", {
+      name: "Map the columns of form.csv",
+    });
+    await editor
+      .getByRole("radio", {
+        name: "One row per student, one column per project",
+      })
+      .click();
+    await editor
+      .getByRole("combobox", { name: "File column for email" })
+      .click();
+    await page
+      .getByRole("option", { name: "Email Address", exact: true })
+      .click();
+    await editor
+      .getByLabel("Project columns' headers start with")
+      .fill("Rank the projects");
+    // The default separator finds no title: the status names the column.
+    await expect(editor).toContainText("Column D");
+    await checkA11y(page);
+    await expectNoHorizontalOverflow(page);
+
+    await editor
+      .getByRole("radio", { name: "The text inside the last square brackets" })
+      .click();
+    await expect(editor.getByRole("table")).toContainText("Robot Arm");
+    await checkA11y(page);
+    await expectNoHorizontalOverflow(page);
+
+    await editor.getByRole("radio", { name: "The columns I tick" }).click();
+    await editor
+      .getByRole("checkbox", { name: "Rank the projects [Robot Arm]" })
+      .click();
+    await expect(editor).toContainText("1 project column: Robot Arm.");
     await checkA11y(page);
     await expectNoHorizontalOverflow(page);
   });

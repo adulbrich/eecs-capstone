@@ -188,6 +188,13 @@ const CENSUS = new Map<string, { class: SeedClass; why: string }>([
     },
   ],
   [
+    "src/components/placement/column-mapping.tsx: useState(() => wideDraft(initial && fitToDataset(initial, dataset).wide))",
+    {
+      class: "D",
+      why: "the wide reading being edited (#736), from the column mapping stored in this browser, never loader data; the editor mounts when opened and remounts for a new file",
+    },
+  ],
+  [
     "src/components/placement/download-as.tsx: useState(STANDARD_OPTION)",
     {
       class: "D",
