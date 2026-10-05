@@ -38,8 +38,8 @@ async function makeUser(email: string, role: UserRole) {
 }
 
 describe("the instructor-bearing reads are staff-only", () => {
-  // Both were reachable without a session until 2026-08-28. See the QUIRKS
-  // entry "A read is public or staff-only per endpoint, not per domain" for
+  // Both were reachable without a session until 2026-08-28. See ADR-0003
+  // (docs/adr/0003-every-server-function-declares-its-access-level.md) for
   // why, and for the rule that replaced the classification which missed it.
   it("refuses a program detail read to a non-staff viewer", async () => {
     const admin = await makeUser(`gp-a-${Date.now()}@x.com`, "admin");

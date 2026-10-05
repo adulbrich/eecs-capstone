@@ -192,7 +192,7 @@ ONID's callback is `/api/auth/oauth2/callback/onid` on Better Auth 1.6; 1.7 move
 
 ### `user.name` is trimmed and refused blank in the create hook
 
-Better Auth accepts `""` for a name, so `requireUserName` (`src/lib/_internal/user-name.ts`) runs in `databaseHooks.user.create.before` and `update.before`. No render site needs a fallback for a missing name ([ADR-0015](./adr/0015-addresses-are-normalized-on-write.md)).
+Better Auth accepts `""` for a name, so `requireUserName` (`src/lib/_internal/user-name.ts`) runs in `databaseHooks.user.create.before` and `update.before`. No render site needs a fallback for a missing name; the module's docblock makes the case, the one [ADR-0015](./adr/0015-addresses-are-normalized-on-write.md) makes for addresses.
 
 ### `databaseHooks` covers `user` and `session`, never `account`
 

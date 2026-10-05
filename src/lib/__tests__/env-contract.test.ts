@@ -103,7 +103,7 @@ const UNSET_IN_PRODUCTION = new Map([
   ["BEDROCK_SECRET_KEY", "task role, see buildBedrockConfig"],
   [
     "BEDROCK_EMBEDDINGS_ENABLED",
-    "deliberately not plumbed, so turning embeddings off in production is a terraform change rather than a variable flip. See the Bedrock section of docs/QUIRKS.md",
+    "deliberately not plumbed, so turning embeddings off in production is a terraform change rather than a variable flip. See the docblock of src/lib/_internal/embeddings-flag.ts",
   ],
 ]);
 
