@@ -204,19 +204,60 @@ export function applyStatus(
   return `${lost}Every required column is mapped.`;
 }
 
+type DraftChange = (change: Partial<WideDraft>) => void;
+
+/** How a bids file is laid out (#736), and what reading it wide does. */
+function LayoutChoice({
+  draft,
+  onDraft,
+}: {
+  draft: WideDraft;
+  onDraft: DraftChange;
+}) {
+  const id = useId();
+  return (
+    <fieldset className="flex flex-col gap-1">
+      <legend className="font-medium">How the file is laid out</legend>
+      <RadioGroup
+        aria-describedby={`${id}-hint`}
+        className="gap-1"
+        onValueChange={(v) => onDraft({ on: v === "wide" })}
+        value={draft.on ? "wide" : "long"}
+      >
+        <Label className="min-h-7 font-normal">
+          <RadioGroupItem value="long" />
+          One row per bid
+        </Label>
+        <Label className="min-h-7 font-normal">
+          <RadioGroupItem value="wide" />
+          One row per student, one column per project
+        </Label>
+      </RadioGroup>
+      <p className="text-muted-foreground text-xs" id={`${id}-hint`}>
+        With one column per project, as a Google Forms grid or a Qualtrics
+        ranking exports it, each project column's cell is the student's priority
+        for that project, and the project's title comes from the column's
+        header. Each filled cell becomes one bid. A blank cell is no bid:
+        nothing is read from it, and a student who left every project blank has
+        no bids. The email, name and avoid columns repeat on every bid from the
+        student's row.
+      </p>
+    </fieldset>
+  );
+}
+
 /**
- * How a bids file is laid out (#736), and with one column per project, which
- * columns those are and where each header holds its title. Every choice is
- * kept while another is in use.
+ * With one column per project (#736): which columns those are, and where
+ * each header holds its title. Every choice is kept while another is in use.
  */
-function WideSettings({
+function ProjectColumnSettings({
   draft,
   headers,
   onDraft,
 }: {
   draft: WideDraft;
   headers: readonly string[];
-  onDraft: (change: Partial<WideDraft>) => void;
+  onDraft: DraftChange;
 }) {
   const id = useId();
   const ticked = new Set(draft.headers.map(normalizeHeader));
@@ -231,125 +272,94 @@ function WideSettings({
   return (
     <div className="flex flex-col gap-3">
       <fieldset className="flex flex-col gap-1">
-        <legend className="font-medium">How the file is laid out</legend>
+        <legend className="font-medium">Project columns</legend>
         <RadioGroup
-          aria-describedby={`${id}-layout-hint`}
           className="gap-1"
-          onValueChange={(v) => onDraft({ on: v === "wide" })}
-          value={draft.on ? "wide" : "long"}
+          onValueChange={(v) =>
+            onDraft({ by: v === "headers" ? "headers" : "prefix" })
+          }
+          value={draft.by}
         >
           <Label className="min-h-7 font-normal">
-            <RadioGroupItem value="long" />
-            One row per bid
+            <RadioGroupItem value="prefix" />
+            Every column whose header starts with
           </Label>
           <Label className="min-h-7 font-normal">
-            <RadioGroupItem value="wide" />
-            One row per student, one column per project
+            <RadioGroupItem value="headers" />
+            The columns I tick
           </Label>
         </RadioGroup>
-        <p className="text-muted-foreground text-xs" id={`${id}-layout-hint`}>
-          With one column per project, as a Google Forms grid or a Qualtrics
-          ranking exports it, each project column's cell is the student's
-          priority for that project, and the project's title comes from the
-          column's header. Each filled cell becomes one bid. A blank cell is no
-          bid: nothing is read from it, and a student who left every project
-          blank has no bids. The email, name and avoid columns repeat on every
-          bid from the student's row.
-        </p>
+        {draft.by === "prefix" ? (
+          <Input
+            aria-label="Project columns' headers start with"
+            className="sm:w-80"
+            onChange={(e) => onDraft({ prefix: e.target.value })}
+            placeholder="Rank the projects"
+            value={draft.prefix}
+          />
+        ) : (
+          <ul
+            aria-label="Project columns"
+            className="flex max-h-56 flex-col overflow-y-auto rounded-md border px-2 py-1"
+          >
+            {headers.map((h) => (
+              <li key={h}>
+                <Label className="min-h-7 font-normal">
+                  <Checkbox
+                    checked={ticked.has(normalizeHeader(h))}
+                    onCheckedChange={(on) => tick(h, on === true)}
+                  />
+                  {h}
+                </Label>
+              </li>
+            ))}
+          </ul>
+        )}
       </fieldset>
-      {draft.on && (
-        <>
-          <fieldset className="flex flex-col gap-1">
-            <legend className="font-medium">Project columns</legend>
-            <RadioGroup
-              className="gap-1"
-              onValueChange={(v) =>
-                onDraft({ by: v === "headers" ? "headers" : "prefix" })
-              }
-              value={draft.by}
+      <fieldset className="flex flex-col gap-1">
+        <legend className="font-medium">Project title</legend>
+        <RadioGroup
+          className="gap-1"
+          onValueChange={(v) =>
+            onDraft({
+              titleBy: v === "brackets" ? "brackets" : "separator",
+            })
+          }
+          value={draft.titleBy}
+        >
+          <Label className="min-h-7 font-normal">
+            <RadioGroupItem value="separator" />
+            The text after a separator
+          </Label>
+          <Label className="min-h-7 font-normal">
+            <RadioGroupItem value="brackets" />
+            The text inside the last square brackets
+          </Label>
+        </RadioGroup>
+        {draft.titleBy === "separator" ? (
+          <>
+            <Input
+              aria-describedby={`${id}-separator-hint`}
+              aria-label="Title separator"
+              className="sm:w-40"
+              onChange={(e) => onDraft({ separator: e.target.value })}
+              value={draft.separator}
+            />
+            <p
+              className="text-muted-foreground text-xs"
+              id={`${id}-separator-hint`}
             >
-              <Label className="min-h-7 font-normal">
-                <RadioGroupItem value="prefix" />
-                Every column whose header starts with
-              </Label>
-              <Label className="min-h-7 font-normal">
-                <RadioGroupItem value="headers" />
-                The columns I tick
-              </Label>
-            </RadioGroup>
-            {draft.by === "prefix" ? (
-              <Input
-                aria-label="Project columns' headers start with"
-                className="sm:w-80"
-                onChange={(e) => onDraft({ prefix: e.target.value })}
-                placeholder="Rank the projects"
-                value={draft.prefix}
-              />
-            ) : (
-              <ul
-                aria-label="Project columns"
-                className="flex max-h-56 flex-col overflow-y-auto rounded-md border px-2 py-1"
-              >
-                {headers.map((h) => (
-                  <li key={h}>
-                    <Label className="min-h-7 font-normal">
-                      <Checkbox
-                        checked={ticked.has(normalizeHeader(h))}
-                        onCheckedChange={(on) => tick(h, on === true)}
-                      />
-                      {h}
-                    </Label>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </fieldset>
-          <fieldset className="flex flex-col gap-1">
-            <legend className="font-medium">Project title</legend>
-            <RadioGroup
-              className="gap-1"
-              onValueChange={(v) =>
-                onDraft({
-                  titleBy: v === "brackets" ? "brackets" : "separator",
-                })
-              }
-              value={draft.titleBy}
-            >
-              <Label className="min-h-7 font-normal">
-                <RadioGroupItem value="separator" />
-                The text after a separator
-              </Label>
-              <Label className="min-h-7 font-normal">
-                <RadioGroupItem value="brackets" />
-                The text inside the last square brackets
-              </Label>
-            </RadioGroup>
-            {draft.titleBy === "separator" ? (
-              <>
-                <Input
-                  aria-describedby={`${id}-separator-hint`}
-                  aria-label="Title separator"
-                  className="sm:w-40"
-                  onChange={(e) => onDraft({ separator: e.target.value })}
-                  value={draft.separator}
-                />
-                <p
-                  className="text-muted-foreground text-xs"
-                  id={`${id}-separator-hint`}
-                >
-                  Spaces count: " - " is a dash with a space each side, as
-                  Qualtrics writes it. The title is everything after the first
-                  one, so a title with the separator in it stays whole.
-                </p>
-              </>
-            ) : (
-              <p className="text-muted-foreground text-xs">
-                As a Google Forms grid writes "Rank the projects [Tide Clock]".
-              </p>
-            )}
-          </fieldset>
-        </>
-      )}
+              Spaces count: " - " is a dash with a space each side, as Qualtrics
+              writes it. The title is everything after the first one, so a title
+              with the separator in it stays whole.
+            </p>
+          </>
+        ) : (
+          <p className="text-muted-foreground text-xs">
+            As a Google Forms grid writes "Rank the projects [Tide Clock]".
+          </p>
+        )}
+      </fieldset>
     </div>
   );
 }
@@ -405,6 +415,8 @@ export function ColumnMappingEditor({
   );
   const [loadError, setLoadError] = useState<string | null>(null);
   const wide = draft.on && dataset === "bids";
+  const onDraft: DraftChange = (change) =>
+    setDraft((d) => ({ ...d, ...change }));
 
   const picker = useFilePicker({
     accept: ".json,application/json",
@@ -503,13 +515,7 @@ export function ColumnMappingEditor({
         Download it to read next term's file, or another department's, the same
         way. It stays in this browser and in the files you save.
       </p>
-      {dataset === "bids" && (
-        <WideSettings
-          draft={draft}
-          headers={headers}
-          onDraft={(change) => setDraft((d) => ({ ...d, ...change }))}
-        />
-      )}
+      {dataset === "bids" && <LayoutChoice draft={draft} onDraft={onDraft} />}
       <ul className="flex flex-col divide-y">
         {shown.map((c) => {
           const header = headerFor(c.name);
@@ -549,6 +555,13 @@ export function ColumnMappingEditor({
           );
         })}
       </ul>
+      {wide && (
+        <ProjectColumnSettings
+          draft={draft}
+          headers={headers}
+          onDraft={onDraft}
+        />
+      )}
       {missing.length > 0 && (
         <p role="status" style={{ color: "var(--status-warning)" }}>
           This file has no {missingLine(edited, missing)}, which the column
