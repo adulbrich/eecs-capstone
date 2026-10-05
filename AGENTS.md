@@ -82,8 +82,7 @@ A tool enforces the first five, so a refusal names the rule you hit.
 
 ## Reference docs
 
-Grep for the section your task needs; do not read a doc whole. `docs/QUIRKS.md` alone
-is over 200 KB.
+Grep for the section your task needs; do not read a doc whole.
 
 - `CONTRIBUTING.md`: the process, the table of gates, which suites to run.
 - `CONTEXT.md`: the glossary. Use its words in issue titles, test names and copy.
@@ -99,7 +98,9 @@ is over 200 KB.
 
 ## Adding to these docs
 
-A gotcha goes in `docs/QUIRKS.md` under its subsystem; a decision in `docs/adr/` as
-one paragraph with the next number; a term in `CONTEXT.md` with the synonyms to avoid;
-a design rule in `docs/UI-CONVENTIONS.md`; a process or gate change in
-`CONTRIBUTING.md`. Add here only a rule that binds every turn.
+A gotcha goes in `docs/QUIRKS.md` under its subsystem; a decision in `docs/adr/` with
+the next number; a term in `CONTEXT.md` with the synonyms to avoid; a design rule in
+`docs/UI-CONVENTIONS.md`; a process or gate change in `CONTRIBUTING.md`. An ADR is
+one paragraph under its title, with the consequences as its closing sentences and no
+`## Consequences` heading. `scripts/check-doc-size.mjs` caps a quirk, an ADR and a UI
+convention by size. Add here only a rule that binds every turn.

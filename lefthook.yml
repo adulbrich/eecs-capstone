@@ -14,6 +14,11 @@ pre-commit:
     prose:
       glob: "*.{md,ts,tsx,js,mjs,cjs,json,yml,yaml,css,tf,sh,sql}"
       run: node scripts/check-prose.mjs {staged_files}
+    # A quirk, an ADR and a UI convention each under a byte cap. The script
+    # skips every other Markdown file.
+    doc-size:
+      glob: "*.md"
+      run: node scripts/check-doc-size.mjs {staged_files}
     # The ruleset rejects a push to main; this stops the commit that would
     # need untangling first.
     branch:

@@ -4,7 +4,7 @@ import ts from "typescript";
 import { describe, expect, it } from "vitest";
 
 /**
- * Every once-only seed in `src/`, held to the census in ADR-0029.
+ * Every once-only seed in `src/`, held to `CENSUS` below.
  *
  * A `useState`, `useRef` or `useReducer` initializer and an uncontrolled
  * `defaultValue` or `defaultChecked` run once, at mount. A TanStack Form
@@ -13,10 +13,10 @@ import { describe, expect, it } from "vitest";
  * tabbed through keeps the values it held at that first touch (QUIRKS, TanStack
  * Form). One seeded from loader data keeps whatever frame it mounted on, so it
  * is correct only while `src/router.tsx` blocks on a stale reload (#474, #499),
- * which the router tests at the end hold. ADR-0029's Consequences sort the
- * seeds into four classes and say why the unkeyed ones rely on that option by
- * decision; this is the part that is enforced, in the style of
- * `error-text-scan.test.ts`. A rule in a doc is remembered: the first version
+ * which the router tests at the end hold. ADR-0029 says why the unkeyed ones
+ * rely on that option by decision; the four classes are defined above
+ * `SeedClass` below, and `CENSUS` sorts every seed into one. That is the part
+ * that is enforced, in the style of `error-text-scan.test.ts`. A rule in a doc is remembered: the first version
  * of that ADR said the routes seeding from loader data were keyed, and a sweep
  * found six that were not.
  *
@@ -28,7 +28,8 @@ import { describe, expect, it } from "vitest";
  */
 
 /**
- * The four classes, as ADR-0029 names them.
+ * The four classes. This is their definition; ADR-0029 records the decision
+ * class A rests on and points here.
  *
  * - A: seeded from loader data, no key, no resync of its own. Correct because
  *   the router blocks, by decision. The two forms here resync while untouched,
@@ -666,7 +667,7 @@ function labelsIn(source: string): string[] {
 }
 
 describe("once-only seeds", () => {
-  it("are all in ADR-0029's census, and the census has none left over", () => {
+  it("are all in the census, and the census has none left over", () => {
     const found = treeSeeds();
     const unclassified = [...found].filter((site) => !CENSUS.has(site)).sort();
     expect(
@@ -674,11 +675,11 @@ describe("once-only seeds", () => {
       "A once-only initializer that is not a plain literal is not in the\n" +
         "census. It is read at mount (a form's until a field is touched), so\n" +
         "one seeded from loader data keeps whatever frame it mounted on. Read\n" +
-        "the census in\n" +
-        "docs/adr/0029-a-revisit-waits-for-its-loader.md, classify each site\n" +
-        "below as A, B, C or D in CENSUS with the reason, and name a new A, B\n" +
-        "or C site in that ADR's Consequences too. A site whose initializer\n" +
-        "was edited appears here under its new text; move its entry.\n\n" +
+        "the classes in the comment above `SeedClass` in\n" +
+        "src/test/loader-seed-scan.test.ts, then classify each site below as\n" +
+        "A, B, C or D in CENSUS there, with the reason. A site whose\n" +
+        "initializer was edited appears here under its new text; move its\n" +
+        "entry.\n\n" +
         unclassified.join("\n")
     ).toEqual([]);
 
@@ -687,8 +688,7 @@ describe("once-only seeds", () => {
     const stale = [...CENSUS.keys()].filter((site) => !found.has(site)).sort();
     expect(
       stale,
-      "These census entries match nothing in src/. Remove them, and from\n" +
-        "ADR-0029's Consequences if it names them.\n\n" +
+      "These CENSUS entries match nothing in src/. Remove them.\n\n" +
         stale.join("\n")
     ).toEqual([]);
   });
@@ -934,7 +934,7 @@ describe("the comment blanking the scan reads through", () => {
 describe("the stale reload mode the census rests on", () => {
   const remedy =
     "ADR-0029's class A seeds are correct only while a stale revisit\n" +
-    "blocks. Before changing this, apply the remedy in the Consequences of\n" +
+    "blocks. Before changing this, apply the remedy in\n" +
     "docs/adr/0029-a-revisit-waits-for-its-loader.md to every class A seed\n" +
     "the change reaches, and reclassify them in CENSUS.";
 

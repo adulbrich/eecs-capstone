@@ -76,6 +76,7 @@ first column is what stops you locally; the last is what stops the merge.
 | --- | --- | --- | --- |
 | Conventional subject; no emdash, emoji or session link in the message | `commit-msg` | `guard-git.mjs` reads the `-m` text first | `verify` walks the PR's commits; `pr-text` checks the title and body |
 | No emdash or emoji in tracked prose and code | `pre-commit`, staged files | `after-edit.mjs` on the edited file | `verify`: `npm run check:prose` |
+| A quirk at most 1000 bytes and a UI convention at most 2000, code blocks and table rows not counted; an ADR at most 1300 after its title | `pre-commit`, staged files | | `verify`: `npm run check:doc-size` |
 | No session link in PR or issue text | (never sees it) | `guard-gh.mjs` refuses the command | `pr-text`, for the PR title and body; issue text has no CI gate |
 | A UI change carries a screenshot in the PR body, or the opt-out line with a reason | | `guard-gh.mjs` warns on `gh pr create` and `gh pr edit` | `pr-text`, over the changed files and the body |
 | Stage by name; never commit on `main` | `pre-commit` branch check | `guard-git.mjs` refuses `add -A`, `commit -a`, a commit on `main` | ruleset rejects a push to `main` |
