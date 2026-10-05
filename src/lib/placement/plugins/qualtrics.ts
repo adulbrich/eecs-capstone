@@ -1,6 +1,10 @@
 import Papa from "papaparse";
 import { type ImportIssue, normalizeTitle } from "#/lib/placement/csv";
 import { BIDS_FORMAT, writeFormat } from "#/lib/placement/formats";
+import {
+  QUALTRICS_SEPARATOR,
+  splitAtSeparator,
+} from "#/lib/placement/plugins/header-title";
 import type { FilePlugin } from "#/lib/placement/plugins/types";
 import type { WorkspaceProject } from "#/lib/placement/types";
 
@@ -68,8 +72,8 @@ const isSurveyShaped = (grid: Grid) => {
     return false;
   }
   return (grid[1] ?? []).some((question) => {
-    const dash = question.indexOf(" - ");
-    return dash !== -1 && RANK_QUESTION.test(question.slice(0, dash));
+    const split = splitAtSeparator(question, QUALTRICS_SEPARATOR);
+    return split !== undefined && RANK_QUESTION.test(split.stem);
   });
 };
 
@@ -138,18 +142,18 @@ function findColumns(
   let rankQuestion: string | undefined;
   const ignoredStems = new Set<string>();
   text.forEach((question, column) => {
-    const dash = question.indexOf(" - ");
-    const stem = dash === -1 ? question : question.slice(0, dash);
+    const split = splitAtSeparator(question, QUALTRICS_SEPARATOR);
+    const stem = split?.stem ?? question;
     const reason = REASON.exec(question);
     if (reason) {
       columns.reasons.set(Number(reason[1]), column);
-    } else if (dash !== -1 && RANK_QUESTION.test(stem)) {
+    } else if (split !== undefined && RANK_QUESTION.test(stem)) {
       // Keyed on the QID group as well as the wording, so a second question
       // pasted with the same wording is still told apart.
       const group = `${ids[column]?.split("_")[0] ?? ""} ${stem}`;
       rankQuestion ??= group;
       if (group === rankQuestion) {
-        columns.ranks.push({ column, title: question.slice(dash + 3).trim() });
+        columns.ranks.push({ column, title: split.title });
       } else {
         ignoredStems.add(stem);
       }

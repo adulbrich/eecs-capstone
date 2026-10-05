@@ -72,69 +72,98 @@ export const PLUGIN_FIXTURES: Record<string, string> = {
   ].join("\r\n"),
 };
 
+/** A file nothing detects, and what staff chose to read it with. */
+export interface ChosenFixture {
+  context: Omit<PluginContext, "projects">;
+  text: string;
+}
+
 /**
- * For a plugin staff choose rather than one that detects its file, by id: a
- * file nothing detects, and what staff chose to read it with. Custom
- * mapping's headers are spelled and ordered unlike the standard format's,
- * and leave an optional column unmapped.
+ * For a plugin staff choose rather than one that detects its file, by id:
+ * one fixture per way staff can choose to read a file. Custom mapping's
+ * headers are spelled and ordered unlike the standard format's, and leave
+ * an optional column unmapped; its bids are read one row per bid, and wide,
+ * one column per project (#736).
  */
-export const CHOSEN_FIXTURES: Record<
-  string,
-  { context: Omit<PluginContext, "projects">; text: string }
-> = {
-  "custom-mapping-projects": {
-    text: [
-      "Sponsor,Project Name,Teams",
-      "Jane Doe,Tide Clock,2",
-      "Ada Park,Robot Arm,",
-    ].join("\n"),
-    context: {
-      mapping: {
-        version: 1,
-        dataset: "projects",
-        columns: {
-          "Project Name": "title",
-          Teams: "max_teams",
-          Sponsor: "proposer_name",
+export const CHOSEN_FIXTURES: Record<string, ChosenFixture[]> = {
+  "custom-mapping-projects": [
+    {
+      text: [
+        "Sponsor,Project Name,Teams",
+        "Jane Doe,Tide Clock,2",
+        "Ada Park,Robot Arm,",
+      ].join("\n"),
+      context: {
+        mapping: {
+          version: 1,
+          dataset: "projects",
+          columns: {
+            "Project Name": "title",
+            Teams: "max_teams",
+            Sponsor: "proposer_name",
+          },
         },
       },
     },
-  },
-  "custom-mapping-roster": {
-    text: [
-      "Student Email,Full Name,Team",
-      "ada@example.edu,Ada Park,Tide Clock",
-      "kim@example.edu,Kim Lee,",
-    ].join("\n"),
-    context: {
-      mapping: {
-        version: 1,
-        dataset: "roster",
-        columns: {
-          "Student Email": "email",
-          "Full Name": "name",
-          Team: "project",
+  ],
+  "custom-mapping-roster": [
+    {
+      text: [
+        "Student Email,Full Name,Team",
+        "ada@example.edu,Ada Park,Tide Clock",
+        "kim@example.edu,Kim Lee,",
+      ].join("\n"),
+      context: {
+        mapping: {
+          version: 1,
+          dataset: "roster",
+          columns: {
+            "Student Email": "email",
+            "Full Name": "name",
+            Team: "project",
+          },
         },
       },
     },
-  },
-  "custom-mapping-bids": {
-    text: [
-      "Choice,Student,Rank,Why",
-      "Tide Clock,ada@example.edu,1,I built a tide gauge.",
-      "Robot Arm,ada@example.edu,2,",
-    ].join("\n"),
-    context: {
-      mapping: {
-        version: 1,
-        dataset: "bids",
-        columns: {
-          Student: "email",
-          Rank: "priority",
-          Choice: "project",
-          Why: "comment",
+  ],
+  "custom-mapping-bids": [
+    {
+      text: [
+        "Choice,Student,Rank,Why",
+        "Tide Clock,ada@example.edu,1,I built a tide gauge.",
+        "Robot Arm,ada@example.edu,2,",
+      ].join("\n"),
+      context: {
+        mapping: {
+          version: 1,
+          dataset: "bids",
+          columns: {
+            Student: "email",
+            Rank: "priority",
+            Choice: "project",
+            Why: "comment",
+          },
         },
       },
     },
-  },
+    {
+      // A Google Forms grid: a blank cell is no bid.
+      text: [
+        "Timestamp,Email Address,Name,Rank the projects [Tide Clock],Rank the projects [Robot Arm]",
+        "2026-09-28 10:00,ada@example.edu,Ada Park,2,1",
+        "2026-09-28 10:05,kim@example.edu,Kim Lee,1,",
+      ].join("\n"),
+      context: {
+        mapping: {
+          version: 2,
+          dataset: "bids",
+          columns: { "Email Address": "email", Name: "name" },
+          wide: {
+            projectColumns: { by: "prefix", prefix: "Rank the projects" },
+            title: { by: "brackets" },
+          },
+        },
+      },
+    },
+  ],
 };

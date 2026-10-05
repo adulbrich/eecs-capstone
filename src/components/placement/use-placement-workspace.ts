@@ -1,6 +1,10 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { parseBidsCsv } from "#/lib/placement/csv";
 import { resolveFilePlugin, toStandard } from "#/lib/placement/plugins";
+import {
+  columnMappingId,
+  nameConvertedRows,
+} from "#/lib/placement/plugins/custom-mapping";
 import { pastedRoster } from "#/lib/placement/plugins/paste";
 import {
   mergeRoster,
@@ -123,6 +127,10 @@ export function usePlacementWorkspace() {
     );
     return {
       plugin,
+      // Read wide (#736), one file row gives several converted rows.
+      wide:
+        plugin?.id === columnMappingId("bids") &&
+        storedBids.mapping?.wide !== undefined,
       ...toStandard(plugin, storedBids.text, {
         projects,
         mapping: storedBids.mapping,
@@ -156,7 +164,12 @@ export function usePlacementWorkspace() {
     if (bidsSource === null || projects === undefined) {
       return null;
     }
-    const parsed = parseBidsCsv(bidsSource.text, projects, titleMatches);
+    const read = parseBidsCsv(bidsSource.text, projects, titleMatches);
+    // A converted row's number is no row of a file read wide, so each
+    // problem also names whose bid it is.
+    const parsed = bidsSource.wide
+      ? { ...read, issues: nameConvertedRows(read.issues, bidsSource.text) }
+      : read;
     // The roster's students join the survey's, so every tab and the run
     // see one list (#665), with its pre-approvals pinned (#670).
     const merged =

@@ -85,8 +85,7 @@ when it changes. Choosing another "Read as" keeps the column mapping stored but
 unused, and leaves the fingerprint as if it were not there; choosing "Column
 mapping" again reads through it. Removing the file removes it. Projects are stored
 parsed, so a projects column mapping runs once at import and is not kept. Value
-transforms, such as "1st choice" to 1, are out of scope, and a wide bids file (one
-column per choice) is #736.
+transforms, such as "1st choice" to 1, are out of scope.
 
 A column mapping downloads as a small JSON file, to load again next term or in
 another department:
@@ -103,8 +102,14 @@ another department:
 }
 ```
 
-- `version` is the shape's number, `MAPPING_VERSION`. A file with another number
-  is refused with a message naming both; a later shape (#736) bumps it.
+- `version` is the shape's number: 1 for columns alone, 2 with `wide` below.
+  `MAPPING_VERSION` is the latest the page reads; a file with a later number is
+  refused with a message naming both. A version 1 file loads and reads exactly as
+  it did before version 2, and a `wide` key in one is ignored, as any unknown key
+  always was. The page writes version 1 whenever a column mapping does not read
+  wide, so a roster or long bids column mapping still loads on a build that reads
+  version 1 alone, and the run fingerprint of a stored version 1 column mapping is
+  unchanged.
 - `dataset` is `"projects"`, `"roster"` or `"bids"`, and must match where it is
   loaded.
 - `columns` pairs each header the column mapping reads, as the file spells it,
@@ -112,6 +117,68 @@ another department:
   ignored, as the standard format ignores them. Each standard column takes at most
   one header, every value must be a column of the dataset's format, and a required
   column left out stops the file with a problem naming it.
+
+### Reading a bids file wide
+
+A Google Forms grid, or a survey written the way Qualtrics writes its ranking
+columns, exports bids wide: one row per student and one column per project, the
+cell holding the rank (#736). A bids column mapping reads such a file with
+`wide`, at version 2. A Microsoft Forms ranking is not this shape (one column per
+question, its items joined by `;`), so wide reading does not read it.
+
+```json
+{
+  "version": 2,
+  "dataset": "bids",
+  "columns": {
+    "Email Address": "email",
+    "Your name": "name"
+  },
+  "wide": {
+    "projectColumns": { "by": "prefix", "prefix": "Rank the projects" },
+    "title": { "by": "brackets" }
+  }
+}
+```
+
+- `projectColumns` is every column whose header starts with `prefix`
+  (`{ "by": "prefix", "prefix": "..." }`), or the headers staff ticked
+  (`{ "by": "headers", "headers": ["...", "..."] }`). Case and surrounding spaces
+  are ignored, as for `columns`. A picked header the file lacks is named, as a
+  missing student column is. The editor lists every project column it found,
+  with its letter, so a column the prefix took by accident is in sight before
+  Apply.
+- `title` says where each project column's header holds the project's title: the
+  text after the first `separator` (`{ "by": "separator", "separator": " - " }`,
+  the default, as Qualtrics writes it), or the text inside the last pair of square
+  brackets (`{ "by": "brackets" }`, as a Google Forms grid writes `Rank the
+  projects [Tide Clock]`). `header-title.ts` holds both readings, and the
+  Qualtrics plugin reads its headers through the same separator function.
+- `columns` may then fill only `email`, `name` and `avoid`, which repeat on every
+  bid the student's row gives; the project columns fill `priority` and `project`,
+  and the schema refuses a header for any other column.
+
+Each filled cell of a project column becomes one long bids row, `priority` the
+cell as it is and `project` the header's title, in the file's column order. A
+blank cell gives nothing, and a row with no filled project cell gives a warning on
+its row. Priorities are checked by `parseBidsCsv`, not the plugin, and the
+extracted titles reach title matching like any other. A cell is read as it is: a
+Google Forms checkbox grid can put several choices in one cell (`1, 2`), or a
+label such as `1st choice`, and the priority check refuses those rows; value
+transforms are out of scope. Read wide, one file row gives several converted rows,
+so the problems the conversion finds name rows of the uploaded file, and the ones
+the parser finds name rows of the converted CSV, which staff can download.
+`nameConvertedRows` adds to each of the latter whose bid the row is and for which
+project, and the page lists the two under separate headings.
+
+The file stops, as a problem with the whole file, when a project column's header
+gives no title, when a header is both a student column and a project column, when
+two project columns give the same project once titles are normalized (as
+`Pick1 [Tide Clock]` and `Pick2 [tide clock]`), or when no column is a project
+column; each names the header and its column letter,
+as `Column E, "Rank the projects", is a project column, but its header has no
+title inside square brackets.` The editor shows the same message and holds Apply
+until the column mapping is changed.
 
 Loading a column mapping against a file that lacks one of its headers names the
 header, and the page keeps saying so until that column takes another header;
@@ -134,8 +201,9 @@ of its converted header for that reason. A column mapping never reaches the serv
    unambiguous.
 3. Add a fixture under its id to `src/lib/placement/__tests__/plugin-fixtures.ts`:
    invented people and `example.edu` addresses only. A chosen plugin puts its
-   fixture in `CHOSEN_FIXTURES` instead, under its id, with the context staff's
-   choice gives it, such as custom mapping's `mapping`.
+   fixtures in `CHOSEN_FIXTURES` instead, a list under its id with one per way
+   staff can choose to read a file, each with the context that choice gives it,
+   such as custom mapping's `mapping`; the bids have a long one and a wide one.
 4. Run `npx vitest run src/lib/placement`. `plugins.contract.test.ts` runs the contract on
    every registered plugin: it has a fixture, converts it without an error, writes
    CSV the standard parser reads without an issue, claims its own fixture over the

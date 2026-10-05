@@ -47,7 +47,7 @@ export type Row = Record<string, string | undefined>;
  * its case and every column read by its lowercase name would come back
  * empty (#735).
  */
-const LEADING_BLANK_LINES = /^\uFEFF?(?:[ \t]*(?:\r\n|\r|\n))*/;
+export const LEADING_BLANK_LINES = /^\uFEFF?(?:[ \t]*(?:\r\n|\r|\n))*/;
 const LINE_BREAKS = /\r\n|\r|\n/g;
 
 /**

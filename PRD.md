@@ -625,7 +625,9 @@ catalogue that decided the matrix below; #288 shipped it.
   plugin chosen in "Download as" on the Results tab (#734).
 - [x] Map an unrecognized file's columns to the standard format with a column
   mapping, saved with the workspace and downloadable as JSON (#735).
-- [ ] Read a wide bids file through a column mapping (#736).
+- [x] Read a wide bids file through a column mapping: one row per student, one
+  column per project chosen by header prefix or by ticking, titles read after a
+  separator or inside square brackets (#736).
 
 ## 18. Analytics Dashboard
 

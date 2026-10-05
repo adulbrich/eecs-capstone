@@ -751,15 +751,32 @@ export function inputFingerprint(
   return `${text.length}:${hash.toString(36)}`;
 }
 
+const byName = (a: string, b: string) => (a < b ? -1 : 1);
+
 /**
  * A column mapping in a fixed order, since the page builds one in the
  * format's column order and storage hands it back in the schema's: the same
- * mapping must hash the same either way.
+ * mapping must hash the same either way. Wide reading (#736) comes last and
+ * only when set, so a column mapping without it hashes as it did before.
  */
-function mappingKey(mapping: ColumnMapping): [string, string[][]] {
-  return [
+function mappingKey(mapping: ColumnMapping): unknown[] {
+  const key = [
     mapping.dataset,
-    Object.entries(mapping.columns).sort(([a], [b]) => (a < b ? -1 : 1)),
+    Object.entries(mapping.columns).sort(([a], [b]) => byName(a, b)),
+  ];
+  const { wide } = mapping;
+  if (wide === undefined) {
+    return key;
+  }
+  const set = wide.projectColumns;
+  return [
+    ...key,
+    set.by === "prefix"
+      ? ["prefix", set.prefix]
+      : ["headers", [...set.headers].sort(byName)],
+    wide.title.by === "brackets"
+      ? ["brackets"]
+      : ["separator", wide.title.separator],
   ];
 }
 

@@ -1261,6 +1261,107 @@ test.describe("placement workspace", () => {
     }
   });
 
+  test("a Google Forms grid reads wide through a column mapping, one bid per filled cell (#736)", async ({
+    page,
+  }) => {
+    await page.goto("/admin/placement");
+    await waitForHydration(page);
+    await page.getByLabel("Projects CSV file").setInputFiles({
+      name: "projects.csv",
+      mimeType: "text/csv",
+      buffer: Buffer.from(PROJECTS_CSV),
+    });
+    await page.getByRole("tab", { name: /Bids/ }).click();
+    // One row per student, one column per project, the title in brackets:
+    // Ben left Tide Clok blank, and "Tide Clok" names no project.
+    await page.getByLabel("Bids CSV file").setInputFiles({
+      name: "form.csv",
+      mimeType: "text/csv",
+      buffer: Buffer.from(
+        [
+          "Timestamp,Email Address,Your name,Who to avoid,Rank the projects [Tide Clok],Rank the projects [Robot Arm]",
+          `2026-09-28 10:00,ada@${DOMAIN},Ada Park,Sam Roe,2,1`,
+          `2026-09-28 10:05,ben@${DOMAIN},Ben Ito,,,1`,
+        ].join("\n")
+      ),
+    });
+    await expect(
+      page.getByText("No format on this page recognized")
+    ).toBeVisible();
+    await page.getByRole("button", { name: "Map columns" }).click();
+    const editor = page.getByRole("region", {
+      name: "Map the columns of form.csv",
+    });
+    await editor
+      .getByRole("radio", {
+        name: "One row per student, one column per project",
+      })
+      .click();
+    // Only who the student is comes from a header now.
+    await expect(
+      editor.getByRole("combobox", { name: "File column for priority" })
+    ).toHaveCount(0);
+    for (const [column, header] of [
+      ["email", "Email Address"],
+      ["name", "Your name"],
+      ["avoid", "Who to avoid"],
+    ]) {
+      await editor
+        .getByRole("combobox", { name: `File column for ${column}` })
+        .click();
+      await page.getByRole("option", { name: header, exact: true }).click();
+    }
+    await editor
+      .getByLabel("Project columns' headers start with")
+      .fill("Rank the projects");
+    // The default separator finds no title in these headers, and says which.
+    const apply = editor.getByRole("button", { name: "Apply column mapping" });
+    await expect(editor).toContainText(
+      'Column E, "Rank the projects [Tide Clok]", is a project column, but its header has no title after " - ".'
+    );
+    await expect(apply).toBeDisabled();
+    await editor
+      .getByRole("radio", { name: "The text inside the last square brackets" })
+      .click();
+    await expect(editor).toContainText(
+      "2 project columns: Tide Clok (E), Robot Arm (F)."
+    );
+    const preview = editor.getByRole("table");
+    await expect(preview.getByRole("row")).toHaveCount(4);
+    await expect(preview.getByRole("row").nth(1)).toHaveText(
+      `ada@${DOMAIN}Ada Park2Tide ClokSam Roe`
+    );
+    await apply.click();
+
+    // The extracted titles go through title matching like any other.
+    const unmatched = page.getByRole("region", { name: "Unmatched titles" });
+    await expect(unmatched).toContainText("1 title matches no project");
+    await expect(page.getByText("2 students and 2 bids")).toBeVisible();
+    await unmatched.getByRole("button", { name: 'Match "Tide Clok"' }).click();
+    await expect(page.getByText("2 students and 3 bids")).toBeVisible();
+    await expect(
+      page.getByRole("rowheader", { name: /Ada Park/ })
+    ).toBeVisible();
+
+    const bidsOf = async () => JSON.parse((await stored(page)) ?? "null")?.bids;
+    await expect
+      .poll(async () => (await bidsOf())?.readAs)
+      .toBe("custom-mapping-bids");
+    expect((await bidsOf()).mapping).toEqual({
+      version: 2,
+      dataset: "bids",
+      columns: {
+        "Email Address": "email",
+        "Your name": "name",
+        "Who to avoid": "avoid",
+      },
+      wide: {
+        projectColumns: { by: "prefix", prefix: "Rank the projects" },
+        title: { by: "brackets" },
+      },
+    });
+  });
+
   test("staff read the bids per project and pin a student from there", async ({
     page,
   }) => {

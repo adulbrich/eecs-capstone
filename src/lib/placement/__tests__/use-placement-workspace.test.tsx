@@ -128,3 +128,42 @@ describe("a file converted on read (#733)", () => {
     ]);
   });
 });
+
+describe("a bids file read wide through a column mapping (#736)", () => {
+  it("names whose bid a converted row is, so it is not mistaken for the file's row", async () => {
+    const { result } = await loaded({
+      ...EMPTY_WORKSPACE,
+      projects: [project("Tide Clock"), project("Robot Arm")],
+      bids: {
+        filename: "form.csv",
+        text: [
+          "Mail,Pick [Tide Clock],Pick [Robot Arm]",
+          "ada@example.edu,1,first",
+          "kim@example.edu,,",
+        ].join("\n"),
+        readAs: "custom-mapping-bids",
+        mapping: {
+          version: 2,
+          dataset: "bids",
+          columns: { Mail: "email" },
+          wide: {
+            projectColumns: { by: "prefix", prefix: "Pick" },
+            title: { by: "brackets" },
+          },
+        },
+      },
+    });
+    // Row 3 of the file is Kim's; row 3 of the converted file is Ada's.
+    expect(result.current.bidsSource?.issues).toEqual([
+      expect.objectContaining({ level: "warning", row: 3 }),
+    ]);
+    expect(result.current.bids?.issues).toEqual([
+      expect.objectContaining({
+        row: 3,
+        message: expect.stringContaining(
+          "That row is ada@example.edu's bid for Robot Arm."
+        ),
+      }),
+    ]);
+  });
+});
