@@ -314,13 +314,15 @@ _Avoid_: alias, mapping, title fix
 The one CSV shape placement reads for each of the projects, the roster and the bids,
 and writes back out. Whatever a file came as, placement reads it as this
 ([ADR-0059](./docs/adr/0059-placement-plugins-convert-to-the-standard-csv.md)).
+The placement it produces has one too, which placement writes and never reads.
 _Avoid_: schema, native format, template (the template is an example file in it)
 
 **Plugin**:
 A way to read one source's own shape into the standard format, such as a survey
 tool's export, an LMS roster export or pasted text, or to write the standard format
 out in another tool's shape. Placement recognizes a file's plugin by its content,
-and staff can read the file as another. The page calls a plugin a format: "Read as".
+and staff can read the file as another. The page calls a plugin a format: "Read as"
+for a file, "Download as" for what placement writes.
 _Avoid_: adapter, connector (suggests a live link to the other tool), integration,
 importer
 

@@ -1,31 +1,52 @@
-import { parseRows } from "#/lib/placement/csv";
+import { type ImportIssue, parseRows } from "#/lib/placement/csv";
 import {
+  type ExportDataset,
   type PlacementDataset,
   STANDARD_FORMATS,
 } from "#/lib/placement/formats";
-import { canvasRoster } from "#/lib/placement/plugins/canvas";
+import { canvasGroups, canvasRoster } from "#/lib/placement/plugins/canvas";
 import { pastedRoster, pastedTitles } from "#/lib/placement/plugins/paste";
 import { qualtricsBids } from "#/lib/placement/plugins/qualtrics";
 import type {
   Conversion,
+  ExportContext,
+  ExportedFile,
+  ExportPlugin,
   FilePlugin,
-  PlacementPlugin,
+  ImportPlugin,
   PluginContext,
 } from "#/lib/placement/plugins/types";
 
 /**
- * Every placement plugin. A file is tried against its dataset's standard
+ * Every import plugin. A file is tried against its dataset's standard
  * format first, then against each file plugin here in order, and the first
  * that claims it reads it. Add a plugin by adding it to this list.
  */
-export const PLUGINS: readonly PlacementPlugin[] = [
+export const PLUGINS: readonly ImportPlugin[] = [
   canvasRoster,
   qualtricsBids,
   pastedRoster,
   pastedTitles,
 ];
 
-export function pluginById(id: string): PlacementPlugin | undefined {
+/**
+ * The standard format's value in the Read as and Download as selects, beside
+ * plugin ids, so no plugin may take it as its id: the contract test checks.
+ */
+export const STANDARD_OPTION = "standard";
+
+/**
+ * Every export plugin, offered by "Download as" after the dataset's standard
+ * CSV, in this order. Add one by adding it to this list.
+ */
+export const EXPORT_PLUGINS: readonly ExportPlugin[] = [canvasGroups];
+
+/** The export plugins that write `dataset`, in the order "Download as" lists them. */
+export function exportPlugins(dataset: ExportDataset): ExportPlugin[] {
+  return EXPORT_PLUGINS.filter((p) => p.dataset === dataset);
+}
+
+export function pluginById(id: string): ImportPlugin | undefined {
   return PLUGINS.find((p) => p.id === id);
 }
 
@@ -95,13 +116,32 @@ export function readAsChoice(
 const TRAILING_STOP = /\.$/;
 
 /**
+ * A plugin that threw, as the one problem with the whole file: `failure`
+ * says what could not be done, as "The Canvas roster export could not be
+ * read".
+ */
+function thrown(failure: string, error: unknown): ImportIssue[] {
+  const reason = (
+    error instanceof Error ? error.message : String(error)
+  ).replace(TRAILING_STOP, "");
+  return [
+    {
+      level: "error",
+      row: 1,
+      message: `${failure}: ${reason}.`,
+      wholeFile: true,
+    },
+  ];
+}
+
+/**
  * The text as standard CSV: through `plugin`, or as it is when null. A
  * plugin that throws is reported as a problem with the whole file, because
  * the file stays stored and is read again on every load: an exception here
  * would otherwise break the page until staff cleared their browser.
  */
 export function toStandard(
-  plugin: PlacementPlugin | null,
+  plugin: ImportPlugin | null,
   text: string,
   context: PluginContext
 ): Conversion {
@@ -113,14 +153,31 @@ export function toStandard(
   } catch (error) {
     return {
       text: "",
-      issues: [
-        {
-          level: "error",
-          row: 1,
-          message: `The ${plugin.label} could not be read: ${(error instanceof Error ? error.message : String(error)).replace(TRAILING_STOP, "")}.`,
-          wholeFile: true,
-        },
-      ],
+      issues: thrown(`The ${plugin.label} could not be read`, error),
+    };
+  }
+}
+
+/**
+ * The standard CSV as a file to download: through `plugin`, or as it is when
+ * null. A plugin that throws is reported as a problem with the whole file,
+ * so the page can say so rather than the download doing nothing.
+ */
+export function exportWith(
+  plugin: ExportPlugin | null,
+  text: string,
+  context: ExportContext
+): ExportedFile {
+  if (plugin === null) {
+    return { filename: context.filename, text, issues: [] };
+  }
+  try {
+    return plugin.fromStandard(text, context);
+  } catch (error) {
+    return {
+      filename: context.filename,
+      text: "",
+      issues: thrown(`The ${plugin.label} file could not be written`, error),
     };
   }
 }

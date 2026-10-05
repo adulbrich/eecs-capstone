@@ -3,7 +3,6 @@ import {
   ChevronDown,
   ChevronRight,
   ChevronsUpDown,
-  Download,
   FoldVertical,
   Pin,
   PinOff,
@@ -26,6 +25,7 @@ import {
   defineAdminColumns,
 } from "#/components/admin-data-table";
 import { ErrorBanner } from "#/components/error-banner";
+import { DownloadAs } from "#/components/placement/download-as";
 import { StudentMenu } from "#/components/placement/removed-students";
 import type { PlacementWorkspace } from "#/components/placement/use-placement-workspace";
 import { Badge } from "#/components/ui/badge";
@@ -73,7 +73,6 @@ import {
   unplacedReason,
   unsurveyedRows,
 } from "#/lib/placement/board";
-import { downloadText } from "#/lib/placement/download";
 import { runPlacement } from "#/lib/placement/run-placement";
 import type {
   PlacementResult,
@@ -252,41 +251,25 @@ export function ResultsTab({
             Placing {students.length} students...
           </span>
         )}
-        {result && (
-          <div className="ml-auto flex flex-wrap gap-2">
-            <Button
-              onClick={() =>
-                downloadText(
-                  `placement-${today()}.csv`,
-                  placementCsv(rows, titles),
-                  "text/csv"
-                )
-              }
-              size="sm"
-              type="button"
-              variant="outline"
-            >
-              <Download aria-hidden="true" />
-              Download placement
-            </Button>
-            <Button
-              onClick={() =>
-                downloadText(
-                  `bids-with-pins-${today()}.csv`,
-                  bidsWithPinsCsv(students, titles),
-                  "text/csv"
-                )
-              }
-              size="sm"
-              type="button"
-              variant="outline"
-            >
-              <Download aria-hidden="true" />
-              Download bids with pins
-            </Button>
-          </div>
-        )}
       </div>
+      {result && (
+        <div className="mt-4 flex flex-wrap items-start gap-x-6 gap-y-2">
+          <DownloadAs
+            dataset="placement"
+            filename={`placement-${today()}.csv`}
+            text={() => placementCsv(rows, titles)}
+          >
+            Download placement
+          </DownloadAs>
+          <DownloadAs
+            dataset="bids"
+            filename={`bids-with-pins-${today()}.csv`}
+            text={() => bidsWithPinsCsv(students, titles)}
+          >
+            Download bids with pins
+          </DownloadAs>
+        </div>
+      )}
       {missing && <p className="mt-2 text-sm">{missing}</p>}
       <FieldError message={error} />
       {failed &&

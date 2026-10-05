@@ -173,6 +173,13 @@ const CENSUS = new Map<string, { class: SeedClass; why: string }>([
     },
   ],
   [
+    "src/components/placement/download-as.tsx: useState(STANDARD_OPTION)",
+    {
+      class: "D",
+      why: "the Download as choice, a module constant to start; staff's own choice in component state, never loader data",
+    },
+  ],
+  [
     "src/components/comment-thread.tsx: useState(comment.content)",
     {
       class: "D",

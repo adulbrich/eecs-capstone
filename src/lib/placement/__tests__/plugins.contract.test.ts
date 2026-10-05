@@ -7,24 +7,30 @@ import {
   type ImportIssue,
   parseBidsCsv,
   parseProjectsCsv,
+  parseRows,
 } from "#/lib/placement/csv";
 import {
+  EXPORT_FORMATS,
   formatTemplate,
   type PlacementDataset,
   STANDARD_FORMATS,
+  writeFormat,
 } from "#/lib/placement/formats";
 import {
   detectPlugin,
+  EXPORT_PLUGINS,
+  exportWith,
   PLUGINS,
   pluginById,
   readAsChoice,
   resolveFilePlugin,
+  STANDARD_OPTION,
   toStandard,
 } from "#/lib/placement/plugins";
-import { canvasRoster } from "#/lib/placement/plugins/canvas";
+import { canvasGroups, canvasRoster } from "#/lib/placement/plugins/canvas";
 import { pastedTitles } from "#/lib/placement/plugins/paste";
 import { qualtricsBids } from "#/lib/placement/plugins/qualtrics";
-import type { FilePlugin } from "#/lib/placement/plugins/types";
+import type { ExportPlugin, FilePlugin } from "#/lib/placement/plugins/types";
 import { parseRosterCsv } from "#/lib/placement/roster";
 
 /** The one parser of each dataset's standard CSV. */
@@ -83,6 +89,87 @@ describe.each(PLUGINS.map((p) => [p.id, p] as const))(
     }
   }
 );
+
+// Every export plugin passes these from a standard fixture under its id
+// (#734), as every import plugin passes the contract above.
+describe.each(EXPORT_PLUGINS.map((p) => [p.id, p] as const))(
+  "export plugin %s",
+  (id, plugin) => {
+    const fixture = PLUGIN_FIXTURES[id];
+    const format = EXPORT_FORMATS[plugin.dataset];
+    const context = { filename: "placement-2026-10-04.csv" };
+    const header = (text: string) => parseRows(text).fields;
+
+    it("has a standard fixture and an id no other plugin uses", () => {
+      expect(fixture).toBeDefined();
+      for (const column of format.columns.filter((c) => c.required)) {
+        expect(header(fixture)).toContain(column.name);
+      }
+      expect(
+        [...PLUGINS, ...EXPORT_PLUGINS].filter((p) => p.id === id)
+      ).toHaveLength(1);
+    });
+
+    it("writes its fixture without an error, with every column it needs", () => {
+      const written = plugin.fromStandard(fixture, context);
+      expect(written.issues.filter((i) => i.level === "error")).toEqual([]);
+      expect(header(written.text)).toEqual(
+        expect.arrayContaining([...plugin.requiredColumns])
+      );
+      expect(written.filename).not.toBe(context.filename);
+    });
+
+    it("writes the header from a standard file with no rows", () => {
+      const written = plugin.fromStandard(writeFormat(format, []), context);
+      expect(written.issues).toEqual([]);
+      expect(header(written.text)).toEqual(
+        expect.arrayContaining([...plugin.requiredColumns])
+      );
+    });
+  }
+);
+
+it("gives no plugin the id the selects use for the standard format", () => {
+  expect(
+    [...PLUGINS, ...EXPORT_PLUGINS]
+      .map((p) => p.id)
+      .filter((id) => id === STANDARD_OPTION)
+  ).toEqual([]);
+});
+
+describe("writing a download", () => {
+  const context = { filename: "placement-2026-10-04.csv" };
+
+  it("writes the standard CSV as it is with no plugin", () => {
+    expect(exportWith(null, "email\r\n", context)).toEqual({
+      filename: "placement-2026-10-04.csv",
+      text: "email\r\n",
+      issues: [],
+    });
+  });
+
+  it("reports a plugin that throws as a problem with the whole file", () => {
+    const broken: ExportPlugin = {
+      ...canvasGroups,
+      fromStandard: () => {
+        throw new Error("out of cheese.");
+      },
+    };
+    expect(exportWith(broken, "", context)).toEqual({
+      filename: "placement-2026-10-04.csv",
+      text: "",
+      issues: [
+        {
+          level: "error",
+          row: 1,
+          message:
+            "The Canvas groups file could not be written: out of cheese.",
+          wholeFile: true,
+        },
+      ],
+    });
+  });
+});
 
 describe("reading a stored file", () => {
   const canvas = PLUGIN_FIXTURES["canvas-roster"];

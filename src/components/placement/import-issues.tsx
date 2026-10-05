@@ -2,17 +2,21 @@ import type { ImportIssue } from "#/lib/placement/csv";
 
 /**
  * Every problem an import found, errors first. A row with an error is left
- * out of the run; a warning keeps the row.
+ * out of the run; a warning keeps the row. With `writing`, the problems an
+ * export plugin found writing its file, whose rows are those it left out.
  */
 export function ImportIssues({
   issues,
   label,
   unit = "row",
+  writing = false,
 }: {
   issues: readonly ImportIssue[];
   label: string;
   /** "line" for pasted text, which has no header row. */
   unit?: "line" | "row";
+  /** The file is one placement writes, so it fails to be written, not read. */
+  writing?: boolean;
 }) {
   if (issues.length === 0) {
     return null;
@@ -31,7 +35,9 @@ export function ImportIssues({
     >
       {unread ? (
         // Only a file has a header to refuse; a pasted list never does.
-        <p className="font-medium">The {label} file was not read</p>
+        <p className="font-medium">
+          The {label} file was not {writing ? "written" : "read"}
+        </p>
       ) : (
         <p className="font-medium">
           {errors.length > 0 &&

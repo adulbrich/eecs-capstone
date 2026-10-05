@@ -1,5 +1,9 @@
 import { toCsv } from "#/lib/csv";
-import { BIDS_FORMAT } from "#/lib/placement/formats";
+import {
+  BIDS_FORMAT,
+  PLACEMENT_FORMAT,
+  writeFormat,
+} from "#/lib/placement/formats";
 import type {
   PlacementBid,
   PlacementResult,
@@ -392,37 +396,33 @@ export function moveStudent(
   };
 }
 
-type Row = Record<string, string | number | null>;
-
 /** The CSV's priority cell: the number, or why there is none. */
-function csvPriority(row: BoardRow): string | number | null {
+function csvPriority(row: BoardRow): string {
   if (row.preApproved) {
     return "pre-approved";
   }
-  return row.rosterOnly ? "not in the survey" : row.priority;
+  if (row.rosterOnly) {
+    return "not in the survey";
+  }
+  return row.priority === null ? "" : String(row.priority);
 }
 
-/** One row per student, unplaced ones with a blank project and team. */
+/**
+ * The placement in `PLACEMENT_FORMAT`: one row per student, unplaced ones
+ * with a blank project and team.
+ */
 export function placementCsv(
   rows: readonly BoardRow[],
   titles: Map<string, string>
 ) {
-  return toCsv(
-    [
-      { header: "email", value: (r: Row) => r.email },
-      { header: "name", value: (r: Row) => r.name },
-      { header: "project", value: (r: Row) => r.project },
-      { header: "team", value: (r: Row) => r.team },
-      { header: "priority", value: (r: Row) => r.priority },
-      { header: "comment", value: (r: Row) => r.comment },
-      { header: "avoid", value: (r: Row) => r.avoid },
-    ],
+  return writeFormat(
+    PLACEMENT_FORMAT,
     rows.map((r) => ({
       email: r.email,
       name: r.name,
       project:
         r.projectKey === null ? "" : (titles.get(r.projectKey) ?? r.projectKey),
-      team: r.team,
+      team: r.team === null ? "" : String(r.team),
       priority: csvPriority(r),
       comment: r.comment,
       avoid: r.avoid ?? "",

@@ -2,8 +2,10 @@ import type { WorkspaceProject } from "#/lib/placement/types";
 
 /**
  * One source per registered plugin, by plugin id, for the contract test in
- * `plugins.contract.test.ts`. Invented names and `example.edu` addresses only. Kept
- * out of the plugin modules so test data never reaches the page's bundle.
+ * `plugins.contract.test.ts`: what an import plugin reads, or the standard
+ * CSV an export plugin reads. Invented names and `example.edu` addresses
+ * only. Kept out of the plugin modules so test data never reaches the page's
+ * bundle.
  */
 
 export const FIXTURE_PROJECTS: WorkspaceProject[] = [
@@ -58,4 +60,13 @@ export const PLUGIN_FIXTURES: Record<string, string> = {
   "paste-roster":
     "Ada Park <ada@example.edu>\nkim@example.edu, lou@example.edu",
   "paste-titles": "Tide Clock\n\nRobot Arm",
+  // A standard placement: Tide Clock with two teams, Robot Arm with one,
+  // and an unplaced student.
+  "canvas-groups": [
+    "email,name,project,team,priority,comment,avoid",
+    "ada@example.edu,Ada Park,Tide Clock,1,1,,",
+    "kim@example.edu,Kim Lee,Tide Clock,2,pre-approved,,",
+    "lou@example.edu,Lou Ma,Robot Arm,1,not in the survey,,",
+    "cy@example.edu,Cy Moss,,,,,",
+  ].join("\r\n"),
 };

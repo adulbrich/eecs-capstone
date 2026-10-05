@@ -620,7 +620,8 @@ catalogue that decided the matrix below; #288 shipped it.
   Read as; a contributor adds one by pull request
   ([ADR-0059](./docs/adr/0059-placement-plugins-convert-to-the-standard-csv.md),
   #698, #733).
-- [ ] Download the placement as a Canvas group-set import (#734).
+- [x] Download the placement as a Canvas group-set import, through an export
+  plugin chosen in "Download as" on the Results tab (#734).
 - [ ] Map an unrecognized file's columns to the standard format (#735), and
   read a wide bids file through that mapping (#736).
 

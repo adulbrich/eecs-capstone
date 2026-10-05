@@ -524,6 +524,16 @@ test("admin placement, a run on the results board", async ({ page }) => {
   await checkA11y(page);
   await page.getByRole("button", { name: "Expand all" }).click();
 
+  // Download as offers the Canvas group set import, and says what Canvas
+  // does with it (#734). It stays chosen for the 375px scan below.
+  await page.getByRole("combobox", { name: "Download as" }).click();
+  await page.getByRole("option", { name: "Canvas groups" }).click();
+  await expect(page.getByRole("listbox")).toHaveCount(0);
+  await expect(
+    page.getByText(/Canvas matches each student by their login/)
+  ).toBeVisible();
+  await checkA11y(page);
+
   // A student's bids open under their row (#687), with Move here on each.
   const bidsToggle = page.getByRole("button", { name: /, \d+ bids?$/ }).first();
   await bidsToggle.click();
