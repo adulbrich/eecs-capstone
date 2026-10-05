@@ -41,6 +41,13 @@ export function normalizeTitle(title: string): string {
 
 export type Row = Record<string, string | undefined>;
 
+/**
+ * Blank lines before the header. Papa skips them as rows but then never
+ * calls `transformHeader`, so the header would keep its case and every
+ * column read by its lowercase name would come back empty (#735).
+ */
+const LEADING_BLANK_LINES = /^(?:[ \t]*(?:\r\n|\r|\n))+/;
+
 export function parseRows(text: string): {
   fields: string[];
   issues: ImportIssue[];
@@ -50,7 +57,7 @@ export function parseRows(text: string): {
   // reader keyed by name would silently use one and drop the other.
   const seen = new Set<string>();
   const repeated = new Set<string>();
-  const parsed = Papa.parse<Row>(text, {
+  const parsed = Papa.parse<Row>(text.replace(LEADING_BLANK_LINES, ""), {
     header: true,
     skipEmptyLines: "greedy",
     transformHeader: (header) => {
@@ -104,8 +111,12 @@ export function missingColumns(
     }));
 }
 
+/**
+ * A row's cell, own properties only: a header named `__proto__` or
+ * `constructor` must read as blank, not as what every object inherits.
+ */
 export const cell = (row: Row, column: string) =>
-  unguardCell((row[column] ?? "").trim());
+  unguardCell(((Object.hasOwn(row, column) ? row[column] : "") ?? "").trim());
 
 /** Blank is undefined; anything but a whole number at or above `min` is invalid. */
 function parseCount(

@@ -1,10 +1,13 @@
 import { describe, expect, it } from "vitest";
 import {
+  cell,
   normalizeTitle,
   parseBidsCsv,
   parseProjectsCsv,
   parseProjectTitles,
+  parseRows,
 } from "#/lib/placement/csv";
+import { parseRosterCsv } from "#/lib/placement/roster";
 
 // Every name, email and title here is invented (#648).
 
@@ -22,6 +25,30 @@ function bids(...lines: string[]) {
 
 const errors = (result: { issues: { level: string; row: number }[] }) =>
   result.issues.filter((i) => i.level === "error").map((i) => i.row);
+
+describe("parseRows", () => {
+  it("lowercases the header of a file that starts with blank lines (#735)", () => {
+    const { fields, issues, rows } = parseRows(
+      "\n \r\nEmail,Name\nada@example.edu,Ada Park"
+    );
+    expect(issues).toEqual([]);
+    expect(fields).toEqual(["email", "name"]);
+    expect(rows).toEqual([{ email: "ada@example.edu", name: "Ada Park" }]);
+  });
+
+  it("reads a standard file that starts with a blank line", () => {
+    expect(parseRosterCsv("\nEmail,Name\nada@example.edu,Ada").issues).toEqual(
+      []
+    );
+  });
+
+  it("reads a column named __proto__ as blank rather than throwing (#735)", () => {
+    const { rows } = parseRows("__proto__,email\nx,ada@example.edu");
+    expect(rows[0] && cell(rows[0], "__proto__")).toBe("");
+    expect(rows[0] && cell(rows[0], "email")).toBe("ada@example.edu");
+    expect(cell({}, "constructor")).toBe("");
+  });
+});
 
 describe("normalizeTitle", () => {
   it("trims, folds case and collapses inner whitespace", () => {
