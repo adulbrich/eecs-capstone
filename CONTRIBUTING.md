@@ -55,7 +55,8 @@ claim it        fix/ feat/ ...                                           review 
    - **The local branch**, once its remote is gone. A squash merge leaves it
      "not fully merged", so `git branch -d` refuses it and only `-D` removes
      it. `.claude/hooks/guard-git.mjs` reserves `-D` for you rather than an
-     agent, so an agent's part is to give the count and the one command.
+     agent, so an agent's part is to give the count, a command to review them, and the
+     command that deletes them.
 
    `node scripts/check-workspace.mjs --ports` reports all three, and the
    SessionStart hook runs the same checks, so a session is told at its first
