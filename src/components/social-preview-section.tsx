@@ -72,11 +72,18 @@ function SummaryAttemptStatus({ view }: { view: SocialSummaryView }) {
   if (attempt || view.summary !== null) {
     return null;
   }
+  if (!view.refreshable) {
+    return (
+      <AttemptNote>
+        Written automatically once the project is published.
+      </AttemptNote>
+    );
+  }
   return (
     <AttemptNote>
-      {view.refreshable
-        ? "No automatic attempt yet."
-        : "Written automatically once the project is published."}
+      {view.automaticEnabled
+        ? "No automatic attempt on record yet."
+        : "Automatic summaries are switched off. Regenerate with AI still works."}
     </AttemptNote>
   );
 }

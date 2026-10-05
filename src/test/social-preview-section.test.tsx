@@ -31,6 +31,7 @@ beforeEach(() => {
 
 const AUTOMATIC: SocialSummaryView = {
   isManual: false,
+  automaticEnabled: true,
   refreshable: true,
   summaryAttempt: null,
   summary: "A rover that streams sensor data from a greenhouse.",
@@ -38,6 +39,7 @@ const AUTOMATIC: SocialSummaryView = {
 };
 const MANUAL: SocialSummaryView = {
   isManual: true,
+  automaticEnabled: true,
   refreshable: true,
   summaryAttempt: null,
   summary: "Wording staff chose.",
@@ -45,6 +47,7 @@ const MANUAL: SocialSummaryView = {
 };
 const NONE: SocialSummaryView = {
   isManual: false,
+  automaticEnabled: true,
   refreshable: true,
   summaryAttempt: null,
   summary: null,
@@ -61,6 +64,7 @@ const REWRITTEN: RegenerateSocialSummaryResult = {
  */
 const RACED: RegenerateSocialSummaryResult = {
   isManual: true,
+  automaticEnabled: true,
   refreshable: true,
   summaryAttempt: null,
   summary: "Wording a colleague saved mid-flight.",
@@ -295,8 +299,20 @@ const FAILED_AT = new Date("2026-10-05T10:02:00Z");
 describe("SocialPreviewSection last rewrite", () => {
   it("says no attempt has run on a published project with nothing stored", async () => {
     await renderWith(NONE);
-    expect(screen.getByText("No automatic attempt yet.")).toBeDefined();
+    expect(
+      screen.getByText("No automatic attempt on record yet.")
+    ).toBeDefined();
     expect(screen.queryByText(/failed/)).toBeNull();
+  });
+
+  it("says the automatic path is off rather than that it has not run yet", async () => {
+    // With the kill switch off every refresh skips and records nothing, so
+    // "not yet" would be a promise nothing keeps.
+    await renderWith({ ...NONE, automaticEnabled: false });
+    expect(
+      screen.getByText(/Automatic summaries are switched off/)
+    ).toBeDefined();
+    expect(screen.queryByText(/No automatic attempt/)).toBeNull();
   });
 
   it("says when one will run on a project that is not published yet", async () => {
@@ -319,7 +335,9 @@ describe("SocialPreviewSection last rewrite", () => {
       screen.getByText(/The last rewrite failed automatically/)
     ).toBeDefined();
     expect(screen.getByText(/previews use the start/)).toBeDefined();
-    expect(screen.queryByText("No automatic attempt yet.")).toBeNull();
+    expect(
+      screen.queryByText("No automatic attempt on record yet.")
+    ).toBeNull();
     expect(regenerateButton().hasAttribute("disabled")).toBe(false);
   });
 

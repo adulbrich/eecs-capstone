@@ -97,6 +97,7 @@ vi.mock("#/server/social-summary", () => ({
   getSocialSummary: vi.fn(() =>
     Promise.resolve({
       isManual: false,
+      automaticEnabled: false,
       refreshable: false,
       summary: null,
       summaryAttempt: null,

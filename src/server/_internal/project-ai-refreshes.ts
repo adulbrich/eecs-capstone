@@ -1,4 +1,4 @@
-import { and, eq } from "drizzle-orm";
+import { and, eq, inArray, lte, sql } from "drizzle-orm";
 import { db } from "#/db";
 import { projectAiRefreshes } from "#/db/schema";
 import { redactQueryError } from "#/lib/_internal/redact-query-error";
@@ -14,10 +14,18 @@ import {
  * overwriting the one before.
  *
  * Takes the writer's outcome whole and drops the ones that are not attempts:
- * `skipped`, `unchanged` and `manual` make no attempt to write, and recording
- * them would add a row on every draft save and make "no row" mean nothing.
- * So a project with no row was never attempted, which is what staff need to
- * tell apart from "failed".
+ * `skipped` and `manual` make no attempt to write, and recording them would
+ * add a row on every draft save. So a project with no row has no attempt on
+ * record, which is what staff need to tell apart from "failed". "On record",
+ * not "never attempted": a record write that fails below is logged and lost.
+ *
+ * `unchanged` is not recorded either, but it does retire a `failed` or
+ * `superseded` row: it means the stored output already matches the current
+ * text, as when an edit is reverted after a failed attempt, and a failure
+ * left beside it would offer a retry that has nothing to do.
+ *
+ * The upsert keeps the later stamp. A staff Recompute or Regenerate does not
+ * share the background queue, so two attempts can commit in either order.
  *
  * Never throws, for the reason the writers never throw: the save or publish
  * has committed, and losing the record costs a status line, not the user's
@@ -30,11 +38,23 @@ export async function recordAiRefresh(
   trigger: AiRefreshTrigger,
   writerOutcome: string
 ): Promise<void> {
-  const outcome = recordableOutcome(writerOutcome);
-  if (!outcome) {
-    return;
-  }
   try {
+    if (writerOutcome === "unchanged") {
+      await db
+        .delete(projectAiRefreshes)
+        .where(
+          and(
+            eq(projectAiRefreshes.projectId, projectId),
+            eq(projectAiRefreshes.kind, kind),
+            inArray(projectAiRefreshes.outcome, ["failed", "superseded"])
+          )
+        );
+      return;
+    }
+    const outcome = recordableOutcome(writerOutcome);
+    if (!outcome) {
+      return;
+    }
     const attemptedAt = new Date();
     await db
       .insert(projectAiRefreshes)
@@ -42,6 +62,10 @@ export async function recordAiRefresh(
       .onConflictDoUpdate({
         target: [projectAiRefreshes.projectId, projectAiRefreshes.kind],
         set: { trigger, outcome, attemptedAt },
+        setWhere: lte(
+          projectAiRefreshes.attemptedAt,
+          sql`excluded.attempted_at`
+        ),
       });
   } catch (error) {
     // A deleted project fails the foreign key here, which is the same

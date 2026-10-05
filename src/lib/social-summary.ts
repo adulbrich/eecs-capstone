@@ -89,10 +89,13 @@ export type SocialSummaryResult = z.infer<typeof socialSummarySchema>;
  *
  * Beside it, the last attempt at writing it (#631), already passed through
  * `currentAttempt`, so null means "no attempt since what is stored" and, with
- * nothing stored, "never attempted". `refreshable` says whether the
- * project's status is one the automatic refresh writes for at all.
+ * nothing stored, "no attempt on record". `refreshable` says whether the
+ * project's status is one the automatic refresh writes for at all, and
+ * `automaticEnabled` whether the kill switch lets it, since a switched-off
+ * refresh skips every project without recording anything.
  */
 export interface SocialSummaryView {
+  automaticEnabled: boolean;
   isManual: boolean;
   refreshable: boolean;
   summary: string | null;

@@ -6,6 +6,7 @@ import {
   mantleResponses,
   type ResponsesFn,
 } from "#/lib/_internal/bedrock-mantle";
+import { socialSummariesEnabled } from "#/lib/_internal/social-summary-flag";
 import { currentAttempt } from "#/lib/ai-refresh";
 import {
   type RegenerateSocialSummaryResult,
@@ -63,6 +64,7 @@ async function aiStatus(project: ProjectRow, summaryStoredAt: Date | null) {
       summaryStoredAt
     ),
     refreshable: isRefreshable(project),
+    automaticEnabled: socialSummariesEnabled(),
   };
 }
 

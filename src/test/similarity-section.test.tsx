@@ -136,6 +136,30 @@ describe("SimilaritySection Recompute", () => {
     });
   });
 
+  it("names Recompute on a success staff started", async () => {
+    await renderWith({
+      ...COMPUTED,
+      attempt: { at: AT, outcome: "updated", trigger: "staff" },
+    });
+    expect(document.querySelector("time")?.closest("p")?.textContent).toMatch(
+      / from Recompute\.$/
+    );
+  });
+
+  it("confirms politely when the stored result was already current", async () => {
+    await renderWith({ ...COMPUTED, attempt: failed("automatic") });
+    server.recomputeSimilarity.mockResolvedValue({
+      ...COMPUTED,
+      attempt: null,
+      outcome: "unchanged",
+    } satisfies RecomputeSimilarityResult);
+    fireEvent.click(recompute() as HTMLElement);
+
+    const note = await screen.findByText("Already up to date.");
+    expect(note.getAttribute("role")).not.toBe("alert");
+    expect(screen.queryByText(/failed/)).toBeNull();
+  });
+
   it("explains an outcome the status line cannot", async () => {
     await renderWith(NEVER);
     server.recomputeSimilarity.mockResolvedValue({

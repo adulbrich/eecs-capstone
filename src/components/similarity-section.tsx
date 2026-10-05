@@ -17,9 +17,10 @@ const MISSING =
 
 /**
  * What Recompute reports beyond the status line, which already shows the
- * outcome and its time. A failure is in the status box; these are the three
- * outcomes that box cannot explain, because they are about the click rather
- * than the project.
+ * outcome and its time. A failure is in the status box. The two below did
+ * not do what was asked, so they interrupt through `FieldError`, the way
+ * Social preview reports a lost rewrite; the two in `SAVED_NOTICE` did, so
+ * they are polite (UI-CONVENTIONS, "Where the success goes").
  */
 const OUTCOME_NOTICE: Partial<
   Record<RecomputeSimilarityResult["outcome"], string>
@@ -28,7 +29,15 @@ const OUTCOME_NOTICE: Partial<
     "Nothing was computed: the project is no longer published or archived.",
   superseded:
     "The project changed while this ran, so the result was dropped. The change started its own.",
-  unchanged: "Already up to date, so nothing was recomputed.",
+};
+
+const SAVED_NOTICE: Partial<
+  Record<RecomputeSimilarityResult["outcome"], string>
+> = {
+  updated: "Recomputed.",
+  // The stored result already matched the text, for instance after an edit
+  // that failed was reverted. The failure it replaced is cleared.
+  unchanged: "Already up to date.",
 };
 
 /**
@@ -73,7 +82,7 @@ export function SimilaritySection({ projectId }: { projectId: string }) {
       const result = await recomputeSimilarity({ data: { projectId } });
       setView(result);
       setNotice(OUTCOME_NOTICE[result.outcome] ?? null);
-      setSaved(result.outcome === "updated" ? "Recomputed." : null);
+      setSaved(SAVED_NOTICE[result.outcome] ?? null);
     }, "Could not recompute similarity");
   }
 

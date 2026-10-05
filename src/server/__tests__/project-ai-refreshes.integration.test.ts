@@ -9,8 +9,9 @@ import {
   vi,
 } from "vitest";
 import { db } from "#/db";
-import { projectAiRefreshes, projects, user } from "#/db/schema";
+import { aiReviewUsage, projectAiRefreshes, projects, user } from "#/db/schema";
 import type { ResponsesFn } from "#/lib/_internal/bedrock-mantle";
+import { redactQueryError } from "#/lib/_internal/redact-query-error";
 import type { AiRefreshKind } from "#/lib/ai-refresh";
 import { auth } from "#/lib/auth";
 import { refreshProjectEmbedding } from "../_internal/project-embeddings";
@@ -195,6 +196,75 @@ describe("the automatic writers record their attempts", () => {
     expect(rows[0].outcome).toBe("updated");
   });
 
+  it("clears a failure once the stored output matches the text again", async () => {
+    // An edit fails, then is reverted: the vector from before the edit is
+    // current again, and a failure left beside it would offer a retry with
+    // nothing to do.
+    const project = await makeProject();
+    await refreshProjectEmbedding(project.id, () => Promise.resolve(VECTOR));
+    await db
+      .update(projects)
+      .set({ description: "An edit whose embedding fails." })
+      .where(eq(projects.id, project.id));
+    await refreshProjectEmbedding(project.id, () =>
+      Promise.reject(new Error("throttled"))
+    );
+    expect(await readAttempt(project.id, "embedding")).toMatchObject({
+      outcome: "failed",
+    });
+
+    await db
+      .update(projects)
+      .set({ description: project.description })
+      .where(eq(projects.id, project.id));
+    expect(
+      await refreshProjectEmbedding(project.id, () => Promise.resolve(VECTOR))
+    ).toBe("unchanged");
+    expect(await readAttempt(project.id, "embedding")).toBeNull();
+  });
+
+  it("keeps the later attempt when an earlier one commits after it", async () => {
+    // Recompute and Regenerate do not share the background queue.
+    const project = await makeProject();
+    const later = new Date();
+    await db.insert(projectAiRefreshes).values({
+      projectId: project.id,
+      kind: "embedding",
+      trigger: "staff",
+      outcome: "updated",
+      attemptedAt: new Date(later.getTime() + 60_000),
+    });
+
+    await refreshProjectEmbedding(project.id, () =>
+      Promise.reject(new Error("throttled"))
+    );
+    expect(await readAttempt(project.id, "embedding")).toMatchObject({
+      outcome: "updated",
+      trigger: "staff",
+    });
+  });
+
+  it("records a write the text moved under as superseded", async () => {
+    // A save on another task changes the text during the model call, so the
+    // guarded write matches nothing (ADR-0053).
+    const project = await makeProject();
+    const editsMidCall: ResponsesFn = async (body) => {
+      await db
+        .update(projects)
+        .set({ description: "Text saved during the call." })
+        .where(eq(projects.id, project.id));
+      return fakeModel("Of the text the model was shown.")(body);
+    };
+
+    expect(await refreshSocialSummary(project.id, editsMidCall)).toBe(
+      "superseded"
+    );
+    expect(await readAttempt(project.id, "social_summary")).toMatchObject({
+      outcome: "superseded",
+      trigger: "automatic",
+    });
+  });
+
   it("keeps the writer's outcome when the record cannot be written", async () => {
     // The save has committed; losing the record costs a status line, never
     // the outcome the refresh log line and its alarm read.
@@ -202,16 +272,19 @@ describe("the automatic writers record their attempts", () => {
     const error = vi.spyOn(console, "error").mockImplementation(() => {
       // Asserted below.
     });
+    const cause = new Error("connection reset");
     vi.spyOn(db, "insert").mockImplementationOnce(() => {
-      throw new Error("connection reset");
+      throw cause;
     });
 
     expect(await refreshSocialSummary(project.id, fakeModel("A rover."))).toBe(
       "updated"
     );
+    // The redacted string, not the error object, whose query parameters
+    // would carry the bound values into the log.
     expect(error).toHaveBeenCalledWith(
       `Recording the social_summary attempt failed for project ${project.id}`,
-      expect.anything()
+      redactQueryError(cause)
     );
     const [row] = await db
       .select()
@@ -234,6 +307,36 @@ describe("Regenerate records a staff attempt", () => {
 
     expect(await readAttempt(project.id, "social_summary")).toMatchObject({
       outcome: "updated",
+      trigger: "staff",
+    });
+    // Beside its usage row, not instead of it: the two answer different
+    // questions (ADR-0060).
+    const usage = await db
+      .select()
+      .from(aiReviewUsage)
+      .where(eq(aiReviewUsage.projectId, project.id));
+    expect(usage).toHaveLength(1);
+  });
+
+  it("records a lost race as superseded", async () => {
+    const admin = await makeUser("admin");
+    const project = await makeProject();
+    const editsMidCall: ResponsesFn = async (body) => {
+      await db
+        .update(projects)
+        .set({ description: "What the proposer saved mid-call." })
+        .where(eq(projects.id, project.id));
+      return fakeModel("A summary of the older text.")(body);
+    };
+
+    const result = await regenerateSocialSummaryAs(
+      admin,
+      { projectId: project.id },
+      editsMidCall
+    );
+    expect(result.outcome).toBe("changed");
+    expect(await readAttempt(project.id, "social_summary")).toMatchObject({
+      outcome: "superseded",
       trigger: "staff",
     });
   });

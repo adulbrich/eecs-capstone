@@ -15,7 +15,8 @@ export type AiRefreshTrigger = "automatic" | "staff";
 /**
  * Only the outcomes of an attempt to write. A writer's `skipped`, `unchanged`
  * and `manual` are not attempts and are never recorded, so a project with no
- * row was never attempted.
+ * row has no attempt on record (`recordAiRefresh` says why that is not quite
+ * "never attempted").
  */
 export type AiRefreshOutcome = "updated" | "superseded" | "failed";
 
