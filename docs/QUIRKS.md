@@ -197,10 +197,6 @@ Better Auth accepts `""` for a name, so `requireUserName` (`src/lib/_internal/us
 
 No hook fires when an OAuth identity links to an existing row. The only seams ahead of the link are the provider's `getUserInfo` and a `hooks.after` on the callback; `onidUserInfo` in `src/lib/auth.ts` uses the first, so `requireLocalEmailVerified` keeps its safe default.
 
-### `revokeUnprovenAccountAccess` runs on one email-otp path, and refuses less than `releaseUnverifiedAddress`
-
-Better Auth's helper deletes an unverified row's `credential` accounts and sessions before a proof flips `emailVerified`, but only `/sign-in/email-otp` and magic link call it. `/email-otp/verify-email`, the OTP reset and `/verify-email` do not, which is why `src/lib/auth.ts` disables them. It refuses neither a banned row nor one with another provider linked, so `src/server/_internal/otp-sign-in-guard.ts` adds both refusals ahead of it, and OAuth goes through `releaseUnverifiedAddress` instead ([ADR-0045](./adr/0045-onid-takes-an-address-off-an-unproven-account.md)).
-
 ### A plugin mounts every endpoint it has, whatever its options say
 
 An option turns a feature off inside a handler; the route stays mounted, served and rate-counted, and `/verify-email` redeems any link it ever signed. Only top-level `disabledPaths` makes a path 404, matched exactly against the path without the base path (`/email-otp/verify-email`), before routing and the limiter, so a path with a parameter cannot be listed. `auth.integration.test.ts` and `email-otp.integration.test.ts` assert each disabled path 404s.
@@ -284,10 +280,6 @@ Every timestamp column is `timestamp("col", { withTimezone: true })`, nullable o
 ### A `DrizzleQueryError` carries the bound parameters, including in its message
 
 Its `message` includes the parameters, and a session lookup's parameter is the session token, so logging `error.message` leaks as much as logging the error. Log `redactQueryError(error)` from `src/lib/_internal/redact-query-error.ts`. [ADR-0042](./adr/0042-a-log-line-takes-a-string-never-an-error.md) has the rule and the Better Auth seams.
-
-### Resizing the RDS instance zeroes its burst credits
-
-Changing the instance class restarts the burstable instance and resets `CPUCreditBalance` to zero; credits return at about 18 an hour at idle, so a full balance is most of a day away. Read the balance before a load test, not the clock.
 
 ---
 
