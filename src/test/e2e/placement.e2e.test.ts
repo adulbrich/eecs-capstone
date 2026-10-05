@@ -1324,7 +1324,7 @@ test.describe("placement workspace", () => {
       .getByRole("radio", { name: "The text inside the last square brackets" })
       .click();
     await expect(editor).toContainText(
-      "2 project columns: Tide Clok, Robot Arm."
+      "2 project columns: Tide Clok (E), Robot Arm (F)."
     );
     const preview = editor.getByRole("table");
     await expect(preview.getByRole("row")).toHaveCount(4);

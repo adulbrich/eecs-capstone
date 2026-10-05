@@ -12,8 +12,10 @@ import {
   droppedColumns,
   fileHeaders,
   fitToDataset,
+  nameConvertedRows,
   parseMapping,
   presentIn,
+  readsAs,
   serializeMapping,
   suggestMapping,
   unmappedRequired,
@@ -469,6 +471,106 @@ describe("wide reading of a bids file (#736)", () => {
       dataset: "roster",
       columns: { "Email Address": "email", "Your name": "name" },
     });
+  });
+});
+
+describe("a wide file the column mapping cannot read as it stands (#736)", () => {
+  const PICKS: ColumnMapping = {
+    version: 2,
+    dataset: "bids",
+    columns: { Mail: "email" },
+    wide: {
+      projectColumns: { by: "prefix", prefix: "Pick" },
+      title: { by: "brackets" },
+    },
+  };
+  const stopsOf = (text: string, mapping: ColumnMapping) =>
+    CUSTOM_MAPPINGS.bids
+      .toStandard(text, { projects: [], mapping })
+      .issues.map((i) => {
+        expect(i).toMatchObject({ level: "error", row: 1, wholeFile: true });
+        return i.message;
+      });
+
+  it("names two project columns that give the same title, however it is spelled", () => {
+    expect(
+      stopsOf(
+        "Mail,Pick1 [Tide Clock],Pick2 [Robot Arm],Pick3 [ tide  clock: ]\nada@example.edu,1,2,3",
+        PICKS
+      )
+    ).toEqual([
+      'Column D, "Pick3 [ tide  clock: ]", gives the same project as column B, "Pick1 [Tide Clock]"; tick or name one of them.',
+    ]);
+  });
+
+  it("names a header that only an inherited property would answer for", () => {
+    expect(
+      stopsOf("Mail,Pick [Tide Clock]\nada@example.edu,1", {
+        ...PICKS,
+        wide: {
+          projectColumns: { by: "headers", headers: ["constructor"] },
+          title: { by: "brackets" },
+        },
+      })
+    ).toEqual([
+      'The file has no "constructor" column, which the column mapping reads as a project column.',
+    ]);
+    expect(readsAs(PICKS, "toString")).toBe("a project column");
+  });
+
+  it("names whose bid each converted row is, apart from the file's own rows", () => {
+    // File row 3 is Kim's, who ranked nothing; converted row 3 is Ada's
+    // second bid, whose priority the parser refuses.
+    const file = [
+      "Mail,Pick [Tide Clock],Pick [Robot Arm]",
+      "ada@example.edu,1,first",
+      "kim@example.edu,,",
+    ].join("\n");
+    const converted = CUSTOM_MAPPINGS.bids.toStandard(file, {
+      projects: [],
+      mapping: PICKS,
+    });
+    expect(converted.issues).toEqual([
+      {
+        level: "warning",
+        row: 3,
+        message:
+          "The row has no priority in any project column, so it gives no bids.",
+      },
+    ]);
+    const parsed = parseBidsCsv(converted.text, [
+      { key: "tide clock", title: "Tide Clock" },
+      { key: "robot arm", title: "Robot Arm" },
+    ]);
+    expect(nameConvertedRows(parsed.issues, converted.text)).toEqual([
+      {
+        level: "error",
+        row: 3,
+        message:
+          "priority must be a whole number, 1 or more. That row is ada@example.edu's bid for Robot Arm.",
+      },
+    ]);
+  });
+});
+
+describe("a column mapping file's version", () => {
+  const refused = (version: unknown) => {
+    const parsed = parseMapping(
+      JSON.stringify({ ...MAPPING, version: version ?? undefined })
+    );
+    return parsed.ok ? null : parsed.message;
+  };
+
+  it("says what it is when it is not one this page reads", () => {
+    expect(refused("2")).toBe(
+      'The column mapping\'s version is "2", which is not a number, and this page reads version 2 and earlier.'
+    );
+    expect(refused(null)).toBe(
+      "The column mapping has no version, and this page reads version 2 and earlier."
+    );
+    expect(refused(0)).toBe(
+      "The column mapping is version 0, and this page reads version 2 and earlier."
+    );
   });
 });
 

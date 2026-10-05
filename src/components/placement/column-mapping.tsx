@@ -22,15 +22,14 @@ import {
   STANDARD_FORMATS,
 } from "#/lib/placement/formats";
 import {
-  asSentence,
   type ColumnMapping,
-  columnMapping,
   droppedColumns,
   fileHeaders,
   fitToDataset,
   mapRows,
   missingHeaders,
   normalizeHeader,
+  PROJECT_FILLED,
   parseMapping,
   presentIn,
   quoted,
@@ -39,6 +38,7 @@ import {
   serializeMapping,
   suggestMapping,
   unmappedRequired,
+  versionedMapping,
   type WideBids,
   wideProblems,
 } from "#/lib/placement/plugins/custom-mapping";
@@ -51,9 +51,6 @@ const headerValue = (header: string) => `header:${header}`;
 
 /** How many converted rows the preview shows. */
 const PREVIEW_ROWS = 5;
-
-/** The bids columns the project columns fill when the file is read wide. */
-const FROM_PROJECT_COLUMNS = new Set(["priority", "project"]);
 
 /** "roster.csv" to "roster (column mapping).json". */
 const mappingFilename = (filename: string) =>
@@ -128,9 +125,9 @@ export function editedMapping(
   draft: WideDraft
 ): ColumnMapping {
   if (!(draft.on && dataset === "bids")) {
-    return columnMapping(dataset, columns);
+    return versionedMapping(dataset, columns);
   }
-  return columnMapping(
+  return versionedMapping(
     dataset,
     Object.fromEntries(
       Object.entries(columns).filter(([, c]) => STUDENT_COLUMNS.includes(c))
@@ -160,8 +157,9 @@ function seed(
 ): ColumnMapping {
   const fitted = fitToDataset(mapping, dataset);
   const present = presentIn(fitted, headers);
+  const lacking = missingHeaders(fitted, headers);
   const missing = Object.entries(fitted.columns).filter(([h]) =>
-    missingHeaders(fitted, headers).includes(h)
+    lacking.includes(h)
   );
   return {
     ...present,
@@ -240,7 +238,11 @@ function LayoutChoice({
         header. Each filled cell becomes one bid. A blank cell is no bid:
         nothing is read from it, and a student who left every project blank has
         no bids. The email, name and avoid columns repeat on every bid from the
-        student's row.
+        student's row. Each cell is read as it is, so it must be a priority: a
+        Google Forms checkbox grid can put several choices in one cell, as "1,
+        2", or a label such as "1st choice", and the priority check refuses
+        those rows; turning labels into numbers is not part of this reading
+        (#736).
       </p>
     </fieldset>
   );
@@ -474,9 +476,9 @@ export function ColumnMappingEditor({
   // What the column mapping gets wrong before the file is read, a blank
   // separator say, comes first: the file is not read wide until it is right.
   const read = useMemo(() => {
-    const settings = wideProblems(usable).map(asSentence);
+    const settings = wideProblems(usable);
     return settings.length > 0
-      ? { issues: [], problems: settings, rows: [], titles: undefined }
+      ? { issues: [], problems: settings, rows: [], projects: undefined }
       : mapRows(text, usable);
   }, [text, usable]);
   const { problems } = read;
@@ -487,7 +489,7 @@ export function ColumnMappingEditor({
   const mapped = format.columns.filter(
     (c) =>
       headerFor(c.name) !== undefined ||
-      (wide && FROM_PROJECT_COLUMNS.has(c.name))
+      (wide && PROJECT_FILLED.includes(c.name))
   );
   const preview = read.rows.slice(0, PREVIEW_ROWS);
   // A file whose header cannot be read at all, as one naming a column
@@ -570,12 +572,14 @@ export function ColumnMappingEditor({
           missing.
         </p>
       )}
-      {read.titles !== undefined && (
+      {/* Every column the prefix or the ticks took, by its letter, so one
+          staff did not mean to read is in sight before Apply. */}
+      {read.projects !== undefined && (
         <p>
-          {read.titles.length === 1
+          {read.projects.length === 1
             ? "1 project column"
-            : `${read.titles.length} project columns`}
-          : {read.titles.join(", ")}.
+            : `${read.projects.length} project columns`}
+          : {read.projects.map((p) => `${p.title} (${p.column})`).join(", ")}.
         </p>
       )}
       {/* A plain table, as CsvFormatHelp's is: a few read-only rows with no

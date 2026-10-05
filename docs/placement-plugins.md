@@ -120,9 +120,11 @@ another department:
 
 ### Reading a bids file wide
 
-A survey tool such as Google Forms or Microsoft Forms exports bids wide: one row
-per student and one column per project, the cell holding the rank (#736). A bids
-column mapping reads such a file with `wide`, at version 2:
+A Google Forms grid, or a survey written the way Qualtrics writes its ranking
+columns, exports bids wide: one row per student and one column per project, the
+cell holding the rank (#736). A bids column mapping reads such a file with
+`wide`, at version 2. A Microsoft Forms ranking is not this shape (one column per
+question, its items joined by `;`), so wide reading does not read it.
 
 ```json
 {
@@ -143,7 +145,9 @@ column mapping reads such a file with `wide`, at version 2:
   (`{ "by": "prefix", "prefix": "..." }`), or the headers staff ticked
   (`{ "by": "headers", "headers": ["...", "..."] }`). Case and surrounding spaces
   are ignored, as for `columns`. A picked header the file lacks is named, as a
-  missing student column is.
+  missing student column is. The editor lists every project column it found,
+  with its letter, so a column the prefix took by accident is in sight before
+  Apply.
 - `title` says where each project column's header holds the project's title: the
   text after the first `separator` (`{ "by": "separator", "separator": " - " }`,
   the default, as Qualtrics writes it), or the text inside the last pair of square
@@ -158,13 +162,20 @@ Each filled cell of a project column becomes one long bids row, `priority` the
 cell as it is and `project` the header's title, in the file's column order. A
 blank cell gives nothing, and a row with no filled project cell gives a warning on
 its row. Priorities are checked by `parseBidsCsv`, not the plugin, and the
-extracted titles reach title matching like any other. Read wide, one file row
-gives several converted rows, so the problems listed for the converted file name
-rows of the converted CSV, which staff can download.
+extracted titles reach title matching like any other. A cell is read as it is: a
+Google Forms checkbox grid can put several choices in one cell (`1, 2`), or a
+label such as `1st choice`, and the priority check refuses those rows; value
+transforms are out of scope. Read wide, one file row gives several converted rows,
+so the problems the conversion finds name rows of the uploaded file, and the ones
+the parser finds name rows of the converted CSV, which staff can download.
+`nameConvertedRows` adds to each of the latter whose bid the row is and for which
+project, and the page lists the two under separate headings.
 
 The file stops, as a problem with the whole file, when a project column's header
-gives no title, when a header is both a student column and a project column, or
-when no column is a project column; each names the header and its column letter,
+gives no title, when a header is both a student column and a project column, when
+two project columns give the same project once titles are normalized (as
+`Pick1 [Tide Clock]` and `Pick2 [tide clock]`), or when no column is a project
+column; each names the header and its column letter,
 as `Column E, "Rank the projects", is a project column, but its header has no
 title inside square brackets.` The editor shows the same message and holds Apply
 until the column mapping is changed.

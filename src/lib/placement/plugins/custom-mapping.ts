@@ -4,6 +4,7 @@ import {
   cell,
   type ImportIssue,
   LEADING_BLANK_LINES,
+  normalizeTitle,
   parseRows,
   type Row,
 } from "#/lib/placement/csv";
@@ -66,14 +67,14 @@ export const STUDENT_COLUMNS: readonly string[] = ["email", "name", "avoid"];
  * The columns the project columns fill in wide reading: a cell's value is
  * the priority, and its header's title the project.
  */
-const PROJECT_FILLED: readonly string[] = ["priority", "project"];
+export const PROJECT_FILLED: readonly string[] = ["priority", "project"];
 
 /**
  * A column mapping with the version its shape needs: 2 with wide reading,
  * 1 without, so a column mapping that does not read wide still loads on a
  * page that reads version 1 alone.
  */
-export function columnMapping(
+export function versionedMapping(
   dataset: PlacementDataset,
   columns: Record<string, string>,
   wide?: WideBids
@@ -83,20 +84,26 @@ export function columnMapping(
     : { version: 2, dataset, columns, wide };
 }
 
-/** Each student column's header, by its key, with the column it fills. */
-const studentColumnsByKey = (mapping: ColumnMapping) =>
-  new Map(
-    Object.entries(mapping.columns).map(([header, column]) => [
-      normalizeHeader(header),
-      column,
-    ])
+/** Each header the column mapping reads, as `parseRows` keys it, and its column. */
+const keyedColumns = (mapping: ColumnMapping) =>
+  Object.entries(mapping.columns).map(
+    ([header, column]) => [normalizeHeader(header), column] as const
   );
+
+/** "with one column per project, ..." as a sentence. */
+const asSentence = (phrase: string) =>
+  `${phrase.charAt(0).toUpperCase()}${phrase.slice(1)}.`;
 
 /**
  * What is wrong with a column mapping's wide reading, before any file is
- * read, as phrases: what the schema refuses and conversion stops on.
+ * read, as sentences: what conversion stops on and the editor holds Apply
+ * for.
  */
-export function wideProblems(mapping: ColumnMapping): string[] {
+export const wideProblems = (mapping: ColumnMapping): string[] =>
+  wideProblemPhrases(mapping).map(asSentence);
+
+/** `wideProblems` as phrases, which the schema's messages are made of. */
+function wideProblemPhrases(mapping: ColumnMapping): string[] {
   const { wide } = mapping;
   if (wide === undefined) {
     return [];
@@ -118,7 +125,7 @@ export function wideProblems(mapping: ColumnMapping): string[] {
     if (set.headers.length === 0) {
       problems.push("no column is chosen as a project column");
     }
-    const students = studentColumnsByKey(mapping);
+    const students = new Map(keyedColumns(mapping));
     const seen = new Set<string>();
     for (const header of set.headers) {
       const key = normalizeHeader(header);
@@ -198,7 +205,7 @@ const columnMappingSchema = z
       }
       filled.add(column);
     }
-    for (const message of wideProblems(mapping)) {
+    for (const message of wideProblemPhrases(mapping)) {
       ctx.addIssue({ code: "custom", message });
     }
   });
@@ -211,10 +218,12 @@ export function readMapping(
   value: unknown
 ):
   | { ok: true; mapping: ColumnMapping }
-  | { ok: false; version: number }
+  | { ok: false; version: unknown }
   | { ok: false; problem: string } {
   const version = (value as { version?: unknown } | null)?.version;
-  if (typeof version === "number" && version !== 1 && version !== 2) {
+  // Anything but 1 or 2 is a version this page does not read, said as
+  // such rather than as the schema's discriminator message.
+  if (version !== 1 && version !== 2) {
     return { ok: false, version };
   }
   const parsed = columnMappingSchema.safeParse(value);
@@ -226,9 +235,19 @@ export function readMapping(
       };
 }
 
-/** "The column mapping is version 3, and this page reads version 2 and earlier." */
-export const versionMessage = (version: number) =>
-  `The column mapping is version ${version}, and this page reads version ${MAPPING_VERSION} and earlier.`;
+/**
+ * "The column mapping is version 3, and this page reads version 2 and
+ * earlier.", or that it has none, or one that is not a number.
+ */
+export function versionMessage(version: unknown): string {
+  const reads = `this page reads version ${MAPPING_VERSION} and earlier.`;
+  if (version === undefined || version === null) {
+    return `The column mapping has no version, and ${reads}`;
+  }
+  return typeof version === "number"
+    ? `The column mapping is version ${version}, and ${reads}`
+    : `The column mapping's version is ${JSON.stringify(version)}, which is not a number, and ${reads}`;
+}
 
 /** A downloaded column mapping file, or why it is not one this page reads. */
 export function parseMapping(
@@ -315,7 +334,7 @@ export function suggestMapping(
       columns[header] = name;
     }
   }
-  return columnMapping(dataset, columns);
+  return versionedMapping(dataset, columns);
 }
 
 /**
@@ -338,7 +357,7 @@ export function fitToDataset(
       columns[header] = column;
     }
   }
-  return columnMapping(
+  return versionedMapping(
     dataset,
     columns,
     dataset === "bids" ? mapping.wide : undefined
@@ -426,7 +445,11 @@ export function missingHeaders(
 
 /** What the column mapping reads a header as: "email", "a project column". */
 export const readsAs = (mapping: ColumnMapping, header: string) =>
-  mapping.columns[header] ?? "a project column";
+  // Own keys only: a header named "constructor" must not read as what
+  // every object inherits.
+  Object.hasOwn(mapping.columns, header)
+    ? mapping.columns[header]
+    : "a project column";
 
 /** Each standard column more than one header fills, with those headers. */
 function filledTwice(mapping: ColumnMapping): [string, string[]][] {
@@ -468,8 +491,12 @@ const titlePlace = (title: WideBids["title"]) =>
     ? "inside square brackets"
     : `after "${title.separator}"`;
 
-/** A project column, by the key `parseRows` reads it under, and its title. */
-interface ProjectColumn {
+/**
+ * A project column: the key `parseRows` reads it under, its letter, and
+ * the title its header gives.
+ */
+export interface ProjectColumn {
+  column: string;
   key: string;
   title: string;
 }
@@ -477,21 +504,24 @@ interface ProjectColumn {
 /**
  * The file's project columns, in its order, with the title each header
  * gives; or, as sentences, why the file cannot be read wide: a project
- * column that is also a student column or gives no title, or no project
- * column at all.
+ * column that is also a student column, gives no title, or gives the same
+ * project as another, or no project column at all.
  */
-function projectColumns(
+function findProjectColumns(
   text: string,
-  mapping: ColumnMapping,
-  wide: WideBids
+  mapping: ColumnMapping & { wide: WideBids }
 ): { columns: ProjectColumn[] } | { problems: string[] } {
+  const { wide } = mapping;
   const set = wide.projectColumns;
   const picked = new Set(pickedHeaders(mapping).map(normalizeHeader));
   const prefix = set.by === "prefix" ? normalizeHeader(set.prefix) : "";
   const inSet = (key: string) =>
     set.by === "prefix" ? key.startsWith(prefix) : picked.has(key);
-  const students = studentColumnsByKey(mapping);
+  const students = new Map(keyedColumns(mapping));
   const found: ProjectColumn[] = [];
+  // Each project by its title as a bid names it, so two headers the parser
+  // would read as one project are caught here, in the file's terms.
+  const byProject = new Map<string, string>();
   const problems: string[] = [];
   headerCells(text).forEach((raw, index) => {
     const header = raw.trim();
@@ -499,19 +529,26 @@ function projectColumns(
     if (key === "" || !inSet(key)) {
       return;
     }
-    const named = `Column ${columnLetter(index)}, "${header}",`;
+    const column = columnLetter(index);
+    const named = `Column ${column}, "${header}",`;
     const student = students.get(key);
     const title = titleOf(header, wide.title);
+    const earlier = byProject.get(normalizeTitle(title));
     if (student !== undefined) {
       problems.push(
         `${named} is the ${student} column and a project column; choose one.`
       );
-    } else if (title === "") {
+    } else if (normalizeTitle(title) === "") {
       problems.push(
         `${named} is a project column, but its header has no title ${titlePlace(wide.title)}.`
       );
+    } else if (earlier === undefined) {
+      byProject.set(normalizeTitle(title), `column ${column}, "${header}"`);
+      found.push({ column, key, title });
     } else {
-      found.push({ key, title });
+      problems.push(
+        `${named} gives the same project as ${earlier}; tick or name one of them.`
+      );
     }
   });
   if (problems.length > 0) {
@@ -532,7 +569,8 @@ function projectColumns(
 /**
  * Each record row as its bids: one per project column with a priority,
  * the student's columns repeated on each. A row with none gives none, and
- * says so in the file's own row.
+ * the warning names the row of the uploaded file, as every problem found
+ * while reading the file does; `nameConvertedRows` is for the parser's.
  */
 function wideRows(
   rows: Row[],
@@ -540,9 +578,7 @@ function wideRows(
   mapping: ColumnMapping,
   projects: readonly ProjectColumn[]
 ): { issues: ImportIssue[]; rows: Record<string, string>[] } {
-  const student = Object.entries(mapping.columns).map(
-    ([header, column]) => [normalizeHeader(header), column] as const
-  );
+  const student = keyedColumns(mapping);
   const issues: ImportIssue[] = [];
   const bids: Record<string, string>[] = [];
   rows.forEach((raw, index) => {
@@ -576,7 +612,7 @@ function wideRows(
  * parser reads the result, as it reads a standard file, and the page shows
  * the first few rows as they come. `problems` says why the column mapping
  * cannot read this file wide, as sentences, with no rows; read wide,
- * `titles` names the project columns found, in the file's order.
+ * `projects` lists the project columns found, in the file's order.
  */
 export function mapRows(
   text: string,
@@ -585,8 +621,8 @@ export function mapRows(
   firstRecordRow: number;
   issues: ImportIssue[];
   problems: string[];
+  projects?: ProjectColumn[];
   rows: Record<string, string>[];
-  titles?: string[];
 } {
   const { fields, firstRecordRow, issues, rows } = parseRows(text);
   if (issues.some((i) => i.wholeFile)) {
@@ -605,8 +641,9 @@ export function mapRows(
       rows: [],
     };
   }
-  if (mapping.wide !== undefined) {
-    const projects = projectColumns(text, mapping, mapping.wide);
+  const { wide } = mapping;
+  if (wide !== undefined) {
+    const projects = findProjectColumns(text, { ...mapping, wide });
     if ("problems" in projects) {
       return { firstRecordRow, issues, problems: projects.problems, rows: [] };
     }
@@ -615,13 +652,11 @@ export function mapRows(
       firstRecordRow,
       issues: [...issues, ...read.issues],
       problems: [],
+      projects: projects.columns,
       rows: read.rows,
-      titles: projects.columns.map((p) => p.title),
     };
   }
-  const pairs = Object.entries(mapping.columns).map(
-    ([header, column]) => [normalizeHeader(header), column] as const
-  );
+  const pairs = keyedColumns(mapping);
   return {
     firstRecordRow,
     issues,
@@ -633,10 +668,6 @@ export function mapRows(
     ),
   };
 }
-
-/** "with one column per project, ..." as a sentence. */
-export const asSentence = (phrase: string) =>
-  `${phrase.charAt(0).toUpperCase()}${phrase.slice(1)}.`;
 
 function convert(
   dataset: PlacementDataset,
@@ -660,7 +691,7 @@ function convert(
   }
   const wrong = wideProblems(mapping);
   if (wrong.length > 0) {
-    return stop(...wrong.map(asSentence));
+    return stop(...wrong);
   }
   // One header per column, as the schema has it: otherwise the last header
   // would fill the column and the others vanish without a word.
@@ -697,12 +728,38 @@ function convert(
 export const columnMappingId = (dataset: PlacementDataset) =>
   `custom-mapping-${dataset}`;
 
+/**
+ * The parser's problems with a file converted wide, each naming whose bid
+ * its row is and for which project. One file row gives several converted
+ * rows, so a converted row's number is not a row of the uploaded file, and
+ * could be the same number as a row the conversion's own problems name.
+ */
+export function nameConvertedRows(
+  issues: readonly ImportIssue[],
+  convertedText: string
+): ImportIssue[] {
+  const { firstRecordRow, rows } = parseRows(convertedText);
+  return issues.map((issue) => {
+    const raw = issue.wholeFile ? undefined : rows[issue.row - firstRecordRow];
+    if (raw === undefined) {
+      return issue;
+    }
+    const email = cell(raw, "email");
+    const whose = email === "" ? "a bid with no email" : `${email}'s bid`;
+    const project = cell(raw, "project") || "no project";
+    return {
+      ...issue,
+      message: `${issue.message} That row is ${whose} for ${project}.`,
+    };
+  });
+}
+
 const DESCRIPTION =
   "Read through your column mapping: each standard column takes the cell of the file column chosen for it, and an optional column left unmapped is blank. Each row of the file becomes one row of the converted CSV, in order, so the problems listed for the converted file follow your file's rows.";
 
 /** What changes for a bids file read with one column per project. */
 const WIDE_DESCRIPTION =
-  " A bids file read with one column per project instead gives one bid for each filled cell, so the problems listed for the converted file name rows of the converted CSV, which you can download.";
+  " A bids file read with one column per project instead gives one bid for each filled cell. Problems found reading your file still name its rows; problems listed for the converted file name rows of the converted CSV, which you can download, and each says whose bid it is and for which project.";
 
 function customMapping(dataset: PlacementDataset): ChosenPlugin {
   return {

@@ -606,7 +606,7 @@ for (const width of [1280, 375]) {
     await editor
       .getByRole("checkbox", { name: "Rank the projects [Robot Arm]" })
       .click();
-    await expect(editor).toContainText("1 project column: Robot Arm.");
+    await expect(editor).toContainText("1 project column: Robot Arm (E).");
     await checkA11y(page);
     await expectNoHorizontalOverflow(page);
   });
