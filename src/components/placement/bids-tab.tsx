@@ -20,6 +20,7 @@ import { standingText, studentStanding } from "#/lib/placement/bids-view";
 import { applyPins } from "#/lib/placement/board";
 import { BIDS_FORMAT } from "#/lib/placement/formats";
 import { readAsChoice } from "#/lib/placement/plugins";
+import { CUSTOM_MAPPING_ID } from "#/lib/placement/plugins/custom-mapping";
 import { repointRosterPins } from "#/lib/placement/roster";
 import type { PlacementStudent } from "#/lib/placement/types";
 import {
@@ -152,21 +153,33 @@ export function BidsTab({
         // A workspace saved before plugins converted on read (#733) holds
         // the converted text, and its conversion's issues, as they were.
         legacyConvertedFrom={workspace.bids.convertedFrom}
-        onReadAs={(choice) =>
+        mapping={workspace.bids.mapping}
+        onMapping={(mapping) =>
           update((w) => ({
             ...w,
-            bids:
-              w.bids === null
-                ? null
-                : {
-                    ...w.bids,
-                    readAs: readAsChoice("bids", w.bids.text, choice),
-                  },
+            bids: w.bids && { ...w.bids, readAs: CUSTOM_MAPPING_ID, mapping },
           }))
+        }
+        onReadAs={(choice) =>
+          update((w) => {
+            if (w.bids === null) {
+              return w;
+            }
+            // The mapping goes with the choice that used it.
+            const { mapping: _mapping, ...rest } = w.bids;
+            return {
+              ...w,
+              bids: {
+                ...rest,
+                readAs: readAsChoice("bids", rest.text, choice),
+              },
+            };
+          })
         }
         parseIssues={bids.issues}
         plugin={source?.plugin ?? null}
         readAs={workspace.bids.readAs}
+        text={workspace.bids.text}
       />
       <TitleMatchesPanel
         matches={workspace.titleMatches}

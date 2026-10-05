@@ -91,6 +91,7 @@ export function usePlacementWorkspace() {
     // roster plugin reads it yet; a roster is small enough to re-read.
     const conversion = toStandard(plugin, storedRoster.text, {
       projects: projects ?? [],
+      mapping: storedRoster.mapping,
     });
     return { ...parseRosterCsv(conversion.text), plugin, conversion };
   }, [storedRoster, projects]);
@@ -105,7 +106,13 @@ export function usePlacementWorkspace() {
       storedBids.text,
       storedBids.readAs
     );
-    return { plugin, ...toStandard(plugin, storedBids.text, { projects }) };
+    return {
+      plugin,
+      ...toStandard(plugin, storedBids.text, {
+        projects,
+        mapping: storedBids.mapping,
+      }),
+    };
   }, [storedBids, projects]);
   // A removed student's pre-approval goes with them (#679), so a project
   // the roster adds shrinks, or disappears, without them.

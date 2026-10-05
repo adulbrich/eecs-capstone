@@ -8,6 +8,7 @@ import type { PlacementWorkspace } from "#/components/placement/use-placement-wo
 import { Button } from "#/components/ui/button";
 import { ROSTER_FORMAT } from "#/lib/placement/formats";
 import { readAsChoice } from "#/lib/placement/plugins";
+import { CUSTOM_MAPPING_ID } from "#/lib/placement/plugins/custom-mapping";
 import { removeStudents, type Workspace } from "#/lib/placement/workspace";
 
 export const plural = (n: number, one: string, many: string) =>
@@ -129,18 +130,37 @@ export function RosterSection({
         conversion={roster.conversion}
         dataset="roster"
         filename={stored.source.kind === "csv" ? stored.source.filename : null}
-        onReadAs={(choice) =>
+        mapping={stored.mapping}
+        onMapping={(mapping) =>
           update((w) => ({
             ...w,
             roster: w.roster && {
               ...w.roster,
-              readAs: readAsChoice("roster", w.roster.text, choice),
+              readAs: CUSTOM_MAPPING_ID,
+              mapping,
             },
           }))
+        }
+        onReadAs={(choice) =>
+          update((w) => {
+            if (w.roster === undefined) {
+              return w;
+            }
+            // The mapping goes with the choice that used it.
+            const { mapping: _mapping, ...rest } = w.roster;
+            return {
+              ...w,
+              roster: {
+                ...rest,
+                readAs: readAsChoice("roster", rest.text, choice),
+              },
+            };
+          })
         }
         parseIssues={roster.issues}
         plugin={roster.plugin}
         readAs={stored.readAs}
+        text={stored.text}
       />
       <p className="mt-1">
         {rosterSummary(

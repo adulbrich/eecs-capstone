@@ -1,5 +1,6 @@
 import type { ImportIssue } from "#/lib/placement/csv";
 import type { ExportDataset, PlacementDataset } from "#/lib/placement/formats";
+import type { ColumnMapping } from "#/lib/placement/plugins/custom-mapping";
 import type { WorkspaceProject } from "#/lib/placement/types";
 
 /**
@@ -14,6 +15,11 @@ import type { WorkspaceProject } from "#/lib/placement/types";
 
 /** What a plugin may read besides the text. */
 export interface PluginContext {
+  /**
+   * The column mapping stored with the file (#735), which only custom
+   * mapping reads.
+   */
+  mapping?: ColumnMapping;
   /** The project list as it is now, for a source that names projects. */
   projects: readonly Pick<WorkspaceProject, "title">[];
 }
@@ -48,14 +54,15 @@ interface PluginBase {
   toStandard: (text: string, context: PluginContext) => Conversion;
 }
 
-/** An uploaded file, recognized by its content. */
+/** An uploaded file, recognized by its content or chosen by staff. */
 export interface FilePlugin extends PluginBase {
   /**
    * True when the text is this plugin's source. Never true for the
    * dataset's standard format, which is tried first, or for another
-   * plugin's source: the contract test checks both.
+   * plugin's source: the contract test checks both. Absent for a plugin
+   * nothing detects, which staff choose with Read as, as custom mapping is.
    */
-  detect: (text: string) => boolean;
+  detect?: (text: string) => boolean;
   input: "file";
 }
 

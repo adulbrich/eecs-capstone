@@ -2,6 +2,10 @@ import { z } from "zod";
 import { removeFromResult } from "#/lib/placement/board";
 import { type ImportIssue, normalizeTitle } from "#/lib/placement/csv";
 import type { ReadAs } from "#/lib/placement/plugins";
+import {
+  type ColumnMapping,
+  columnMappingSchema,
+} from "#/lib/placement/plugins/custom-mapping";
 import { repointRosterPins, rosterProjectKey } from "#/lib/placement/roster";
 import {
   DEFAULT_PLACEMENT_PARAMETERS,
@@ -47,6 +51,8 @@ export interface Workspace {
      */
     convertedFrom?: string;
     filename: string;
+    /** The column mapping the file is read through, with `readAs` custom mapping. */
+    mapping?: ColumnMapping;
     /** How the file is read: see `ReadAs`. Absent means detected. */
     readAs?: ReadAs;
     /** The file as it was uploaded, converted on every read. */
@@ -85,6 +91,8 @@ export interface Workspace {
 export type TitleMatches = Record<string, TitleMatch>;
 
 export interface StoredRoster {
+  /** The column mapping a CSV is read through, with `readAs` custom mapping. */
+  mapping?: ColumnMapping;
   /** How a CSV is read: see `ReadAs`. A pasted list has one way. */
   readAs?: ReadAs;
   source: { kind: "csv"; filename: string } | { kind: "pasted" };
@@ -211,6 +219,7 @@ const workspaceSchema = z
         filename: z.string(),
         text: z.string(),
         readAs: z.string().nullable().optional(),
+        mapping: columnMappingSchema.optional(),
         convertedFrom: z.string().optional(),
         conversionIssues: z
           .array(
@@ -238,6 +247,7 @@ const workspaceSchema = z
         ]),
         text: z.string(),
         readAs: z.string().nullable().optional(),
+        mapping: columnMappingSchema.optional(),
       })
       .optional(),
     titleMatches: z
@@ -542,6 +552,14 @@ export function inputFingerprint(
     ...(workspace.bids?.readAs === undefined
       ? []
       : [{ bidsReadAs: workspace.bids.readAs }]),
+    // Last, and only when there is one, so a workspace with no column
+    // mapping hashes as it did before mappings existed (#735).
+    ...(workspace.roster?.mapping === undefined
+      ? []
+      : [{ rosterMapping: mappingKey(workspace.roster.mapping) }]),
+    ...(workspace.bids?.mapping === undefined
+      ? []
+      : [{ bidsMapping: mappingKey(workspace.bids.mapping) }]),
   ]);
   // djb2 in plain arithmetic, kept below 2^32 so it stays exact.
   let hash = 5381;
@@ -549,6 +567,18 @@ export function inputFingerprint(
     hash = (hash * 33 + text.charCodeAt(i)) % 4_294_967_296;
   }
   return `${text.length}:${hash.toString(36)}`;
+}
+
+/**
+ * A column mapping in a fixed order, since the page builds one in the
+ * format's column order and storage hands it back in the schema's: the same
+ * mapping must hash the same either way.
+ */
+function mappingKey(mapping: ColumnMapping): [string, string[][]] {
+  return [
+    mapping.dataset,
+    Object.entries(mapping.columns).sort(([a], [b]) => (a < b ? -1 : 1)),
+  ];
 }
 
 /**

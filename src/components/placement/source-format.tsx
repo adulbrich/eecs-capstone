@@ -1,5 +1,9 @@
-import { Download } from "lucide-react";
-import { useId } from "react";
+import { Columns3, Download } from "lucide-react";
+import { useId, useState } from "react";
+import {
+  ColumnMappingEditor,
+  mappingFilename,
+} from "#/components/placement/column-mapping";
 import { CsvFormatHelp } from "#/components/placement/csv-format";
 import { ImportIssues } from "#/components/placement/import-issues";
 import { Button } from "#/components/ui/button";
@@ -22,6 +26,11 @@ import {
   type ReadAs,
   STANDARD_OPTION,
 } from "#/lib/placement/plugins";
+import {
+  type ColumnMapping,
+  CUSTOM_MAPPING_ID,
+  serializeMapping,
+} from "#/lib/placement/plugins/custom-mapping";
 import type { Conversion, ImportPlugin } from "#/lib/placement/plugins/types";
 
 const CSV_EXTENSION = /(\.csv)?$/i;
@@ -60,22 +69,104 @@ function DownloadConverted({
 }
 
 /**
+ * A file read through a column mapping, with Edit and Download; and the
+ * editor while it is open, which Apply closes.
+ */
+function MappingControls({
+  dataset,
+  filename,
+  mapped,
+  mapping,
+  onMapping,
+  open,
+  setOpen,
+  text,
+}: {
+  dataset: PlacementDataset;
+  filename: string;
+  /** True when the file is read through a column mapping now. */
+  mapped: boolean;
+  mapping: ColumnMapping | undefined;
+  onMapping: (mapping: ColumnMapping) => void;
+  open: boolean;
+  setOpen: (open: boolean) => void;
+  text: string;
+}) {
+  if (open) {
+    return (
+      <ColumnMappingEditor
+        dataset={dataset}
+        filename={filename}
+        initial={mapped ? mapping : undefined}
+        kept
+        onApply={(next) => {
+          setOpen(false);
+          onMapping(next);
+        }}
+        onCancel={() => setOpen(false)}
+        text={text}
+      />
+    );
+  }
+  if (!mapped) {
+    return null;
+  }
+  return (
+    <div className="flex flex-wrap items-center gap-2">
+      <Button
+        onClick={() => setOpen(true)}
+        size="sm"
+        type="button"
+        variant="outline"
+      >
+        <Columns3 aria-hidden="true" />
+        Edit column mapping
+      </Button>
+      {mapping !== undefined && (
+        <Button
+          onClick={() =>
+            downloadText(
+              mappingFilename(filename),
+              serializeMapping(mapping),
+              "application/json"
+            )
+          }
+          size="sm"
+          type="button"
+          variant="outline"
+        >
+          <Download aria-hidden="true" />
+          Download column mapping
+        </Button>
+      )}
+      <span className="text-muted-foreground">
+        The mapping is saved with this workspace and travels in its export.
+      </span>
+    </div>
+  );
+}
+
+/**
  * How a stored file or pasted list is read (#733), and everything reading it
  * found: the plugin that converted it, with a download of what it converted
  * to; a Read as select to change it, for an uploaded file; what the plugin
  * noticed, in the source's own rows or lines; then what the dataset's parser
  * found in the standard CSV. A file nothing recognized is read as the standard
- * format, and gets that format's help when it is not one.
+ * format, and gets that format's help when it is not one, with Map columns
+ * to read it through a column mapping instead (#735).
  */
 export function SourceFormat({
   conversion,
   dataset,
   filename,
   legacyConvertedFrom,
+  mapping,
+  onMapping,
   onReadAs,
   parseIssues,
   plugin,
   readAs,
+  text,
 }: {
   conversion: Conversion;
   dataset: PlacementDataset;
@@ -86,15 +177,26 @@ export function SourceFormat({
    * on read, which stored the converted CSV and its issues instead.
    */
   legacyConvertedFrom?: string;
-  /** Null reads the file as the standard format; an id, through that plugin. */
+  /** The column mapping stored with the file, if it is read through one. */
+  mapping?: ColumnMapping;
+  /** Reads the file through `mapping` from here on. */
+  onMapping: (mapping: ColumnMapping) => void;
+  /**
+   * Null reads the file as the standard format; an id, through that plugin.
+   * Never custom mapping, which `onMapping` chooses with its mapping.
+   */
   onReadAs: (readAs: string | null) => void;
   parseIssues: readonly ImportIssue[];
   plugin: ImportPlugin | null;
   /** The stored choice: undefined while the file is read as detected. */
   readAs: ReadAs;
+  /** The file or list as stored, which a column mapping reads. */
+  text: string;
 }) {
   const id = useId();
+  const [mappingOpen, setMappingOpen] = useState(false);
   const plugins = filePlugins(dataset);
+  const mapped = plugin?.id === CUSTOM_MAPPING_ID;
   const conversionStopped = conversion.issues.some((i) => i.wholeFile);
   // Only when detection found nothing: staff who chose the standard format
   // for a file a plugin claims know what it is. A stored id no plugin has
@@ -114,9 +216,16 @@ export function SourceFormat({
           <div className="flex flex-wrap items-center gap-2">
             <Label htmlFor={id}>Read as</Label>
             <Select
-              onValueChange={(value) =>
-                onReadAs(value === STANDARD_OPTION ? null : value)
-              }
+              onValueChange={(value) => {
+                // Column mapping needs its mapping first, so choosing it
+                // opens the editor and Apply stores both.
+                if (value === CUSTOM_MAPPING_ID) {
+                  setMappingOpen(true);
+                  return;
+                }
+                setMappingOpen(false);
+                onReadAs(value === STANDARD_OPTION ? null : value);
+              }}
               value={plugin?.id ?? STANDARD_OPTION}
             >
               <SelectTrigger className="w-64" id={id} size="sm">
@@ -128,7 +237,7 @@ export function SourceFormat({
                 </SelectItem>
                 {plugins.map((p) => (
                   <SelectItem key={p.id} value={p.id}>
-                    {p.label}
+                    {p.id === CUSTOM_MAPPING_ID ? "Column mapping" : p.label}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -153,6 +262,18 @@ export function SourceFormat({
           </div>
         )}
       {plugin?.description !== undefined && <p>{plugin.description}</p>}
+      {filename !== null && (
+        <MappingControls
+          dataset={dataset}
+          filename={filename}
+          mapped={mapped}
+          mapping={mapping}
+          onMapping={onMapping}
+          open={mappingOpen}
+          setOpen={setMappingOpen}
+          text={text}
+        />
+      )}
       <ImportIssues
         issues={conversion.issues}
         label={
@@ -176,8 +297,21 @@ export function SourceFormat({
         <>
           <p>
             No format on this page recognized the file, so it was read as the
-            standard format below.
+            standard format below. Map its columns to the standard format to
+            read it as it is, or change the file to match.
           </p>
+          {!mappingOpen && (
+            <div>
+              <Button
+                onClick={() => setMappingOpen(true)}
+                size="sm"
+                type="button"
+              >
+                <Columns3 aria-hidden="true" />
+                Map columns
+              </Button>
+            </div>
+          )}
           <CsvFormatHelp format={STANDARD_FORMATS[dataset]} label={dataset} />
         </>
       )}

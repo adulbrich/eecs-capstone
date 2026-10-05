@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  CHOSEN_FIXTURES,
   FIXTURE_PROJECTS,
   PLUGIN_FIXTURES,
 } from "#/lib/placement/__tests__/plugin-fixtures";
@@ -20,6 +21,8 @@ import {
   detectPlugin,
   EXPORT_PLUGINS,
   exportWith,
+  filePlugins,
+  isStandard,
   PLUGINS,
   pluginById,
   readAsChoice,
@@ -28,9 +31,15 @@ import {
   toStandard,
 } from "#/lib/placement/plugins";
 import { canvasGroups, canvasRoster } from "#/lib/placement/plugins/canvas";
+import { CUSTOM_MAPPINGS } from "#/lib/placement/plugins/custom-mapping";
 import { pastedTitles } from "#/lib/placement/plugins/paste";
 import { qualtricsBids } from "#/lib/placement/plugins/qualtrics";
-import type { ExportPlugin, FilePlugin } from "#/lib/placement/plugins/types";
+import type {
+  ExportPlugin,
+  FilePlugin,
+  ImportPlugin,
+  PluginContext,
+} from "#/lib/placement/plugins/types";
 import { parseRosterCsv } from "#/lib/placement/roster";
 
 /** The one parser of each dataset's standard CSV. */
@@ -45,46 +54,98 @@ const STANDARD_PARSERS: Record<
 
 const TEMPLATES = Object.values(STANDARD_FORMATS).map(formatTemplate);
 
+/** A file plugin nothing detects, which staff choose with Read as. */
+const isChosen = (plugin: ImportPlugin) =>
+  plugin.input === "file" && plugin.detect === undefined;
+
+/**
+ * The plugin's fixture and what it reads it with: a chosen plugin's is under
+ * its id and dataset, with what staff chose, since it may read several.
+ */
+function fixtureOf(plugin: ImportPlugin): {
+  context: PluginContext;
+  text: string | undefined;
+} {
+  if (isChosen(plugin)) {
+    const chosen = CHOSEN_FIXTURES[`${plugin.id} ${plugin.dataset}`];
+    return {
+      context: { ...chosen?.context, projects: FIXTURE_PROJECTS },
+      text: chosen?.text,
+    };
+  }
+  return {
+    context: { projects: FIXTURE_PROJECTS },
+    text: PLUGIN_FIXTURES[plugin.id],
+  };
+}
+
 // Every registered plugin passes these, with no test of its own needed for
 // the contract: a new plugin only adds its fixture (#733).
-describe.each(PLUGINS.map((p) => [p.id, p] as const))(
+describe.each(PLUGINS.map((p) => [`${p.id} (${p.dataset})`, p] as const))(
   "plugin %s",
-  (id, plugin) => {
-    const fixture = PLUGIN_FIXTURES[id];
+  (_name, plugin) => {
+    const { id } = plugin;
+    const { context, text } = fixtureOf(plugin);
+    const fixture = text ?? "";
 
-    it("has a fixture and an id no other plugin uses", () => {
-      expect(fixture).toBeDefined();
-      expect(PLUGINS.filter((p) => p.id === id)).toHaveLength(1);
+    it("has a fixture and an id no other plugin of its dataset uses", () => {
+      expect(text).toBeDefined();
+      const same = PLUGINS.filter((p) => p.id === id);
+      expect(same.filter((p) => p.dataset === plugin.dataset)).toHaveLength(1);
+      // Only a chosen plugin reads several datasets under one id: a stored
+      // choice names the dataset by where it is.
+      if (same.length > 1) {
+        expect(same.every(isChosen)).toBe(true);
+      }
     });
 
     it("converts its fixture without an error", () => {
-      const converted = plugin.toStandard(fixture, {
-        projects: FIXTURE_PROJECTS,
-      });
+      const converted = plugin.toStandard(fixture, context);
       expect(converted.issues.filter((i) => i.level === "error")).toEqual([]);
     });
 
     it("writes standard CSV the parser reads without a word", () => {
-      const converted = plugin.toStandard(fixture, {
-        projects: FIXTURE_PROJECTS,
-      });
+      const converted = plugin.toStandard(fixture, context);
       expect(STANDARD_PARSERS[plugin.dataset](converted.text).issues).toEqual(
         []
       );
     });
 
-    if (plugin.input === "file") {
+    if (plugin.input === "file" && plugin.detect !== undefined) {
+      const { detect } = plugin;
+
       it("claims its own fixture, over the standard format", () => {
         expect(detectPlugin(plugin.dataset, fixture)).toBe(plugin);
       });
 
-      it("claims no standard template and no other plugin's fixture", () => {
+      it("claims no standard template, and no other plugin's fixture", () => {
         for (const template of TEMPLATES) {
-          expect(plugin.detect(template)).toBe(false);
+          expect(detect(template)).toBe(false);
         }
         for (const other of PLUGINS.filter((p) => p.id !== id)) {
-          expect(plugin.detect(PLUGIN_FIXTURES[other.id] ?? "")).toBe(false);
+          expect(detect(fixtureOf(other).text ?? "")).toBe(false);
         }
+      });
+    }
+
+    if (isChosen(plugin)) {
+      it("reads a fixture nothing detects, and is offered by Read as", () => {
+        expect(isStandard(plugin.dataset, fixture)).toBe(false);
+        expect(detectPlugin(plugin.dataset, fixture)).toBeNull();
+        expect(filePlugins(plugin.dataset)).toContain(plugin);
+      });
+
+      it("reads through it once chosen", () => {
+        expect(resolveFilePlugin(plugin.dataset, fixture, id)).toBe(plugin);
+      });
+
+      it("reports reading without its choice as a problem with the whole file", () => {
+        const converted = plugin.toStandard(fixture, {
+          projects: FIXTURE_PROJECTS,
+        });
+        expect(converted.issues).toEqual([
+          expect.objectContaining({ level: "error", wholeFile: true }),
+        ]);
       });
     }
   }
@@ -194,7 +255,20 @@ describe("reading a stored file", () => {
     expect(resolveFilePlugin("roster", canvas, qualtricsBids.id)).toBe(
       canvasRoster
     );
-    expect(pluginById("gone")).toBeUndefined();
+    expect(pluginById("roster", "gone")).toBeUndefined();
+  });
+
+  it("reads custom mapping as the dataset the file is stored under", () => {
+    expect(resolveFilePlugin("bids", "x", "custom-mapping")).toBe(
+      CUSTOM_MAPPINGS.bids
+    );
+    expect(resolveFilePlugin("roster", canvas, "custom-mapping")).toBe(
+      CUSTOM_MAPPINGS.roster
+    );
+    // Detection never stores it away: there is no detection that picks it.
+    expect(readAsChoice("roster", canvas, "custom-mapping")).toBe(
+      "custom-mapping"
+    );
   });
 
   it("stores nothing for the choice detection would make anyway", () => {

@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import type { ColumnMapping } from "#/lib/placement/plugins/custom-mapping";
 import type { WorkspaceProject } from "#/lib/placement/types";
 import {
   addProject,
@@ -377,6 +378,95 @@ describe("how a file is read (#733)", () => {
     expect(parseWorkspace(serializeWorkspace(workspace))).toEqual({
       ok: true,
       workspace,
+    });
+  });
+});
+
+describe("a column mapping (#735)", () => {
+  const roster = {
+    source: { kind: "csv" as const, filename: "roster.csv" },
+    text: "Student Email,Full Name,Team\nada@example.edu,Ada Park,",
+    readAs: "custom-mapping",
+  };
+  const mapping: ColumnMapping = {
+    version: 1,
+    dataset: "roster",
+    columns: { "Student Email": "email", "Full Name": "name", Team: "project" },
+  };
+  const base = { ...WORKSPACE, titleMatches: undefined, roster };
+
+  it("changes the fingerprint, and changing it changes it again", () => {
+    const without = inputFingerprint(base);
+    const mapped = inputFingerprint({
+      ...base,
+      roster: { ...roster, mapping },
+    });
+    const renamed = inputFingerprint({
+      ...base,
+      roster: {
+        ...roster,
+        mapping: { ...mapping, columns: { "Student Email": "email" } },
+      },
+    });
+    expect(mapped).not.toBe(without);
+    expect(renamed).not.toBe(mapped);
+    const bids = { filename: "bids.csv", text: "x", readAs: "custom-mapping" };
+    expect(
+      inputFingerprint({
+        ...base,
+        bids: { ...bids, mapping: { ...mapping, dataset: "bids" } },
+      })
+    ).not.toBe(inputFingerprint({ ...base, bids }));
+  });
+
+  it("hashes the same in any key order, as storage hands it back", () => {
+    const reordered: ColumnMapping = {
+      columns: {
+        Team: "project",
+        "Full Name": "name",
+        "Student Email": "email",
+      },
+      dataset: "roster",
+      version: 1,
+    };
+    expect(
+      inputFingerprint({ ...base, roster: { ...roster, mapping: reordered } })
+    ).toBe(inputFingerprint({ ...base, roster: { ...roster, mapping } }));
+  });
+
+  it("round-trips through a file, with the roster and the bids", () => {
+    const workspace: Workspace = {
+      ...EMPTY_WORKSPACE,
+      bids: {
+        filename: "bids.csv",
+        text: "x",
+        readAs: "custom-mapping",
+        mapping: {
+          version: 1,
+          dataset: "bids",
+          columns: { Student: "email", Rank: "priority", Choice: "project" },
+        },
+      },
+      roster: { ...roster, mapping },
+    };
+    expect(parseWorkspace(serializeWorkspace(workspace))).toEqual({
+      ok: true,
+      workspace,
+    });
+  });
+
+  it("refuses a workspace whose mapping fills a column the format lacks", () => {
+    const workspace = {
+      ...EMPTY_WORKSPACE,
+      roster: {
+        ...roster,
+        mapping: { ...mapping, columns: { Team: "team" } },
+      },
+    };
+    expect(parseWorkspace(JSON.stringify(workspace))).toEqual({
+      ok: false,
+      message:
+        "The file is not a placement workspace: team is not a column of the roster format.",
     });
   });
 });

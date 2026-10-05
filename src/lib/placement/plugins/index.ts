@@ -5,6 +5,7 @@ import {
   STANDARD_FORMATS,
 } from "#/lib/placement/formats";
 import { canvasGroups, canvasRoster } from "#/lib/placement/plugins/canvas";
+import { CUSTOM_MAPPINGS } from "#/lib/placement/plugins/custom-mapping";
 import { pastedRoster, pastedTitles } from "#/lib/placement/plugins/paste";
 import { qualtricsBids } from "#/lib/placement/plugins/qualtrics";
 import type {
@@ -20,13 +21,16 @@ import type {
 /**
  * Every import plugin. A file is tried against its dataset's standard
  * format first, then against each file plugin here in order, and the first
- * that claims it reads it. Add a plugin by adding it to this list.
+ * that claims it reads it. Add a plugin by adding it to this list. Custom
+ * mapping comes last, once per dataset under one id: nothing detects it, and
+ * Read as lists it after the formats that are.
  */
 export const PLUGINS: readonly ImportPlugin[] = [
   canvasRoster,
   qualtricsBids,
   pastedRoster,
   pastedTitles,
+  ...Object.values(CUSTOM_MAPPINGS),
 ];
 
 /**
@@ -46,11 +50,21 @@ export function exportPlugins(dataset: ExportDataset): ExportPlugin[] {
   return EXPORT_PLUGINS.filter((p) => p.dataset === dataset);
 }
 
-export function pluginById(id: string): ImportPlugin | undefined {
-  return PLUGINS.find((p) => p.id === id);
+/**
+ * The plugin `id` names for `dataset`. An id is unique within a dataset; only
+ * custom mapping uses one id for several.
+ */
+export function pluginById(
+  dataset: PlacementDataset,
+  id: string
+): ImportPlugin | undefined {
+  return PLUGINS.find((p) => p.id === id && p.dataset === dataset);
 }
 
-/** The plugins that read an uploaded file of `dataset`, in detection order. */
+/**
+ * The plugins that read an uploaded file of `dataset`, in detection order:
+ * what Read as lists.
+ */
 export function filePlugins(dataset: PlacementDataset): FilePlugin[] {
   return PLUGINS.filter(
     (p): p is FilePlugin => p.input === "file" && p.dataset === dataset
@@ -73,7 +87,7 @@ export function detectPlugin(
   if (isStandard(dataset, text)) {
     return null;
   }
-  return filePlugins(dataset).find((p) => p.detect(text)) ?? null;
+  return filePlugins(dataset).find((p) => p.detect?.(text) === true) ?? null;
 }
 
 /**
@@ -92,10 +106,8 @@ export function resolveFilePlugin(
   if (readAs === null) {
     return null;
   }
-  const chosen = readAs === undefined ? undefined : pluginById(readAs);
-  return chosen?.input === "file" && chosen.dataset === dataset
-    ? chosen
-    : detectPlugin(dataset, text);
+  const chosen = readAs === undefined ? undefined : pluginById(dataset, readAs);
+  return chosen?.input === "file" ? chosen : detectPlugin(dataset, text);
 }
 
 /**
