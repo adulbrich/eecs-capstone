@@ -16,8 +16,9 @@ import {
   SelectValue,
 } from "#/components/ui/select";
 import type { ImportIssue } from "#/lib/placement/csv";
-import { CSV_EXTENSION, downloadText } from "#/lib/placement/download";
+import { downloadText } from "#/lib/placement/download";
 import {
+  CSV_EXTENSION,
   type PlacementDataset,
   STANDARD_FORMATS,
 } from "#/lib/placement/formats";

@@ -6,8 +6,7 @@ import {
   parseRows,
   type Row,
 } from "#/lib/placement/csv";
-import { CSV_EXTENSION } from "#/lib/placement/download";
-import { PLACEMENT_FORMAT } from "#/lib/placement/formats";
+import { CSV_EXTENSION, PLACEMENT_FORMAT } from "#/lib/placement/formats";
 import type { ExportPlugin, FilePlugin } from "#/lib/placement/plugins/types";
 import { readRosterCsv, rosterCsv } from "#/lib/placement/roster";
 

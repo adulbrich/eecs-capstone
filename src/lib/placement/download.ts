@@ -1,6 +1,3 @@
-/** A file name's ".csv", if it has one, for naming what is made from it. */
-export const CSV_EXTENSION = /(\.csv)?$/i;
-
 /**
  * Saves text the page built as a file. Browser only. The anchor goes into
  * the document before the click and the URL is revoked a macrotask later,
