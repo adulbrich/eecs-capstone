@@ -1653,6 +1653,11 @@ tasks on CPU, and each extra task is about $8.51 a month for the hours it
 actually runs. See [ADR-0035](./docs/adr/0035-scale-the-service-and-let-it-pick-the-instance.md)
 for why the instance class is sized by connections rather than by load.
 
+Changing the instance class restarts the burstable instance and resets its
+`CPUCreditBalance` to zero. Credits return at about 18 an hour at idle, so a
+full balance is most of a day away; read the balance, not the clock, before a
+load test after a resize.
+
 There is deliberately no NAT Gateway (~$32/mo avoided). The ALB is the largest
 line and is required for stable, secure HTTPS on Fargate.
 

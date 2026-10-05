@@ -5,10 +5,11 @@
 # nvm never fires and `node` is whatever is first on PATH, a Homebrew Node two
 # majors ahead on the machine this was written on. On that Node the jsdom
 # environment comes up without localStorage and about 65 unit tests fail in
-# files that have nothing to do with the change (docs/QUIRKS.md, "Run the tests
-# on the Node in .nvmrc"). A pre-push that fails that way teaches everyone to
-# skip it, so this wrapper does the version switch itself and, when it cannot,
-# fails on the version rather than on the tests.
+# files that have nothing to do with the change. `package.json` engines admits
+# that Node, so nothing warns, and anything else that bypasses shell functions
+# (`env FOO=bar npx vitest`) lands on it too. A pre-push that fails that way
+# teaches everyone to skip it, so this wrapper does the version switch itself
+# and, when it cannot, fails on the version rather than on the tests.
 #
 # Usage: sh scripts/nvmrc-node.sh <command> [args...]
 

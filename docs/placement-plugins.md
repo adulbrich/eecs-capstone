@@ -56,6 +56,11 @@ A stored id no plugin has any more is detected again. A plugin that throws is
 reported as a problem with the whole file rather than breaking the page. Report
 what you can as issues instead, so staff see which row to fix.
 
+A plugin may be chosen rather than detected (#735): a `"chosen"` plugin has no
+`detect`, claims no file, and reads a file only once staff pick it with "Read as"
+or "Map columns", so the detection order above covers detected plugins alone.
+Custom mapping is the one, and the contract test runs its own branch for it.
+
 ## Custom mapping
 
 `src/lib/placement/plugins/custom-mapping.ts` reads a file through a **column

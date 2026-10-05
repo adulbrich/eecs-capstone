@@ -514,8 +514,9 @@ catalogue that decided the matrix below; #288 shipped it.
 - [`CONTEXT.md`](./CONTEXT.md): the entries for Notification, Staff inbox,
   Proposer email and Submitted.
 - [`docs/QUIRKS.md`](./docs/QUIRKS.md): the console transport in dev, the
-  render functions and their escaping, the two notification rules that look
-  wrong, and the custom-line transition table.
+  render functions and their escaping, and the two notification rules that
+  look wrong. The custom-line transition table is in
+  `src/lib/inventory-custom-workflow.ts`.
 - [`DEPLOYMENT.md`](./DEPLOYMENT.md), section 9: SES identity, DKIM, sandbox exit
   and cutover.
 - [`docs/adr/0005-lazy-deadlines-no-scheduler.md`](./docs/adr/0005-lazy-deadlines-no-scheduler.md):

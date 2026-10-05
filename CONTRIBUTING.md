@@ -22,7 +22,9 @@ claim it        fix/ feat/ ...                                           review 
    The issue is the spec: an agent brief with acceptance criteria, and a table of
    which fields are public and who edits them. Filing one goes through the forms
    under `.github/ISSUE_TEMPLATE/`. Labels are explained in
-   `docs/agents/triage-labels.md`.
+   `docs/agents/triage-labels.md`. One issue per Claude Code session: a second
+   issue starts a new session, because a session that works several runs its
+   context past what it can hold.
 2. **Branch from a fresh `origin/main`.** `git fetch origin main` first; a stale
    local `main` is how rebase conflicts start. Prefix the branch with the commit
    type: `fix/`, `feat/`, `test/`, `docs/`, `chore/`, `ci/`, `refactor/`.
@@ -53,7 +55,8 @@ claim it        fix/ feat/ ...                                           review 
    - **The local branch**, once its remote is gone. A squash merge leaves it
      "not fully merged", so `git branch -d` refuses it and only `-D` removes
      it. `.claude/hooks/guard-git.mjs` reserves `-D` for you rather than an
-     agent, so an agent's part is to name the branches and the command.
+     agent, so an agent's part is to give the count, a command to review them, and the
+     command that deletes them.
 
    `node scripts/check-workspace.mjs --ports` reports all three, and the
    SessionStart hook runs the same checks, so a session is told at its first
@@ -124,13 +127,13 @@ hooks under `.claude/hooks/`, which is what the middle column above describes.
 `docs/ONBOARDING.md` has the trust prompt a fresh clone answers, a table of the
 hooks, what a refusal looks like, and the two commands the sandbox refuses.
 
-Working several issues at once: put a worktree outside the repo and symlink
-`node_modules` and `.env.local` into it. The smoke and accessibility suites want the
-main checkout, since both share one local database and one port.
+Working several issues at once: one worktree per issue, `npm ci` inside it, and copy
+or symlink only `.env.local`. A symlinked `node_modules` fails about 400 unit tests
+with "Invalid hook call" and breaks the dev server. The smoke and accessibility
+suites want the main checkout, since both share one local database and one port.
 
-The superpowers plugin (brainstorm, spec, plan, subagent-driven implementation) is
-for a few large new features, and its specs and plans live in `docs/superpowers/`.
-Ordinary work does not go through it: the issue is the spec.
+The issue is the spec for all work. `docs/superpowers/` holds the specs and plans of
+features built before 2026-10, kept for reference.
 
 ## What to read for what
 
