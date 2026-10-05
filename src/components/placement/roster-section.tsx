@@ -2,11 +2,12 @@ import { Trash2, UserMinus } from "lucide-react";
 import { ConfirmDialog } from "#/components/confirm-dialog";
 import { CsvFormatHelp } from "#/components/placement/csv-format";
 import { FilePickerButton } from "#/components/placement/file-picker-button";
-import { ImportIssues } from "#/components/placement/import-issues";
 import { PasteList } from "#/components/placement/paste-list";
+import { SourceFormat } from "#/components/placement/source-format";
 import type { PlacementWorkspace } from "#/components/placement/use-placement-workspace";
 import { Button } from "#/components/ui/button";
 import { ROSTER_FORMAT } from "#/lib/placement/formats";
+import { readAsChoice } from "#/lib/placement/plugins";
 import { removeStudents, type Workspace } from "#/lib/placement/workspace";
 
 export const plural = (n: number, one: string, many: string) =>
@@ -91,7 +92,6 @@ export function RosterSection({
     );
   }
 
-  const unit = stored.source.kind === "csv" ? "row" : "line";
   const from =
     stored.source.kind === "csv" ? stored.source.filename : "a pasted list";
   const notInSurvey = bids?.students.filter((s) => s.rosterOnly).length ?? 0;
@@ -125,17 +125,23 @@ export function RosterSection({
           </Button>
         </ConfirmDialog>
       </div>
-      {roster.format === "canvas" && (
-        <p className="mt-1">
-          Read as a Canvas roster and groups export: login_id is the email, and
-          each student's group_name is the project they are pre-approved for. A
-          group named like a project on the Projects tab joins it; any other
-          group becomes a project of its own holding just that group. A student
-          in no group is not pre-approved. A student listed twice keeps their
-          first group, and the problems list names any other it ignored.
-          Canvas's Test Student is left out.
-        </p>
-      )}
+      <SourceFormat
+        conversion={roster.conversion}
+        dataset="roster"
+        filename={stored.source.kind === "csv" ? stored.source.filename : null}
+        onReadAs={(choice) =>
+          update((w) => ({
+            ...w,
+            roster: w.roster && {
+              ...w.roster,
+              readAs: readAsChoice("roster", w.roster.text, choice),
+            },
+          }))
+        }
+        parseIssues={roster.issues}
+        plugin={roster.plugin}
+        readAs={stored.readAs}
+      />
       <p className="mt-1">
         {rosterSummary(
           bids === null,
@@ -198,7 +204,6 @@ export function RosterSection({
           </Button>
         </div>
       )}
-      <ImportIssues issues={roster.issues} label="roster" unit={unit} />
     </section>
   );
 }

@@ -31,12 +31,10 @@ import {
   SelectTrigger,
   SelectValue,
 } from "#/components/ui/select";
-import {
-  type ImportIssue,
-  parseProjectsCsv,
-  parseProjectTitles,
-} from "#/lib/placement/csv";
+import { type ImportIssue, parseProjectsCsv } from "#/lib/placement/csv";
 import { PROJECTS_FORMAT } from "#/lib/placement/formats";
+import { detectPlugin, toStandard } from "#/lib/placement/plugins";
+import { pastedTitles } from "#/lib/placement/plugins/paste";
 import type { WorkspaceProject } from "#/lib/placement/types";
 import {
   contactFor,
@@ -116,10 +114,13 @@ export function ProjectsTab({
         duplicates={duplicates}
         issues={issues}
         onPaste={(text) => {
-          const parsed = parseProjectTitles(text);
+          // Projects are stored parsed, not as text (they are edited by hand
+          // afterward), so a plugin runs once, here, not on every read.
+          const converted = pastedTitles.toStandard(text, { projects: [] });
+          const parsed = parseProjectsCsv(converted.text);
           setDuplicates([]);
-          setIssues([]);
-          setPasteIssues(parsed.issues);
+          setIssues(parsed.issues);
+          setPasteIssues(converted.issues);
           if (parsed.projects.length > 0) {
             setProjects(parsed.projects, { kind: "pasted" });
           }
@@ -131,9 +132,12 @@ export function ProjectsTab({
           setProjects(projects, projectSource);
         }}
         onText={(text, filename) => {
-          const parsed = parseProjectsCsv(text);
+          const converted = toStandard(detectPlugin("projects", text), text, {
+            projects: [],
+          });
+          const parsed = parseProjectsCsv(converted.text);
           setDuplicates([]);
-          setIssues(parsed.issues);
+          setIssues([...converted.issues, ...parsed.issues]);
           setPasteIssues([]);
           if (parsed.projects.length > 0) {
             setProjects(parsed.projects, { kind: "csv", filename });

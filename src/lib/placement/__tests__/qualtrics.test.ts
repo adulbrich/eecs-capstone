@@ -1,7 +1,10 @@
 import Papa from "papaparse";
 import { describe, expect, it } from "vitest";
 import { parseBidsCsv } from "#/lib/placement/csv";
-import { convertQualtrics, isQualtricsExport } from "#/lib/placement/qualtrics";
+import {
+  convertQualtrics,
+  isQualtricsExport,
+} from "#/lib/placement/plugins/qualtrics";
 
 // An invented export in the shape Qualtrics writes: three header rows (short
 // ids, question text, ImportId JSON), then one row per response. The titles

@@ -404,6 +404,53 @@ test.describe("placement workspace", () => {
     await expect(page.getByText("Robots, mostly")).toBeVisible();
   });
 
+  test("a workspace saved before plugins converted on read still shows its conversion", async ({
+    page,
+  }) => {
+    await page.goto("/admin/placement");
+    await waitForHydration(page);
+    await importFiles(page);
+    // What the build before #733 saved for a Qualtrics upload: the converted
+    // CSV as the text, the export's name and what converting it noticed.
+    await page.evaluate(
+      ([key, text]) => {
+        const workspace = JSON.parse(window.localStorage.getItem(key) ?? "{}");
+        workspace.bids = {
+          filename: "survey (converted).csv",
+          text,
+          convertedFrom: "survey.csv",
+          conversionIssues: [
+            {
+              level: "warning",
+              row: 4,
+              message: "A survey preview, not a response; skipped.",
+            },
+          ],
+        };
+        window.localStorage.setItem(key, JSON.stringify(workspace));
+      },
+      [STORAGE_KEY, BIDS_CSV] as const
+    );
+    await page.reload();
+    await waitForHydration(page);
+    await page.getByRole("tab", { name: /Bids/ }).click();
+    await expect(page.getByText("2 students and 3 bids")).toBeVisible();
+    await expect(
+      page.getByText("Converted from the Qualtrics export survey.csv.")
+    ).toBeVisible();
+    await expect(
+      page.getByRole("button", { name: "Download converted CSV" })
+    ).toBeVisible();
+    await expect(
+      page.getByRole("region", {
+        name: "Problems in the Qualtrics export file",
+      })
+    ).toContainText("A survey preview, not a response; skipped.");
+    // Converted text is read by no plugin again, so there is nothing to
+    // choose.
+    await expect(page.getByLabel("Read as")).toHaveCount(0);
+  });
+
   test("staff run, approve, move, re-run and download a placement", async ({
     page,
   }) => {
@@ -663,9 +710,11 @@ test.describe("placement workspace", () => {
       ),
     });
     const problems = page.getByRole("region", {
-      name: "Problems in the survey export file",
+      name: "Problems in the Qualtrics export file",
     });
-    await expect(problems).toContainText("The survey export file was not read");
+    await expect(problems).toContainText(
+      "The Qualtrics export file was not read"
+    );
     await expect(problems).toContainText(
       "The export has no Recipient Email column"
     );
@@ -1216,6 +1265,19 @@ test.describe("placement workspace", () => {
     await expect(roster).toContainText(
       "Read as a Canvas roster and groups export"
     );
+    await expect(roster).toContainText("2 students are pre-approved");
+
+    // Read as the roster's own format, the file has no email column; back
+    // to Canvas, it reads as before (#733).
+    await roster.getByLabel("Read as").click();
+    await page.getByRole("option", { name: "Roster CSV" }).click();
+    await expect(
+      roster.getByRole("region", { name: "Problems in the roster file" })
+    ).toContainText('The file has no "email" column.');
+    // Staff chose the format, so the page does not say nothing matched.
+    await expect(roster).not.toContainText("No format on this page recognized");
+    await roster.getByLabel("Read as").click();
+    await page.getByRole("option", { name: "Canvas roster export" }).click();
     await expect(roster).toContainText("2 students are pre-approved");
     await page.getByRole("tab", { name: /Projects/ }).click();
     await expect(

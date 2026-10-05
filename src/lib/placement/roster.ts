@@ -7,6 +7,7 @@ import {
   pastedLines,
   projectKeysByTitle,
 } from "#/lib/placement/csv";
+import { ROSTER_FORMAT, writeFormat } from "#/lib/placement/formats";
 import {
   type ProjectCandidate,
   rankProjects,
@@ -30,8 +31,6 @@ export interface RosterEntry {
 
 export interface ParsedRoster {
   entries: RosterEntry[];
-  /** How a CSV was read; a pasted list is always "roster". */
-  format: RosterFormat;
   issues: ImportIssue[];
 }
 
@@ -117,40 +116,28 @@ function collect(
   }
 }
 
+type RawRow = Parameters<typeof cell>[0];
+
 /**
- * Which column holds what. The roster's own format, or Canvas's roster and
- * groups export (#674), whose `login_id` is the email and whose `group_name`
- * is the team, read as the pre-approved project.
+ * Which column holds what: the roster's own format, or another CSV a plugin
+ * reads the same way, such as Canvas's export (#674).
  */
-interface RosterColumns {
+export interface RosterColumns {
   email: string;
-  format: RosterFormat;
   name: string;
   project: string;
+  /**
+   * Why a row with no email is left out with a warning rather than an
+   * error, or undefined to report it as an error.
+   */
+  skipRow?: (raw: RawRow) => string | undefined;
 }
 
-export type RosterFormat = "canvas" | "roster";
-
 const ROSTER_COLUMNS: RosterColumns = {
-  format: "roster",
   email: "email",
   name: "name",
   project: "project",
 };
-const CANVAS_COLUMNS: RosterColumns = {
-  format: "canvas",
-  email: "login_id",
-  name: "name",
-  project: "group_name",
-};
-
-/** A Canvas export has `login_id` and no `email`; `email` wins if both. */
-const columnsFor = (fields: readonly string[]): RosterColumns =>
-  fields.includes("login_id") && !fields.includes("email")
-    ? CANVAS_COLUMNS
-    : ROSTER_COLUMNS;
-
-type RawRow = Parameters<typeof cell>[0];
 
 const projectCell = (raw: RawRow, column: string) => {
   const project = cell(raw, column);
@@ -165,22 +152,24 @@ const unreadableProject = (raw: RawRow, column: string) => {
 
 /**
  * `email, name, project`, one row per student; only `email` is required.
- * `project` pre-approves the student for that project. A Canvas roster and
- * groups export reads as it comes: see `RosterColumns`.
+ * `project` pre-approves the student for that project. Any other shape is a
+ * plugin's to convert first (`#/lib/placement/plugins`).
  */
-export function parseRosterCsv(text: string): ParsedRoster {
+export const parseRosterCsv = (text: string): ParsedRoster =>
+  readRosterCsv(text, ROSTER_COLUMNS);
+
+/** A roster CSV read through `columns`, for a plugin whose names differ. */
+export function readRosterCsv(
+  text: string,
+  columns: RosterColumns
+): ParsedRoster {
   const { fields, issues, rows } = parseRows(text);
-  const columns = columnsFor(fields);
   const missing =
     fields.length === 0 && issues.length > 0
       ? []
       : missingColumns(fields, [columns.email]);
   if (missing.length > 0) {
-    return {
-      entries: [],
-      issues: [...issues, ...missing],
-      format: columns.format,
-    };
+    return { entries: [], issues: [...issues, ...missing] };
   }
   const entries: RosterEntry[] = [];
   const seen: Seen = new Map();
@@ -191,17 +180,9 @@ export function parseRosterCsv(text: string): ParsedRoster {
       return;
     }
     const email = cell(raw, columns.email).toLowerCase();
-    // Canvas adds a Test Student to every course, with no login_id.
-    if (
-      email === "" &&
-      columns.format === "canvas" &&
-      cell(raw, columns.name).toLowerCase() === "test student"
-    ) {
-      issues.push({
-        level: "warning",
-        row,
-        message: "Canvas's Test Student has no login_id, and is left out.",
-      });
+    const skipped = email === "" ? columns.skipRow?.(raw) : undefined;
+    if (skipped !== undefined) {
+      issues.push({ level: "warning", row, message: skipped });
       return;
     }
     if (!isEmail(email)) {
@@ -236,11 +217,7 @@ export function parseRosterCsv(text: string): ParsedRoster {
       "row"
     );
   });
-  return {
-    entries,
-    issues: issues.sort((a, b) => a.row - b.row),
-    format: columns.format,
-  };
+  return { entries, issues: issues.sort((a, b) => a.row - b.row) };
 }
 
 /**
@@ -295,8 +272,26 @@ export function parseRosterList(text: string): ParsedRoster {
       }
     }
   }
-  return { entries, issues, format: "roster" };
+  return { entries, issues };
 }
+
+/**
+ * Entries as the roster's own CSV, which a plugin hands on after reading its
+ * source. A project that names nothing was already reported, so it is left
+ * blank rather than reported again.
+ */
+export const rosterCsv = (entries: readonly RosterEntry[]): string =>
+  writeFormat(
+    ROSTER_FORMAT,
+    entries.map((e) => ({
+      email: e.email,
+      name: e.name,
+      project:
+        e.project !== undefined && normalizeTitle(e.project) !== ""
+          ? e.project
+          : "",
+    }))
+  );
 
 /** What the roster's pre-approvals come to against the project list. */
 export interface RosterAssignments {

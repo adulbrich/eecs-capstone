@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { parseBidsCsv } from "#/lib/placement/csv";
+import { resolveFilePlugin, toStandard } from "#/lib/placement/plugins";
+import { pastedRoster } from "#/lib/placement/plugins/paste";
 import {
   mergeRoster,
   parseRosterCsv,
-  parseRosterList,
   resolveRosterProjects,
 } from "#/lib/placement/roster";
 import {
@@ -71,19 +72,41 @@ export function usePlacementWorkspace() {
   const replace = useCallback((next: Workspace) => setWorkspace(next), []);
   const clear = useCallback(() => setWorkspace(EMPTY_WORKSPACE), []);
 
-  const bidsText = workspace?.bids?.text;
+  const storedBids = workspace?.bids;
   const projects = workspace?.projects;
   const titleMatches = workspace?.titleMatches;
   const storedRoster = workspace?.roster;
   const removed = workspace?.removed;
+  // The roster through its plugin, if any, then the roster parser. A pasted
+  // list has one plugin; a file is read as staff chose, or as detected.
   const roster = useMemo(() => {
     if (storedRoster === undefined) {
       return null;
     }
-    return storedRoster.source.kind === "csv"
-      ? parseRosterCsv(storedRoster.text)
-      : parseRosterList(storedRoster.text);
-  }, [storedRoster]);
+    const plugin =
+      storedRoster.source.kind === "pasted"
+        ? pastedRoster
+        : resolveFilePlugin("roster", storedRoster.text, storedRoster.readAs);
+    // Every plugin gets the project list, as the contract says, though no
+    // roster plugin reads it yet; a roster is small enough to re-read.
+    const conversion = toStandard(plugin, storedRoster.text, {
+      projects: projects ?? [],
+    });
+    return { ...parseRosterCsv(conversion.text), plugin, conversion };
+  }, [storedRoster, projects]);
+  // The bids converted again on every read, so a plugin that names projects
+  // (a survey answer that pins its student) sees the list as it is now.
+  const bidsSource = useMemo(() => {
+    if (!storedBids || projects === undefined) {
+      return null;
+    }
+    const plugin = resolveFilePlugin(
+      "bids",
+      storedBids.text,
+      storedBids.readAs
+    );
+    return { plugin, ...toStandard(plugin, storedBids.text, { projects }) };
+  }, [storedBids, projects]);
   // A removed student's pre-approval goes with them (#679), so a project
   // the roster adds shrinks, or disappears, without them.
   const assignments = useMemo(
@@ -108,10 +131,10 @@ export function usePlacementWorkspace() {
     [projects, assignments]
   );
   const bids = useMemo(() => {
-    if (bidsText === undefined || projects === undefined) {
+    if (bidsSource === null || projects === undefined) {
       return null;
     }
-    const parsed = parseBidsCsv(bidsText, projects, titleMatches);
+    const parsed = parseBidsCsv(bidsSource.text, projects, titleMatches);
     // The roster's students join the survey's, so every tab and the run
     // see one list (#665), with its pre-approvals pinned (#670).
     const merged =
@@ -130,7 +153,7 @@ export function usePlacementWorkspace() {
       removed: aside.removed,
       notOnRoster: merged.notOnRoster.filter((e) => !removed?.includes(e)),
     };
-  }, [bidsText, projects, titleMatches, roster, assignments, removed]);
+  }, [bidsSource, projects, titleMatches, roster, assignments, removed]);
 
   // What a run reads, hashed once per change for every tab that asks
   // whether the last run is stale. The stored project list, not the roster's
@@ -151,6 +174,11 @@ export function usePlacementWorkspace() {
   return {
     workspace,
     bids,
+    /**
+     * The bids file as standard CSV, the plugin that converted it (null for
+     * a file already in the standard format) and what that plugin noticed.
+     */
+    bidsSource,
     /** `inputFingerprint` of the workspace now, to compare with a result's. */
     fingerprint,
     roster,

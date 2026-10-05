@@ -1,0 +1,186 @@
+import { Download } from "lucide-react";
+import { useId } from "react";
+import { CsvFormatHelp } from "#/components/placement/csv-format";
+import { ImportIssues } from "#/components/placement/import-issues";
+import { Button } from "#/components/ui/button";
+import { Label } from "#/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "#/components/ui/select";
+import type { ImportIssue } from "#/lib/placement/csv";
+import { downloadText } from "#/lib/placement/download";
+import {
+  type PlacementDataset,
+  STANDARD_FORMATS,
+} from "#/lib/placement/formats";
+import { filePlugins, type ReadAs } from "#/lib/placement/plugins";
+import type {
+  Conversion,
+  PlacementPlugin,
+} from "#/lib/placement/plugins/types";
+
+const STANDARD = "standard";
+const CSV_EXTENSION = /(\.csv)?$/i;
+
+/** The standard format's name in the Read as select. */
+const STANDARD_LABELS: Record<PlacementDataset, string> = {
+  projects: "Projects CSV",
+  roster: "Roster CSV",
+  bids: "Bids CSV",
+};
+
+/** "survey.csv" to "survey (converted).csv". */
+const convertedFilename = (filename: string) =>
+  filename.replace(CSV_EXTENSION, " (converted).csv");
+
+function DownloadConverted({
+  filename,
+  text,
+}: {
+  filename: string;
+  text: string;
+}) {
+  return (
+    <Button
+      onClick={() =>
+        downloadText(convertedFilename(filename), text, "text/csv")
+      }
+      size="sm"
+      type="button"
+      variant="outline"
+    >
+      <Download aria-hidden="true" />
+      Download converted CSV
+    </Button>
+  );
+}
+
+/**
+ * How a stored file or pasted list is read (#733), and everything reading it
+ * found: the plugin that converted it, with a download of what it converted
+ * to; a Read as select to change it, for an uploaded file; what the plugin
+ * noticed, in the source's own rows or lines; then what the dataset's parser
+ * found in the standard CSV. A file nothing recognized is read as the standard
+ * format, and gets that format's help when it is not one.
+ */
+export function SourceFormat({
+  conversion,
+  dataset,
+  filename,
+  legacyConvertedFrom,
+  onReadAs,
+  parseIssues,
+  plugin,
+  readAs,
+}: {
+  conversion: Conversion;
+  dataset: PlacementDataset;
+  /** The uploaded file's name; null for pasted text, which has no Read as. */
+  filename: string | null;
+  /**
+   * The survey export's name, for a workspace saved before plugins converted
+   * on read, which stored the converted CSV and its issues instead.
+   */
+  legacyConvertedFrom?: string;
+  /** Null reads the file as the standard format; an id, through that plugin. */
+  onReadAs: (readAs: string | null) => void;
+  parseIssues: readonly ImportIssue[];
+  plugin: PlacementPlugin | null;
+  /** The stored choice: undefined while the file is read as detected. */
+  readAs: ReadAs;
+}) {
+  const id = useId();
+  const plugins = filePlugins(dataset);
+  const conversionStopped = conversion.issues.some((i) => i.wholeFile);
+  // Only when detection found nothing: staff who chose the standard format
+  // for a file a plugin claims know what it is. A stored id no plugin has
+  // any more was detected again, so it counts as detection.
+  const unrecognized =
+    plugin === null &&
+    readAs !== null &&
+    legacyConvertedFrom === undefined &&
+    parseIssues.some((i) => i.wholeFile);
+  return (
+    <div className="mt-2 flex flex-col gap-2 text-sm">
+      {/* A legacy workspace holds converted text, which no plugin reads
+          again, so it has no Read as. */}
+      {filename !== null &&
+        legacyConvertedFrom === undefined &&
+        plugins.length > 0 && (
+          <div className="flex flex-wrap items-center gap-2">
+            <Label htmlFor={id}>Read as</Label>
+            <Select
+              onValueChange={(value) =>
+                onReadAs(value === STANDARD ? null : value)
+              }
+              value={plugin?.id ?? STANDARD}
+            >
+              <SelectTrigger className="w-64" id={id} size="sm">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value={STANDARD}>
+                  {STANDARD_LABELS[dataset]}
+                </SelectItem>
+                {plugins.map((p) => (
+                  <SelectItem key={p.id} value={p.id}>
+                    {p.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <span className="text-muted-foreground">
+              Changing it reads the file again. Pins stay, and the last run
+              stays on the Results tab, marked as before your changes.
+            </span>
+          </div>
+        )}
+      {filename !== null &&
+        (plugin !== null || legacyConvertedFrom !== undefined) && (
+          <div className="flex flex-wrap items-center gap-2">
+            <span>
+              Converted from the {plugin?.label ?? "Qualtrics export"}{" "}
+              {legacyConvertedFrom ?? filename}.
+            </span>
+            <DownloadConverted
+              filename={legacyConvertedFrom ?? filename}
+              text={conversion.text}
+            />
+          </div>
+        )}
+      {plugin?.description !== undefined && <p>{plugin.description}</p>}
+      <ImportIssues
+        issues={conversion.issues}
+        label={
+          plugin?.label ?? (legacyConvertedFrom ? "Qualtrics export" : dataset)
+        }
+        unit={plugin?.input === "paste" ? "line" : "row"}
+      />
+      {/* A source the plugin could not read leaves an empty CSV, whose
+          missing columns would only repeat that (#681). */}
+      {!conversionStopped && (
+        <ImportIssues
+          issues={parseIssues}
+          label={
+            plugin === null && legacyConvertedFrom === undefined
+              ? dataset
+              : `converted ${dataset}`
+          }
+        />
+      )}
+      {unrecognized && (
+        <>
+          <p>
+            No format on this page recognized the file, so it was read as the
+            standard format below.
+          </p>
+          <CsvFormatHelp format={STANDARD_FORMATS[dataset]} label={dataset} />
+        </>
+      )}
+    </div>
+  );
+}

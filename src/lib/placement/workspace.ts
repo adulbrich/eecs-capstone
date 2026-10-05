@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { removeFromResult } from "#/lib/placement/board";
 import { type ImportIssue, normalizeTitle } from "#/lib/placement/csv";
+import type { ReadAs } from "#/lib/placement/plugins";
 import { repointRosterPins, rosterProjectKey } from "#/lib/placement/roster";
 import {
   DEFAULT_PLACEMENT_PARAMETERS,
@@ -35,11 +36,20 @@ export type ProjectSource =
 
 export interface Workspace {
   bids: {
-    /** What the conversion from a survey export noticed, kept with it. */
+    /**
+     * What converting `convertedFrom` noticed, kept by a workspace saved
+     * before plugins converted on read (#733). Never written now.
+     */
     conversionIssues?: ImportIssue[];
-    /** The survey export's own filename, when `text` was converted from it. */
+    /**
+     * The survey export's own filename, in a workspace saved before plugins
+     * converted on read, whose `text` is the converted CSV. Never written now.
+     */
     convertedFrom?: string;
     filename: string;
+    /** How the file is read: see `ReadAs`. Absent means detected. */
+    readAs?: ReadAs;
+    /** The file as it was uploaded, converted on every read. */
     text: string;
   } | null;
   parameters: WorkspaceParameters;
@@ -75,6 +85,8 @@ export interface Workspace {
 export type TitleMatches = Record<string, TitleMatch>;
 
 export interface StoredRoster {
+  /** How a CSV is read: see `ReadAs`. A pasted list has one way. */
+  readAs?: ReadAs;
   source: { kind: "csv"; filename: string } | { kind: "pasted" };
   text: string;
 }
@@ -198,6 +210,7 @@ const workspaceSchema = z
       .object({
         filename: z.string(),
         text: z.string(),
+        readAs: z.string().nullable().optional(),
         convertedFrom: z.string().optional(),
         conversionIssues: z
           .array(
@@ -224,6 +237,7 @@ const workspaceSchema = z
           z.object({ kind: z.literal("pasted") }),
         ]),
         text: z.string(),
+        readAs: z.string().nullable().optional(),
       })
       .optional(),
     titleMatches: z
@@ -513,11 +527,21 @@ export function inputFingerprint(
     workspace.parameters,
     workspace.bids?.text ?? null,
     // Each only when present, so a run stored before it existed keeps its
-    // fingerprint.
+    // fingerprint. A detected file has no plugin id, and hashes as before.
     ...(Object.keys(matches).length > 0 ? [matches] : []),
     ...(workspace.roster === undefined
       ? []
-      : [{ roster: workspace.roster.text }]),
+      : [
+          workspace.roster.readAs === undefined
+            ? { roster: workspace.roster.text }
+            : {
+                roster: workspace.roster.text,
+                readAs: workspace.roster.readAs,
+              },
+        ]),
+    ...(workspace.bids?.readAs === undefined
+      ? []
+      : [{ bidsReadAs: workspace.bids.readAs }]),
   ]);
   // djb2 in plain arithmetic, kept below 2^32 so it stays exact.
   let hash = 5381;

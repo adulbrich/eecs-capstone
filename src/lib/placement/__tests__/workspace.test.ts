@@ -340,6 +340,47 @@ describe("title matches", () => {
   });
 });
 
+describe("how a file is read (#733)", () => {
+  const roster = {
+    source: { kind: "csv" as const, filename: "canvas.csv" },
+    text: "name,login_id\nAda,ada@example.edu",
+  };
+  const base = {
+    ...WORKSPACE,
+    bids: { filename: "bids.csv", text: "email,priority,project\n" },
+    titleMatches: undefined,
+    roster,
+  };
+
+  it("hashes as before while detected, and differently once chosen", () => {
+    const before = inputFingerprint(base);
+    // What main hashed this workspace to before plugins: a saved run whose
+    // files were detected stays current.
+    expect(before).toBe("385:ltcu53");
+    const chosen = [
+      { ...base, roster: { ...roster, readAs: null } },
+      { ...base, roster: { ...roster, readAs: "canvas-roster" } },
+      { ...base, bids: { ...base.bids, readAs: null } },
+    ].map(inputFingerprint);
+    for (const hash of chosen) {
+      expect(hash).not.toBe(before);
+    }
+    expect(new Set(chosen).size).toBe(3);
+  });
+
+  it("round-trips a chosen plugin id, and null for the standard format", () => {
+    const workspace: Workspace = {
+      ...EMPTY_WORKSPACE,
+      bids: { filename: "survey.csv", text: "x", readAs: "qualtrics-bids" },
+      roster: { ...roster, readAs: null },
+    };
+    expect(parseWorkspace(serializeWorkspace(workspace))).toEqual({
+      ok: true,
+      workspace,
+    });
+  });
+});
+
 describe("the roster", () => {
   const roster = {
     source: { kind: "pasted" as const },

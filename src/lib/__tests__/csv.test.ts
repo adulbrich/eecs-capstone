@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { type CsvColumn, toCsv } from "#/lib/csv";
+import { type CsvColumn, toCsv, unguardCell } from "#/lib/csv";
 
 interface Row {
   active: boolean;
@@ -91,6 +91,17 @@ describe("toCsv", () => {
       [row({ name: "=SUM(A1,A2)" })]
     );
     expect(csv.split("\r\n")[1]).toBe(`"'=SUM(A1,A2)"`);
+  });
+
+  it("guards a value that already looks guarded, so reading it back is exact", () => {
+    const names = ["'-Minus", "'=cmd", "'apostrophe", "-dash"];
+    const csv = toCsv(
+      [{ header: "Name", value: (r: Row) => r.name }],
+      names.map((name) => row({ name }))
+    );
+    const cells = csv.split("\r\n").slice(1);
+    expect(cells).toEqual(["''-Minus", "''=cmd", "'apostrophe", "'-dash"]);
+    expect(cells.map(unguardCell)).toEqual(names);
   });
 
   it("leaves a safe value untouched", () => {
