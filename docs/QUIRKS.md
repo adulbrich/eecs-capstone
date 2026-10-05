@@ -535,7 +535,7 @@ Radix fires `onOpenChange` only for closes it initiates (Escape, the overlay, `D
 ### Workflow conventions
 
 - **The issue is the spec, the pull request is the plan, the review loop is the gate.** [ADR-0013](./adr/0013-specs-live-in-github-issues.md).
-- **`*As` first, `*ForCurrentUser` second.** [ADR-0002](./adr/0002-one-named-wrapper-per-action.md). An implementation that needs no viewer object is `*Impl`; a `My` stem names whose rows are read, so it stays on both halves of a pair. `seam-convention.test.ts` fails a wrapper with no seam sharing its stem.
+- **`*As` first, `*ForCurrentUser` second.** [ADR-0002](./adr/0002-one-named-wrapper-per-action.md). An implementation that needs no viewer object is `*Impl`; a `My` stem names whose rows are read, so it stays on both halves of a pair. `seam-convention.test.ts` fails a wrapper with no seam sharing its stem; it replaced a grep that could not fail, so if you write a check for a convention, make yourself see it red before you trust it.
 - **One server function per workflow action**, never one mega-mutation.
 - **Single canonical URL per resource.** [ADR-0010](./adr/0010-single-canonical-url-per-resource.md).
 
@@ -779,9 +779,13 @@ Drizzle cannot declare an unlogged table, so the migration is hand-written and `
 
 ### `/admin/traffic` reads visits from a rollup that a page load fills
 
-`getTrafficAs` rolls closed days into `traffic_visits` first ([ADR-0050](./adr/0050-closed-days-of-traffic-are-rolled-up.md)); `TRUNCATE traffic_visits` is always safe. A day closes two minutes after local midnight, and a test that omits `now` sees every fixture day closed. `traffic-filters.test.ts` holds the zone literal to `OFFICE_TIME_ZONE` and the filter defaults to their listings.
+`getTrafficAs` rolls closed days into `traffic_visits` first ([ADR-0050](./adr/0050-closed-days-of-traffic-are-rolled-up.md)); `TRUNCATE traffic_visits` is always safe. A day closes two minutes after local midnight, and a test that omits `now` sees every fixture day closed. `traffic-filters.test.ts` holds the zone literal to `OFFICE_TIME_ZONE` and the filter defaults to their listings. `traffic_events.day` is generated from that literal, so changing the zone means a migration that drops and re-adds the column and a truncate of the rollup.
 
 ## Site metadata
+
+### The `noindex` tags must survive server rendering
+
+A crawler runs no JavaScript, so a `noindex` meta tag that appears only after hydration is not there at all. Keep `NOINDEX` (`src/lib/social-meta.ts`) in the server-rendered `head()`; [ADR-0055](./adr/0055-the-catalog-is-shareable-but-not-indexed.md) says why `robots.txt` stays permissive.
 
 ### The social card is a committed PNG, not a build artifact
 
