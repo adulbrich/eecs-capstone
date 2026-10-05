@@ -8,7 +8,7 @@
  * needs a locked row: reading the line, writing the columns, linking the
  * items.
  *
- * The lifecycle, normative in `docs/QUIRKS.md` under Inventory:
+ * The lifecycle, normative here and in this module's tests:
  *
  * | From                   | To          | Who                      |
  * | ---------------------- | ----------- | ------------------------ |
