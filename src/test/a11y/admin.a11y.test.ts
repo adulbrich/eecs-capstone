@@ -182,6 +182,11 @@ test("project detail (staff panel, scope assessment)", async ({ page }) => {
   // the two buttons. Waiting on the textarea rather than the heading, since
   // the heading is in the panel from the first render.
   await expect(page.getByLabel("Social summary")).toBeVisible();
+  // The Similarity section (#631) is one more staff-gated read with its own
+  // "Loading..." paragraph; its help text renders only once the read lands.
+  await expect(
+    page.getByText(/places this project under Similar projects/)
+  ).toBeVisible();
   await checkA11y(page);
 });
 
