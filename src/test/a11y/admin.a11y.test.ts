@@ -450,6 +450,60 @@ for (const width of [1280, 375]) {
   });
 }
 
+// The projects and bids column mappings (#735): one editor each, opened from
+// a file nothing recognizes.
+for (const width of [1280, 375]) {
+  test(`admin placement, projects and bids column mappings at ${width}`, async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width, height: 800 });
+    await page.goto("/admin/placement");
+    await waitForHydration(page);
+    await page.getByLabel("Projects CSV file").setInputFiles({
+      name: "projects.csv",
+      mimeType: "text/csv",
+      buffer: Buffer.from("Project Name,Teams\nTide Clock,2\nRobot Arm,\n"),
+    });
+    await page.getByRole("button", { name: "Map columns" }).click();
+    const projects = page.getByRole("region", {
+      name: "Map the columns of projects.csv",
+    });
+    await projects
+      .getByRole("combobox", { name: "File column for title" })
+      .click();
+    await page
+      .getByRole("option", { name: "Project Name", exact: true })
+      .click();
+    await expect(projects.getByRole("table")).toContainText("Robot Arm");
+    await checkA11y(page);
+    await expectNoHorizontalOverflow(page);
+    await projects
+      .getByRole("button", { name: "Apply column mapping" })
+      .click();
+    await expect(
+      page.getByRole("cell", { name: "Tide Clock", exact: true })
+    ).toBeVisible();
+
+    await page.getByRole("tab", { name: /Bids/ }).click();
+    await page.getByLabel("Bids CSV file").setInputFiles({
+      name: "bids.csv",
+      mimeType: "text/csv",
+      buffer: Buffer.from(
+        "Student,Rank,Choice\nada@example.edu,1,Tide Clock\nada@example.edu,2,Robot Arm\n"
+      ),
+    });
+    await page.getByRole("button", { name: "Map columns" }).click();
+    const bids = page.getByRole("region", {
+      name: "Map the columns of bids.csv",
+    });
+    await expect(
+      bids.getByRole("button", { name: "Apply column mapping" })
+    ).toBeDisabled();
+    await checkA11y(page);
+    await expectNoHorizontalOverflow(page);
+  });
+}
+
 test("@smoke admin placement, projects and bids loaded", async ({ page }) => {
   await page.goto("/admin/placement");
   await waitForHydration(page);

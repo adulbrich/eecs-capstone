@@ -6,6 +6,7 @@ import {
   parseRows,
   type Row,
 } from "#/lib/placement/csv";
+import { CSV_EXTENSION } from "#/lib/placement/download";
 import { PLACEMENT_FORMAT } from "#/lib/placement/formats";
 import type { ExportPlugin, FilePlugin } from "#/lib/placement/plugins/types";
 import { readRosterCsv, rosterCsv } from "#/lib/placement/roster";
@@ -40,8 +41,6 @@ export const canvasRoster: FilePlugin = {
     return { text: rosterCsv(entries), issues };
   },
 };
-
-const CSV_EXTENSION = /(\.csv)?$/i;
 
 const REQUIRED = PLACEMENT_FORMAT.columns
   .filter((c) => c.required)

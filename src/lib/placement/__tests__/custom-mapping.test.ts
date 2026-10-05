@@ -4,7 +4,9 @@ import {
   type ColumnMapping,
   CUSTOM_MAPPINGS,
   fileHeaders,
+  fitToDataset,
   parseMapping,
+  presentIn,
   serializeMapping,
   suggestMapping,
   unmappedRequired,
@@ -119,6 +121,51 @@ describe("custom mapping (#735)", () => {
     expect(text).toBe(
       "title,max_teams,min_students,max_students,proposer_name,proposer_email,mentor_name,mentor_email,student_proposed\r\n'-Minus,,,,,,,,"
     );
+  });
+});
+
+describe("reading a file through a column mapping (#735)", () => {
+  it("reads a file that starts with blank lines", () => {
+    expect(read(`\n\n${FILE}`, MAPPING)).toEqual(read(FILE, MAPPING));
+    expect(read(`\n${FILE}`, MAPPING).text).toContain("ada@example.edu");
+  });
+
+  it("refuses two headers filling one column, rather than keep the last", () => {
+    const { issues } = read(FILE, {
+      ...MAPPING,
+      columns: { "Student Email": "email", "Full Name": "email" },
+    });
+    expect(issues).toEqual([
+      {
+        level: "error",
+        row: 1,
+        message:
+          'The column mapping fills email from "Student Email", "Full Name"; choose one.',
+        wholeFile: true,
+      },
+    ]);
+  });
+});
+
+describe("fitting a column mapping to a slot", () => {
+  it("keeps only its dataset's columns, the first header for each, stamped with the slot", () => {
+    expect(
+      fitToDataset(
+        {
+          version: 1,
+          dataset: "bids",
+          columns: { Mail: "email", Rank: "priority", Other: "email" },
+        },
+        "roster"
+      )
+    ).toEqual({ version: 1, dataset: "roster", columns: { Mail: "email" } });
+  });
+
+  it("keeps the headers a file has, spelled as the file spells them", () => {
+    expect(presentIn(MAPPING, ["student email", "Team"]).columns).toEqual({
+      "student email": "email",
+      Team: "project",
+    });
   });
 });
 

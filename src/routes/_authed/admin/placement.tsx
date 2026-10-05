@@ -97,6 +97,16 @@ function PlacementPage() {
             : null
         }
       />
+      {state.notices.map((notice) => (
+        <p
+          className="mt-2 text-sm"
+          key={notice}
+          role="status"
+          style={{ color: "var(--status-warning)" }}
+        >
+          {notice}
+        </p>
+      ))}
       <FieldError
         message={
           state.changedElsewhere

@@ -6,36 +6,33 @@ import {
   STANDARD_FORMATS,
   writeFormat,
 } from "#/lib/placement/formats";
-import type { Conversion, FilePlugin } from "#/lib/placement/plugins/types";
+import type {
+  ChosenPlugin,
+  ColumnMapping,
+  Conversion,
+} from "#/lib/placement/plugins/types";
 
 /**
- * Custom mapping (#735): a file no plugin recognizes, read through a column
- * mapping staff build on the page. The mapping is data, never code
- * (ADR-0059): which header of the file fills each standard column, one row
- * in and one row out. The roster and the bids store it beside the file, so
- * it is read through on every load and travels in the workspace export;
- * projects run it once, at import. It also downloads as a small JSON file,
- * to load again for a file of the same shape.
+ * Custom mapping (#735): a file read through a column mapping staff build on
+ * the page. The column mapping is data, never code (ADR-0059): which header
+ * of the file fills each standard column, one row in and one row out. The
+ * roster and the bids store it beside the file, so it is read through on
+ * every load and travels in the workspace export; projects run it once, at
+ * import. It also downloads as a small JSON file, to load again for a file
+ * of the same shape.
  */
 
-export const CUSTOM_MAPPING_ID = "custom-mapping";
+export type { ColumnMapping } from "#/lib/placement/plugins/types";
 
-/** The mapping file's shape. A later shape gets a new number. */
+/** The column mapping file's shape. A later shape gets a new number. */
 export const MAPPING_VERSION = 1;
-
-export interface ColumnMapping {
-  /**
-   * Each header the mapping reads, as the file spells it, and the standard
-   * column it fills. Header case and spaces around it are ignored, as the
-   * standard format ignores them.
-   */
-  columns: Record<string, string>;
-  dataset: PlacementDataset;
-  version: typeof MAPPING_VERSION;
-}
 
 /** A header as `parseRows` keys it. */
 export const normalizeHeader = (header: string) => header.trim().toLowerCase();
+
+/** Names as the page lists them: "email", "name". */
+export const quoted = (names: readonly string[]) =>
+  names.map((n) => `"${n}"`).join(", ");
 
 const DATASETS = [
   "projects",
@@ -43,7 +40,7 @@ const DATASETS = [
   "bids",
 ] as const satisfies readonly PlacementDataset[];
 
-export const columnMappingSchema = z
+const columnMappingSchema = z
   .object({
     version: z.literal(MAPPING_VERSION),
     dataset: z.enum(DATASETS),
@@ -81,7 +78,34 @@ export const columnMappingSchema = z
     }
   });
 
-/** A downloaded mapping file, or why it is not one this page reads. */
+/**
+ * A column mapping from parsed JSON, or why it is not one: a version this
+ * page does not read, or the first problem with its shape.
+ */
+export function readMapping(
+  value: unknown
+):
+  | { ok: true; mapping: ColumnMapping }
+  | { ok: false; version: number }
+  | { ok: false; problem: string } {
+  const version = (value as { version?: unknown } | null)?.version;
+  if (typeof version === "number" && version !== MAPPING_VERSION) {
+    return { ok: false, version };
+  }
+  const parsed = columnMappingSchema.safeParse(value);
+  return parsed.success
+    ? { ok: true, mapping: parsed.data }
+    : {
+        ok: false,
+        problem: parsed.error.issues[0]?.message ?? "unknown problem",
+      };
+}
+
+/** "The column mapping is version 2, and this page reads version 1." */
+export const versionMessage = (version: number) =>
+  `The column mapping is version ${version}, and this page reads version ${MAPPING_VERSION}.`;
+
+/** A downloaded column mapping file, or why it is not one this page reads. */
 export function parseMapping(
   json: string
 ): { ok: true; mapping: ColumnMapping } | { ok: false; message: string } {
@@ -91,24 +115,20 @@ export function parseMapping(
   } catch {
     return { ok: false, message: "The file is not JSON." };
   }
-  const version = (value as { version?: unknown } | null)?.version;
-  if (typeof version === "number" && version !== MAPPING_VERSION) {
-    return {
-      ok: false,
-      message: `The column mapping is version ${version}, and this page reads version ${MAPPING_VERSION}.`,
-    };
+  const read = readMapping(value);
+  if (read.ok) {
+    return read;
   }
-  const parsed = columnMappingSchema.safeParse(value);
-  if (!parsed.success) {
-    return {
-      ok: false,
-      message: `The file is not a column mapping: ${parsed.error.issues[0]?.message ?? "unknown problem"}.`,
-    };
-  }
-  return { ok: true, mapping: parsed.data };
+  return {
+    ok: false,
+    message:
+      "version" in read
+        ? versionMessage(read.version)
+        : `The file is not a column mapping: ${read.problem}.`,
+  };
 }
 
-/** The mapping as the file "Download column mapping" saves. */
+/** The column mapping as the file "Download column mapping" saves. */
 export function serializeMapping(mapping: ColumnMapping): string {
   return `${JSON.stringify(
     {
@@ -165,6 +185,47 @@ export function suggestMapping(
   return { version: MAPPING_VERSION, dataset, columns };
 }
 
+/**
+ * The column mapping for `dataset`'s slot: only pairs that fill one of its
+ * standard columns, the first header for each, stamped with `dataset`. What
+ * a mapping from a stored workspace or a loaded file becomes before the page
+ * edits it, so Apply can never store a mapping another format would read.
+ */
+export function fitToDataset(
+  mapping: ColumnMapping,
+  dataset: PlacementDataset
+): ColumnMapping {
+  const known = new Set(STANDARD_FORMATS[dataset].columns.map((c) => c.name));
+  const filled = new Set<string>();
+  const columns: Record<string, string> = {};
+  for (const [header, column] of Object.entries(mapping.columns)) {
+    if (known.has(column) && !filled.has(column)) {
+      filled.add(column);
+      columns[header] = column;
+    }
+  }
+  return { version: MAPPING_VERSION, dataset, columns };
+}
+
+/**
+ * The pairs whose header the file has, spelled as the file spells it: what
+ * Apply stores and the preview reads.
+ */
+export function presentIn(
+  mapping: ColumnMapping,
+  headers: readonly string[]
+): ColumnMapping {
+  const byKey = new Map(headers.map((h) => [normalizeHeader(h), h]));
+  const columns: Record<string, string> = {};
+  for (const [header, column] of Object.entries(mapping.columns)) {
+    const own = byKey.get(normalizeHeader(header));
+    if (own !== undefined) {
+      columns[own] = column;
+    }
+  }
+  return { ...mapping, columns };
+}
+
 /** The required standard columns no header fills yet, in format order. */
 export function unmappedRequired(mapping: ColumnMapping): string[] {
   const filled = new Set(Object.values(mapping.columns));
@@ -173,7 +234,10 @@ export function unmappedRequired(mapping: ColumnMapping): string[] {
     .map((c) => c.name);
 }
 
-/** The headers the mapping reads that the file lacks, as the mapping spells them. */
+/**
+ * The headers the column mapping reads that the file lacks, as the mapping
+ * spells them.
+ */
 export function missingHeaders(
   mapping: ColumnMapping,
   headers: readonly string[]
@@ -184,8 +248,14 @@ export function missingHeaders(
   );
 }
 
-const quoted = (names: readonly string[]) =>
-  names.map((n) => `"${n}"`).join(", ");
+/** Each standard column more than one header fills, with those headers. */
+function filledTwice(mapping: ColumnMapping): [string, string[]][] {
+  const byColumn = new Map<string, string[]>();
+  for (const [header, column] of Object.entries(mapping.columns)) {
+    byColumn.set(column, [...(byColumn.get(column) ?? []), header]);
+  }
+  return [...byColumn].filter(([, headers]) => headers.length > 1);
+}
 
 const stopped = (message: string): ImportIssue => ({
   level: "error",
@@ -238,9 +308,9 @@ function convert(
   mapping: ColumnMapping | undefined
 ): Conversion {
   const format = STANDARD_FORMATS[dataset];
-  const stop = (message: string): Conversion => ({
+  const stop = (...messages: string[]): Conversion => ({
     text: writeFormat(format, []),
-    issues: [stopped(message)],
+    issues: messages.map(stopped),
   });
   if (mapping === undefined) {
     return stop(
@@ -250,6 +320,17 @@ function convert(
   if (mapping.dataset !== dataset) {
     return stop(
       `The column mapping is for the ${mapping.dataset}, not the ${dataset}.`
+    );
+  }
+  // One header per column, as the schema has it: otherwise the last header
+  // would fill the column and the others vanish without a word.
+  const twice = filledTwice(mapping);
+  if (twice.length > 0) {
+    return stop(
+      ...twice.map(
+        ([column, headers]) =>
+          `The column mapping fills ${column} from ${quoted(headers)}; choose one.`
+      )
     );
   }
   const unmapped = unmappedRequired(mapping);
@@ -262,24 +343,25 @@ function convert(
   return { text: writeFormat(format, rows), issues };
 }
 
-function customMapping(dataset: PlacementDataset): FilePlugin {
+/** Custom mapping's id for `dataset`, as a workspace stores it in `readAs`. */
+export const columnMappingId = (dataset: PlacementDataset) =>
+  `custom-mapping-${dataset}`;
+
+function customMapping(dataset: PlacementDataset): ChosenPlugin {
   return {
-    id: CUSTOM_MAPPING_ID,
+    id: columnMappingId(dataset),
     label: "column-mapped",
+    menuLabel: "Column mapping",
     dataset,
-    input: "file",
+    input: "chosen",
     description:
       "Read through your column mapping: each standard column takes the cell of the file column chosen for it, and an optional column left unmapped is blank. Each row of the file becomes one row of the converted CSV, in order, so the problems listed for the converted file follow your file's rows.",
-    // No detect: nothing claims a file for it, staff choose it.
     toStandard: (text, { mapping }) => convert(dataset, text, mapping),
   };
 }
 
-/**
- * Custom mapping for each dataset, under one id, so a workspace stores
- * `readAs: "custom-mapping"` wherever the file is.
- */
-export const CUSTOM_MAPPINGS: Record<PlacementDataset, FilePlugin> = {
+/** Custom mapping for each dataset. */
+export const CUSTOM_MAPPINGS: Record<PlacementDataset, ChosenPlugin> = {
   projects: customMapping("projects"),
   roster: customMapping("roster"),
   bids: customMapping("bids"),

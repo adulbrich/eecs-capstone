@@ -73,17 +73,16 @@ export const PLUGIN_FIXTURES: Record<string, string> = {
 };
 
 /**
- * For a plugin staff choose rather than one that detects its file, under
- * "<id> <dataset>", since one such plugin may read several datasets: a file
- * nothing detects, and what staff chose to read it with. Custom mapping's
- * headers are spelled and ordered unlike the standard format's, and leave
- * an optional column unmapped.
+ * For a plugin staff choose rather than one that detects its file, by id: a
+ * file nothing detects, and what staff chose to read it with. Custom
+ * mapping's headers are spelled and ordered unlike the standard format's,
+ * and leave an optional column unmapped.
  */
 export const CHOSEN_FIXTURES: Record<
   string,
   { context: Omit<PluginContext, "projects">; text: string }
 > = {
-  "custom-mapping projects": {
+  "custom-mapping-projects": {
     text: [
       "Sponsor,Project Name,Teams",
       "Jane Doe,Tide Clock,2",
@@ -101,7 +100,7 @@ export const CHOSEN_FIXTURES: Record<
       },
     },
   },
-  "custom-mapping roster": {
+  "custom-mapping-roster": {
     text: [
       "Student Email,Full Name,Team",
       "ada@example.edu,Ada Park,Tide Clock",
@@ -119,7 +118,7 @@ export const CHOSEN_FIXTURES: Record<
       },
     },
   },
-  "custom-mapping bids": {
+  "custom-mapping-bids": {
     text: [
       "Choice,Student,Rank,Why",
       "Tide Clock,ada@example.edu,1,I built a tide gauge.",

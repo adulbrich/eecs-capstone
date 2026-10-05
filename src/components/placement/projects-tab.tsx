@@ -118,7 +118,7 @@ export function ProjectsTab({
     bidCount: bidCounts.get(p.key) ?? 0,
   }));
 
-  // Projects are stored parsed, so the mapping runs once, here, and is not
+  // Projects are stored parsed, so the column mapping runs once, here, and is not
   // kept: the editor says so.
   const readMapped = (mapping: ColumnMapping) => {
     if (unread === null) {
@@ -267,7 +267,6 @@ function ProjectsImport({
   workspace: Workspace;
 }) {
   const [programId, setProgramId] = useState("");
-  const [mappingOpen, setMappingOpen] = useState(false);
   const { busy, error, run } = useAction({
     fallback: "Could not load the program's projects",
   });
@@ -353,39 +352,12 @@ function ProjectsImport({
         <DuplicateTitles titles={duplicates} />
         <ImportIssues issues={issues} label="projects" />
         {unread !== null && (
-          <div className="mt-2 flex flex-col items-start gap-2 text-sm">
-            {mappingOpen ? (
-              <ColumnMappingEditor
-                dataset="projects"
-                filename={unread.filename}
-                kept={false}
-                // A new file remounts the editor with its own headers.
-                key={unread.text}
-                onApply={(mapping) => {
-                  setMappingOpen(false);
-                  onMapping(mapping);
-                }}
-                onCancel={() => setMappingOpen(false)}
-                text={unread.text}
-              />
-            ) : (
-              <>
-                <p>
-                  No format on this page recognized {unread.filename}. Map its
-                  columns to the projects format to read it as it is, or change
-                  the file to match.
-                </p>
-                <Button
-                  onClick={() => setMappingOpen(true)}
-                  size="sm"
-                  type="button"
-                >
-                  <Columns3 aria-hidden="true" />
-                  Map columns
-                </Button>
-              </>
-            )}
-          </div>
+          <UnreadProjectsFile
+            // A new file starts closed, with its own headers.
+            key={unread.text}
+            onMapping={onMapping}
+            unread={unread}
+          />
         )}
       </section>
       <section aria-labelledby="placement-projects-paste-heading">
@@ -418,6 +390,49 @@ function ProjectsImport({
           <AddProjectDialog update={update} workspace={workspace} />
         </div>
       </section>
+    </div>
+  );
+}
+
+/**
+ * A projects file nothing recognized (#735): Map columns, then the editor.
+ * Keyed by the file, so replacing or clearing it closes the editor.
+ */
+function UnreadProjectsFile({
+  onMapping,
+  unread,
+}: {
+  onMapping: (mapping: ColumnMapping) => void;
+  unread: { filename: string; text: string };
+}) {
+  const [mappingOpen, setMappingOpen] = useState(false);
+  return (
+    <div className="mt-2 flex flex-col items-start gap-2 text-sm">
+      {mappingOpen ? (
+        <ColumnMappingEditor
+          dataset="projects"
+          filename={unread.filename}
+          kept={false}
+          onApply={(mapping) => {
+            setMappingOpen(false);
+            onMapping(mapping);
+          }}
+          onCancel={() => setMappingOpen(false)}
+          text={unread.text}
+        />
+      ) : (
+        <>
+          <p>
+            No format on this page recognized {unread.filename}. Map its columns
+            to the projects format to read it as it is, or change the file to
+            match.
+          </p>
+          <Button onClick={() => setMappingOpen(true)} size="sm" type="button">
+            <Columns3 aria-hidden="true" />
+            Map columns
+          </Button>
+        </>
+      )}
     </div>
   );
 }

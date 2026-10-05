@@ -11,7 +11,7 @@ import {
   SelectValue,
 } from "#/components/ui/select";
 import type { ImportIssue } from "#/lib/placement/csv";
-import { downloadText } from "#/lib/placement/download";
+import { CSV_EXTENSION, downloadText } from "#/lib/placement/download";
 import {
   type PlacementDataset,
   STANDARD_FORMATS,
@@ -19,11 +19,13 @@ import {
 import {
   type ColumnMapping,
   fileHeaders,
-  MAPPING_VERSION,
+  fitToDataset,
   mapRows,
   missingHeaders,
   normalizeHeader,
   parseMapping,
+  presentIn,
+  quoted,
   serializeMapping,
   suggestMapping,
   unmappedRequired,
@@ -37,36 +39,62 @@ const headerValue = (header: string) => `header:${header}`;
 /** How many converted rows the preview shows. */
 const PREVIEW_ROWS = 5;
 
-const CSV_EXTENSION = /(\.csv)?$/i;
-
 /** "roster.csv" to "roster (column mapping).json". */
-export const mappingFilename = (filename: string) =>
+const mappingFilename = (filename: string) =>
   filename.replace(CSV_EXTENSION, " (column mapping).json");
 
+/** Saves a column mapping as the JSON file Load column mapping reads. */
+export function DownloadMappingButton({
+  filename,
+  mapping,
+}: {
+  /** The uploaded file's name, which the download is named after. */
+  filename: string;
+  mapping: ColumnMapping;
+}) {
+  return (
+    <Button
+      onClick={() =>
+        downloadText(
+          mappingFilename(filename),
+          serializeMapping(mapping),
+          "application/json"
+        )
+      }
+      size="sm"
+      type="button"
+      variant="outline"
+    >
+      <Download aria-hidden="true" />
+      Download column mapping
+    </Button>
+  );
+}
+
 /**
- * The mapping with only the headers this file has, spelled as the file
- * spells them, and the ones it lacks, as the mapping spells them.
+ * What the editor starts from: the column mapping fitted to this dataset,
+ * with the headers this file has spelled as it spells them, and the ones it
+ * lacks kept as the mapping spells them, so the page can name them.
  */
-function fitToFile(
+function seed(
   mapping: ColumnMapping,
+  dataset: PlacementDataset,
   headers: readonly string[]
-): { mapping: ColumnMapping; missing: string[] } {
-  const byKey = new Map(headers.map((h) => [normalizeHeader(h), h]));
-  const columns: Record<string, string> = {};
-  for (const [header, column] of Object.entries(mapping.columns)) {
-    const own = byKey.get(normalizeHeader(header));
-    if (own !== undefined) {
-      columns[own] = column;
-    }
-  }
+): ColumnMapping {
+  const fitted = fitToDataset(mapping, dataset);
+  const present = presentIn(fitted, headers);
+  const missing = missingHeaders(fitted, headers).map(
+    (h) => [h, fitted.columns[h] ?? ""] as const
+  );
   return {
-    mapping: { ...mapping, columns },
-    missing: missingHeaders(mapping, headers),
+    ...present,
+    columns: { ...present.columns, ...Object.fromEntries(missing) },
   };
 }
 
-const quoted = (names: readonly string[]) =>
-  names.map((n) => `"${n}"`).join(", ");
+/** '"Team" (project)': a missing header and the column it filled. */
+const missingLine = (mapping: ColumnMapping, headers: readonly string[]) =>
+  headers.map((h) => `"${h}" (${mapping.columns[h]})`).join(", ");
 
 /** What Apply waits for, or that it is ready. */
 function applyStatus(
@@ -116,13 +144,12 @@ export function ColumnMappingEditor({
   const id = useId();
   const format = STANDARD_FORMATS[dataset];
   const headers = useMemo(() => fileHeaders(text), [text]);
-  // Seeded once: the editor mounts when staff open it, and a new file or
-  // mapping remounts it.
-  const [state, setState] = useState(() =>
-    fitToFile(initial ?? suggestMapping(dataset, headers), headers)
+  // Seeded once: the editor mounts when staff open it, and a new file
+  // remounts it.
+  const [mapping, setMapping] = useState(() =>
+    seed(initial ?? suggestMapping(dataset, headers), dataset, headers)
   );
   const [loadError, setLoadError] = useState<string | null>(null);
-  const { mapping, missing } = state;
 
   const picker = useFilePicker({
     accept: ".json,application/json",
@@ -140,31 +167,38 @@ export function ColumnMappingEditor({
         return;
       }
       setLoadError(null);
-      setState(fitToFile(parsed.mapping, headers));
+      setMapping(seed(parsed.mapping, dataset, headers));
     },
   });
 
   // Keyed by header, so one header fills one column: choosing it for
-  // another column moves it there.
+  // another column moves it there. A header this file lacks stays in the
+  // mapping, and named, until its column takes another header.
   const choose = (column: string, value: string) =>
-    setState(({ mapping: current }) => {
+    setMapping((current) => {
+      const chosen = headers.find((h) => headerValue(h) === value);
       const columns = Object.fromEntries(
         Object.entries(current.columns).filter(
-          ([h, c]) => c !== column && headerValue(h) !== value
+          ([h, c]) =>
+            c !== column &&
+            (chosen === undefined ||
+              normalizeHeader(h) !== normalizeHeader(chosen))
         )
       );
-      const chosen = headers.find((h) => headerValue(h) === value);
       if (chosen !== undefined) {
         columns[chosen] = column;
       }
-      return { mapping: { ...current, columns }, missing: [] };
+      return { ...current, columns };
     });
 
+  // What Apply stores and the preview reads: the headers this file has.
+  const usable = useMemo(() => presentIn(mapping, headers), [mapping, headers]);
+  const missing = missingHeaders(mapping, headers);
   const headerFor = (column: string) =>
-    Object.entries(mapping.columns).find(([, c]) => c === column)?.[0];
-  const unmapped = unmappedRequired(mapping);
+    Object.entries(usable.columns).find(([, c]) => c === column)?.[0];
+  const unmapped = unmappedRequired(usable);
   const mapped = format.columns.filter((c) => headerFor(c.name) !== undefined);
-  const read = useMemo(() => mapRows(text, mapping), [text, mapping]);
+  const read = useMemo(() => mapRows(text, usable), [text, usable]);
   const preview = read.rows.slice(0, PREVIEW_ROWS);
   // A file whose header cannot be read at all, as one naming a column
   // twice: no mapping reads it, so Apply waits for a new file.
@@ -185,8 +219,8 @@ export function ColumnMappingEditor({
         left as Not in the file is blank. A file column fills one column here,
         so choosing it for a second one moves it.{" "}
         {kept
-          ? "Applying saves the mapping with this workspace: the file is read through it on every visit, and it travels in the workspace export."
-          : "Applying reads the projects once; the mapping is not kept, so download it first to use it again."}{" "}
+          ? "Applying saves the column mapping with this workspace: the file is read through it on every visit, and it travels in the workspace export."
+          : "Applying reads the projects once; the column mapping is not kept, so download it first to use it again."}{" "}
         Download it to read next term's file, or another department's, the same
         way. It stays in this browser and in the files you save.
       </p>
@@ -231,12 +265,15 @@ export function ColumnMappingEditor({
       </ul>
       {missing.length > 0 && (
         <p role="status" style={{ color: "var(--status-warning)" }}>
-          This file has no {quoted(missing)}{" "}
-          {missing.length === 1 ? "column" : "columns"}, which the mapping
-          reads. Choose another column for what{" "}
-          {missing.length === 1 ? "it" : "they"} filled.
+          This file has no {missingLine(mapping, missing)}, which the column
+          mapping reads. Choose another file column for{" "}
+          {missing.length === 1 ? "it" : "them"}; Apply leaves out what is still
+          missing.
         </p>
       )}
+      {/* A plain table, as CsvFormatHelp's is: a few read-only rows with no
+          sorting, paging or row actions, where AdminDataTable would add
+          nothing. */}
       {mapped.length > 0 && preview.length > 0 && (
         <div className="overflow-x-auto">
           <table className="w-full text-left text-xs">
@@ -279,33 +316,13 @@ export function ColumnMappingEditor({
         <Button
           aria-describedby={statusId}
           disabled={unmapped.length > 0 || unreadable.length > 0}
-          onClick={() =>
-            onApply({
-              version: MAPPING_VERSION,
-              dataset,
-              columns: mapping.columns,
-            })
-          }
+          onClick={() => onApply(usable)}
           size="sm"
           type="button"
         >
           Apply column mapping
         </Button>
-        <Button
-          onClick={() =>
-            downloadText(
-              mappingFilename(filename),
-              serializeMapping(mapping),
-              "application/json"
-            )
-          }
-          size="sm"
-          type="button"
-          variant="outline"
-        >
-          <Download aria-hidden="true" />
-          Download column mapping
-        </Button>
+        <DownloadMappingButton filename={filename} mapping={mapping} />
         <Button onClick={picker.open} size="sm" type="button" variant="outline">
           <Upload aria-hidden="true" />
           Load column mapping
@@ -315,7 +332,9 @@ export function ColumnMappingEditor({
           Cancel
         </Button>
       </div>
-      <FieldError message={loadError ?? picker.error} />
+      {/* The picker's own error first: a file it could not read is newer
+          than any parse message, which a new pick clears on success. */}
+      <FieldError message={picker.error ?? loadError} />
     </section>
   );
 }

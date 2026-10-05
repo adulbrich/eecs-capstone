@@ -321,16 +321,18 @@ _Avoid_: schema, native format, template (the template is an example file in it)
 A way to read one source's own shape into the standard format, such as a survey
 tool's export, an LMS roster export or pasted text, or to write the standard format
 out in another tool's shape. Placement recognizes a file's plugin by its content,
-and staff can read the file as another. The page calls a plugin a format: "Read as"
+and staff can read the file as another; a few plugins, as custom mapping, are only
+ever chosen, never recognized. The page calls a plugin a format: "Read as"
 for a file, "Download as" for what placement writes.
 _Avoid_: adapter, connector (suggests a live link to the other tool), integration,
 importer
 
 **Column mapping**:
-Staff's word on which column of a file holds each column of the standard format,
-for a file no plugin recognizes. It is data, never code: the roster and the bids
-keep it beside their file and are read through it on every load, and it downloads
-as JSON to use again on next term's file. It pairs a file's header with a standard
+Staff's word on which column of a file holds each column of the standard format.
+Placement offers one for a file no plugin recognizes, and "Read as" offers one for
+any uploaded file. It is data, never code: the roster and the bids keep it beside
+their file and are read through it on every load, and it downloads as JSON to use
+again on next term's file. It pairs a file's header with a standard
 column, never a bid title with a project, so it is not a title match.
 _Avoid_: mapping on its own, field map, schema, template
 

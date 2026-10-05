@@ -29,6 +29,7 @@ import {
   resolveFilePlugin,
   STANDARD_OPTION,
   toStandard,
+  uploadPlugins,
 } from "#/lib/placement/plugins";
 import { canvasGroups, canvasRoster } from "#/lib/placement/plugins/canvas";
 import { CUSTOM_MAPPINGS } from "#/lib/placement/plugins/custom-mapping";
@@ -54,20 +55,16 @@ const STANDARD_PARSERS: Record<
 
 const TEMPLATES = Object.values(STANDARD_FORMATS).map(formatTemplate);
 
-/** A file plugin nothing detects, which staff choose with Read as. */
-const isChosen = (plugin: ImportPlugin) =>
-  plugin.input === "file" && plugin.detect === undefined;
-
 /**
- * The plugin's fixture and what it reads it with: a chosen plugin's is under
- * its id and dataset, with what staff chose, since it may read several.
+ * The plugin's fixture and what it reads it with: a chosen plugin's comes
+ * with what staff chose.
  */
 function fixtureOf(plugin: ImportPlugin): {
   context: PluginContext;
   text: string | undefined;
 } {
-  if (isChosen(plugin)) {
-    const chosen = CHOSEN_FIXTURES[`${plugin.id} ${plugin.dataset}`];
+  if (plugin.input === "chosen") {
+    const chosen = CHOSEN_FIXTURES[plugin.id];
     return {
       context: { ...chosen?.context, projects: FIXTURE_PROJECTS },
       text: chosen?.text,
@@ -81,22 +78,15 @@ function fixtureOf(plugin: ImportPlugin): {
 
 // Every registered plugin passes these, with no test of its own needed for
 // the contract: a new plugin only adds its fixture (#733).
-describe.each(PLUGINS.map((p) => [`${p.id} (${p.dataset})`, p] as const))(
+describe.each(PLUGINS.map((p) => [p.id, p] as const))(
   "plugin %s",
-  (_name, plugin) => {
-    const { id } = plugin;
+  (id, plugin) => {
     const { context, text } = fixtureOf(plugin);
     const fixture = text ?? "";
 
-    it("has a fixture and an id no other plugin of its dataset uses", () => {
+    it("has a fixture and an id no other plugin uses", () => {
       expect(text).toBeDefined();
-      const same = PLUGINS.filter((p) => p.id === id);
-      expect(same.filter((p) => p.dataset === plugin.dataset)).toHaveLength(1);
-      // Only a chosen plugin reads several datasets under one id: a stored
-      // choice names the dataset by where it is.
-      if (same.length > 1) {
-        expect(same.every(isChosen)).toBe(true);
-      }
+      expect(PLUGINS.filter((p) => p.id === id)).toHaveLength(1);
     });
 
     it("converts its fixture without an error", () => {
@@ -111,7 +101,7 @@ describe.each(PLUGINS.map((p) => [`${p.id} (${p.dataset})`, p] as const))(
       );
     });
 
-    if (plugin.input === "file" && plugin.detect !== undefined) {
+    if (plugin.input === "file") {
       const { detect } = plugin;
 
       it("claims its own fixture, over the standard format", () => {
@@ -128,11 +118,12 @@ describe.each(PLUGINS.map((p) => [`${p.id} (${p.dataset})`, p] as const))(
       });
     }
 
-    if (isChosen(plugin)) {
+    if (plugin.input === "chosen") {
       it("reads a fixture nothing detects, and is offered by Read as", () => {
         expect(isStandard(plugin.dataset, fixture)).toBe(false);
         expect(detectPlugin(plugin.dataset, fixture)).toBeNull();
-        expect(filePlugins(plugin.dataset)).toContain(plugin);
+        expect(filePlugins(plugin.dataset)).not.toContain(plugin);
+        expect(uploadPlugins(plugin.dataset)).toContain(plugin);
       });
 
       it("reads through it once chosen", () => {
@@ -255,19 +246,19 @@ describe("reading a stored file", () => {
     expect(resolveFilePlugin("roster", canvas, qualtricsBids.id)).toBe(
       canvasRoster
     );
-    expect(pluginById("roster", "gone")).toBeUndefined();
+    expect(pluginById("gone")).toBeUndefined();
   });
 
-  it("reads custom mapping as the dataset the file is stored under", () => {
-    expect(resolveFilePlugin("bids", "x", "custom-mapping")).toBe(
+  it("reads a file through custom mapping for its own dataset only", () => {
+    expect(resolveFilePlugin("bids", "x", CUSTOM_MAPPINGS.bids.id)).toBe(
       CUSTOM_MAPPINGS.bids
     );
-    expect(resolveFilePlugin("roster", canvas, "custom-mapping")).toBe(
-      CUSTOM_MAPPINGS.roster
+    expect(resolveFilePlugin("roster", canvas, CUSTOM_MAPPINGS.bids.id)).toBe(
+      canvasRoster
     );
-    // Detection never stores it away: there is no detection that picks it.
-    expect(readAsChoice("roster", canvas, "custom-mapping")).toBe(
-      "custom-mapping"
+    // Detection never picks it, so the choice is always stored.
+    expect(readAsChoice("roster", canvas, CUSTOM_MAPPINGS.roster.id)).toBe(
+      CUSTOM_MAPPINGS.roster.id
     );
   });
 

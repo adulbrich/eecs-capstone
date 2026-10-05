@@ -33,10 +33,11 @@ export function useFilePicker({
         if (!file) {
           return;
         }
+        // A new pick clears the last one's error before it is read.
+        setError(null);
         // A file moved or locked between the pick and the read.
         try {
           const text = await file.text();
-          setError(null);
           onText(text, file.name);
         } catch {
           setError(`Could not read ${file.name}. Choose it again.`);

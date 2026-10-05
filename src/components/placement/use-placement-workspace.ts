@@ -31,6 +31,9 @@ export function usePlacementWorkspace() {
   const [saveFailed, setSaveFailed] = useState(false);
   const [unreadable, setUnreadable] = useState(false);
   const [changedElsewhere, setChangedElsewhere] = useState(false);
+  // What reading the workspace set aside, as a column mapping it could not
+  // read (#735), until the next import or clear.
+  const [notices, setNotices] = useState<string[]>([]);
 
   // The storage event fires only in the other tabs, so this one learns that
   // a second copy of the page wrote the workspace it is about to overwrite.
@@ -48,6 +51,7 @@ export function usePlacementWorkspace() {
   useEffect(() => {
     const stored = readStoredWorkspace();
     setUnreadable(stored.status === "unreadable");
+    setNotices((stored.status === "ok" && stored.notices) || []);
     setWorkspace(stored.status === "ok" ? stored.workspace : EMPTY_WORKSPACE);
   }, []);
 
@@ -69,8 +73,17 @@ export function usePlacementWorkspace() {
     setWorkspace((current) => (current === null ? current : change(current)));
   }, []);
 
-  const replace = useCallback((next: Workspace) => setWorkspace(next), []);
-  const clear = useCallback(() => setWorkspace(EMPTY_WORKSPACE), []);
+  const replace = useCallback(
+    (next: Workspace, setAside: readonly string[] = []) => {
+      setNotices([...setAside]);
+      setWorkspace(next);
+    },
+    []
+  );
+  const clear = useCallback(() => {
+    setNotices([]);
+    setWorkspace(EMPTY_WORKSPACE);
+  }, []);
 
   const storedBids = workspace?.bids;
   const projects = workspace?.projects;
@@ -197,6 +210,8 @@ export function usePlacementWorkspace() {
     placementProjects: allProjects,
     saveFailed,
     unreadable,
+    /** What reading the workspace set aside, to say on the page. */
+    notices,
     changedElsewhere,
     update,
     replace,

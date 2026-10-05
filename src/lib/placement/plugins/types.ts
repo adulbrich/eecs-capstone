@@ -1,6 +1,5 @@
 import type { ImportIssue } from "#/lib/placement/csv";
 import type { ExportDataset, PlacementDataset } from "#/lib/placement/formats";
-import type { ColumnMapping } from "#/lib/placement/plugins/custom-mapping";
 import type { WorkspaceProject } from "#/lib/placement/types";
 
 /**
@@ -12,6 +11,22 @@ import type { WorkspaceProject } from "#/lib/placement/types";
  * is uploaded or loaded at run time. `docs/placement-plugins.md` says how to
  * write one.
  */
+
+/**
+ * Which header of a file fills each standard column of a dataset (#735):
+ * what custom mapping reads a file through. Data, never code.
+ */
+export interface ColumnMapping {
+  /**
+   * Each header the column mapping reads, as the file spells it, and the
+   * standard column it fills. Header case and spaces around it are ignored,
+   * as the standard format ignores them.
+   */
+  columns: Record<string, string>;
+  dataset: PlacementDataset;
+  /** The shape's number, `MAPPING_VERSION`. */
+  version: 1;
+}
 
 /** What a plugin may read besides the text. */
 export interface PluginContext {
@@ -46,6 +61,8 @@ interface PluginBase {
    * file, "Problems in the pasted <label>" for pasted text.
    */
   label: string;
+  /** The option's name in Read as, when it is not `label`. */
+  menuLabel?: string;
   /**
    * The source as standard CSV. Rows it reports an error on are left out,
    * and rows it keeps should already be valid and unique, so the standard
@@ -54,16 +71,24 @@ interface PluginBase {
   toStandard: (text: string, context: PluginContext) => Conversion;
 }
 
-/** An uploaded file, recognized by its content or chosen by staff. */
+/** An uploaded file, recognized by its content. */
 export interface FilePlugin extends PluginBase {
   /**
    * True when the text is this plugin's source. Never true for the
    * dataset's standard format, which is tried first, or for another
-   * plugin's source: the contract test checks both. Absent for a plugin
-   * nothing detects, which staff choose with Read as, as custom mapping is.
+   * plugin's source: the contract test checks both.
    */
-  detect?: (text: string) => boolean;
+  detect: (text: string) => boolean;
   input: "file";
+}
+
+/**
+ * An uploaded file read the way staff chose, never detected: offered by
+ * Read as and by Map columns, and reading what staff chose from the
+ * context. Custom mapping is the one (#735).
+ */
+export interface ChosenPlugin extends PluginBase {
+  input: "chosen";
 }
 
 /** Text pasted into a box on the page; issues name lines, not rows. */
@@ -71,8 +96,11 @@ export interface PastePlugin extends PluginBase {
   input: "paste";
 }
 
+/** A plugin that reads an uploaded file: detected, or chosen. */
+export type UploadPlugin = FilePlugin | ChosenPlugin;
+
 /** An import plugin: one that reads a source into placement. */
-export type ImportPlugin = FilePlugin | PastePlugin;
+export type ImportPlugin = UploadPlugin | PastePlugin;
 
 /** What an export plugin may read besides the text. */
 export interface ExportContext {

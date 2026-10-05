@@ -7,9 +7,12 @@ import { SourceFormat } from "#/components/placement/source-format";
 import type { PlacementWorkspace } from "#/components/placement/use-placement-workspace";
 import { Button } from "#/components/ui/button";
 import { ROSTER_FORMAT } from "#/lib/placement/formats";
-import { readAsChoice } from "#/lib/placement/plugins";
-import { CUSTOM_MAPPING_ID } from "#/lib/placement/plugins/custom-mapping";
-import { removeStudents, type Workspace } from "#/lib/placement/workspace";
+import {
+  removeStudents,
+  setColumnMapping,
+  setReadAs,
+  type Workspace,
+} from "#/lib/placement/workspace";
 
 export const plural = (n: number, one: string, many: string) =>
   `${n} ${n === 1 ? one : many}`;
@@ -116,7 +119,7 @@ export function RosterSection({
         <ConfirmDialog
           busyLabel="Removing..."
           confirmLabel="Remove"
-          description="The students who did not answer the survey leave the board and the run, and so does the last placement. The bids stay."
+          description={`The students who did not answer the survey leave the board and the run, and so does the last placement. The bids stay.${stored.mapping === undefined ? "" : " The column mapping goes with the file; download it first to keep it."}`}
           onConfirm={removeRoster}
           title="Remove the class roster?"
         >
@@ -132,31 +135,9 @@ export function RosterSection({
         filename={stored.source.kind === "csv" ? stored.source.filename : null}
         mapping={stored.mapping}
         onMapping={(mapping) =>
-          update((w) => ({
-            ...w,
-            roster: w.roster && {
-              ...w.roster,
-              readAs: CUSTOM_MAPPING_ID,
-              mapping,
-            },
-          }))
+          update((w) => setColumnMapping(w, "roster", mapping))
         }
-        onReadAs={(choice) =>
-          update((w) => {
-            if (w.roster === undefined) {
-              return w;
-            }
-            // The mapping goes with the choice that used it.
-            const { mapping: _mapping, ...rest } = w.roster;
-            return {
-              ...w,
-              roster: {
-                ...rest,
-                readAs: readAsChoice("roster", rest.text, choice),
-              },
-            };
-          })
-        }
+        onReadAs={(choice) => update((w) => setReadAs(w, "roster", choice))}
         parseIssues={roster.issues}
         plugin={roster.plugin}
         readAs={stored.readAs}

@@ -173,7 +173,7 @@ const CENSUS = new Map<string, { class: SeedClass; why: string }>([
     },
   ],
   [
-    "src/components/placement/column-mapping.tsx: useState(() => fitToFile(initial ?? suggestMapping(dataset, headers), headers))",
+    "src/components/placement/column-mapping.tsx: useState(() => seed(initial ?? suggestMapping(dataset, headers), dataset, headers))",
     {
       class: "D",
       why: "the column mapping being edited, from the file staff uploaded and the workspace in this browser, never loader data; the editor mounts when opened and remounts for a new file",

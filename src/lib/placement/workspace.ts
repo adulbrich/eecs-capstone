@@ -1,10 +1,12 @@
 import { z } from "zod";
 import { removeFromResult } from "#/lib/placement/board";
 import { type ImportIssue, normalizeTitle } from "#/lib/placement/csv";
-import type { ReadAs } from "#/lib/placement/plugins";
+import { type ReadAs, readAsChoice } from "#/lib/placement/plugins";
 import {
   type ColumnMapping,
-  columnMappingSchema,
+  columnMappingId,
+  readMapping,
+  versionMessage,
 } from "#/lib/placement/plugins/custom-mapping";
 import { repointRosterPins, rosterProjectKey } from "#/lib/placement/roster";
 import {
@@ -51,7 +53,10 @@ export interface Workspace {
      */
     convertedFrom?: string;
     filename: string;
-    /** The column mapping the file is read through, with `readAs` custom mapping. */
+    /**
+     * The column mapping staff made for the file, read through while
+     * `readAs` is custom mapping and kept, unused, while it is not.
+     */
     mapping?: ColumnMapping;
     /** How the file is read: see `ReadAs`. Absent means detected. */
     readAs?: ReadAs;
@@ -91,7 +96,10 @@ export interface Workspace {
 export type TitleMatches = Record<string, TitleMatch>;
 
 export interface StoredRoster {
-  /** The column mapping a CSV is read through, with `readAs` custom mapping. */
+  /**
+   * The column mapping staff made for a CSV, read through while `readAs` is
+   * custom mapping and kept, unused, while it is not.
+   */
   mapping?: ColumnMapping;
   /** How a CSV is read: see `ReadAs`. A pasted list has one way. */
   readAs?: ReadAs;
@@ -219,7 +227,9 @@ const workspaceSchema = z
         filename: z.string(),
         text: z.string(),
         readAs: z.string().nullable().optional(),
-        mapping: columnMappingSchema.optional(),
+        // Checked by `settleMappings`, which sets aside one it cannot read
+        // rather than refusing the whole workspace.
+        mapping: z.unknown().optional(),
         convertedFrom: z.string().optional(),
         conversionIssues: z
           .array(
@@ -247,7 +257,7 @@ const workspaceSchema = z
         ]),
         text: z.string(),
         readAs: z.string().nullable().optional(),
-        mapping: columnMappingSchema.optional(),
+        mapping: z.unknown().optional(),
       })
       .optional(),
     titleMatches: z
@@ -286,10 +296,76 @@ const workspaceSchema = z
     }
   );
 
-/** A workspace from an exported file or from storage, or why it is not one. */
+/** A file the roster or the bids hold, which a column mapping can read. */
+export type MappedSource = "roster" | "bids";
+
+/**
+ * The entry with a stored column mapping it can use, or without one it
+ * cannot, and why: a mapping of another version, of another dataset, or of
+ * the wrong shape. Its `readAs` goes with it, so the file is detected again.
+ */
+function settleMapping<E extends { mapping?: unknown; readAs?: ReadAs }>(
+  entry: E,
+  dataset: MappedSource
+): {
+  entry: Omit<E, "mapping" | "readAs"> & {
+    mapping?: ColumnMapping;
+    readAs?: ReadAs;
+  };
+  notice?: string;
+} {
+  const { mapping, readAs, ...base } = entry;
+  const kept = readAs === undefined ? {} : { readAs };
+  if (mapping === undefined) {
+    return { entry: { ...base, ...kept } };
+  }
+  const read = readMapping(mapping);
+  if (read.ok && read.mapping.dataset === dataset) {
+    return { entry: { ...base, ...kept, mapping: read.mapping } };
+  }
+  let reason = `It could not be read: ${"problem" in read ? read.problem : ""}.`;
+  if (read.ok) {
+    reason = `It is for the ${read.mapping.dataset}, not the ${dataset}.`;
+  } else if ("version" in read) {
+    reason = versionMessage(read.version);
+  }
+  // A file read through the mapping is detected again without it.
+  const inUse = readAs === columnMappingId(dataset);
+  return {
+    entry: inUse ? base : { ...base, ...kept },
+    notice: `The column mapping saved with the ${dataset} was set aside${inUse ? ", and the file is read as detected" : ""}. ${reason} Map its columns again to read it that way.`,
+  };
+}
+
+/** The workspace with every stored column mapping checked (#735). */
+function settleMappings(parsed: z.infer<typeof workspaceSchema>): {
+  notices: string[];
+  workspace: Workspace;
+} {
+  const { bids: storedBids, roster: storedRoster, ...rest } = parsed;
+  const bids = storedBids && settleMapping(storedBids, "bids");
+  const roster = storedRoster && settleMapping(storedRoster, "roster");
+  return {
+    notices: [bids?.notice, roster?.notice].filter(
+      (n): n is string => n !== undefined
+    ),
+    workspace: {
+      ...rest,
+      bids: bids?.entry ?? null,
+      ...(roster === undefined ? {} : { roster: roster.entry }),
+    },
+  };
+}
+
+/**
+ * A workspace from an exported file or from storage, or why it is not one.
+ * `notices` says what was set aside to read it, when anything was.
+ */
 export function parseWorkspace(
   json: string
-): { ok: true; workspace: Workspace } | { ok: false; message: string } {
+):
+  | { ok: true; workspace: Workspace; notices?: string[] }
+  | { ok: false; message: string } {
   let value: unknown;
   try {
     value = JSON.parse(json);
@@ -303,7 +379,60 @@ export function parseWorkspace(
       message: `The file is not a placement workspace: ${parsed.error.issues[0]?.message ?? "unknown problem"}.`,
     };
   }
-  return { ok: true, workspace: parsed.data };
+  const { notices, workspace } = settleMappings(parsed.data);
+  return notices.length > 0
+    ? { ok: true, workspace, notices }
+    : { ok: true, workspace };
+}
+
+/**
+ * The workspace with the roster or bids file read as staff chose in Read
+ * as. A column mapping stays stored, unused, so choosing column mapping again
+ * reads through it.
+ */
+export function setReadAs(
+  workspace: Workspace,
+  dataset: MappedSource,
+  choice: string | null
+): Workspace {
+  if (dataset === "roster") {
+    const { roster } = workspace;
+    return roster === undefined
+      ? workspace
+      : {
+          ...workspace,
+          roster: {
+            ...roster,
+            readAs: readAsChoice("roster", roster.text, choice),
+          },
+        };
+  }
+  const { bids } = workspace;
+  return bids === null
+    ? workspace
+    : {
+        ...workspace,
+        bids: { ...bids, readAs: readAsChoice("bids", bids.text, choice) },
+      };
+}
+
+/** The workspace with the roster or bids file read through `mapping`. */
+export function setColumnMapping(
+  workspace: Workspace,
+  dataset: MappedSource,
+  mapping: ColumnMapping
+): Workspace {
+  const readAs = columnMappingId(dataset);
+  if (dataset === "roster") {
+    const { roster } = workspace;
+    return roster === undefined
+      ? workspace
+      : { ...workspace, roster: { ...roster, readAs, mapping } };
+  }
+  const { bids } = workspace;
+  return bids === null
+    ? workspace
+    : { ...workspace, bids: { ...bids, readAs, mapping } };
 }
 
 export function serializeWorkspace(workspace: Workspace): string {
@@ -328,7 +457,7 @@ export const UNREADABLE_WORKSPACE_PREFIX = `${WORKSPACE_STORAGE_KEY}:unreadable:
  */
 export function readStoredWorkspace():
   | { status: "none" }
-  | { status: "ok"; workspace: Workspace }
+  | { status: "ok"; workspace: Workspace; notices?: string[] }
   | { status: "unreadable" } {
   try {
     const raw = window.localStorage.getItem(WORKSPACE_STORAGE_KEY);
@@ -337,7 +466,11 @@ export function readStoredWorkspace():
     }
     const parsed = parseWorkspace(raw);
     if (parsed.ok) {
-      return { status: "ok", workspace: parsed.workspace };
+      return {
+        status: "ok",
+        workspace: parsed.workspace,
+        notices: parsed.notices,
+      };
     }
     window.localStorage.setItem(
       `${UNREADABLE_WORKSPACE_PREFIX}${new Date().toISOString()}`,
@@ -552,14 +685,16 @@ export function inputFingerprint(
     ...(workspace.bids?.readAs === undefined
       ? []
       : [{ bidsReadAs: workspace.bids.readAs }]),
-    // Last, and only when there is one, so a workspace with no column
-    // mapping hashes as it did before mappings existed (#735).
-    ...(workspace.roster?.mapping === undefined
-      ? []
-      : [{ rosterMapping: mappingKey(workspace.roster.mapping) }]),
-    ...(workspace.bids?.mapping === undefined
-      ? []
-      : [{ bidsMapping: mappingKey(workspace.bids.mapping) }]),
+    // Last, and only while the file is read through it, so a workspace with
+    // no column mapping in use hashes as it did before they existed (#735).
+    ...(workspace.roster?.mapping !== undefined &&
+    workspace.roster.readAs === columnMappingId("roster")
+      ? [{ rosterMapping: mappingKey(workspace.roster.mapping) }]
+      : []),
+    ...(workspace.bids?.mapping !== undefined &&
+    workspace.bids.readAs === columnMappingId("bids")
+      ? [{ bidsMapping: mappingKey(workspace.bids.mapping) }]
+      : []),
   ]);
   // djb2 in plain arithmetic, kept below 2^32 so it stays exact.
   let hash = 5381;

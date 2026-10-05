@@ -2,7 +2,7 @@ import { Columns3, Download } from "lucide-react";
 import { useId, useState } from "react";
 import {
   ColumnMappingEditor,
-  mappingFilename,
+  DownloadMappingButton,
 } from "#/components/placement/column-mapping";
 import { CsvFormatHelp } from "#/components/placement/csv-format";
 import { ImportIssues } from "#/components/placement/import-issues";
@@ -16,24 +16,21 @@ import {
   SelectValue,
 } from "#/components/ui/select";
 import type { ImportIssue } from "#/lib/placement/csv";
-import { downloadText } from "#/lib/placement/download";
+import { CSV_EXTENSION, downloadText } from "#/lib/placement/download";
 import {
   type PlacementDataset,
   STANDARD_FORMATS,
 } from "#/lib/placement/formats";
 import {
-  filePlugins,
   type ReadAs,
   STANDARD_OPTION,
+  uploadPlugins,
 } from "#/lib/placement/plugins";
-import {
-  type ColumnMapping,
-  CUSTOM_MAPPING_ID,
-  serializeMapping,
-} from "#/lib/placement/plugins/custom-mapping";
-import type { Conversion, ImportPlugin } from "#/lib/placement/plugins/types";
-
-const CSV_EXTENSION = /(\.csv)?$/i;
+import type {
+  ColumnMapping,
+  Conversion,
+  ImportPlugin,
+} from "#/lib/placement/plugins/types";
 
 /** The standard format's name in the Read as select. */
 const STANDARD_LABELS: Record<PlacementDataset, string> = {
@@ -86,6 +83,7 @@ function MappingControls({
   filename: string;
   /** True when the file is read through a column mapping now. */
   mapped: boolean;
+  /** The column mapping stored with the file, in use or not. */
   mapping: ColumnMapping | undefined;
   onMapping: (mapping: ColumnMapping) => void;
   open: boolean;
@@ -97,8 +95,10 @@ function MappingControls({
       <ColumnMappingEditor
         dataset={dataset}
         filename={filename}
-        initial={mapped ? mapping : undefined}
+        initial={mapping}
         kept
+        // The file's own editor: another file starts from its own headers.
+        key={text}
         onApply={(next) => {
           setOpen(false);
           onMapping(next);
@@ -123,26 +123,12 @@ function MappingControls({
         Edit column mapping
       </Button>
       {mapping !== undefined && (
-        <Button
-          onClick={() =>
-            downloadText(
-              mappingFilename(filename),
-              serializeMapping(mapping),
-              "application/json"
-            )
-          }
-          size="sm"
-          type="button"
-          variant="outline"
-        >
-          <Download aria-hidden="true" />
-          Download column mapping
-        </Button>
+        <DownloadMappingButton filename={filename} mapping={mapping} />
       )}
       <span className="text-muted-foreground">
-        The mapping is saved with this workspace and travels in its export.
-        Choosing another format in Read as drops it, so download it first to
-        keep it.
+        The column mapping is saved with this workspace and travels in its
+        export. Choosing another format in Read as keeps it saved, and choosing
+        Column mapping again reads through it.
       </span>
     </div>
   );
@@ -179,13 +165,14 @@ export function SourceFormat({
    * on read, which stored the converted CSV and its issues instead.
    */
   legacyConvertedFrom?: string;
-  /** The column mapping stored with the file, if it is read through one. */
+  /** The column mapping stored with the file, in use or not. */
   mapping?: ColumnMapping;
   /** Reads the file through `mapping` from here on. */
   onMapping: (mapping: ColumnMapping) => void;
   /**
    * Null reads the file as the standard format; an id, through that plugin.
-   * Never custom mapping, which `onMapping` chooses with its mapping.
+   * Custom mapping only once a column mapping is stored, which `onMapping`
+   * stores.
    */
   onReadAs: (readAs: string | null) => void;
   parseIssues: readonly ImportIssue[];
@@ -197,8 +184,8 @@ export function SourceFormat({
 }) {
   const id = useId();
   const [mappingOpen, setMappingOpen] = useState(false);
-  const plugins = filePlugins(dataset);
-  const mapped = plugin?.id === CUSTOM_MAPPING_ID;
+  const plugins = uploadPlugins(dataset);
+  const mapped = plugin?.input === "chosen";
   const conversionStopped = conversion.issues.some((i) => i.wholeFile);
   // Only when detection found nothing: staff who chose the standard format
   // for a file a plugin claims know what it is. A stored id no plugin has
@@ -219,9 +206,10 @@ export function SourceFormat({
             <Label htmlFor={id}>Read as</Label>
             <Select
               onValueChange={(value) => {
-                // Column mapping needs its mapping first, so choosing it
-                // opens the editor and Apply stores both.
-                if (value === CUSTOM_MAPPING_ID) {
+                // Column mapping with none saved opens the editor, and Apply
+                // stores both; with one saved, it reads through it again.
+                const chosen = plugins.find((p) => p.id === value);
+                if (chosen?.input === "chosen" && mapping === undefined) {
                   setMappingOpen(true);
                   return;
                 }
@@ -239,7 +227,7 @@ export function SourceFormat({
                 </SelectItem>
                 {plugins.map((p) => (
                   <SelectItem key={p.id} value={p.id}>
-                    {p.id === CUSTOM_MAPPING_ID ? "Column mapping" : p.label}
+                    {p.menuLabel ?? p.label}
                   </SelectItem>
                 ))}
               </SelectContent>

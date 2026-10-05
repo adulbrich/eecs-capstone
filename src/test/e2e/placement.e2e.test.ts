@@ -1175,7 +1175,21 @@ test.describe("placement workspace", () => {
     await expect(roster).toContainText("2 students from roster.csv");
     await expect(roster).toContainText("1 student is pre-approved");
     await expect(roster).toContainText("Converted from the column-mapped");
-    await expect.poll(() => stored(page)).toContain('"custom-mapping"');
+    await expect.poll(() => stored(page)).toContain('"custom-mapping-roster"');
+
+    // Read as another format keeps the column mapping, and choosing it
+    // again reads through it with no editor.
+    const readAs = roster.getByRole("combobox", { name: "Read as" });
+    await readAs.click();
+    await page.getByRole("option", { name: "Roster CSV" }).click();
+    await expect(roster).toContainText("0 students from roster.csv");
+    await readAs.click();
+    await page.getByRole("option", { name: "Column mapping" }).click();
+    await expect(roster).toContainText("2 students from roster.csv");
+    await expect(
+      page.getByRole("region", { name: "Map the columns of roster.csv" })
+    ).toHaveCount(0);
+
     await page.getByRole("tab", { name: /Bids/ }).click();
     await expect(
       page.getByRole("rowheader", {
@@ -1229,9 +1243,19 @@ test.describe("placement workspace", () => {
         mimeType: "application/json",
         buffer: Buffer.from(mapping),
       });
-      await expect(
-        other.getByRole("status").filter({ hasText: 'no "Team" column' })
-      ).toBeVisible();
+      const missing = other
+        .getByRole("status")
+        .filter({ hasText: 'no "Team" (project)' });
+      await expect(missing).toBeVisible();
+      // Another column's choice leaves the warning, and Apply goes ahead
+      // without the optional column.
+      await other
+        .getByRole("combobox", { name: "File column for name" })
+        .click();
+      await other.getByRole("option", { name: "Not in the file" }).click();
+      await expect(missing).toBeVisible();
+      await other.getByRole("button", { name: "Apply column mapping" }).click();
+      await expect(otherRoster).toContainText("1 student from roster.csv");
     } finally {
       await fresh.close();
     }
