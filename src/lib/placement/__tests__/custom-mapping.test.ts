@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { applyStatus } from "#/components/placement/column-mapping";
+import { parseBidsCsv } from "#/lib/placement/csv";
 import { toStandard } from "#/lib/placement/plugins";
 import {
   type ColumnMapping,
@@ -163,6 +164,310 @@ describe("reading a file through a column mapping (#735)", () => {
   });
 });
 
+describe("wide reading of a bids file (#736)", () => {
+  const BIDS_HEADER = "email,name,priority,project,comment,override,avoid";
+
+  // A Google Forms grid: the title inside the brackets of each header.
+  const FORM = [
+    "Timestamp,Email Address,Your name,Who to avoid,Rank the projects [Tide Clock],Rank the projects [Robot Arm],Rank the projects [Moon Base]",
+    "2026-09-28 10:00,ada@example.edu,Ada Park,Sam Roe,2,1,",
+    "2026-09-28 10:05,kim@example.edu,Kim Lee,,,,1",
+  ].join("\n");
+
+  const BRACKETS: ColumnMapping = {
+    version: 2,
+    dataset: "bids",
+    columns: {
+      "Email Address": "email",
+      "Your name": "name",
+      "Who to avoid": "avoid",
+    },
+    wide: {
+      projectColumns: { by: "prefix", prefix: "Rank the projects" },
+      title: { by: "brackets" },
+    },
+  };
+
+  const readBids = (text: string, mapping?: ColumnMapping) =>
+    CUSTOM_MAPPINGS.bids.toStandard(text, { projects: [], mapping });
+
+  it("titles each project from the last square brackets, one bid per filled cell", () => {
+    const { issues, text } = readBids(FORM, BRACKETS);
+    expect(issues).toEqual([]);
+    expect(text).toBe(
+      [
+        BIDS_HEADER,
+        "ada@example.edu,Ada Park,2,Tide Clock,,,Sam Roe",
+        "ada@example.edu,Ada Park,1,Robot Arm,,,Sam Roe",
+        "kim@example.edu,Kim Lee,1,Moon Base,,,",
+      ].join("\r\n")
+    );
+  });
+
+  it("titles each project from the text after the first separator", () => {
+    const { issues, text } = readBids(
+      [
+        "Student,Rank - Tide Clock,Rank - Robot Arm - Mk II",
+        "ada@example.edu,1,2",
+      ].join("\n"),
+      {
+        version: 2,
+        dataset: "bids",
+        columns: { Student: "email" },
+        wide: {
+          projectColumns: { by: "prefix", prefix: "rank" },
+          title: { by: "separator", separator: " - " },
+        },
+      }
+    );
+    expect(issues).toEqual([]);
+    expect(text).toBe(
+      [
+        BIDS_HEADER,
+        "ada@example.edu,,1,Tide Clock,,,",
+        "ada@example.edu,,2,Robot Arm - Mk II,,,",
+      ].join("\r\n")
+    );
+  });
+
+  it("reads the columns staff picked, and only those", () => {
+    const { text } = readBids(FORM, {
+      ...BRACKETS,
+      wide: {
+        ...BRACKETS.wide,
+        projectColumns: {
+          by: "headers",
+          headers: ["rank the projects [robot arm]"],
+        },
+      } as ColumnMapping["wide"],
+    });
+    expect(text).toBe(
+      [BIDS_HEADER, "ada@example.edu,Ada Park,1,Robot Arm,,,Sam Roe"].join(
+        "\r\n"
+      )
+    );
+  });
+
+  it("reads a title with brackets of its own, and leaves priorities to the parser", () => {
+    const { issues, text } = readBids(
+      "Mail,Rank [Robot [v2]]\nada@example.edu,first",
+      {
+        version: 2,
+        dataset: "bids",
+        columns: { Mail: "email" },
+        wide: {
+          projectColumns: { by: "prefix", prefix: "Rank" },
+          title: { by: "brackets" },
+        },
+      }
+    );
+    expect(issues).toEqual([]);
+    expect(text).toBe(`${BIDS_HEADER}\r\nada@example.edu,,first,Robot [v2],,,`);
+    // "first" is the parser's to refuse, in the converted file's rows.
+    expect(parseBidsCsv(text, []).issues).toEqual([
+      {
+        level: "error",
+        row: 2,
+        message: "priority must be a whole number, 1 or more.",
+      },
+    ]);
+  });
+
+  it("emits nothing for a blank cell, and says so for a row with no bid", () => {
+    const { issues, text } = readBids(
+      `${FORM}\n2026-09-28 10:09,lou@example.edu,Lou Ma,,,,`,
+      BRACKETS
+    );
+    expect(text.split("\r\n")).toHaveLength(4);
+    expect(issues).toEqual([
+      {
+        level: "warning",
+        row: 4,
+        message:
+          "The row has no priority in any project column, so it gives no bids.",
+      },
+    ]);
+  });
+
+  it("repeats the student columns on every bid, which the parser reads as one student", () => {
+    const { text } = readBids(FORM, BRACKETS);
+    const { issues, students } = parseBidsCsv(text, [
+      { key: "tide clock", title: "Tide Clock" },
+      { key: "robot arm", title: "Robot Arm" },
+      { key: "moon base", title: "Moon Base" },
+    ]);
+    expect(issues).toEqual([]);
+    expect(students).toEqual([
+      {
+        email: "ada@example.edu",
+        name: "Ada Park",
+        avoid: "Sam Roe",
+        bids: [
+          { projectKey: "tide clock", priority: 2, comment: "" },
+          { projectKey: "robot arm", priority: 1, comment: "" },
+        ],
+      },
+      {
+        email: "kim@example.edu",
+        name: "Kim Lee",
+        bids: [{ projectKey: "moon base", priority: 1, comment: "" }],
+      },
+    ]);
+  });
+
+  const stops = (text: string, mapping: ColumnMapping) =>
+    readBids(text, mapping).issues.map((i) => {
+      expect(i).toMatchObject({ level: "error", row: 1, wholeFile: true });
+      return i.message;
+    });
+
+  it("names a project column whose header gives no title, by its column", () => {
+    expect(
+      stops(
+        "Email Address,Rank the projects,Rank the projects [ ],Rank the projects [Tide Clock]\nada@example.edu,1,2,3",
+        { ...BRACKETS, columns: { "Email Address": "email" } }
+      )
+    ).toEqual([
+      'Column B, "Rank the projects", is a project column, but its header has no title inside square brackets.',
+      'Column C, "Rank the projects [ ]", is a project column, but its header has no title inside square brackets.',
+    ]);
+    expect(
+      stops("Student,Rank Tide Clock\nada@example.edu,1", {
+        ...BRACKETS,
+        columns: { Student: "email" },
+        wide: {
+          projectColumns: { by: "prefix", prefix: "Rank" },
+          title: { by: "separator", separator: " - " },
+        },
+      })
+    ).toEqual([
+      'Column B, "Rank Tide Clock", is a project column, but its header has no title after " - ".',
+    ]);
+  });
+
+  it("refuses a header that is both a student column and a project column", () => {
+    expect(
+      stops(FORM, {
+        ...BRACKETS,
+        columns: {
+          "Email Address": "email",
+          "Rank the projects [Moon Base]": "name",
+        },
+      })
+    ).toEqual([
+      'Column G, "Rank the projects [Moon Base]", is the name column and a project column; choose one.',
+    ]);
+  });
+
+  it("says when no column is a project column", () => {
+    expect(
+      stops(FORM, {
+        ...BRACKETS,
+        wide: {
+          projectColumns: { by: "prefix", prefix: "Choice" },
+          title: { by: "brackets" },
+        },
+      })
+    ).toEqual(['No column\'s header starts with "Choice".']);
+  });
+
+  it("names a picked project column the file lacks", () => {
+    expect(
+      stops(FORM, {
+        ...BRACKETS,
+        wide: {
+          projectColumns: { by: "headers", headers: ["Rank [Gone]"] },
+          title: { by: "brackets" },
+        },
+      })
+    ).toEqual([
+      'The file has no "Rank [Gone]" column, which the column mapping reads as a project column.',
+    ]);
+  });
+
+  it("refuses priority, project, comment or override from a header", () => {
+    expect(
+      stops(FORM, {
+        ...BRACKETS,
+        columns: { ...BRACKETS.columns, Timestamp: "comment" },
+      })
+    ).toEqual([
+      "With one column per project, a header fills only email, name or avoid, not comment.",
+    ]);
+  });
+
+  it("needs only email from a header: the project columns fill the rest", () => {
+    expect(unmappedRequired(BRACKETS)).toEqual([]);
+    expect(unmappedRequired({ ...BRACKETS, columns: {} })).toEqual(["email"]);
+  });
+
+  it("saves and loads as version 2, and version 1 loads as it always did", () => {
+    expect(JSON.parse(serializeMapping(BRACKETS))).toEqual(BRACKETS);
+    expect(parseMapping(serializeMapping(BRACKETS))).toEqual({
+      ok: true,
+      mapping: BRACKETS,
+    });
+    // A version 1 file never had wide reading: anything under that key is
+    // ignored, as any unknown key always was.
+    expect(parseMapping(JSON.stringify({ ...BRACKETS, version: 1 }))).toEqual({
+      ok: true,
+      mapping: { version: 1, dataset: "bids", columns: BRACKETS.columns },
+    });
+  });
+
+  it("refuses wide reading in a file that is not one it reads", () => {
+    const refused = (value: unknown) => {
+      const parsed = parseMapping(JSON.stringify(value));
+      return parsed.ok ? null : parsed.message;
+    };
+    expect(refused({ ...BRACKETS, dataset: "roster", columns: {} })).toBe(
+      "The file is not a column mapping: one column per project is for the bids only."
+    );
+    expect(
+      refused({ ...BRACKETS, columns: { Rank: "priority", Mail: "email" } })
+    ).toBe(
+      "The file is not a column mapping: with one column per project, a header fills only email, name or avoid, not priority."
+    );
+    expect(
+      refused({
+        ...BRACKETS,
+        wide: {
+          ...BRACKETS.wide,
+          projectColumns: { by: "prefix", prefix: " " },
+        },
+      })
+    ).toBe(
+      "The file is not a column mapping: the project columns' header start is blank."
+    );
+    expect(
+      refused({
+        ...BRACKETS,
+        wide: {
+          ...BRACKETS.wide,
+          projectColumns: { by: "headers", headers: ["Email Address"] },
+        },
+      })
+    ).toBe(
+      'The file is not a column mapping: the header "Email Address" is the email column and a project column.'
+    );
+    expect(
+      refused({
+        ...BRACKETS,
+        wide: { ...BRACKETS.wide, title: { by: "separator", separator: "" } },
+      })
+    ).toBe("The file is not a column mapping: the title separator is blank.");
+  });
+
+  it("is fitted to the bids slot only", () => {
+    expect(fitToDataset(BRACKETS, "bids")).toEqual(BRACKETS);
+    expect(fitToDataset(BRACKETS, "roster")).toEqual({
+      version: 1,
+      dataset: "roster",
+      columns: { "Email Address": "email", "Your name": "name" },
+    });
+  });
+});
+
 describe("fitting a column mapping to a slot", () => {
   it("names what it leaves out, and the editor's status says so", () => {
     const bids: ColumnMapping = {
@@ -206,6 +511,13 @@ describe("the headers a mapping offers", () => {
     ).toEqual(["Student Email", "Full Name"]);
   });
 
+  it("are read after blank lines before the header, as the rows are", () => {
+    expect(fileHeaders("\r\n \nStudent Email,Team\nx,y")).toEqual([
+      "Student Email",
+      "Team",
+    ]);
+  });
+
   it("are suggested for a standard column whose name they match, ignoring case", () => {
     expect(suggestMapping("roster", ["EMAIL", "Full Name", "Project"])).toEqual(
       {
@@ -234,8 +546,8 @@ describe("a mapping file", () => {
       return parsed.ok ? null : parsed.message;
     };
     expect(refused("{")).toBe("The file is not JSON.");
-    expect(refused({ ...MAPPING, version: 2 })).toBe(
-      "The column mapping is version 2, and this page reads version 1."
+    expect(refused({ ...MAPPING, version: 3 })).toBe(
+      "The column mapping is version 3, and this page reads version 2 and earlier."
     );
     expect(refused({ ...MAPPING, columns: { Team: "team" } })).toBe(
       "The file is not a column mapping: team is not a column of the roster format."

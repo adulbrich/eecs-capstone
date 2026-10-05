@@ -56,24 +56,23 @@ const STANDARD_PARSERS: Record<
 const TEMPLATES = Object.values(STANDARD_FORMATS).map(formatTemplate);
 
 /**
- * The plugin's fixture and what it reads it with: a chosen plugin's comes
- * with what staff chose.
+ * The plugin's fixtures and what it reads each with: a chosen plugin has one
+ * per way staff can choose to read a file, each with what staff chose.
  */
-function fixtureOf(plugin: ImportPlugin): {
+function fixturesOf(plugin: ImportPlugin): {
   context: PluginContext;
-  text: string | undefined;
-} {
+  text: string;
+}[] {
   if (plugin.input === "chosen") {
-    const chosen = CHOSEN_FIXTURES[plugin.id];
-    return {
-      context: { ...chosen?.context, projects: FIXTURE_PROJECTS },
-      text: chosen?.text,
-    };
+    return (CHOSEN_FIXTURES[plugin.id] ?? []).map((chosen) => ({
+      context: { ...chosen.context, projects: FIXTURE_PROJECTS },
+      text: chosen.text,
+    }));
   }
-  return {
-    context: { projects: FIXTURE_PROJECTS },
-    text: PLUGIN_FIXTURES[plugin.id],
-  };
+  const text = PLUGIN_FIXTURES[plugin.id];
+  return text === undefined
+    ? []
+    : [{ context: { projects: FIXTURE_PROJECTS }, text }];
 }
 
 // Every registered plugin passes these, with no test of its own needed for
@@ -81,31 +80,36 @@ function fixtureOf(plugin: ImportPlugin): {
 describe.each(PLUGINS.map((p) => [p.id, p] as const))(
   "plugin %s",
   (id, plugin) => {
-    const { context, text } = fixtureOf(plugin);
-    const fixture = text ?? "";
+    const fixtures = fixturesOf(plugin);
 
     it("has a fixture and an id no other plugin uses", () => {
-      expect(text).toBeDefined();
+      expect(fixtures).not.toEqual([]);
       expect(PLUGINS.filter((p) => p.id === id)).toHaveLength(1);
     });
 
-    it("converts its fixture without an error", () => {
-      const converted = plugin.toStandard(fixture, context);
-      expect(converted.issues.filter((i) => i.level === "error")).toEqual([]);
+    it("converts its fixtures without an error", () => {
+      for (const { context, text } of fixtures) {
+        const converted = plugin.toStandard(text, context);
+        expect(converted.issues.filter((i) => i.level === "error")).toEqual([]);
+      }
     });
 
     it("writes standard CSV the parser reads without a word", () => {
-      const converted = plugin.toStandard(fixture, context);
-      expect(STANDARD_PARSERS[plugin.dataset](converted.text).issues).toEqual(
-        []
-      );
+      for (const { context, text } of fixtures) {
+        const converted = plugin.toStandard(text, context);
+        expect(STANDARD_PARSERS[plugin.dataset](converted.text).issues).toEqual(
+          []
+        );
+      }
     });
 
     if (plugin.input === "file") {
       const { detect } = plugin;
 
       it("claims its own fixture, over the standard format", () => {
-        expect(detectPlugin(plugin.dataset, fixture)).toBe(plugin);
+        for (const { text } of fixtures) {
+          expect(detectPlugin(plugin.dataset, text)).toBe(plugin);
+        }
       });
 
       it("claims no standard template, and no other plugin's fixture", () => {
@@ -113,30 +117,38 @@ describe.each(PLUGINS.map((p) => [p.id, p] as const))(
           expect(detect(template)).toBe(false);
         }
         for (const other of PLUGINS.filter((p) => p.id !== id)) {
-          expect(detect(fixtureOf(other).text ?? "")).toBe(false);
+          for (const { text } of fixturesOf(other)) {
+            expect(detect(text)).toBe(false);
+          }
         }
       });
     }
 
     if (plugin.input === "chosen") {
-      it("reads a fixture nothing detects, and is offered by Read as", () => {
-        expect(isStandard(plugin.dataset, fixture)).toBe(false);
-        expect(detectPlugin(plugin.dataset, fixture)).toBeNull();
+      it("reads fixtures nothing detects, and is offered by Read as", () => {
+        for (const { text } of fixtures) {
+          expect(isStandard(plugin.dataset, text)).toBe(false);
+          expect(detectPlugin(plugin.dataset, text)).toBeNull();
+        }
         expect(filePlugins(plugin.dataset)).not.toContain(plugin);
         expect(uploadPlugins(plugin.dataset)).toContain(plugin);
       });
 
       it("reads through it once chosen", () => {
-        expect(resolveFilePlugin(plugin.dataset, fixture, id)).toBe(plugin);
+        for (const { text } of fixtures) {
+          expect(resolveFilePlugin(plugin.dataset, text, id)).toBe(plugin);
+        }
       });
 
       it("reports reading without its choice as a problem with the whole file", () => {
-        const converted = plugin.toStandard(fixture, {
-          projects: FIXTURE_PROJECTS,
-        });
-        expect(converted.issues).toEqual([
-          expect.objectContaining({ level: "error", wholeFile: true }),
-        ]);
+        for (const { text } of fixtures) {
+          const converted = plugin.toStandard(text, {
+            projects: FIXTURE_PROJECTS,
+          });
+          expect(converted.issues).toEqual([
+            expect.objectContaining({ level: "error", wholeFile: true }),
+          ]);
+        }
       });
     }
   }

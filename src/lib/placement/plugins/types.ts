@@ -13,6 +13,27 @@ import type { WorkspaceProject } from "#/lib/placement/types";
  */
 
 /**
+ * Wide reading of a bids file (#736): one row per student and one column
+ * per project, the cell holding the student's priority for it. Each filled
+ * cell becomes one bid, titled from its column's header.
+ */
+export interface WideBids {
+  /**
+   * The project columns: every header that starts with `prefix`, or the
+   * headers listed, as the file spells them. Case and spaces around a
+   * header are ignored, as they are for `columns`.
+   */
+  projectColumns:
+    | { by: "prefix"; prefix: string }
+    | { by: "headers"; headers: string[] };
+  /**
+   * Where a project column's header holds the title: after the first
+   * `separator`, or inside the last pair of square brackets.
+   */
+  title: { by: "separator"; separator: string } | { by: "brackets" };
+}
+
+/**
  * Which header of a file fills each standard column of a dataset (#735):
  * what custom mapping reads a file through. Data, never code.
  */
@@ -20,12 +41,18 @@ export interface ColumnMapping {
   /**
    * Each header the column mapping reads, as the file spells it, and the
    * standard column it fills. Header case and spaces around it are ignored,
-   * as the standard format ignores them.
+   * as the standard format ignores them. With `wide`, only the student
+   * columns: email, name and avoid.
    */
   columns: Record<string, string>;
   dataset: PlacementDataset;
-  /** The shape's number, `MAPPING_VERSION`. */
-  version: 1;
+  /**
+   * The shape's number: 2 with `wide`, 1 without, so a column mapping with
+   * no wide reading still loads on a page that reads only version 1.
+   */
+  version: 1 | 2;
+  /** Wide reading, for the bids only (#736). */
+  wide?: WideBids;
 }
 
 /** What a plugin may read besides the text. */

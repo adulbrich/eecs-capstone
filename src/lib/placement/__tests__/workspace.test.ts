@@ -426,6 +426,25 @@ describe("a column mapping (#735)", () => {
     ).not.toBe(inputFingerprint({ ...base, bids }));
   });
 
+  it("hashes a version 1 column mapping as it did before wide reading (#736)", () => {
+    const bids = {
+      filename: "bids.csv",
+      text: "Student,Rank,Choice\nada@example.edu,1,Tide Clock",
+      readAs: "custom-mapping-bids",
+      mapping: {
+        version: 1,
+        dataset: "bids",
+        columns: { Student: "email", Rank: "priority", Choice: "project" },
+      } satisfies ColumnMapping,
+    };
+    expect(inputFingerprint({ ...base, roster: { ...roster, mapping } })).toBe(
+      "563:84o81q"
+    );
+    expect(
+      inputFingerprint({ ...base, roster: { ...roster, mapping }, bids })
+    ).toBe("686:3nmbwv");
+  });
+
   it("leaves the fingerprint alone while kept but not in use", () => {
     const detected = { ...base, roster: { ...roster, readAs: undefined } };
     expect(
@@ -532,7 +551,7 @@ describe("a column mapping (#735)", () => {
     const result = imported({
       ...roster,
       readAs: null,
-      mapping: { ...mapping, version: 2 },
+      mapping: { ...mapping, version: 3 },
     });
     expect(result).toEqual({
       ok: true,
@@ -545,14 +564,58 @@ describe("a column mapping (#735)", () => {
           source: "roster",
           text: roster.text,
           message:
-            "The column mapping saved with the roster could not be read, so it was removed from this workspace. The column mapping is version 2, and this page reads version 1. Map its columns again to read it that way.",
+            "The column mapping saved with the roster could not be read, so it was removed from this workspace. The column mapping is version 3, and this page reads version 2 and earlier. Map its columns again to read it that way.",
         },
       ],
     });
   });
 
+  it("keeps a version 2 column mapping, wide reading and all (#736)", () => {
+    const wide: ColumnMapping = {
+      version: 2,
+      dataset: "bids",
+      columns: { "Email Address": "email" },
+      wide: {
+        projectColumns: { by: "prefix", prefix: "Rank the projects" },
+        title: { by: "brackets" },
+      },
+    };
+    const bids = {
+      filename: "form.csv",
+      text: "Email Address,Rank the projects [Tide Clock]\nada@example.edu,1",
+      readAs: "custom-mapping-bids",
+      mapping: wide,
+    };
+    expect(
+      parseWorkspace(JSON.stringify({ ...EMPTY_WORKSPACE, bids }))
+    ).toEqual({ ok: true, workspace: { ...EMPTY_WORKSPACE, bids } });
+    // Wide reading is part of what the run read.
+    const { wide: _columnsOnly, ...withoutWide } = wide;
+    expect(inputFingerprint({ ...base, bids })).not.toBe(
+      inputFingerprint({
+        ...base,
+        bids: { ...bids, mapping: { ...withoutWide, version: 1 } },
+      })
+    );
+    expect(
+      inputFingerprint({
+        ...base,
+        bids: {
+          ...bids,
+          mapping: {
+            ...wide,
+            wide: {
+              ...wide.wide,
+              title: { by: "separator", separator: " - " },
+            },
+          } as ColumnMapping,
+        },
+      })
+    ).not.toBe(inputFingerprint({ ...base, bids }));
+  });
+
   it("says so only while the file is there with no new column mapping", () => {
-    const result = imported({ ...roster, mapping: { ...mapping, version: 2 } });
+    const result = imported({ ...roster, mapping: { ...mapping, version: 3 } });
     if (!result.ok) {
       throw new Error(result.message);
     }
