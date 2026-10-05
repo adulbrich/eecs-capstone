@@ -522,6 +522,26 @@ test.describe("placement workspace", () => {
     const placed = await readFile(await (await placement).path(), "utf-8");
     expect(placed).toContain(`ben@${DOMAIN},Ben Ito,Tide Clock,1`);
 
+    // The same placement as a Canvas group set import (#734).
+    await page.getByRole("combobox", { name: "Download as" }).click();
+    await page.getByRole("option", { name: "Canvas groups" }).click();
+    await expect(
+      page.getByText(/Canvas matches each student by their login/)
+    ).toBeVisible();
+    const canvas = page.waitForEvent("download");
+    await page.getByRole("button", { name: "Download placement" }).click();
+    const download = await canvas;
+    expect(download.suggestedFilename()).toMatch(
+      /^placement-\d{4}-\d{2}-\d{2} \(Canvas groups\)\.csv$/
+    );
+    const groups = (await readFile(await download.path(), "utf-8"))
+      .replace(/^﻿/, "")
+      .split("\r\n");
+    expect(groups[0]).toBe("name,login_id,group_name");
+    expect(groups).toContainEqual(
+      expect.stringMatching(`^Ben Ito,ben@${DOMAIN},Tide Clock`)
+    );
+
     const withPins = page.waitForEvent("download");
     await page.getByRole("button", { name: "Download bids with pins" }).click();
     const bids = await readFile(await (await withPins).path(), "utf-8");

@@ -234,6 +234,81 @@ export const ROSTER_FORMAT: CsvFormat = {
   ],
 };
 
+/**
+ * What "Download placement" writes (`placementCsv`), and what an export
+ * plugin reads (#734). Placement only ever writes it: no import reads it.
+ */
+export const PLACEMENT_FORMAT: CsvFormat = {
+  filename: "placement-template",
+  columns: [
+    {
+      name: "email",
+      required: true,
+      meaning: "The student's email. One row per student.",
+      example: "ada@example.edu",
+    },
+    {
+      name: "name",
+      required: false,
+      meaning: "The student's name.",
+      example: "Ada Park",
+    },
+    {
+      name: "project",
+      required: true,
+      meaning:
+        "The title of the project the student is placed on. Blank for an unplaced student.",
+      example: "Tide Clock",
+    },
+    {
+      name: "team",
+      required: true,
+      meaning:
+        "The student's team on that project, numbered from 1 as the board numbers it. Blank for an unplaced student.",
+      example: "1",
+    },
+    {
+      name: "priority",
+      required: false,
+      meaning:
+        "The priority the student gave that project; pre-approved for a roster pre-approval; not in the survey for a roster student without bids; blank for a placement outside their bids.",
+      example: "1",
+    },
+    {
+      name: "comment",
+      required: false,
+      meaning: "What the student wrote about that project.",
+      example: "I built a tide gauge last summer.",
+    },
+    {
+      name: "avoid",
+      required: false,
+      meaning: "Who the student would prefer not to work with.",
+      example: "",
+    },
+  ],
+  templateRows: [
+    {
+      email: "ada@example.edu",
+      name: "Ada Park",
+      project: "Tide Clock",
+      team: "1",
+      priority: "1",
+      comment: "I built a tide gauge last summer.",
+      avoid: "",
+    },
+    {
+      email: "kim@example.edu",
+      name: "Kim Lee",
+      project: "",
+      team: "",
+      priority: "",
+      comment: "",
+      avoid: "",
+    },
+  ],
+};
+
 /** The one standard format of each dataset, which every plugin writes. */
 export const STANDARD_FORMATS = {
   projects: PROJECTS_FORMAT,
@@ -241,4 +316,16 @@ export const STANDARD_FORMATS = {
   bids: BIDS_FORMAT,
 } as const satisfies Record<string, CsvFormat>;
 
+/** A dataset staff upload or paste, which import plugins convert into. */
 export type PlacementDataset = keyof typeof STANDARD_FORMATS;
+
+/**
+ * What placement writes, which export plugins convert out of (#734): the
+ * placement, and the bids again with their pins.
+ */
+export const EXPORT_FORMATS = {
+  placement: PLACEMENT_FORMAT,
+  bids: BIDS_FORMAT,
+} as const satisfies Record<string, CsvFormat>;
+
+export type ExportDataset = keyof typeof EXPORT_FORMATS;

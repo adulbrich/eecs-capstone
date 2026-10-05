@@ -1,20 +1,24 @@
 import { parseRows } from "#/lib/placement/csv";
 import {
+  type ExportDataset,
   type PlacementDataset,
   STANDARD_FORMATS,
 } from "#/lib/placement/formats";
-import { canvasRoster } from "#/lib/placement/plugins/canvas";
+import { canvasGroups, canvasRoster } from "#/lib/placement/plugins/canvas";
 import { pastedRoster, pastedTitles } from "#/lib/placement/plugins/paste";
 import { qualtricsBids } from "#/lib/placement/plugins/qualtrics";
 import type {
   Conversion,
+  Export,
+  ExportContext,
+  ExportPlugin,
   FilePlugin,
   PlacementPlugin,
   PluginContext,
 } from "#/lib/placement/plugins/types";
 
 /**
- * Every placement plugin. A file is tried against its dataset's standard
+ * Every import plugin. A file is tried against its dataset's standard
  * format first, then against each file plugin here in order, and the first
  * that claims it reads it. Add a plugin by adding it to this list.
  */
@@ -24,6 +28,17 @@ export const PLUGINS: readonly PlacementPlugin[] = [
   pastedRoster,
   pastedTitles,
 ];
+
+/**
+ * Every export plugin, offered by "Download as" after the dataset's standard
+ * CSV, in this order. Add one by adding it to this list.
+ */
+export const EXPORT_PLUGINS: readonly ExportPlugin[] = [canvasGroups];
+
+/** The export plugins that write `dataset`, in the order "Download as" lists them. */
+export function exportPlugins(dataset: ExportDataset): ExportPlugin[] {
+  return EXPORT_PLUGINS.filter((p) => p.dataset === dataset);
+}
 
 export function pluginById(id: string): PlacementPlugin | undefined {
   return PLUGINS.find((p) => p.id === id);
@@ -94,6 +109,12 @@ export function readAsChoice(
 
 const TRAILING_STOP = /\.$/;
 
+const reason = (error: unknown) =>
+  (error instanceof Error ? error.message : String(error)).replace(
+    TRAILING_STOP,
+    ""
+  );
+
 /**
  * The text as standard CSV: through `plugin`, or as it is when null. A
  * plugin that throws is reported as a problem with the whole file, because
@@ -117,7 +138,38 @@ export function toStandard(
         {
           level: "error",
           row: 1,
-          message: `The ${plugin.label} could not be read: ${(error instanceof Error ? error.message : String(error)).replace(TRAILING_STOP, "")}.`,
+          message: `The ${plugin.label} could not be read: ${reason(error)}.`,
+          wholeFile: true,
+        },
+      ],
+    };
+  }
+}
+
+/**
+ * The standard CSV as a file to download: through `plugin`, or as it is when
+ * null. A plugin that throws is reported as a problem with the whole file,
+ * so the page can say so rather than the download doing nothing.
+ */
+export function fromStandard(
+  plugin: ExportPlugin | null,
+  text: string,
+  context: ExportContext
+): Export {
+  if (plugin === null) {
+    return { filename: context.filename, text, issues: [] };
+  }
+  try {
+    return plugin.fromStandard(text, context);
+  } catch (error) {
+    return {
+      filename: context.filename,
+      text: "",
+      issues: [
+        {
+          level: "error",
+          row: 1,
+          message: `The ${plugin.label} file could not be written: ${reason(error)}.`,
           wholeFile: true,
         },
       ],

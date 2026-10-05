@@ -68,3 +68,39 @@ what you can as issues instead, so staff see which row to fix.
    standard format, and claims no standard template and no other plugin's fixture.
 5. Add tests of your own for the source's quirks, as `canvas.test.ts` and
    `qualtrics.test.ts` do.
+
+## Export plugins
+
+An **export plugin** goes the other way: it reads a standard CSV placement wrote and
+writes the file another tool imports, offered on the Results tab under "Download as"
+after the standard CSV (#734). Placement writes two standard CSVs, listed in
+`EXPORT_FORMATS` in `formats.ts`: the placement (`PLACEMENT_FORMAT`, what
+`placementCsv` in `board.ts` writes) and the bids with their pins
+(`BIDS_FORMAT`). The bids download shows the button alone until a plugin writes
+that dataset. `canvasGroups` in `canvas.ts` is the example: it writes Canvas's
+[group set import](https://canvas.instructure.com/doc/api/file.group_category_csv.html),
+and lives beside the Canvas roster import.
+
+`ExportPlugin` in `types.ts` is its own type, with no `detect` and no `input`, and
+`EXPORT_PLUGINS` in `index.ts` is its own list, so nothing on the import side, from
+detection to Read as, ever sees one.
+
+| Field | What it is |
+| --- | --- |
+| `id` | Unique across every plugin, import or export. |
+| `label` | The option's name in "Download as". |
+| `dataset` | `"placement"` or `"bids"`: whose standard CSV the plugin reads. |
+| `description` | Shown while the option is chosen: what the other tool does with the file, and what the file leaves out. Required, because staff need it before they import. |
+| `requiredColumns` | The columns the other tool needs. The contract test checks the plugin writes them. |
+| `fromStandard(text, { filename })` | The file, the name to save it under (derive it from `filename`, the standard download's name), and the issues it found. |
+
+Read cells with `cell` from `csv.ts`, which takes off the spreadsheet guard
+`toCsv` put on, and write with `toCsv` or `writeFormat`, which puts it back, so a
+title like `-Minus` is guarded once. Report an issue in the standard CSV's rows,
+header as row 1, and leave that row out; the page shows the issues under the
+download, and a problem with the whole file stops the download.
+
+To add one, write it, add it to `EXPORT_PLUGINS`, and put a standard CSV under its
+id in `plugin-fixtures.ts`. The contract test checks the fixture has the dataset's
+required columns, that the plugin writes it with no error and with every column in
+`requiredColumns`, and that it writes the header from a standard file with no rows.

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
+import { PLACEMENT_FORMAT, writeFormat } from "#/lib/placement/formats";
 import { detectPlugin } from "#/lib/placement/plugins";
-import { canvasRoster } from "#/lib/placement/plugins/canvas";
+import { canvasGroups, canvasRoster } from "#/lib/placement/plugins/canvas";
 import { parseRosterCsv } from "#/lib/placement/roster";
 
 // Invented names and emails only (#648).
@@ -134,5 +135,143 @@ describe("the Canvas roster and groups export (#674)", () => {
         wholeFile: true,
       },
     ]);
+  });
+});
+
+describe("the Canvas group set import (#734)", () => {
+  /** A standard placement, as "Download placement" writes it. */
+  const placement = (rows: Record<string, string>[]) =>
+    writeFormat(PLACEMENT_FORMAT, rows);
+  const groups = (text: string) =>
+    canvasGroups.fromStandard(text, {
+      filename: "placement-2026-10-04.csv",
+    });
+  const lines = (text: string) => groups(text).text.split("\r\n");
+
+  it("names a project with one team by its title alone", () => {
+    expect(
+      lines(
+        placement([
+          {
+            email: "ada@example.edu",
+            name: "Ada Park",
+            project: "Tide Clock",
+            team: "1",
+          },
+          {
+            email: "kim@example.edu",
+            name: "Kim Lee",
+            project: "Tide Clock",
+            team: "1",
+          },
+        ])
+      )
+    ).toEqual([
+      "name,login_id,group_name",
+      "Ada Park,ada@example.edu,Tide Clock",
+      "Kim Lee,kim@example.edu,Tide Clock",
+    ]);
+  });
+
+  it("names each team of a project with more than one, as the board numbers it", () => {
+    // Team 2 emptied by hand, so the teams left are 1 and 3.
+    expect(
+      lines(
+        placement([
+          { email: "ada@example.edu", project: "Robot Arm", team: "1" },
+          { email: "kim@example.edu", project: "Robot Arm", team: "3" },
+          { email: "lou@example.edu", project: "Tide Clock", team: "2" },
+        ])
+      )
+    ).toEqual([
+      "name,login_id,group_name",
+      ",ada@example.edu,Robot Arm (Team 1)",
+      ",kim@example.edu,Robot Arm (Team 3)",
+      ",lou@example.edu,Tide Clock",
+    ]);
+  });
+
+  it("leaves an unplaced student out, with nothing to report", () => {
+    const written = groups(
+      placement([
+        { email: "ada@example.edu", project: "Tide Clock", team: "1" },
+        { email: "cy@example.edu", name: "Cy Moss", project: "", team: "" },
+      ])
+    );
+    expect(written.text).not.toContain("cy@example.edu");
+    expect(written.issues).toEqual([]);
+  });
+
+  it("guards a title that starts like a formula once, not twice", () => {
+    expect(
+      lines(
+        placement([
+          { email: "ada@example.edu", project: "-Minus", team: "1" },
+          { email: "kim@example.edu", project: "=Sum", team: "1" },
+          { email: "lou@example.edu", project: "=Sum", team: "2" },
+        ])
+      )
+    ).toEqual([
+      "name,login_id,group_name",
+      ",ada@example.edu,'-Minus",
+      ",kim@example.edu,'=Sum (Team 1)",
+      ",lou@example.edu,'=Sum (Team 2)",
+    ]);
+  });
+
+  it("names the file after the placement", () => {
+    expect(groups(placement([])).filename).toBe(
+      "placement-2026-10-04 (Canvas groups).csv"
+    );
+  });
+
+  it("leaves out a row it cannot name a login or a group for", () => {
+    const written = groups(
+      placement([
+        { email: "", name: "Ada Park", project: "Tide Clock", team: "1" },
+        { email: "kim@example.edu", project: "Robot Arm", team: "1" },
+        { email: "lou@example.edu", project: "Robot Arm", team: "2" },
+        { email: "max@example.edu", project: "Robot Arm", team: "" },
+        // One team needs no number.
+        { email: "sam@example.edu", project: "Tide Clock", team: "" },
+      ])
+    );
+    expect(written.text.split("\r\n")).toEqual([
+      "name,login_id,group_name",
+      ",kim@example.edu,Robot Arm (Team 1)",
+      ",lou@example.edu,Robot Arm (Team 2)",
+      ",sam@example.edu,Tide Clock",
+    ]);
+    expect(written.issues).toEqual([
+      {
+        level: "error",
+        row: 2,
+        message: "The row has no email, which Canvas needs as the login.",
+      },
+      {
+        level: "error",
+        row: 5,
+        message: "Robot Arm has more than one team, and the row names none.",
+      },
+    ]);
+  });
+
+  it("says a column is missing from a file that is not a placement", () => {
+    const written = groups("email,name\nada@example.edu,Ada Park");
+    expect(written.issues).toEqual([
+      {
+        level: "error",
+        row: 1,
+        message: 'The file has no "project" column.',
+        wholeFile: true,
+      },
+      {
+        level: "error",
+        row: 1,
+        message: 'The file has no "team" column.',
+        wholeFile: true,
+      },
+    ]);
+    expect(written.text).toBe("name,login_id,group_name");
   });
 });
