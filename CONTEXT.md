@@ -308,7 +308,7 @@ projects. Bids name projects by title, and a survey may cut a title short or spe
 differently; a title match puts those bids on the project without changing the file.
 It pairs a title with a project, never a student with a team, so it is not a
 placement.
-_Avoid_: alias, mapping, title fix
+_Avoid_: alias, mapping (a column mapping pairs columns), title fix
 
 **Standard format**:
 The one CSV shape placement reads for each of the projects, the roster and the bids,
@@ -325,6 +325,14 @@ and staff can read the file as another. The page calls a plugin a format: "Read 
 for a file, "Download as" for what placement writes.
 _Avoid_: adapter, connector (suggests a live link to the other tool), integration,
 importer
+
+**Column mapping**:
+Staff's word on which column of a file holds each column of the standard format,
+for a file no plugin recognizes. It is data, never code: the roster and the bids
+keep it beside their file and are read through it on every load, and it downloads
+as JSON to use again on next term's file. It pairs a file's header with a standard
+column, never a bid title with a project, so it is not a title match.
+_Avoid_: mapping on its own, field map, schema, template
 
 ## Both domains
 

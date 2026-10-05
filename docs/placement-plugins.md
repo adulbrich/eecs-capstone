@@ -20,9 +20,9 @@ network request.
 | `id` | Stable. A workspace stores it when staff choose "Read as", so renaming one sends saved choices back to detection. |
 | `label` | The source's name on the page: "Converted from the `label` file.csv." and "Problems in the `label` file". |
 | `dataset` | `"projects"`, `"roster"` or `"bids"`: whose standard CSV the plugin writes. |
-| `input` | `"file"` for an upload, `"paste"` for the text box. A file plugin also has `detect`. |
-| `detect(text)` | True when the text is this plugin's source. Never true for any standard template or another plugin's source. |
-| `toStandard(text, { projects })` | The standard CSV and the issues the plugin found. |
+| `input` | `"file"` for an upload, `"paste"` for the text box. A file plugin usually also has `detect`. |
+| `detect(text)` | True when the text is this plugin's source. Never true for any standard template or another plugin's source. Absent for a plugin nothing detects, which staff choose with "Read as" ([custom mapping](#custom-mapping) is the one). |
+| `toStandard(text, { projects, mapping })` | The standard CSV and the issues the plugin found. `mapping` is the column mapping stored with the file, which only custom mapping reads. |
 | `description` | Optional prose shown while a file is read through the plugin, for a rule staff would not guess. |
 
 ## The rules
@@ -55,17 +55,71 @@ A stored id no plugin has any more is detected again. A plugin that throws is
 reported as a problem with the whole file rather than breaking the page. Report
 what you can as issues instead, so staff see which row to fix.
 
+## Custom mapping
+
+`src/lib/placement/plugins/custom-mapping.ts` reads a file no plugin recognizes
+through a **column mapping** staff build on the page (#735): which header of the
+file fills each standard column, one row in and one row out. It is the plugin
+whose configuration is data rather than code, as ADR-0059 requires of anything
+staff bring. It has no `detect`, so it never claims a file: the page offers it as
+"Map columns" when detection finds nothing and the file is not the standard
+format, and as "Column mapping" in "Read as". It is registered once per dataset
+under the one id `custom-mapping`, so a stored `readAs` names it wherever the file
+is, and a plugin id is unique within a dataset rather than across all of them.
+
+The roster and the bids store the mapping in their workspace entry beside the file
+(`readAs: "custom-mapping"` plus `mapping`), so it is read through on every load,
+travels in the workspace export and changes the run's fingerprint when it changes.
+Choosing another "Read as" drops it. Projects are stored parsed, so a projects
+mapping runs once at import and is not kept. Value transforms, such as "1st
+choice" to 1, are out of scope, and a wide bids file (one column per choice) is
+#736.
+
+The mapping downloads as a small JSON file, to load again next term or in another
+department:
+
+```json
+{
+  "version": 1,
+  "dataset": "roster",
+  "columns": {
+    "Student Email": "email",
+    "Full Name": "name",
+    "Team": "project"
+  }
+}
+```
+
+- `version` is the shape's number, `MAPPING_VERSION`. A file with another number
+  is refused with a message naming both; a later shape (#736) bumps it.
+- `dataset` is `"projects"`, `"roster"` or `"bids"`, and must match where it is
+  loaded.
+- `columns` pairs each header the mapping reads, as the file spells it, with the
+  standard column it fills. Header case and surrounding spaces are ignored, as the
+  standard format ignores them. Each standard column takes at most one header,
+  every value must be a column of the dataset's format, and a required column
+  left out stops the file with a problem naming it.
+
+Loading a mapping against a file that lacks one of its headers names the header;
+reading a stored file through such a mapping reports it as a problem with the whole
+file. The mapping never reaches the server (ADR-0056).
+
 ## Adding one
 
 1. Write the module in `src/lib/placement/plugins/`.
 2. Add it to `PLUGINS` in `index.ts`, at the position that keeps detection
    unambiguous.
 3. Add a fixture under its id to `src/lib/placement/__tests__/plugin-fixtures.ts`:
-   invented people and `example.edu` addresses only.
+   invented people and `example.edu` addresses only. A plugin with no `detect`
+   puts its fixture in `CHOSEN_FIXTURES` instead, under `"<id> <dataset>"`, with
+   the context staff's choice gives it, such as custom mapping's `mapping`.
 4. Run `npx vitest run src/lib/placement`. `plugins.contract.test.ts` runs the contract on
    every registered plugin: it has a fixture, converts it without an error, writes
    CSV the standard parser reads without an issue, claims its own fixture over the
    standard format, and claims no standard template and no other plugin's fixture.
+   A plugin with no `detect` instead reads a fixture nothing detects, is listed in
+   "Read as" and read through once chosen, and reports reading without its choice
+   as a problem with the whole file.
 5. Add tests of your own for the source's quirks, as `canvas.test.ts` and
    `qualtrics.test.ts` do.
 

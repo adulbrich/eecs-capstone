@@ -400,6 +400,56 @@ for (const width of [1280, 375]) {
   });
 }
 
+// A roster nothing recognizes, read through a column mapping (#735).
+for (const width of [1280, 375]) {
+  test(`admin placement, a column mapping at ${width}`, async ({ page }) => {
+    await page.setViewportSize({ width, height: 800 });
+    await page.goto("/admin/placement?tab=roster");
+    await waitForHydration(page);
+    await page.getByLabel("Roster CSV file").setInputFiles({
+      name: "roster.csv",
+      mimeType: "text/csv",
+      buffer: Buffer.from(
+        [
+          "Student Email,Full Name,Team",
+          "ada@example.edu,Ada Park,Tide Clock",
+          "kim@example.edu,Kim Lee,",
+        ].join("\n")
+      ),
+    });
+    await page.getByRole("button", { name: "Map columns" }).click();
+    const editor = page.getByRole("region", {
+      name: "Map the columns of roster.csv",
+    });
+    await expect(
+      editor.getByRole("button", { name: "Apply column mapping" })
+    ).toBeDisabled();
+    await checkA11y(page);
+    await expectNoHorizontalOverflow(page);
+
+    for (const [column, header] of [
+      ["email", "Student Email"],
+      ["name", "Full Name"],
+      ["project", "Team"],
+    ]) {
+      await editor
+        .getByRole("combobox", { name: `File column for ${column}` })
+        .click();
+      await page.getByRole("option", { name: header, exact: true }).click();
+    }
+    await expect(editor.getByRole("table")).toContainText("ada@example.edu");
+    await checkA11y(page);
+    await expectNoHorizontalOverflow(page);
+
+    await editor.getByRole("button", { name: "Apply column mapping" }).click();
+    await expect(
+      page.getByRole("button", { name: "Edit column mapping" })
+    ).toBeVisible();
+    await checkA11y(page);
+    await expectNoHorizontalOverflow(page);
+  });
+}
+
 test("@smoke admin placement, projects and bids loaded", async ({ page }) => {
   await page.goto("/admin/placement");
   await waitForHydration(page);
