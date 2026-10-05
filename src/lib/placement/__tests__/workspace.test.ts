@@ -1,8 +1,10 @@
 import { describe, expect, it } from "vitest";
+import type { ColumnMapping } from "#/lib/placement/plugins/custom-mapping";
 import type { WorkspaceProject } from "#/lib/placement/types";
 import {
   addProject,
   contactFor,
+  currentNotices,
   EMPTY_WORKSPACE,
   inputFingerprint,
   isEmptyWorkspace,
@@ -16,6 +18,8 @@ import {
   type StoredResult,
   serializeWorkspace,
   setAsideRemoved,
+  setColumnMapping,
+  setReadAs,
   toPlacementInput,
   type Workspace,
   withoutContact,
@@ -378,6 +382,220 @@ describe("how a file is read (#733)", () => {
       ok: true,
       workspace,
     });
+  });
+});
+
+describe("a column mapping (#735)", () => {
+  const roster = {
+    source: { kind: "csv" as const, filename: "roster.csv" },
+    text: "Student Email,Full Name,Team\nada@example.edu,Ada Park,",
+    readAs: "custom-mapping-roster",
+  };
+  const mapping: ColumnMapping = {
+    version: 1,
+    dataset: "roster",
+    columns: { "Student Email": "email", "Full Name": "name", Team: "project" },
+  };
+  const base = { ...WORKSPACE, titleMatches: undefined, roster };
+
+  it("changes the fingerprint while in use, and changing it changes it again", () => {
+    const without = inputFingerprint(base);
+    const mapped = inputFingerprint({
+      ...base,
+      roster: { ...roster, mapping },
+    });
+    const renamed = inputFingerprint({
+      ...base,
+      roster: {
+        ...roster,
+        mapping: { ...mapping, columns: { "Student Email": "email" } },
+      },
+    });
+    expect(mapped).not.toBe(without);
+    expect(renamed).not.toBe(mapped);
+    const bids = {
+      filename: "bids.csv",
+      text: "x",
+      readAs: "custom-mapping-bids",
+    };
+    expect(
+      inputFingerprint({
+        ...base,
+        bids: { ...bids, mapping: { ...mapping, dataset: "bids" } },
+      })
+    ).not.toBe(inputFingerprint({ ...base, bids }));
+  });
+
+  it("leaves the fingerprint alone while kept but not in use", () => {
+    const detected = { ...base, roster: { ...roster, readAs: undefined } };
+    expect(
+      inputFingerprint({
+        ...detected,
+        roster: { ...detected.roster, mapping },
+      })
+    ).toBe(inputFingerprint(detected));
+  });
+
+  it("hashes the same in any key order, as storage hands it back", () => {
+    const reordered: ColumnMapping = {
+      columns: {
+        Team: "project",
+        "Full Name": "name",
+        "Student Email": "email",
+      },
+      dataset: "roster",
+      version: 1,
+    };
+    expect(
+      inputFingerprint({ ...base, roster: { ...roster, mapping: reordered } })
+    ).toBe(inputFingerprint({ ...base, roster: { ...roster, mapping } }));
+  });
+
+  it("round-trips through a file, with the roster and the bids", () => {
+    const workspace: Workspace = {
+      ...EMPTY_WORKSPACE,
+      bids: {
+        filename: "bids.csv",
+        text: "x",
+        readAs: "custom-mapping-bids",
+        mapping: {
+          version: 1,
+          dataset: "bids",
+          columns: { Student: "email", Rank: "priority", Choice: "project" },
+        },
+      },
+      roster: { ...roster, mapping },
+    };
+    expect(parseWorkspace(serializeWorkspace(workspace))).toEqual({
+      ok: true,
+      workspace,
+    });
+  });
+
+  it("stays stored when Read as moves away, and reads through again when chosen", () => {
+    const mapped = setColumnMapping(base, "roster", mapping);
+    expect(mapped.roster).toEqual({ ...roster, mapping });
+    const away = setReadAs(mapped, "roster", null);
+    // Detection finds nothing in this file, so the standard format is no
+    // choice to store.
+    expect(away.roster).toEqual({
+      source: roster.source,
+      text: roster.text,
+      mapping,
+    });
+    expect(setReadAs(away, "roster", "custom-mapping-roster").roster).toEqual(
+      mapped.roster
+    );
+    // Nothing to read as for an absent roster or bids.
+    expect(setReadAs(EMPTY_WORKSPACE, "bids", null)).toBe(EMPTY_WORKSPACE);
+  });
+
+  const imported = (entry: Record<string, unknown>) =>
+    parseWorkspace(JSON.stringify({ ...EMPTY_WORKSPACE, roster: entry }));
+
+  it("removes a mapping for another dataset or of the wrong shape, and reads the file as detected", () => {
+    expect(
+      imported({ ...roster, mapping: { ...mapping, dataset: "bids" } })
+    ).toEqual({
+      ok: true,
+      workspace: {
+        ...EMPTY_WORKSPACE,
+        roster: { source: roster.source, text: roster.text },
+      },
+      notices: [
+        {
+          source: "roster",
+          text: roster.text,
+          message:
+            "The column mapping saved with the roster could not be read, so it was removed from this workspace and the file is read as detected. It is for the bids, not the roster. Map its columns again to read it that way.",
+        },
+      ],
+    });
+    expect(
+      imported({
+        ...roster,
+        mapping: { ...mapping, columns: { Team: "team" } },
+      })
+    ).toMatchObject({
+      ok: true,
+      notices: [
+        expect.objectContaining({
+          message: expect.stringContaining(
+            "Its shape is wrong: team is not a column of the roster format."
+          ),
+        }),
+      ],
+    });
+  });
+
+  it("removes a later version, keeping a Read as that did not use it", () => {
+    const result = imported({
+      ...roster,
+      readAs: null,
+      mapping: { ...mapping, version: 2 },
+    });
+    expect(result).toEqual({
+      ok: true,
+      workspace: {
+        ...EMPTY_WORKSPACE,
+        roster: { source: roster.source, text: roster.text, readAs: null },
+      },
+      notices: [
+        {
+          source: "roster",
+          text: roster.text,
+          message:
+            "The column mapping saved with the roster could not be read, so it was removed from this workspace. The column mapping is version 2, and this page reads version 1. Map its columns again to read it that way.",
+        },
+      ],
+    });
+  });
+
+  it("says so only while the file is there with no new column mapping", () => {
+    const result = imported({ ...roster, mapping: { ...mapping, version: 2 } });
+    if (!result.ok) {
+      throw new Error(result.message);
+    }
+    const notices = result.notices ?? [];
+    expect(currentNotices(notices, result.workspace)).toHaveLength(1);
+    expect(
+      currentNotices(
+        notices,
+        setColumnMapping(result.workspace, "roster", mapping)
+      )
+    ).toEqual([]);
+    expect(
+      currentNotices(notices, {
+        ...result.workspace,
+        roster: {
+          ...roster,
+          readAs: undefined,
+          text: "email\nkim@example.edu",
+        },
+      })
+    ).toEqual([]);
+    expect(
+      currentNotices(notices, { ...result.workspace, roster: undefined })
+    ).toEqual([]);
+  });
+
+  it("refuses a Read as that is no way to read the dataset, and another dataset's mapping", () => {
+    const mapped = setColumnMapping(base, "roster", mapping);
+    expect(setReadAs(mapped, "roster", "custom-mapping-bids")).toBe(mapped);
+    expect(setReadAs(mapped, "roster", "qualtrics-bids")).toBe(mapped);
+    expect(setReadAs(mapped, "roster", "paste-roster")).toBe(mapped);
+    expect(setReadAs(mapped, "roster", "gone")).toBe(mapped);
+    expect(setReadAs(mapped, "roster", "canvas-roster").roster?.readAs).toBe(
+      "canvas-roster"
+    );
+    expect(
+      setColumnMapping(mapped, "roster", { ...mapping, dataset: "bids" })
+    ).toBe(mapped);
+    const bids = {
+      ...base,
+      bids: { filename: "bids.csv", text: "x", readAs: undefined },
+    };
+    expect(setColumnMapping(bids, "bids", mapping)).toBe(bids);
   });
 });
 

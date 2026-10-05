@@ -9,9 +9,11 @@ import {
 } from "#/lib/placement/roster";
 import {
   clearStoredWorkspace,
+  currentNotices,
   EMPTY_WORKSPACE,
   inputFingerprint,
   isEmptyWorkspace,
+  type MappingNotice,
   readStoredWorkspace,
   setAsideRemoved,
   WORKSPACE_STORAGE_KEY,
@@ -31,6 +33,9 @@ export function usePlacementWorkspace() {
   const [saveFailed, setSaveFailed] = useState(false);
   const [unreadable, setUnreadable] = useState(false);
   const [changedElsewhere, setChangedElsewhere] = useState(false);
+  // Column mappings reading the workspace removed (#735). One shows while
+  // its file is still there with no column mapping: see `currentNotices`.
+  const [notices, setNotices] = useState<MappingNotice[]>([]);
 
   // The storage event fires only in the other tabs, so this one learns that
   // a second copy of the page wrote the workspace it is about to overwrite.
@@ -48,6 +53,7 @@ export function usePlacementWorkspace() {
   useEffect(() => {
     const stored = readStoredWorkspace();
     setUnreadable(stored.status === "unreadable");
+    setNotices((stored.status === "ok" && stored.notices) || []);
     setWorkspace(stored.status === "ok" ? stored.workspace : EMPTY_WORKSPACE);
   }, []);
 
@@ -69,8 +75,17 @@ export function usePlacementWorkspace() {
     setWorkspace((current) => (current === null ? current : change(current)));
   }, []);
 
-  const replace = useCallback((next: Workspace) => setWorkspace(next), []);
-  const clear = useCallback(() => setWorkspace(EMPTY_WORKSPACE), []);
+  const replace = useCallback(
+    (next: Workspace, lost: readonly MappingNotice[] = []) => {
+      setNotices([...lost]);
+      setWorkspace(next);
+    },
+    []
+  );
+  const clear = useCallback(() => {
+    setNotices([]);
+    setWorkspace(EMPTY_WORKSPACE);
+  }, []);
 
   const storedBids = workspace?.bids;
   const projects = workspace?.projects;
@@ -91,6 +106,7 @@ export function usePlacementWorkspace() {
     // roster plugin reads it yet; a roster is small enough to re-read.
     const conversion = toStandard(plugin, storedRoster.text, {
       projects: projects ?? [],
+      mapping: storedRoster.mapping,
     });
     return { ...parseRosterCsv(conversion.text), plugin, conversion };
   }, [storedRoster, projects]);
@@ -105,7 +121,13 @@ export function usePlacementWorkspace() {
       storedBids.text,
       storedBids.readAs
     );
-    return { plugin, ...toStandard(plugin, storedBids.text, { projects }) };
+    return {
+      plugin,
+      ...toStandard(plugin, storedBids.text, {
+        projects,
+        mapping: storedBids.mapping,
+      }),
+    };
   }, [storedBids, projects]);
   // A removed student's pre-approval goes with them (#679), so a project
   // the roster adds shrinks, or disappears, without them.
@@ -190,6 +212,8 @@ export function usePlacementWorkspace() {
     placementProjects: allProjects,
     saveFailed,
     unreadable,
+    /** The column mappings reading the workspace removed, to say so. */
+    notices: currentNotices(notices, workspace),
     changedElsewhere,
     update,
     replace,

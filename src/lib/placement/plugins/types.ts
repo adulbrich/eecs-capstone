@@ -12,8 +12,29 @@ import type { WorkspaceProject } from "#/lib/placement/types";
  * write one.
  */
 
+/**
+ * Which header of a file fills each standard column of a dataset (#735):
+ * what custom mapping reads a file through. Data, never code.
+ */
+export interface ColumnMapping {
+  /**
+   * Each header the column mapping reads, as the file spells it, and the
+   * standard column it fills. Header case and spaces around it are ignored,
+   * as the standard format ignores them.
+   */
+  columns: Record<string, string>;
+  dataset: PlacementDataset;
+  /** The shape's number, `MAPPING_VERSION`. */
+  version: 1;
+}
+
 /** What a plugin may read besides the text. */
 export interface PluginContext {
+  /**
+   * The column mapping stored with the file (#735), which only custom
+   * mapping reads.
+   */
+  mapping?: ColumnMapping;
   /** The project list as it is now, for a source that names projects. */
   projects: readonly Pick<WorkspaceProject, "title">[];
 }
@@ -40,6 +61,8 @@ interface PluginBase {
    * file, "Problems in the pasted <label>" for pasted text.
    */
   label: string;
+  /** The option's name in Read as, when it is not `label`. */
+  menuLabel?: string;
   /**
    * The source as standard CSV. Rows it reports an error on are left out,
    * and rows it keeps should already be valid and unique, so the standard
@@ -59,13 +82,25 @@ export interface FilePlugin extends PluginBase {
   input: "file";
 }
 
+/**
+ * An uploaded file read the way staff chose, never detected: offered by
+ * Read as and by Map columns, and reading what staff chose from the
+ * context. Custom mapping is the one (#735).
+ */
+export interface ChosenPlugin extends PluginBase {
+  input: "chosen";
+}
+
 /** Text pasted into a box on the page; issues name lines, not rows. */
 export interface PastePlugin extends PluginBase {
   input: "paste";
 }
 
+/** A plugin that reads an uploaded file: detected, or chosen. */
+export type UploadPlugin = FilePlugin | ChosenPlugin;
+
 /** An import plugin: one that reads a source into placement. */
-export type ImportPlugin = FilePlugin | PastePlugin;
+export type ImportPlugin = UploadPlugin | PastePlugin;
 
 /** What an export plugin may read besides the text. */
 export interface ExportContext {

@@ -1,4 +1,4 @@
-import { Ellipsis, Trash2 } from "lucide-react";
+import { Columns3, Ellipsis, Trash2 } from "lucide-react";
 import { useMemo, useState } from "react";
 import {
   AdminDataTable,
@@ -6,6 +6,7 @@ import {
 } from "#/components/admin-data-table";
 import { ConfirmDialog } from "#/components/confirm-dialog";
 import { AddProjectDialog } from "#/components/placement/add-project-dialog";
+import { ColumnMappingEditor } from "#/components/placement/column-mapping";
 import { CsvFormatHelp } from "#/components/placement/csv-format";
 import { FilePickerButton } from "#/components/placement/file-picker-button";
 import { ImportIssues } from "#/components/placement/import-issues";
@@ -34,6 +35,10 @@ import {
 import { type ImportIssue, parseProjectsCsv } from "#/lib/placement/csv";
 import { PROJECTS_FORMAT } from "#/lib/placement/formats";
 import { detectPlugin, toStandard } from "#/lib/placement/plugins";
+import {
+  type ColumnMapping,
+  CUSTOM_MAPPINGS,
+} from "#/lib/placement/plugins/custom-mapping";
 import { pastedTitles } from "#/lib/placement/plugins/paste";
 import type { WorkspaceProject } from "#/lib/placement/types";
 import {
@@ -73,6 +78,11 @@ export function ProjectsTab({
   // Kept apart from the file's issues: a pasted list numbers lines, not rows.
   const [pasteIssues, setPasteIssues] = useState<ImportIssue[]>([]);
   const [duplicates, setDuplicates] = useState<string[]>([]);
+  // A file nothing recognized, kept until staff map its columns (#735).
+  const [unread, setUnread] = useState<{
+    filename: string;
+    text: string;
+  } | null>(null);
 
   const setProjects = (
     projects: WorkspaceProject[],
@@ -108,11 +118,30 @@ export function ProjectsTab({
     bidCount: bidCounts.get(p.key) ?? 0,
   }));
 
+  // Projects are stored parsed, so the column mapping runs once, here, and
+  // is not kept: the editor says so.
+  const readMapped = (mapping: ColumnMapping) => {
+    if (unread === null) {
+      return;
+    }
+    const converted = toStandard(CUSTOM_MAPPINGS.projects, unread.text, {
+      projects: [],
+      mapping,
+    });
+    const parsed = parseProjectsCsv(converted.text);
+    setIssues([...converted.issues, ...parsed.issues]);
+    if (parsed.projects.length > 0) {
+      setUnread(null);
+      setProjects(parsed.projects, { kind: "csv", filename: unread.filename });
+    }
+  };
+
   if (workspace.projects.length === 0) {
     return (
       <ProjectsImport
         duplicates={duplicates}
         issues={issues}
+        onMapping={readMapped}
         onPaste={(text) => {
           // Projects are stored parsed, not as text (they are edited by hand
           // afterward), so a plugin runs once, here, not on every read.
@@ -121,6 +150,7 @@ export function ProjectsTab({
           setDuplicates([]);
           setIssues(parsed.issues);
           setPasteIssues(converted.issues);
+          setUnread(null);
           if (parsed.projects.length > 0) {
             setProjects(parsed.projects, { kind: "pasted" });
           }
@@ -128,23 +158,31 @@ export function ProjectsTab({
         onPortal={(projects, projectSource, dupes) => {
           setIssues([]);
           setPasteIssues([]);
+          setUnread(null);
           setDuplicates(dupes);
           setProjects(projects, projectSource);
         }}
         onText={(text, filename) => {
-          const converted = toStandard(detectPlugin("projects", text), text, {
-            projects: [],
-          });
+          const plugin = detectPlugin("projects", text);
+          const converted = toStandard(plugin, text, { projects: [] });
           const parsed = parseProjectsCsv(converted.text);
           setDuplicates([]);
           setIssues([...converted.issues, ...parsed.issues]);
           setPasteIssues([]);
+          // Nothing recognized the file and it is not the standard format:
+          // offer to map its columns instead.
+          setUnread(
+            plugin === null && parsed.issues.some((i) => i.wholeFile)
+              ? { filename, text }
+              : null
+          );
           if (parsed.projects.length > 0) {
             setProjects(parsed.projects, { kind: "csv", filename });
           }
         }}
         pasteIssues={pasteIssues}
         programs={programs}
+        unread={unread}
         update={update}
         workspace={workspace}
       />
@@ -201,16 +239,19 @@ export function ProjectsTab({
 function ProjectsImport({
   duplicates,
   issues,
+  onMapping,
   onPaste,
   onPortal,
   onText,
   pasteIssues,
   programs,
+  unread,
   update,
   workspace,
 }: {
   duplicates: string[];
   issues: ImportIssue[];
+  onMapping: (mapping: ColumnMapping) => void;
   onPaste: (text: string) => void;
   onPortal: (
     projects: WorkspaceProject[],
@@ -220,6 +261,8 @@ function ProjectsImport({
   onText: (text: string, filename: string) => void;
   pasteIssues: ImportIssue[];
   programs: ProgramOption[];
+  /** The uploaded file nothing recognized, to map; null with none. */
+  unread: { filename: string; text: string } | null;
   update: PlacementWorkspace["update"];
   workspace: Workspace;
 }) {
@@ -308,6 +351,14 @@ function ProjectsImport({
         </div>
         <DuplicateTitles titles={duplicates} />
         <ImportIssues issues={issues} label="projects" />
+        {unread !== null && (
+          <UnreadProjectsFile
+            // A new file starts closed, with its own headers.
+            key={unread.text}
+            onMapping={onMapping}
+            unread={unread}
+          />
+        )}
       </section>
       <section aria-labelledby="placement-projects-paste-heading">
         <h2 className="font-medium" id="placement-projects-paste-heading">
@@ -339,6 +390,49 @@ function ProjectsImport({
           <AddProjectDialog update={update} workspace={workspace} />
         </div>
       </section>
+    </div>
+  );
+}
+
+/**
+ * A projects file nothing recognized (#735): Map columns, then the editor.
+ * Keyed by the file, so replacing or clearing it closes the editor.
+ */
+function UnreadProjectsFile({
+  onMapping,
+  unread,
+}: {
+  onMapping: (mapping: ColumnMapping) => void;
+  unread: { filename: string; text: string };
+}) {
+  const [mappingOpen, setMappingOpen] = useState(false);
+  return (
+    <div className="mt-2 flex flex-col items-start gap-2 text-sm">
+      {mappingOpen ? (
+        <ColumnMappingEditor
+          dataset="projects"
+          filename={unread.filename}
+          kept={false}
+          onApply={(mapping) => {
+            setMappingOpen(false);
+            onMapping(mapping);
+          }}
+          onCancel={() => setMappingOpen(false)}
+          text={unread.text}
+        />
+      ) : (
+        <>
+          <p>
+            No format on this page recognized {unread.filename}. Map its columns
+            to the projects format to read it as it is, or change the file to
+            match.
+          </p>
+          <Button onClick={() => setMappingOpen(true)} size="sm" type="button">
+            <Columns3 aria-hidden="true" />
+            Map columns
+          </Button>
+        </>
+      )}
     </div>
   );
 }

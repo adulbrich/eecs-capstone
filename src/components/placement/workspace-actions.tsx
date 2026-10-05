@@ -33,7 +33,7 @@ export function WorkspaceActions({
       const parsed = parseWorkspace(text);
       if (parsed.ok) {
         setError(null);
-        state.replace(parsed.workspace);
+        state.replace(parsed.workspace, parsed.notices);
       } else {
         setError(parsed.message);
       }

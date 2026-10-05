@@ -5,6 +5,7 @@ import {
   STANDARD_FORMATS,
 } from "#/lib/placement/formats";
 import { canvasGroups, canvasRoster } from "#/lib/placement/plugins/canvas";
+import { CUSTOM_MAPPINGS } from "#/lib/placement/plugins/custom-mapping";
 import { pastedRoster, pastedTitles } from "#/lib/placement/plugins/paste";
 import { qualtricsBids } from "#/lib/placement/plugins/qualtrics";
 import type {
@@ -15,18 +16,22 @@ import type {
   FilePlugin,
   ImportPlugin,
   PluginContext,
+  UploadPlugin,
 } from "#/lib/placement/plugins/types";
 
 /**
  * Every import plugin. A file is tried against its dataset's standard
  * format first, then against each file plugin here in order, and the first
- * that claims it reads it. Add a plugin by adding it to this list.
+ * that claims it reads it. Add a plugin by adding it to this list. Custom
+ * mapping comes last, one per dataset: nothing detects it, and Read as lists
+ * it after the formats that are.
  */
 export const PLUGINS: readonly ImportPlugin[] = [
   canvasRoster,
   qualtricsBids,
   pastedRoster,
   pastedTitles,
+  ...Object.values(CUSTOM_MAPPINGS),
 ];
 
 /**
@@ -50,10 +55,20 @@ export function pluginById(id: string): ImportPlugin | undefined {
   return PLUGINS.find((p) => p.id === id);
 }
 
-/** The plugins that read an uploaded file of `dataset`, in detection order. */
+/** The plugins that detect an uploaded file of `dataset`, in detection order. */
 export function filePlugins(dataset: PlacementDataset): FilePlugin[] {
   return PLUGINS.filter(
     (p): p is FilePlugin => p.input === "file" && p.dataset === dataset
+  );
+}
+
+/**
+ * Every way to read an uploaded file of `dataset`, as Read as lists them:
+ * the detected plugins in detection order, then the chosen ones.
+ */
+export function uploadPlugins(dataset: PlacementDataset): UploadPlugin[] {
+  return PLUGINS.filter(
+    (p): p is UploadPlugin => p.input !== "paste" && p.dataset === dataset
   );
 }
 
@@ -88,12 +103,14 @@ export function resolveFilePlugin(
   dataset: PlacementDataset,
   text: string,
   readAs: ReadAs
-): FilePlugin | null {
+): UploadPlugin | null {
   if (readAs === null) {
     return null;
   }
   const chosen = readAs === undefined ? undefined : pluginById(readAs);
-  return chosen?.input === "file" && chosen.dataset === dataset
+  return chosen !== undefined &&
+    chosen.input !== "paste" &&
+    chosen.dataset === dataset
     ? chosen
     : detectPlugin(dataset, text);
 }

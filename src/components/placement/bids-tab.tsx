@@ -19,12 +19,13 @@ import { Button } from "#/components/ui/button";
 import { standingText, studentStanding } from "#/lib/placement/bids-view";
 import { applyPins } from "#/lib/placement/board";
 import { BIDS_FORMAT } from "#/lib/placement/formats";
-import { readAsChoice } from "#/lib/placement/plugins";
 import { repointRosterPins } from "#/lib/placement/roster";
 import type { PlacementStudent } from "#/lib/placement/types";
 import {
   isStale,
   type StoredResult,
+  setColumnMapping,
+  setReadAs,
   type Workspace,
 } from "#/lib/placement/workspace";
 import type { SortState } from "#/lib/table-state";
@@ -124,7 +125,7 @@ export function BidsTab({
         <ConfirmDialog
           busyLabel="Removing..."
           confirmLabel="Remove"
-          description="The bids leave this workspace, and with them any placement, the pins set on it and the titles matched by hand. Upload the file again to bring the bids back."
+          description={`The bids leave this workspace, and with them any placement, the pins set on it and the titles matched by hand. Upload the file again to bring the bids back.${workspace.bids.mapping === undefined ? "" : " The column mapping goes with the file; download it first to keep it."}`}
           onConfirm={() =>
             update((w) => ({
               ...w,
@@ -152,21 +153,15 @@ export function BidsTab({
         // A workspace saved before plugins converted on read (#733) holds
         // the converted text, and its conversion's issues, as they were.
         legacyConvertedFrom={workspace.bids.convertedFrom}
-        onReadAs={(choice) =>
-          update((w) => ({
-            ...w,
-            bids:
-              w.bids === null
-                ? null
-                : {
-                    ...w.bids,
-                    readAs: readAsChoice("bids", w.bids.text, choice),
-                  },
-          }))
+        mapping={workspace.bids.mapping}
+        onMapping={(mapping) =>
+          update((w) => setColumnMapping(w, "bids", mapping))
         }
+        onReadAs={(choice) => update((w) => setReadAs(w, "bids", choice))}
         parseIssues={bids.issues}
         plugin={source?.plugin ?? null}
         readAs={workspace.bids.readAs}
+        text={workspace.bids.text}
       />
       <TitleMatchesPanel
         matches={workspace.titleMatches}

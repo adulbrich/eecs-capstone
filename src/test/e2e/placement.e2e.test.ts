@@ -1131,6 +1131,136 @@ test.describe("placement workspace", () => {
     ).toBeVisible();
   });
 
+  test("a roster nothing recognizes reads through a column mapping, which loads again in a fresh browser (#735)", async ({
+    browser,
+    page,
+  }) => {
+    const rosterFile = {
+      name: "roster.csv",
+      mimeType: "text/csv",
+      buffer: Buffer.from(
+        [
+          "Student Email,Full Name,Team",
+          `ada@${DOMAIN},Ada Park,Robot Arm`,
+          `kim@${DOMAIN},Kim Lee,`,
+        ].join("\n")
+      ),
+    };
+    await page.goto("/admin/placement");
+    await waitForHydration(page);
+    await importFiles(page);
+    await page.getByRole("tab", { name: /Roster/ }).click();
+    await page.getByLabel("Roster CSV file").setInputFiles(rosterFile);
+    const roster = page.getByRole("region", { name: /Class roster/ });
+    await expect(roster).toContainText("No format on this page recognized");
+    await roster.getByRole("button", { name: "Map columns" }).click();
+
+    const editor = page.getByRole("region", {
+      name: "Map the columns of roster.csv",
+    });
+    const apply = editor.getByRole("button", { name: "Apply column mapping" });
+    await expect(apply).toBeDisabled();
+    const choose = async (column: string, header: string) => {
+      await editor
+        .getByRole("combobox", { name: `File column for ${column}` })
+        .click();
+      await page.getByRole("option", { name: header, exact: true }).click();
+    };
+    await choose("email", "Student Email");
+    await choose("name", "Full Name");
+    await choose("project", "Team");
+    await expect(editor.getByRole("table")).toContainText(`ada@${DOMAIN}`);
+    await apply.click();
+
+    await expect(roster).toContainText("2 students from roster.csv");
+    await expect(roster).toContainText("1 student is pre-approved");
+    await expect(roster).toContainText("Converted from the column-mapped");
+    await expect.poll(() => stored(page)).toContain('"custom-mapping-roster"');
+
+    // Read as another format keeps the column mapping, and choosing it
+    // again reads through it with no editor.
+    const readAs = roster.getByRole("combobox", { name: "Read as" });
+    await readAs.click();
+    await page.getByRole("option", { name: "Roster CSV" }).click();
+    await expect(roster).toContainText("0 students from roster.csv");
+    await readAs.click();
+    await page.getByRole("option", { name: "Column mapping" }).click();
+    await expect(roster).toContainText("2 students from roster.csv");
+    await expect(
+      page.getByRole("region", { name: "Map the columns of roster.csv" })
+    ).toHaveCount(0);
+
+    await page.getByRole("tab", { name: /Bids/ }).click();
+    await expect(
+      page.getByRole("rowheader", {
+        name: /Ada Park.*pre-approved for Robot Arm/,
+      })
+    ).toBeVisible();
+    await expect(
+      page.getByText("and 1 more from the roster with no bids")
+    ).toBeVisible();
+
+    await page.getByRole("tab", { name: /Roster/ }).click();
+    const download = page.waitForEvent("download");
+    await roster
+      .getByRole("button", { name: "Download column mapping" })
+      .click();
+    const saved = await download;
+    expect(saved.suggestedFilename()).toBe("roster (column mapping).json");
+    const mapping = await readFile(await saved.path(), "utf-8");
+    const rosterOf = async (p: Page) =>
+      JSON.parse((await stored(p)) ?? "null")?.roster;
+    const original = await rosterOf(page);
+
+    // A fresh workspace, the same file, and the downloaded mapping.
+    const fresh = await browser.newContext({ storageState: ADMIN_AUTH });
+    try {
+      const other = await fresh.newPage();
+      await other.goto("/admin/placement?tab=roster");
+      await waitForHydration(other);
+      await other.getByLabel("Roster CSV file").setInputFiles(rosterFile);
+      const otherRoster = other.getByRole("region", { name: /Class roster/ });
+      await otherRoster.getByRole("button", { name: "Map columns" }).click();
+      await other.getByLabel("Column mapping file").setInputFiles({
+        name: "roster (column mapping).json",
+        mimeType: "application/json",
+        buffer: Buffer.from(mapping),
+      });
+      await other.getByRole("button", { name: "Apply column mapping" }).click();
+      await expect(otherRoster).toContainText("2 students from roster.csv");
+      await expect.poll(() => rosterOf(other)).toEqual(original);
+
+      // A file without one of the mapped headers names it.
+      await otherRoster.getByRole("button", { name: "Remove roster" }).click();
+      await other.getByRole("button", { name: "Remove", exact: true }).click();
+      await other.getByLabel("Roster CSV file").setInputFiles({
+        ...rosterFile,
+        buffer: Buffer.from(`Student Email,Full Name\nlou@${DOMAIN},Lou Ma`),
+      });
+      await otherRoster.getByRole("button", { name: "Map columns" }).click();
+      await other.getByLabel("Column mapping file").setInputFiles({
+        name: "roster (column mapping).json",
+        mimeType: "application/json",
+        buffer: Buffer.from(mapping),
+      });
+      const missing = other
+        .getByRole("status")
+        .filter({ hasText: 'no "Team" (project)' });
+      await expect(missing).toBeVisible();
+      // Another column's choice leaves the warning, and Apply goes ahead
+      // without the optional column.
+      await other
+        .getByRole("combobox", { name: "File column for name" })
+        .click();
+      await other.getByRole("option", { name: "Not in the file" }).click();
+      await expect(missing).toBeVisible();
+      await other.getByRole("button", { name: "Apply column mapping" }).click();
+      await expect(otherRoster).toContainText("1 student from roster.csv");
+    } finally {
+      await fresh.close();
+    }
+  });
+
   test("staff read the bids per project and pin a student from there", async ({
     page,
   }) => {

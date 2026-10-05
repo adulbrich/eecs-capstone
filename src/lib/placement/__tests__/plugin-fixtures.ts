@@ -1,3 +1,4 @@
+import type { PluginContext } from "#/lib/placement/plugins/types";
 import type { WorkspaceProject } from "#/lib/placement/types";
 
 /**
@@ -69,4 +70,71 @@ export const PLUGIN_FIXTURES: Record<string, string> = {
     "lou@example.edu,Lou Ma,Robot Arm,1,not in the survey,,",
     "cy@example.edu,Cy Moss,,,,,",
   ].join("\r\n"),
+};
+
+/**
+ * For a plugin staff choose rather than one that detects its file, by id: a
+ * file nothing detects, and what staff chose to read it with. Custom
+ * mapping's headers are spelled and ordered unlike the standard format's,
+ * and leave an optional column unmapped.
+ */
+export const CHOSEN_FIXTURES: Record<
+  string,
+  { context: Omit<PluginContext, "projects">; text: string }
+> = {
+  "custom-mapping-projects": {
+    text: [
+      "Sponsor,Project Name,Teams",
+      "Jane Doe,Tide Clock,2",
+      "Ada Park,Robot Arm,",
+    ].join("\n"),
+    context: {
+      mapping: {
+        version: 1,
+        dataset: "projects",
+        columns: {
+          "Project Name": "title",
+          Teams: "max_teams",
+          Sponsor: "proposer_name",
+        },
+      },
+    },
+  },
+  "custom-mapping-roster": {
+    text: [
+      "Student Email,Full Name,Team",
+      "ada@example.edu,Ada Park,Tide Clock",
+      "kim@example.edu,Kim Lee,",
+    ].join("\n"),
+    context: {
+      mapping: {
+        version: 1,
+        dataset: "roster",
+        columns: {
+          "Student Email": "email",
+          "Full Name": "name",
+          Team: "project",
+        },
+      },
+    },
+  },
+  "custom-mapping-bids": {
+    text: [
+      "Choice,Student,Rank,Why",
+      "Tide Clock,ada@example.edu,1,I built a tide gauge.",
+      "Robot Arm,ada@example.edu,2,",
+    ].join("\n"),
+    context: {
+      mapping: {
+        version: 1,
+        dataset: "bids",
+        columns: {
+          Student: "email",
+          Rank: "priority",
+          Choice: "project",
+          Why: "comment",
+        },
+      },
+    },
+  },
 };

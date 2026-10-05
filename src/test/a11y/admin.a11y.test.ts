@@ -400,6 +400,154 @@ for (const width of [1280, 375]) {
   });
 }
 
+// A roster nothing recognizes, read through a column mapping (#735).
+for (const width of [1280, 375]) {
+  test(`admin placement, a column mapping at ${width}`, async ({ page }) => {
+    await page.setViewportSize({ width, height: 800 });
+    await page.goto("/admin/placement?tab=roster");
+    await waitForHydration(page);
+    await page.getByLabel("Roster CSV file").setInputFiles({
+      name: "roster.csv",
+      mimeType: "text/csv",
+      buffer: Buffer.from(
+        [
+          "Student Email,Full Name,Team",
+          "ada@example.edu,Ada Park,Tide Clock",
+          "kim@example.edu,Kim Lee,",
+        ].join("\n")
+      ),
+    });
+    await page.getByRole("button", { name: "Map columns" }).click();
+    const editor = page.getByRole("region", {
+      name: "Map the columns of roster.csv",
+    });
+    await expect(
+      editor.getByRole("button", { name: "Apply column mapping" })
+    ).toBeDisabled();
+    await checkA11y(page);
+    await expectNoHorizontalOverflow(page);
+
+    for (const [column, header] of [
+      ["email", "Student Email"],
+      ["name", "Full Name"],
+      ["project", "Team"],
+    ]) {
+      await editor
+        .getByRole("combobox", { name: `File column for ${column}` })
+        .click();
+      await page.getByRole("option", { name: header, exact: true }).click();
+    }
+    await expect(editor.getByRole("table")).toContainText("ada@example.edu");
+    await checkA11y(page);
+    await expectNoHorizontalOverflow(page);
+
+    await editor.getByRole("button", { name: "Apply column mapping" }).click();
+    await expect(
+      page.getByRole("button", { name: "Edit column mapping" })
+    ).toBeVisible();
+    await checkA11y(page);
+    await expectNoHorizontalOverflow(page);
+  });
+}
+
+// A saved workspace holding a column mapping this page cannot read (#735):
+// the page loads and says the column mapping was removed.
+for (const width of [1280, 375]) {
+  test(`admin placement, a removed column mapping at ${width}`, async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width, height: 800 });
+    await page.goto("/admin/placement?tab=roster");
+    await waitForHydration(page);
+    await page.getByLabel("Roster CSV file").setInputFiles({
+      name: "roster.csv",
+      mimeType: "text/csv",
+      buffer: Buffer.from("Student Email,Full Name\nada@example.edu,Ada Park"),
+    });
+    await expect(
+      page.getByRole("button", { name: "Map columns" })
+    ).toBeVisible();
+    // What a later build could save: a version 2 column mapping in use.
+    await page.evaluate(() => {
+      const key = "cs-capstone:placement:v1";
+      const workspace = JSON.parse(window.localStorage.getItem(key) ?? "{}");
+      workspace.roster.readAs = "custom-mapping-roster";
+      workspace.roster.mapping = {
+        version: 2,
+        dataset: "roster",
+        columns: { "Student Email": "email" },
+      };
+      window.localStorage.setItem(key, JSON.stringify(workspace));
+    });
+    await page.reload();
+    await waitForHydration(page);
+    await expect(
+      page
+        .getByRole("status")
+        .filter({ hasText: "so it was removed from this workspace" })
+    ).toContainText("version 2");
+    await expect(
+      page.getByRole("button", { name: "Map columns" })
+    ).toBeVisible();
+    await checkA11y(page);
+    await expectNoHorizontalOverflow(page);
+  });
+}
+
+// The projects and bids column mappings (#735): one editor each, opened from
+// a file nothing recognizes.
+for (const width of [1280, 375]) {
+  test(`admin placement, projects and bids column mappings at ${width}`, async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width, height: 800 });
+    await page.goto("/admin/placement");
+    await waitForHydration(page);
+    await page.getByLabel("Projects CSV file").setInputFiles({
+      name: "projects.csv",
+      mimeType: "text/csv",
+      buffer: Buffer.from("Project Name,Teams\nTide Clock,2\nRobot Arm,\n"),
+    });
+    await page.getByRole("button", { name: "Map columns" }).click();
+    const projects = page.getByRole("region", {
+      name: "Map the columns of projects.csv",
+    });
+    await projects
+      .getByRole("combobox", { name: "File column for title" })
+      .click();
+    await page
+      .getByRole("option", { name: "Project Name", exact: true })
+      .click();
+    await expect(projects.getByRole("table")).toContainText("Robot Arm");
+    await checkA11y(page);
+    await expectNoHorizontalOverflow(page);
+    await projects
+      .getByRole("button", { name: "Apply column mapping" })
+      .click();
+    await expect(
+      page.getByRole("cell", { name: "Tide Clock", exact: true })
+    ).toBeVisible();
+
+    await page.getByRole("tab", { name: /Bids/ }).click();
+    await page.getByLabel("Bids CSV file").setInputFiles({
+      name: "bids.csv",
+      mimeType: "text/csv",
+      buffer: Buffer.from(
+        "Student,Rank,Choice\nada@example.edu,1,Tide Clock\nada@example.edu,2,Robot Arm\n"
+      ),
+    });
+    await page.getByRole("button", { name: "Map columns" }).click();
+    const bids = page.getByRole("region", {
+      name: "Map the columns of bids.csv",
+    });
+    await expect(
+      bids.getByRole("button", { name: "Apply column mapping" })
+    ).toBeDisabled();
+    await checkA11y(page);
+    await expectNoHorizontalOverflow(page);
+  });
+}
+
 test("@smoke admin placement, projects and bids loaded", async ({ page }) => {
   await page.goto("/admin/placement");
   await waitForHydration(page);

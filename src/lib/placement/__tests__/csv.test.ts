@@ -1,10 +1,13 @@
 import { describe, expect, it } from "vitest";
 import {
+  cell,
   normalizeTitle,
   parseBidsCsv,
   parseProjectsCsv,
   parseProjectTitles,
+  parseRows,
 } from "#/lib/placement/csv";
+import { parseRosterCsv } from "#/lib/placement/roster";
 
 // Every name, email and title here is invented (#648).
 
@@ -22,6 +25,61 @@ function bids(...lines: string[]) {
 
 const errors = (result: { issues: { level: string; row: number }[] }) =>
   result.issues.filter((i) => i.level === "error").map((i) => i.row);
+
+describe("parseRows", () => {
+  it("lowercases the header of a file that starts with blank lines (#735)", () => {
+    const { fields, issues, rows } = parseRows(
+      "\n \r\nEmail,Name\nada@example.edu,Ada Park"
+    );
+    expect(issues).toEqual([]);
+    expect(fields).toEqual(["email", "name"]);
+    expect(rows).toEqual([{ email: "ada@example.edu", name: "Ada Park" }]);
+  });
+
+  it("reads a standard file that starts with a blank line", () => {
+    expect(parseRosterCsv("\nEmail,Name\nada@example.edu,Ada").issues).toEqual(
+      []
+    );
+  });
+
+  it("lowercases the header after a BOM and blank lines", () => {
+    const { fields, rows } = parseRows("\uFEFF\n\nEmail\nx@example.edu");
+    expect(fields).toEqual(["email"]);
+    expect(rows).toEqual([{ email: "x@example.edu" }]);
+  });
+
+  it("names the file's own rows after leading blank lines", () => {
+    // Line 5 of the file has a cell too many.
+    const text =
+      "\n\nEmail,Name\nada@example.edu,Ada\nkim@example.edu,Kim,z,w\n";
+    expect(parseRows(text).firstRecordRow).toBe(4);
+    expect(parseRows(text).issues.map((i) => i.row)).toEqual([5]);
+    expect(parseRosterCsv(text).issues.map((i) => i.row)).toEqual([5]);
+    expect(
+      parseRosterCsv(
+        "\n\nemail\nada@example.edu\nada@example.edu\n"
+      ).issues.map((i) => i.row)
+    ).toEqual([5]);
+    expect(
+      parseProjectsCsv("\ntitle,max_teams\nTide Clock,x\n").issues.map(
+        (i) => i.row
+      )
+    ).toEqual([3]);
+    expect(
+      parseBidsCsv(
+        "\nemail,priority,project\nada@example.edu,x,Tide Clock\n",
+        PROJECTS
+      ).issues.map((i) => i.row)
+    ).toEqual([3]);
+  });
+
+  it("reads a column named __proto__ as blank rather than throwing (#735)", () => {
+    const { rows } = parseRows("__proto__,email\nx,ada@example.edu");
+    expect(rows[0] && cell(rows[0], "__proto__")).toBe("");
+    expect(rows[0] && cell(rows[0], "email")).toBe("ada@example.edu");
+    expect(cell({}, "constructor")).toBe("");
+  });
+});
 
 describe("normalizeTitle", () => {
   it("trims, folds case and collapses inner whitespace", () => {

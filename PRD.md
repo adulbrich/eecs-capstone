@@ -623,8 +623,9 @@ catalogue that decided the matrix below; #288 shipped it.
   #698, #733).
 - [x] Download the placement as a Canvas group-set import, through an export
   plugin chosen in "Download as" on the Results tab (#734).
-- [ ] Map an unrecognized file's columns to the standard format (#735), and
-  read a wide bids file through that mapping (#736).
+- [x] Map an unrecognized file's columns to the standard format with a column
+  mapping, saved with the workspace and downloadable as JSON (#735).
+- [ ] Read a wide bids file through a column mapping (#736).
 
 ## 18. Analytics Dashboard
 
