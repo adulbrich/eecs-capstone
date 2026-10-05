@@ -1,4 +1,4 @@
-import { parseRows } from "#/lib/placement/csv";
+import { type ImportIssue, parseRows } from "#/lib/placement/csv";
 import {
   type ExportDataset,
   type PlacementDataset,
@@ -9,11 +9,11 @@ import { pastedRoster, pastedTitles } from "#/lib/placement/plugins/paste";
 import { qualtricsBids } from "#/lib/placement/plugins/qualtrics";
 import type {
   Conversion,
-  Export,
   ExportContext,
+  ExportedFile,
   ExportPlugin,
   FilePlugin,
-  PlacementPlugin,
+  ImportPlugin,
   PluginContext,
 } from "#/lib/placement/plugins/types";
 
@@ -22,12 +22,18 @@ import type {
  * format first, then against each file plugin here in order, and the first
  * that claims it reads it. Add a plugin by adding it to this list.
  */
-export const PLUGINS: readonly PlacementPlugin[] = [
+export const PLUGINS: readonly ImportPlugin[] = [
   canvasRoster,
   qualtricsBids,
   pastedRoster,
   pastedTitles,
 ];
+
+/**
+ * The standard format's value in the Read as and Download as selects, beside
+ * plugin ids, so no plugin may take it as its id: the contract test checks.
+ */
+export const STANDARD_OPTION = "standard";
 
 /**
  * Every export plugin, offered by "Download as" after the dataset's standard
@@ -40,7 +46,7 @@ export function exportPlugins(dataset: ExportDataset): ExportPlugin[] {
   return EXPORT_PLUGINS.filter((p) => p.dataset === dataset);
 }
 
-export function pluginById(id: string): PlacementPlugin | undefined {
+export function pluginById(id: string): ImportPlugin | undefined {
   return PLUGINS.find((p) => p.id === id);
 }
 
@@ -109,11 +115,24 @@ export function readAsChoice(
 
 const TRAILING_STOP = /\.$/;
 
-const reason = (error: unknown) =>
-  (error instanceof Error ? error.message : String(error)).replace(
-    TRAILING_STOP,
-    ""
-  );
+/**
+ * A plugin that threw, as the one problem with the whole file: `failure`
+ * says what could not be done, as "The Canvas roster export could not be
+ * read".
+ */
+function thrown(failure: string, error: unknown): ImportIssue[] {
+  const reason = (
+    error instanceof Error ? error.message : String(error)
+  ).replace(TRAILING_STOP, "");
+  return [
+    {
+      level: "error",
+      row: 1,
+      message: `${failure}: ${reason}.`,
+      wholeFile: true,
+    },
+  ];
+}
 
 /**
  * The text as standard CSV: through `plugin`, or as it is when null. A
@@ -122,7 +141,7 @@ const reason = (error: unknown) =>
  * would otherwise break the page until staff cleared their browser.
  */
 export function toStandard(
-  plugin: PlacementPlugin | null,
+  plugin: ImportPlugin | null,
   text: string,
   context: PluginContext
 ): Conversion {
@@ -134,14 +153,7 @@ export function toStandard(
   } catch (error) {
     return {
       text: "",
-      issues: [
-        {
-          level: "error",
-          row: 1,
-          message: `The ${plugin.label} could not be read: ${reason(error)}.`,
-          wholeFile: true,
-        },
-      ],
+      issues: thrown(`The ${plugin.label} could not be read`, error),
     };
   }
 }
@@ -151,11 +163,11 @@ export function toStandard(
  * null. A plugin that throws is reported as a problem with the whole file,
  * so the page can say so rather than the download doing nothing.
  */
-export function fromStandard(
+export function exportWith(
   plugin: ExportPlugin | null,
   text: string,
   context: ExportContext
-): Export {
+): ExportedFile {
   if (plugin === null) {
     return { filename: context.filename, text, issues: [] };
   }
@@ -165,14 +177,7 @@ export function fromStandard(
     return {
       filename: context.filename,
       text: "",
-      issues: [
-        {
-          level: "error",
-          row: 1,
-          message: `The ${plugin.label} file could not be written: ${reason(error)}.`,
-          wholeFile: true,
-        },
-      ],
+      issues: thrown(`The ${plugin.label} file could not be written`, error),
     };
   }
 }

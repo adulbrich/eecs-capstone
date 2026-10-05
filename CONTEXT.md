@@ -312,9 +312,9 @@ _Avoid_: alias, mapping, title fix
 
 **Standard format**:
 The one CSV shape placement reads for each of the projects, the roster and the bids,
-and writes back out, plus the one it writes the placement in. Whatever a file came
-as, placement reads it as this
+and writes back out. Whatever a file came as, placement reads it as this
 ([ADR-0059](./docs/adr/0059-placement-plugins-convert-to-the-standard-csv.md)).
+The placement it produces has one too, which placement writes and never reads.
 _Avoid_: schema, native format, template (the template is an example file in it)
 
 **Plugin**:

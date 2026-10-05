@@ -3,7 +3,7 @@ import type { ExportDataset, PlacementDataset } from "#/lib/placement/formats";
 import type { WorkspaceProject } from "#/lib/placement/types";
 
 /**
- * A placement plugin reads one source's own shape and writes the dataset's
+ * An import plugin reads one source's own shape and writes the dataset's
  * standard CSV (`STANDARD_FORMATS`), which the one parser per dataset then
  * reads (ADR-0059). An export plugin goes the other way, from what placement
  * writes (`EXPORT_FORMATS`) to another tool's shape (#734). Plugins are
@@ -64,8 +64,8 @@ export interface PastePlugin extends PluginBase {
   input: "paste";
 }
 
-/** A plugin that reads a source into placement. */
-export type PlacementPlugin = FilePlugin | PastePlugin;
+/** An import plugin: one that reads a source into placement. */
+export type ImportPlugin = FilePlugin | PastePlugin;
 
 /** What an export plugin may read besides the text. */
 export interface ExportContext {
@@ -73,7 +73,7 @@ export interface ExportContext {
   filename: string;
 }
 
-export interface Export {
+export interface ExportedFile {
   /** The name the download saves the file under. */
   filename: string;
   /**
@@ -97,7 +97,7 @@ export interface ExportPlugin {
    * file, and what the file leaves out. Plain prose.
    */
   description: string;
-  fromStandard: (text: string, context: ExportContext) => Export;
+  fromStandard: (text: string, context: ExportContext) => ExportedFile;
   /** Unique across every plugin, import or export. */
   id: string;
   /** The option's name in "Download as". */

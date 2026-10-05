@@ -4,6 +4,7 @@ import {
   type ImportIssue,
   missingColumns,
   parseRows,
+  type Row,
 } from "#/lib/placement/csv";
 import { PLACEMENT_FORMAT } from "#/lib/placement/formats";
 import type { ExportPlugin, FilePlugin } from "#/lib/placement/plugins/types";
@@ -46,7 +47,120 @@ const REQUIRED = PLACEMENT_FORMAT.columns
   .filter((c) => c.required)
   .map((c) => c.name);
 
-type GroupRow = Record<"name" | "login_id" | "group_name", string>;
+/** Canvas's columns, in the order the file writes them. */
+const GROUP_COLUMNS = ["name", "login_id", "group_name"] as const;
+
+type GroupRow = Record<(typeof GROUP_COLUMNS)[number], string>;
+
+/** A placed student, as the standard placement's row has them. */
+interface Placed {
+  email: string;
+  name: string;
+  project: string;
+  /** The row in the standard CSV, header as row 1. */
+  row: number;
+  team: string;
+}
+
+/** Every placed student, each row read once. The unplaced have no project. */
+function readPlaced(rows: readonly Row[]): Placed[] {
+  return rows.flatMap((raw, i): Placed[] => {
+    const project = cell(raw, "project");
+    return project === ""
+      ? []
+      : [
+          {
+            email: cell(raw, "email"),
+            name: cell(raw, "name"),
+            project,
+            row: i + 2,
+            team: cell(raw, "team"),
+          },
+        ];
+  });
+}
+
+/** Each project's team numbers, leaving out a row that names none. */
+function teamsByProject(placed: readonly Placed[]): Map<string, Set<string>> {
+  const teams = new Map<string, Set<string>>();
+  for (const { project, team } of placed) {
+    if (team !== "") {
+      const numbers = teams.get(project) ?? new Set<string>();
+      numbers.add(team);
+      teams.set(project, numbers);
+    }
+  }
+  return teams;
+}
+
+/**
+ * The group a placed student joins, and the project or team it stands for,
+ * or the problem that leaves their row out.
+ */
+function groupOf(
+  p: Placed,
+  teams: ReadonlyMap<string, ReadonlySet<string>>
+): { group: string; source: string } | ImportIssue {
+  const several = (teams.get(p.project)?.size ?? 0) > 1;
+  if (p.email === "") {
+    return {
+      level: "error",
+      row: p.row,
+      message: "The row has no email, which Canvas needs as the login.",
+    };
+  }
+  if (!several) {
+    return { group: p.project, source: p.project };
+  }
+  if (p.team === "") {
+    return {
+      level: "error",
+      row: p.row,
+      message: `${p.project} has more than one team, and the row names none.`,
+    };
+  }
+  return {
+    group: `${p.project} (Team ${p.team})`,
+    source: `team ${p.team} of ${p.project}`,
+  };
+}
+
+/**
+ * The file's rows, and what naming the groups found: a row left out, or a
+ * group name two projects or teams share, which Canvas would make one group.
+ */
+function groupRows(placed: readonly Placed[]): {
+  issues: ImportIssue[];
+  kept: GroupRow[];
+} {
+  const teams = teamsByProject(placed);
+  const issues: ImportIssue[] = [];
+  const kept: GroupRow[] = [];
+  // Where each group name came from first, and the names already warned of.
+  const sources = new Map<string, string>();
+  const merged = new Set<string>();
+  for (const p of placed) {
+    const named = groupOf(p, teams);
+    if ("level" in named) {
+      issues.push(named);
+      continue;
+    }
+    const { group, source } = named;
+    const first = sources.get(group);
+    if (first === undefined) {
+      sources.set(group, source);
+    } else if (first !== source && !merged.has(group)) {
+      merged.add(group);
+      issues.push({
+        level: "warning",
+        row: p.row,
+        message: `${first} and ${source} both become the group "${group}", which Canvas would fill with the students of both. Rename one of the projects to keep them apart.`,
+      });
+    }
+    kept.push({ name: p.name, login_id: p.email, group_name: group });
+  }
+  return { issues, kept };
+}
 
 /**
  * The placement as a Canvas group set import (#734), in the shape of
@@ -62,63 +176,23 @@ export const canvasGroups: ExportPlugin = {
   label: "Canvas groups",
   dataset: "placement",
   description:
-    "A file to import into a Canvas group set. Canvas matches each student by their login, which is their email here, and creates the groups in the group set you import into: one per project, or one per team when a project has more than one. Unplaced students are left out, and stay in no group.",
-  requiredColumns: ["login_id", "group_name"],
+    "A file to import into a Canvas group set. Canvas matches each student by their login, which is their email here, and creates the groups in the group set you import into: one per project, or one per team when a project has more than one. Unplaced students are left out, and stay in no group. A title starting with =, +, - or @ keeps the apostrophe that stops a spreadsheet reading it as a formula, and Canvas keeps it in the group name. A run that changes how many teams a project has also changes its group names, so import into a new group set rather than over an old one.",
+  requiredColumns: GROUP_COLUMNS.filter((c) => c !== "name"),
   fromStandard: (text, { filename }) => {
     const { fields, issues: parseIssues, rows } = parseRows(text);
-    const issues: ImportIssue[] = [
-      ...parseIssues,
-      ...missingColumns(fields, REQUIRED),
-    ];
-    const kept: GroupRow[] = [];
-    if (!issues.some((i) => i.wholeFile)) {
-      const teams = new Map<string, Set<string>>();
-      for (const raw of rows) {
-        const project = cell(raw, "project");
-        const team = cell(raw, "team");
-        if (project !== "" && team !== "") {
-          teams.set(project, (teams.get(project) ?? new Set()).add(team));
-        }
-      }
-      rows.forEach((raw, i) => {
-        const row = i + 2;
-        const project = cell(raw, "project");
-        if (project === "") {
-          return;
-        }
-        const email = cell(raw, "email");
-        const team = cell(raw, "team");
-        const several = (teams.get(project)?.size ?? 0) > 1;
-        if (email === "") {
-          issues.push({
-            level: "error",
-            row,
-            message: "The row has no email, which Canvas needs as the login.",
-          });
-        } else if (several && team === "") {
-          issues.push({
-            level: "error",
-            row,
-            message: `${project} has more than one team, and the row names none.`,
-          });
-        } else {
-          kept.push({
-            name: cell(raw, "name"),
-            login_id: email,
-            group_name: several ? `${project} (Team ${team})` : project,
-          });
-        }
-      });
-    }
+    const issues = [...parseIssues, ...missingColumns(fields, REQUIRED)];
+    const grouped = issues.some((i) => i.wholeFile)
+      ? { issues: [], kept: [] }
+      : groupRows(readPlaced(rows));
     return {
       filename: filename.replace(CSV_EXTENSION, " (Canvas groups).csv"),
-      issues,
+      issues: [...issues, ...grouped.issues],
       text: toCsv(
-        (["name", "login_id", "group_name"] as const).map((header) => ({
+        GROUP_COLUMNS.map((header) => ({
           header,
           value: (r: GroupRow) => r[header],
         })),
-        kept
+        grouped.kept
       ),
     };
   },

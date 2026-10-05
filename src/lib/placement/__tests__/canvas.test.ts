@@ -219,6 +219,32 @@ describe("the Canvas group set import (#734)", () => {
     ]);
   });
 
+  it("warns once when two projects or teams become one group, and keeps both", () => {
+    const written = groups(
+      placement([
+        { email: "ada@example.edu", project: "Robot (Team 1)", team: "1" },
+        { email: "kim@example.edu", project: "Robot", team: "1" },
+        { email: "lou@example.edu", project: "Robot", team: "2" },
+        { email: "max@example.edu", project: "Robot", team: "1" },
+      ])
+    );
+    expect(written.text.split("\r\n")).toEqual([
+      "name,login_id,group_name",
+      ",ada@example.edu,Robot (Team 1)",
+      ",kim@example.edu,Robot (Team 1)",
+      ",lou@example.edu,Robot (Team 2)",
+      ",max@example.edu,Robot (Team 1)",
+    ]);
+    expect(written.issues).toEqual([
+      {
+        level: "warning",
+        row: 3,
+        message:
+          'Robot (Team 1) and team 1 of Robot both become the group "Robot (Team 1)", which Canvas would fill with the students of both. Rename one of the projects to keep them apart.',
+      },
+    ]);
+  });
+
   it("names the file after the placement", () => {
     expect(groups(placement([])).filename).toBe(
       "placement-2026-10-04 (Canvas groups).csv"

@@ -19,11 +19,12 @@ import {
 import {
   detectPlugin,
   EXPORT_PLUGINS,
-  fromStandard,
+  exportWith,
   PLUGINS,
   pluginById,
   readAsChoice,
   resolveFilePlugin,
+  STANDARD_OPTION,
   toStandard,
 } from "#/lib/placement/plugins";
 import { canvasGroups, canvasRoster } from "#/lib/placement/plugins/canvas";
@@ -128,11 +129,19 @@ describe.each(EXPORT_PLUGINS.map((p) => [p.id, p] as const))(
   }
 );
 
+it("gives no plugin the id the selects use for the standard format", () => {
+  expect(
+    [...PLUGINS, ...EXPORT_PLUGINS]
+      .map((p) => p.id)
+      .filter((id) => id === STANDARD_OPTION)
+  ).toEqual([]);
+});
+
 describe("writing a download", () => {
   const context = { filename: "placement-2026-10-04.csv" };
 
   it("writes the standard CSV as it is with no plugin", () => {
-    expect(fromStandard(null, "email\r\n", context)).toEqual({
+    expect(exportWith(null, "email\r\n", context)).toEqual({
       filename: "placement-2026-10-04.csv",
       text: "email\r\n",
       issues: [],
@@ -146,7 +155,7 @@ describe("writing a download", () => {
         throw new Error("out of cheese.");
       },
     };
-    expect(fromStandard(broken, "", context)).toEqual({
+    expect(exportWith(broken, "", context)).toEqual({
       filename: "placement-2026-10-04.csv",
       text: "",
       issues: [

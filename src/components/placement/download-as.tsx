@@ -13,9 +13,11 @@ import {
 import type { ImportIssue } from "#/lib/placement/csv";
 import { downloadText } from "#/lib/placement/download";
 import type { ExportDataset } from "#/lib/placement/formats";
-import { exportPlugins, fromStandard } from "#/lib/placement/plugins";
-
-const STANDARD = "standard";
+import {
+  exportPlugins,
+  exportWith,
+  STANDARD_OPTION as STANDARD,
+} from "#/lib/placement/plugins";
 
 /** The standard format's name in the Download as select. */
 const STANDARD_LABELS: Record<ExportDataset, string> = {
@@ -51,7 +53,7 @@ export function DownloadAs({
   const plugin = plugins.find((p) => p.id === chosen) ?? null;
 
   function download() {
-    const file = fromStandard(plugin, text(), { filename });
+    const file = exportWith(plugin, text(), { filename });
     setIssues(file.issues);
     // A file the plugin could not write at all is not worth saving; the
     // problems below say why.
@@ -99,7 +101,13 @@ export function DownloadAs({
           {plugin.description}
         </p>
       )}
-      <ImportIssues issues={issues} label={dataset} />
+      {/* Only a plugin reports issues: the standard CSV goes out as it is.
+          They are problems writing the plugin's file, not reading ours. */}
+      <ImportIssues
+        issues={issues}
+        label={plugin?.label ?? dataset}
+        writing={true}
+      />
     </div>
   );
 }
