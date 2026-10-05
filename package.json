@@ -10,6 +10,7 @@
     "check": "ultracite check",
     "check:assets": "node scripts/check-asset-manifest.mjs",
     "check:compression": "node scripts/check-compression.mjs",
+    "check:doc-size": "node scripts/check-doc-size.mjs --all",
     "check:prose": "node scripts/check-prose.mjs --all",
     "db:explain:traffic": "tsx --env-file=.env.local scripts/explain-traffic.ts",
     "db:generate": "drizzle-kit generate",

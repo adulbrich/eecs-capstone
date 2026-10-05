@@ -11,7 +11,9 @@ decisions.
   implementation detail lives there.
 - **`docs/adr/`**: one paragraph per decision that is hard to reverse, surprising
   without context, and the result of a real trade-off. Numbered `NNNN-slug.md`. Read
-  the ones that touch the area you are about to work in.
+  the ones that touch the area you are about to work in. An ADR is one paragraph
+  under its title, with the consequences as its closing sentences and no
+  `## Consequences` heading.
 
 `docs/QUIRKS.md` is the third file: the gotchas. Where a QUIRKS section used to argue
 a decision it now points at the ADR in one line, so a decision has one home.
