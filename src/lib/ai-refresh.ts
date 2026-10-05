@@ -51,9 +51,14 @@ export function currentAttempt(
  * last attempt since, and whether the automatic refresh writes for this
  * project at all. Similarity is what places a project under Similar projects
  * and in the Recommended for you sort.
+ *
+ * `computed` and `computedAt` are separate so a vector with no timestamp
+ * still reads as computed: the button and the "missing" copy key on the
+ * vector, the time is only shown.
  */
 export interface SimilarityView {
   attempt: AiRefreshAttempt | null;
+  computed: boolean;
   computedAt: Date | null;
   refreshable: boolean;
 }

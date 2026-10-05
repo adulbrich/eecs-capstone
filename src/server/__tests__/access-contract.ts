@@ -264,7 +264,7 @@ export const ACCESS_CONTRACT: Record<string, AccessDeclaration> = {
 
   "server/social-summary.ts:getSocialSummary": {
     level: "staff",
-    note: "The summary text itself is public through projectDetailView, since it is the page's og:description. What this adds is the bookkeeping beside it: when it was written and whether a human wrote it, which three columns absent from projectDetailView carry (#498), and the last AI refresh attempts from project_ai_refreshes (#631).",
+    note: "The summary text itself is public through projectDetailView, since it is the page's og:description. What this adds is the bookkeeping beside it: when it was written and whether a human wrote it, from three columns absent from projectDetailView (#498), and the last attempt at writing it, from project_ai_refreshes (#631).",
   },
   "server/social-summary.ts:regenerateSocialSummary": {
     level: "staff",

@@ -108,7 +108,12 @@ vi.mock("#/server/social-summary", () => ({
 }));
 vi.mock("#/server/similarity", () => ({
   getSimilarity: vi.fn(() =>
-    Promise.resolve({ attempt: null, computedAt: null, refreshable: false })
+    Promise.resolve({
+      attempt: null,
+      computed: false,
+      computedAt: null,
+      refreshable: false,
+    })
   ),
   recomputeSimilarity: vi.fn(),
 }));

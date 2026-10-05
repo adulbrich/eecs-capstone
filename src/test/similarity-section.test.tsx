@@ -36,11 +36,13 @@ const failed = (trigger: AiRefreshAttempt["trigger"]): AiRefreshAttempt => ({
 
 const NEVER: SimilarityView = {
   attempt: null,
+  computed: false,
   computedAt: null,
   refreshable: true,
 };
 const COMPUTED: SimilarityView = {
   attempt: { at: AT, outcome: "updated", trigger: "automatic" },
+  computed: true,
   computedAt: AT,
   refreshable: true,
 };
@@ -91,6 +93,13 @@ describe("SimilaritySection status", () => {
     const time = document.querySelector("time");
     expect(time?.closest("p")?.textContent).toMatch(/^Computed .+\.$/);
     expect(screen.queryByText(/failed|Not computed/)).toBeNull();
+    expect(recompute()).toBeNull();
+  });
+
+  it("reads a vector with no timestamp as computed, not as missing", async () => {
+    await renderWith({ ...COMPUTED, attempt: null, computedAt: null });
+    expect(screen.getByText("Computed.")).toBeDefined();
+    expect(screen.queryByText(/Not computed/)).toBeNull();
     expect(recompute()).toBeNull();
   });
 

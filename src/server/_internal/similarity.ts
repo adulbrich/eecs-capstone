@@ -1,4 +1,4 @@
-import { eq } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import { db } from "#/db";
 import { projects } from "#/db/schema";
 import { requireUser } from "#/lib/_internal/auth-guards";
@@ -20,13 +20,13 @@ interface AuthUser {
 
 /**
  * The project's embedding status for the staff panel (#631), without the
- * vector. Read with its own query rather than `select()`, so the 1024 floats
- * never leave the database for a yes or no.
+ * vector. `IS NOT NULL` in the select, the way `similarProjects` asks, so the
+ * 1024 floats never leave the database for a yes or no.
  */
 async function loadView(projectId: string): Promise<SimilarityView> {
   const [project] = await db
     .select({
-      computed: projects.embedding,
+      computed: sql<boolean>`${projects.embedding} IS NOT NULL`,
       computedAt: projects.embeddingUpdatedAt,
       deletedAt: projects.deletedAt,
       status: projects.status,
@@ -36,12 +36,16 @@ async function loadView(projectId: string): Promise<SimilarityView> {
   if (!project) {
     throw new Error("Project not found");
   }
+  // The time only when there is a vector it dates. `computed` decides what
+  // the panel says and offers; a vector some writer left unstamped still
+  // reads as computed.
   const computedAt = project.computed ? project.computedAt : null;
   return {
     attempt: currentAttempt(
       await readAiRefresh(projectId, "embedding"),
       computedAt
     ),
+    computed: project.computed,
     computedAt,
     refreshable: isRefreshable(project),
   };

@@ -97,8 +97,7 @@ export function SimilaritySection({ projectId }: { projectId: string }) {
   }
 
   const canRecompute =
-    view.refreshable &&
-    (view.computedAt === null || view.attempt?.outcome === "failed");
+    view.refreshable && (!view.computed || view.attempt?.outcome === "failed");
 
   return (
     <div className="space-y-3">
@@ -128,15 +127,15 @@ export function SimilaritySection({ projectId }: { projectId: string }) {
 }
 
 function SimilarityStatus({ view }: { view: SimilarityView }) {
-  const { attempt, computedAt } = view;
+  const { attempt, computed, computedAt } = view;
   if (attempt?.outcome === "failed") {
     return (
       <AttemptFailed>
         The last attempt failed {triggerPhrase(attempt.trigger, "Recompute")},{" "}
         <LocalTime value={attempt.at} />.{" "}
-        {computedAt === null
-          ? `Nothing is computed. ${MISSING}`
-          : "Similar projects and Recommended for you still use the text from before the last change."}
+        {computed
+          ? "Similar projects and Recommended for you still use the text from before the last change."
+          : `Nothing is computed. ${MISSING}`}
       </AttemptFailed>
     );
   }
@@ -148,10 +147,16 @@ function SimilarityStatus({ view }: { view: SimilarityView }) {
       </AttemptNote>
     );
   }
-  if (computedAt !== null) {
+  if (computed) {
     return (
       <AttemptNote>
-        Computed <LocalTime value={computedAt} />
+        Computed
+        {computedAt && (
+          <>
+            {" "}
+            <LocalTime value={computedAt} />
+          </>
+        )}
         {attempt?.trigger === "staff" ? " from Recompute" : ""}.
         {view.refreshable
           ? ""

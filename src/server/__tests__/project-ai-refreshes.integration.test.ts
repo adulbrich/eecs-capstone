@@ -319,6 +319,7 @@ describe("similarity", () => {
 
     expect(await getSimilarityAs(admin, { projectId: project.id })).toEqual({
       attempt: null,
+      computed: false,
       computedAt: null,
       refreshable: true,
     });
@@ -369,6 +370,7 @@ describe("similarity", () => {
     const view = await getSimilarityAs(admin, { projectId: project.id });
     expect(Object.keys(view).sort()).toEqual([
       "attempt",
+      "computed",
       "computedAt",
       "refreshable",
     ]);
