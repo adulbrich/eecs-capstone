@@ -174,8 +174,8 @@ locals {
 # default it would go to INSUFFICIENT_DATA and stay silent through exactly the
 # case it is named for.
 #
-# Below the deploy's healthy minimum, not below the floor (ADR-0058,
-# superseding ADR-0044): two of three, or two of four. At the floor this
+# Below the deploy's healthy minimum, not below the floor (ADR-0058): two
+# of three, or two of four. At the floor this
 # mailed on 12 of 12 deploys and on nothing else, and no sample count
 # separates that dip from a real one, so the threshold is the dip itself, read
 # from the service so the two move together. Two of three tasks exiting as

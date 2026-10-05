@@ -1,7 +1,3 @@
 # Server-only code lives in `_internal/` directories, not `*.server.*` files
 
-TanStack Start's import-protection plugin denies any import on a client chain whose resolved path matches `**/*.server.*`, by name, and does not exempt an import that sits inside a stripped `createServerFn` handler. So the split is a directory: `src/server/x.ts` is the client-importable wrapper, holding only `createServerFn`, the Zod schema and types, and each handler does one dynamic import of `./_internal/x`; `src/server/_internal/x.ts` is the server-only impl and may statically import the database, the schema and the auth helpers. `src/lib/_internal/` holds the server-only helpers the same way.
-
-## Consequences
-
-An impl imports its input types back from its wrapper as `import type`, never the schema value: `verbatimModuleSyntax` erases the type and a value import would pull `createServerFn` into a server-only module. A schema an impl needs as a value belongs in a client-safe module under `src/lib/`.
+TanStack Start's import protection denies any client-chain import whose resolved path matches `**/*.server.*`, by name, even one inside a stripped `createServerFn` handler, so the server/client split is a directory. `src/server/x.ts` is the client-importable wrapper, holding only `createServerFn`, its Zod schema and types, and each handler does one dynamic import of `./_internal/x`, the server-only impl that may statically import the database, the schema and the auth helpers; `src/lib/_internal/` holds server-only helpers the same way. An impl imports its input types from its wrapper as `import type`, never the schema value, which would pull `createServerFn` into a server-only module, so a schema an impl needs as a value lives in a client-safe module under `src/lib/`.
