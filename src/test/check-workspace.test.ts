@@ -72,14 +72,17 @@ function commandsIn(line: string) {
   return { remove, review };
 }
 
-/** What a shell command prints, one non-empty line each, sorted. */
+/**
+ * What a shell command prints, one line each, sorted. Blank lines are kept, so
+ * a list padded with them fails the comparison rather than passing it.
+ */
 function listed(dir: string, command: string) {
   const out = spawnSync("sh", ["-c", command], {
     cwd: dir,
     encoding: "utf8",
     env,
   }).stdout;
-  return out.split("\n").filter(Boolean).sort();
+  return out.replace(/\n$/, "").split("\n").sort();
 }
 
 function branchesIn(dir: string) {
@@ -186,6 +189,20 @@ describe("check-workspace", () => {
     expect(listed(dir, review)).toEqual(["feat/free"]);
     expect(spawnSync("sh", ["-c", remove], { cwd: dir, env }).status).toBe(0);
     expect(branchesIn(dir)).toEqual(["feat/current", "feat/held", "main"]);
+  }, 60_000);
+
+  it("says so when the checkout itself is on a branch whose upstream is gone", () => {
+    // Left out of the count because `-D` refuses it, and the worktree lines
+    // skip the checkout itself, so without its own line a session on a merged
+    // branch would hear nothing about it.
+    const { dir, remote } = repoWithRemote();
+    goneOnRemote(dir, remote, ["feat/current"]);
+    run(dir, "checkout", "-q", "feat/current");
+
+    const lines = report(dir).stdout.trim().split("\n");
+    expect(lines).toEqual([
+      "This checkout is on feat/current, whose remote is already deleted: switch to main, then delete it.",
+    ]);
   }, 60_000);
 
   it("names a server on a probed port whose directory is not this checkout", async () => {

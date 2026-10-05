@@ -148,30 +148,34 @@ export function otherWorktrees(root) {
  * all and is not this: it is unpushed work, and saying "leftover" about it is
  * how someone loses it.
  *
- * A gone branch checked out in a worktree, this one included, is left out:
+ * A gone branch checked out in a worktree is left out of `branches`:
  * `git branch -D` refuses it, so counting it would promise a delete the
- * command cannot do, and the worktree line already names it.
+ * command cannot do. One held by another worktree is named by that
+ * worktree's line. One held by this checkout appears in no other line, so it
+ * comes back as `here`, and the report says to switch off it first.
  */
 export function goneBranches(root) {
   const refs = git(root, [
     "for-each-ref",
-    "--format=%(refname:short)|%(upstream)|%(upstream:track)|%(worktreepath)",
+    "--format=%(refname:short)|%(upstream)|%(upstream:track)|%(HEAD)|%(worktreepath)",
     "refs/heads/",
   ]);
   if (!refs.answered) {
-    return { answered: false, branches: [] };
+    return { answered: false, branches: [], here: null };
   }
+  const gone = refs.out
+    .split("\n")
+    .filter(Boolean)
+    .map((line) => line.split("|"))
+    .filter(([, upstream, track]) => upstream && track === "[gone]");
   return {
     answered: true,
-    branches: refs.out
-      .split("\n")
-      .filter(Boolean)
-      .map((line) => line.split("|"))
-      .filter(
-        ([, upstream, track, ...held]) =>
-          upstream && track === "[gone]" && held.join("|") === ""
-      )
+    // `%(worktreepath)` goes last and is rejoined, since a path may hold `|`.
+    branches: gone
+      .filter(([, , , , ...held]) => held.join("|") === "")
       .map(([name]) => name),
+    // `%(HEAD)` is `*` for the branch the checkout `root` names has out.
+    here: gone.find(([, , , head]) => head === "*")?.[0] ?? null,
   };
 }
 
@@ -233,20 +237,33 @@ export function foreignServers(root, ports) {
  *
  * It selects what `goneBranches` selects, because the delete is built on it
  * and a branch counted but not deletable is a report that lies: one checked
- * out in a worktree is skipped, since `git branch -D` refuses it and the
- * worktree line already reports it. It runs when pasted, not when the report
- * did, so the report names it as a step of its own: the user sees the names,
- * and any branch that went gone since, before anything is force-deleted.
+ * out in a worktree is skipped, since `git branch -D` refuses it. It runs
+ * when pasted, not when the report did, so the report names it as a step of
+ * its own: the user sees the names, and any branch that went gone since,
+ * before anything is force-deleted. `--omit-empty` drops the blank line each
+ * skipped ref would otherwise print, which on a busy checkout is most of them.
  */
 const LIST_GONE =
-  "git for-each-ref --format='%(if:equals=[gone])%(upstream:track)%(then)%(if)%(worktreepath)%(then)%(else)%(refname:short)%(end)%(end)' refs/heads/";
+  "git for-each-ref --omit-empty --format='%(if:equals=[gone])%(upstream:track)%(then)%(if)%(worktreepath)%(then)%(else)%(refname:short)%(end)%(end)' refs/heads/";
 
 /** The report, as lines. Pure, so the shapes above are what the tests drive. */
-export function workspaceLines({ worktrees, gone, servers, unchecked, unreadable }) {
+export function workspaceLines({
+  worktrees,
+  gone,
+  goneHere,
+  servers,
+  unchecked,
+  unreadable,
+}) {
   const lines = [];
   for (const w of worktrees) {
     lines.push(
       `Leftover worktree: ${w.path} on ${w.branch}. Remove it with \`git worktree remove ${w.path}\` once its branch has merged.`
+    );
+  }
+  if (goneHere) {
+    lines.push(
+      `This checkout is on ${goneHere}, whose remote is already deleted: switch to main, then delete it.`
     );
   }
   if (gone.length > 0) {
@@ -298,6 +315,7 @@ function main(argv) {
   const branches = goneBranches(top);
   const lines = workspaceLines({
     gone: branches.branches,
+    goneHere: branches.here,
     servers: portProbe.servers,
     unchecked: portProbe.unchecked,
     unreadable: [
