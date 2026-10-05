@@ -62,8 +62,8 @@ A tool enforces the first five, so a refusal names the rule you hit.
   this file and `docs/QUIRKS.md` by hand. `app-security-review` is optional for a diff
   under `src/server`, `src/lib`, `infra` or any prompt or logger, beside the harness's
   generic security review.
-- **Check context7** for TanStack Start, TanStack Router, Better Auth and Drizzle
-  rather than recalling them. Write no version, release cadence or maturity level into
+- **Check context7** for the fast-moving libraries rather than recalling them, above
+  all TanStack Start, TanStack Router, Better Auth and Drizzle. Write no version, release cadence or maturity level into
   these docs; `package.json` has the versions. Naming a major line is fine where it
   identifies the thing, as "Tailwind v4" does. `docs/QUIRKS.md` outranks upstream docs
   about this codebase.

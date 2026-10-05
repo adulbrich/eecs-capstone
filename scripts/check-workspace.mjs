@@ -147,11 +147,15 @@ export function otherWorktrees(root) {
  * `--delete-branch` leaves. A branch that was never pushed has no upstream at
  * all and is not this: it is unpushed work, and saying "leftover" about it is
  * how someone loses it.
+ *
+ * A gone branch checked out in a worktree, this one included, is left out:
+ * `git branch -D` refuses it, so counting it would promise a delete the
+ * command cannot do, and the worktree line already names it.
  */
 export function goneBranches(root) {
   const refs = git(root, [
     "for-each-ref",
-    "--format=%(refname:short)|%(upstream)|%(upstream:track)",
+    "--format=%(refname:short)|%(upstream)|%(upstream:track)|%(worktreepath)",
     "refs/heads/",
   ]);
   if (!refs.answered) {
@@ -163,7 +167,10 @@ export function goneBranches(root) {
       .split("\n")
       .filter(Boolean)
       .map((line) => line.split("|"))
-      .filter(([, upstream, track]) => upstream && track === "[gone]")
+      .filter(
+        ([, upstream, track, ...held]) =>
+          upstream && track === "[gone]" && held.join("|") === ""
+      )
       .map(([name]) => name),
   };
 }
@@ -220,13 +227,19 @@ export function foreignServers(root, ports) {
 }
 
 /**
- * The one command that removes every gone branch, by count rather than by
- * name. The list was 26 names long on 2026-10-03 and went into every session's
- * context; the command finds the same set `goneBranches` does when it runs,
- * so the report never has to carry it.
+ * The command that lists the gone branches, so the report can give a count
+ * rather than the names. The list was 26 names long on 2026-10-03 and went
+ * into every session's context.
+ *
+ * It selects what `goneBranches` selects, because the delete is built on it
+ * and a branch counted but not deletable is a report that lies: one checked
+ * out in a worktree is skipped, since `git branch -D` refuses it and the
+ * worktree line already reports it. It runs when pasted, not when the report
+ * did, so the report names it as a step of its own: the user sees the names,
+ * and any branch that went gone since, before anything is force-deleted.
  */
-const DELETE_GONE =
-  "git branch -D $(git for-each-ref --format='%(if:equals=[gone])%(upstream:track)%(then)%(refname:short)%(end)' refs/heads/)";
+const LIST_GONE =
+  "git for-each-ref --format='%(if:equals=[gone])%(upstream:track)%(then)%(if)%(worktreepath)%(then)%(else)%(refname:short)%(end)%(end)' refs/heads/";
 
 /** The report, as lines. Pure, so the shapes above are what the tests drive. */
 export function workspaceLines({ worktrees, gone, servers, unchecked, unreadable }) {
@@ -238,7 +251,7 @@ export function workspaceLines({ worktrees, gone, servers, unchecked, unreadable
   }
   if (gone.length > 0) {
     lines.push(
-      `Leftover branches: ${gone.length} with the remote already deleted. A squash merge leaves each "not fully merged", so \`git branch -d\` refuses it. Ask the user to run: ${DELETE_GONE}`
+      `Leftover branches: ${gone.length} with the remote already deleted. A squash merge leaves each "not fully merged", so \`git branch -d\` refuses it. Ask the user to review them with \`${LIST_GONE}\`, then delete them with: git branch -D $(${LIST_GONE})`
     );
   }
   for (const s of servers) {
