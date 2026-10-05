@@ -176,7 +176,8 @@ export const canvasGroups: ExportPlugin = {
   label: "Canvas groups",
   dataset: "placement",
   description:
-    "A file to import into a Canvas group set. Canvas matches each student by their login, which is their email here, and creates the groups in the group set you import into: one per project, or one per team when a project has more than one. Unplaced students are left out, and stay in no group. A title starting with =, +, - or @ keeps the apostrophe that stops a spreadsheet reading it as a formula, and Canvas keeps it in the group name. A run that changes how many teams a project has also changes its group names, so import into a new group set rather than over an old one.",
+    "A file to import into a Canvas group set. Canvas matches each student by their login, which is their email here, and creates the groups in the group set you import into: one per project, or one per team when a project has more than one. Unplaced students are left out, and stay in no group. The file keeps a leading apostrophe on a title starting with =, +, - or @, which stops a spreadsheet reading it as a formula, and Canvas may show it in the group name. A run that changes how many teams a project has also changes its group names, so import into a new group set rather than over an old one.",
+  // Canvas ignores `name` on import, so it is not required.
   requiredColumns: GROUP_COLUMNS.filter((c) => c !== "name"),
   fromStandard: (text, { filename }) => {
     const { fields, issues: parseIssues, rows } = parseRows(text);

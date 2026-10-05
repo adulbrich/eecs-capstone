@@ -20,7 +20,7 @@ import {
 import {
   filePlugins,
   type ReadAs,
-  STANDARD_OPTION as STANDARD,
+  STANDARD_OPTION,
 } from "#/lib/placement/plugins";
 import type { Conversion, ImportPlugin } from "#/lib/placement/plugins/types";
 
@@ -115,15 +115,15 @@ export function SourceFormat({
             <Label htmlFor={id}>Read as</Label>
             <Select
               onValueChange={(value) =>
-                onReadAs(value === STANDARD ? null : value)
+                onReadAs(value === STANDARD_OPTION ? null : value)
               }
-              value={plugin?.id ?? STANDARD}
+              value={plugin?.id ?? STANDARD_OPTION}
             >
               <SelectTrigger className="w-64" id={id} size="sm">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value={STANDARD}>
+                <SelectItem value={STANDARD_OPTION}>
                   {STANDARD_LABELS[dataset]}
                 </SelectItem>
                 {plugins.map((p) => (

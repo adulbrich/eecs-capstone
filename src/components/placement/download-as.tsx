@@ -16,7 +16,7 @@ import type { ExportDataset } from "#/lib/placement/formats";
 import {
   exportPlugins,
   exportWith,
-  STANDARD_OPTION as STANDARD,
+  STANDARD_OPTION,
 } from "#/lib/placement/plugins";
 
 /** The standard format's name in the Download as select. */
@@ -48,7 +48,7 @@ export function DownloadAs({
 }) {
   const id = useId();
   const plugins = exportPlugins(dataset);
-  const [chosen, setChosen] = useState(STANDARD);
+  const [chosen, setChosen] = useState(STANDARD_OPTION);
   const [issues, setIssues] = useState<ImportIssue[]>([]);
   const plugin = plugins.find((p) => p.id === chosen) ?? null;
 
@@ -80,13 +80,15 @@ export function DownloadAs({
             setChosen(value);
             setIssues([]);
           }}
-          value={plugin?.id ?? STANDARD}
+          value={plugin?.id ?? STANDARD_OPTION}
         >
           <SelectTrigger className="w-44" id={id} size="sm">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value={STANDARD}>{STANDARD_LABELS[dataset]}</SelectItem>
+            <SelectItem value={STANDARD_OPTION}>
+              {STANDARD_LABELS[dataset]}
+            </SelectItem>
             {plugins.map((p) => (
               <SelectItem key={p.id} value={p.id}>
                 {p.label}

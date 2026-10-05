@@ -87,7 +87,7 @@ detection to Read as, ever sees one.
 
 | Field | What it is |
 | --- | --- |
-| `id` | Unique across every plugin, import or export. |
+| `id` | Unique across every plugin, import or export, and never `standard`, which the Read as and Download as selects use for the standard format (`STANDARD_OPTION`; the contract test checks). |
 | `label` | The option's name in "Download as". |
 | `dataset` | `"placement"` or `"bids"`: whose standard CSV the plugin reads. |
 | `description` | Shown while the option is chosen: what the other tool does with the file, and what the file leaves out. Required, because staff need it before they import. |
@@ -97,8 +97,11 @@ detection to Read as, ever sees one.
 Read cells with `cell` from `csv.ts`, which takes off the spreadsheet guard
 `toCsv` put on, and write with `toCsv` or `writeFormat`, which puts it back, so a
 title like `-Minus` is guarded once. Report an issue in the standard CSV's rows,
-header as row 1, and leave that row out; the page shows the issues under the
-download, and a problem with the whole file stops the download.
+header as row 1, and leave that row out. A warning keeps its row: `canvasGroups`
+warns when two projects or teams would write the same group name, and still writes
+both. The page shows the issues under the download, under the plugin's name, and a
+problem with the whole file, a plugin that throws included, stops the download and
+says the file was not written.
 
 To add one, write it, add it to `EXPORT_PLUGINS`, and put a standard CSV under its
 id in `plugin-fixtures.ts`. The contract test checks the fixture has the dataset's
