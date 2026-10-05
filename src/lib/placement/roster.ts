@@ -163,7 +163,7 @@ export function readRosterCsv(
   text: string,
   columns: RosterColumns
 ): ParsedRoster {
-  const { fields, issues, rows } = parseRows(text);
+  const { fields, firstRecordRow, issues, rows } = parseRows(text);
   const missing =
     fields.length === 0 && issues.length > 0
       ? []
@@ -175,7 +175,7 @@ export function readRosterCsv(
   const seen: Seen = new Map();
   const failedRows = new Set(issues.map((i) => i.row));
   rows.forEach((raw, index) => {
-    const row = index + 2;
+    const row = firstRecordRow + index;
     if (failedRows.has(row)) {
       return;
     }

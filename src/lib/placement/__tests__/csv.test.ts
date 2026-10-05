@@ -42,6 +42,37 @@ describe("parseRows", () => {
     );
   });
 
+  it("lowercases the header after a BOM and blank lines", () => {
+    const { fields, rows } = parseRows("\uFEFF\n\nEmail\nx@example.edu");
+    expect(fields).toEqual(["email"]);
+    expect(rows).toEqual([{ email: "x@example.edu" }]);
+  });
+
+  it("names the file's own rows after leading blank lines", () => {
+    // Line 5 of the file has a cell too many.
+    const text =
+      "\n\nEmail,Name\nada@example.edu,Ada\nkim@example.edu,Kim,z,w\n";
+    expect(parseRows(text).firstRecordRow).toBe(4);
+    expect(parseRows(text).issues.map((i) => i.row)).toEqual([5]);
+    expect(parseRosterCsv(text).issues.map((i) => i.row)).toEqual([5]);
+    expect(
+      parseRosterCsv(
+        "\n\nemail\nada@example.edu\nada@example.edu\n"
+      ).issues.map((i) => i.row)
+    ).toEqual([5]);
+    expect(
+      parseProjectsCsv("\ntitle,max_teams\nTide Clock,x\n").issues.map(
+        (i) => i.row
+      )
+    ).toEqual([3]);
+    expect(
+      parseBidsCsv(
+        "\nemail,priority,project\nada@example.edu,x,Tide Clock\n",
+        PROJECTS
+      ).issues.map((i) => i.row)
+    ).toEqual([3]);
+  });
+
   it("reads a column named __proto__ as blank rather than throwing (#735)", () => {
     const { rows } = parseRows("__proto__,email\nx,ada@example.edu");
     expect(rows[0] && cell(rows[0], "__proto__")).toBe("");

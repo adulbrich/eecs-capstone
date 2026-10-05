@@ -42,22 +42,33 @@ export function normalizeTitle(title: string): string {
 export type Row = Record<string, string | undefined>;
 
 /**
- * Blank lines before the header. Papa skips them as rows but then never
- * calls `transformHeader`, so the header would keep its case and every
- * column read by its lowercase name would come back empty (#735).
+ * Blank lines before the header, after any byte order mark. Papa skips them
+ * as rows but then never calls `transformHeader`, so the header would keep
+ * its case and every column read by its lowercase name would come back
+ * empty (#735).
  */
-const LEADING_BLANK_LINES = /^(?:[ \t]*(?:\r\n|\r|\n))+/;
+const LEADING_BLANK_LINES = /^\uFEFF?(?:[ \t]*(?:\r\n|\r|\n))*/;
+const LINE_BREAKS = /\r\n|\r|\n/g;
 
+/**
+ * The file's rows keyed by lowercase header. `firstRecordRow` is the row of
+ * the file the first record sits on, so an issue names the row staff see in
+ * what they uploaded even after blank lines before the header: a reader
+ * numbers record `index` as `firstRecordRow + index`.
+ */
 export function parseRows(text: string): {
   fields: string[];
+  firstRecordRow: number;
   issues: ImportIssue[];
   rows: Row[];
 } {
+  const leading = LEADING_BLANK_LINES.exec(text)?.[0] ?? "";
+  const firstRecordRow = 2 + (leading.match(LINE_BREAKS) ?? []).length;
   // Papa renames a repeated header ("title_1") and keeps both columns, so a
   // reader keyed by name would silently use one and drop the other.
   const seen = new Set<string>();
   const repeated = new Set<string>();
-  const parsed = Papa.parse<Row>(text.replace(LEADING_BLANK_LINES, ""), {
+  const parsed = Papa.parse<Row>(text.slice(leading.length), {
     header: true,
     skipEmptyLines: "greedy",
     transformHeader: (header) => {
@@ -77,6 +88,7 @@ export function parseRows(text: string): {
   if (repeated.size > 0) {
     return {
       fields: [],
+      firstRecordRow,
       rows: [],
       issues: [...repeated].map((name) => ({
         level: "error",
@@ -91,10 +103,15 @@ export function parseRows(text: string): {
     .filter((e) => e.code !== "UndetectableDelimiter")
     .map((e) => ({
       level: "error",
-      row: (e.row ?? -1) + 2,
+      row: firstRecordRow + (e.row ?? -1),
       message: e.message,
     }));
-  return { fields: parsed.meta.fields ?? [], issues, rows: parsed.data };
+  return {
+    fields: parsed.meta.fields ?? [],
+    firstRecordRow,
+    issues,
+    rows: parsed.data,
+  };
 }
 
 export function missingColumns(
@@ -167,7 +184,7 @@ export function parseProjectsCsv(text: string): {
   issues: ImportIssue[];
   projects: WorkspaceProject[];
 } {
-  const { fields, issues, rows } = parseRows(text);
+  const { fields, firstRecordRow, issues, rows } = parseRows(text);
   const missing =
     fields.length === 0 && issues.length > 0
       ? []
@@ -179,7 +196,7 @@ export function parseProjectsCsv(text: string): {
   const firstRow = new Map<string, number>();
   const failedRows = new Set(issues.map((i) => i.row));
   rows.forEach((raw, index) => {
-    const row = index + 2;
+    const row = firstRecordRow + index;
     if (failedRows.has(row)) {
       return;
     }
@@ -453,7 +470,7 @@ export function parseBidsCsv(
   students: PlacementStudent[];
   unmatched: UnmatchedTitle[];
 } {
-  const { fields, issues, rows } = parseRows(text);
+  const { fields, firstRecordRow, issues, rows } = parseRows(text);
   const missing =
     fields.length === 0 && issues.length > 0
       ? []
@@ -469,7 +486,7 @@ export function parseBidsCsv(
   const unmatched = new Map<string, UnmatchedTitle>();
 
   rows.forEach((raw, index) => {
-    const row = index + 2;
+    const row = firstRecordRow + index;
     if (failedRows.has(row)) {
       return;
     }

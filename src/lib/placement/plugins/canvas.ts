@@ -61,7 +61,7 @@ interface Placed {
 }
 
 /** Every placed student, each row read once. The unplaced have no project. */
-function readPlaced(rows: readonly Row[]): Placed[] {
+function readPlaced(rows: readonly Row[], firstRecordRow: number): Placed[] {
   return rows.flatMap((raw, i): Placed[] => {
     const project = cell(raw, "project");
     return project === ""
@@ -71,7 +71,7 @@ function readPlaced(rows: readonly Row[]): Placed[] {
             email: cell(raw, "email"),
             name: cell(raw, "name"),
             project,
-            row: i + 2,
+            row: firstRecordRow + i,
             team: cell(raw, "team"),
           },
         ];
@@ -178,11 +178,16 @@ export const canvasGroups: ExportPlugin = {
   // Canvas ignores `name` on import, so it is not required.
   requiredColumns: GROUP_COLUMNS.filter((c) => c !== "name"),
   fromStandard: (text, { filename }) => {
-    const { fields, issues: parseIssues, rows } = parseRows(text);
+    const {
+      fields,
+      firstRecordRow,
+      issues: parseIssues,
+      rows,
+    } = parseRows(text);
     const issues = [...parseIssues, ...missingColumns(fields, REQUIRED)];
     const grouped = issues.some((i) => i.wholeFile)
       ? { issues: [], kept: [] }
-      : groupRows(readPlaced(rows));
+      : groupRows(readPlaced(rows, firstRecordRow));
     return {
       filename: filename.replace(CSV_EXTENSION, " (Canvas groups).csv"),
       issues: [...issues, ...grouped.issues],
