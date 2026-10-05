@@ -2,6 +2,9 @@ import { fileURLToPath } from "node:url";
 import { config as loadDotenv } from "dotenv";
 import { defineConfig } from "vitest/config";
 
+// Here at config load, not in setupFiles: `src/db/index.ts` throws at import
+// without DATABASE_URL, and setupFiles' own static imports reach it before any
+// call in its body runs.
 loadDotenv({ path: [".env.local", ".env"] });
 
 export default defineConfig({

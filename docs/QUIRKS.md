@@ -29,87 +29,49 @@ The stack is fast-moving. TanStack Start, TanStack Router, Better Auth and Drizz
 
 ### `createServerFn` must be a top-level exported `const` initializer
 
-TanStack Start's bundler transform recognizes `createServerFn(...).handler(fn)` ONLY when it appears as the direct initializer of a top-level exported const. Calls wrapped in factory functions are not recognized, the handler body is shipped to the browser intact, and any imports it references (like `db`, `pg`, `drizzle`) end up in the client bundle. Symptom: `ReferenceError: Buffer is not defined`.
+Start's compiler strips a handler from the client bundle only when `createServerFn(...).handler(fn)` is the direct initializer of a top-level exported const. Built inside a factory, the handler ships to the browser with its server imports (`ReferenceError: Buffer is not defined`). Write ten near-identical functions as ten constants. `src/server/__tests__/access-contract.test.ts` fails on a shape it cannot read.
 
 ```ts
-// Recognized: stripped on client, RPC stub remains.
-export const createProject = createServerFn({ method: "POST" })
-  .inputValidator((d: unknown) => schema.parse(d))
+// Stripped on the client.
+export const submitProject = createServerFn({ method: "POST" })
+  .validator((d: unknown) => schema.parse(d))
   .handler(async ({ data }) => { /* server work */ });
 
-// NOT recognized: ships to the browser, drags db into the client bundle.
-function makeTransition(target: Status) {
-  return createServerFn({ method: "POST" })
-    .handler(async ({ data }) => { /* never stripped */ });
-}
-export const submitProject = makeTransition("submitted");
+// Ships to the browser, server imports and all.
+const make = (s: Status) => createServerFn({ method: "POST" }).handler(/* ... */);
 ```
-
-Even if there are 10 near-identical server functions, write them out as 10 top-level constants. Verbose, but the only shape the framework understands.
 
 ### Server-only modules must not match `**/*.server.*`
 
-TanStack Start's `import-protection` plugin denies any client-chain import (static OR dynamic) where the resolved path matches `**/*.server.*` OR the specifier matches `@tanstack/react-start/server` (or similar denylist entries). The denial is based on static name analysis; the fact that the import lives inside a stripped `createServerFn` handler does not exempt it. The `_internal/` directory convention is the answer, and [ADR-0001](./adr/0001-internal-directory-for-server-only-code.md) is the layout: wrapper in `src/server/x.ts` doing one dynamic import per handler, impl in `src/server/_internal/x.ts`, auth helpers in `src/lib/_internal/auth-guards.ts` with the client-safe `getSession` wrapper beside it.
+Start's import protection fails the build on any client-chain import of a `*.server.*` path, even one inside a stripped handler. Server-only code goes under `_internal/`: [ADR-0001](./adr/0001-internal-directory-for-server-only-code.md).
 
 ### An impl imports its input types back from its domain's wrapper, type-only
 
-The wrapper owns the Zod schema, so the impl takes `import type { XInput } from "../x"` rather than hand-writing an interface that drifts from it. `import type` is erased, so no runtime edge to a `createServerFn` module survives; `verbatimModuleSyntax` is what turns a dropped `type` into a tsc error instead of a silent bundler hazard. **Type-only, never the schema value**: reaching for `listInventorySchema` itself pulls `createServerFn` into a server-only impl and makes the cycle real. An impl that needs a schema as a value means the schema belongs in a client-safe logic module under `src/lib/`.
+`import type { XInput } from "../x"`, never the schema value, which would pull `createServerFn` into the impl. [ADR-0001](./adr/0001-internal-directory-for-server-only-code.md) has the rule; `verbatimModuleSyntax` turns a dropped `type` into a tsc error.
 
-A domain split across several impls points every impl that needs an input type at its one wrapper (`inventory-catalog.ts` and `inventory-holdings.ts` import from `../inventory`; there is no `_internal/inventory.ts`). Do not read the pattern as requiring matching filenames. Grep for it with `grep -rn 'from "\.\./' src/server/_internal/*.ts`; multi-line imports undercount a grep for `import type`, and `__tests__/` files match on ordinary sibling imports, so count the files the recipe prints rather than trusting a list.
+### `.validator(...)`, not `.inputValidator(...)`
 
-### `getRequest`, not `getWebRequest`
-
-The currently installed version of `@tanstack/react-start/server` exports `getRequest`. Older docs and examples reference `getWebRequest`, which does not exist. Use `getRequest()` to access the in-flight `Request`.
-
-### `.validator(...)`, and before 2026-09-10 `.inputValidator(...)`
-
-`createServerFn(...).validator((d) => schema.parse(d)).handler(...)`. The method has been renamed twice: `.validator` became `.inputValidator` for a while, and `@tanstack/react-start` 1.168 renamed it back, keeping `.inputValidator` as a deprecated alias that the Start compiler warns about on every call site (a `TODO remove upon stable` in `start-plugin-core`). The plans under `docs/superpowers/plans/` still say `.inputValidator`, because they are the record of what was written; the code and this entry say `.validator`. Check `node_modules/@tanstack/start-client-core/dist/esm/createServerFn.d.ts` for the `@deprecated` marker before trusting either name in a doc.
-
-### `redirect()` throws an object whose target lives at `.options.to`
-
-```ts
-throw redirect({ to: "/sign-in" });  // works
-// In tests, the caught error shape is { options: { to: "/sign-in" } },
-// NOT { to: "/sign-in" }.
-```
-
-Tests asserting on the thrown shape need `.toMatchObject({ options: { to: "/sign-in" } })`.
-
-### Sign-out: use `window.location.href`, not `router.navigate`
-
-After `authClient.signOut()`, `router.navigate({ to: "/sign-in" })` does not always land the user on a public page because the in-memory route context still holds the protected route. `window.location.href = "/sign-in"` forces a fresh request, the server sees no cookie, and everything renders from scratch. Use it for sign-out specifically; SPA navigation is fine everywhere else.
-
-### `useEffect` exhaustive deps
-
-Biome's `useExhaustiveDependencies` rule enforces complete dependency arrays. There is no `// eslint-disable-next-line` because we use Biome, not ESLint. The fix is to wrap the function in `useCallback` (with its OWN dep array) so the effect's dep can be just the stable callback reference.
-
-### Default not-found route
-
-Add `defaultNotFoundComponent` in `getRouter()` (see `src/router.tsx`). Without it, TanStack Router prints a "no notFoundComponent configured" warning on every missing-route hit.
+The method is `.validator`. `.inputValidator` is a deprecated alias the Start compiler warns about at every call site, and the plans under `docs/superpowers/plans/` still use it.
 
 ### Code that must run at boot goes in a Nitro plugin, not `src/server.ts`
 
-Nitro loads TanStack Start's optional server entry (`src/server.ts`, `createServerEntry`) on the first request, not when the process starts, and ESM evaluates its imports before its body. Measured on the built output with `NODE_ENV=production` and a variable missing: a throw at the top of the entry left the process up with the port bound, answering 500 on every route including `/api/healthz`, and with nothing set `src/db/index.ts` threw first so the check never ran. A Nitro plugin named in `nitro({ plugins })` in `vite.config.ts` runs synchronously inside `useNitroApp` before the listener binds, so a throw there is exit code 1, the message on stderr, and no port. `src/nitro/config-check.ts` is that plugin; it only calls `assertProductionConfig` from `src/lib/_internal/startup-config.ts`, which holds the fatal list and the production gate and is what the unit test imports. Module-level code in `src/lib/auth.ts` or `src/db/index.ts` is not a home either: tests import both, against a CI `.env.local` with no provider credentials. #137. The pool's warm-up is the exception that runs on the first request instead, on purpose: [ADR-0052](./adr/0052-the-pool-keeps-a-warm-floor.md).
+Nitro loads the server entry (`src/server.ts`) on the first request, not at start. Measured on the built output, a throw there leaves the process up and answering 500 on every route, `/api/healthz` included. A plugin listed in `nitro({ plugins })` in `vite.config.ts` runs before the listener binds, so a throw there is exit code 1 and no port. `src/nitro/config-check.ts` is that plugin, and `src/lib/_internal/startup-config.ts` holds the fatal list. The pool warm-up runs on the first request on purpose: [ADR-0052](./adr/0052-the-pool-keeps-a-warm-floor.md).
 
 ### A loader that throws during SSR logs nothing unless `src/server.ts` does it
 
-router-core's `load-server.js` catches a loader's or `beforeLoad`'s error, sets the match to `status: "error"` and answers 500, and `Match.js` renders the error component straight from the match on the server. React runs no error boundary on the server, so neither a route's `onCatch` nor the router's `defaultOnCatch` fires, and a route's `onError` has no router-level default. A failed server render therefore wrote nothing to the task log; the only trace of #601's 500 was the ALB access log. `src/server.ts` replaces Start's default entry with `defineHandlerCallback`, which runs after `router.load()` with the matches in hand, and writes the lines `renderFailureLines` in `src/lib/_internal/render-failure.ts` builds: one per failed match, route id rather than URL, cause through `redactQueryError`. A `notFound()` leaves `error` set too, so the filter is on status. A role guard's refusal (#606) is also `status: "error"` and is filtered out by shape, since it is a page working as meant; `refusedByRole` beside it is what `src/server.ts` answers 403 for. Keep the entry thin; it loads on the first request, not at boot (the section above). #602.
+On the server, router-core catches a loader's or `beforeLoad`'s error, renders the error component and answers 500; no error boundary and no `onCatch` runs, so nothing reaches the log. `src/server.ts` writes one line per failed match through `renderFailureLines` (`src/lib/_internal/render-failure.ts`) and answers 403 for a role refusal. Keep the entry thin: it loads on the first request.
 
 ### The SSR pass hashes `?url` assets on its own, so Tailwind's scan set is pinned
 
-`vite build` runs a client pass and an SSR pass. Only the client pass writes `.output/public/assets`; the SSR pass computes the URL of every `?url` import from the bytes it sees and emits nothing. So if the two passes disagree about the bytes of `src/styles.css`, the SSR HTML links `/assets/styles-<hash>.css` for a file that does not exist, the request 404s fast, the browser paints unstyled, and the page only styles itself once React hydrates and hoists the client bundle's link. Tailwind v4's automatic source detection is what made them disagree: it skips whatever `.gitignore` lists, and the Docker build context had no `.gitignore` (dropped by `.dockerignore`), so during the SSR pass Tailwind also scanned the `.output/` the client pass had just written. Locally the hashes always matched, and CI builds a checkout with `.gitignore` in it, so nothing went red. Three guards now: `@import 'tailwindcss' source("../src")` in `src/styles.css` makes the scan set explicit (measured byte-identical to the implicit one), `.dockerignore` keeps `.gitignore`, and `scripts/check-asset-manifest.mjs` fails the Dockerfile build stage and CI when the server bundle names an asset that is not on disk. If you add a `?url` import outside `src/`, extend `source()` rather than dropping it. #397.
-
-### A 404 under `/assets/` used to carry the immutable header
-
-Nitro's Vite plugin adds a `/assets/**` route rule with `cache-control: public, max-age=31536000, immutable` unless the project sets one, and route rule headers apply to every response on the path, a 404 included. CloudFront caches a 404 for the longer of its error minimum TTL (10 s) and the origin's `max-age`, so one missing asset was pinned at an edge for a year. The window is open on every rolling deploy, while the old task still answers for hashes only the new image has. `src/nitro/asset-error-headers.ts` registers a `response` hook that sets `no-store` on any 4xx or 5xx under `/assets/`; the logic is in `src/lib/_internal/asset-error-headers.ts` so the unit test does not import the Nitro runtime (importing `nitro` under Vitest fails on a CommonJS `react` entry). Nitro's runtime hooks are on because a plugin is registered; `features.runtimeHooks` defaults to that. #397.
+The client and SSR builds each hash `src/styles.css`, and only the client build writes it. When Tailwind's automatic source detection scans different files in the two passes (in Docker, without `.gitignore`, it scanned `.output/`), the SSR HTML links a stylesheet that 404s. `source("../src")` in `src/styles.css` pins the scan set, and `scripts/check-asset-manifest.mjs` fails CI and the Docker build when the server bundle names a missing asset. A `?url` import outside `src/` extends `source()`.
 
 ### The HTTP server's timeouts are only reachable by wrapping `createServer`
 
-Nitro's `node-server` entry calls srvx's `serve()` with a fixed options object and never passes srvx's `node` key, which is the one that reaches `http.createServer` and so the only route to `keepAliveTimeout`, `headersTimeout` or `requestTimeout`. Nitro v3 has no setting for any of them, srvx's plugin list is Nitro's own, and the four Nitro runtime hooks (`close`, `error`, `request`, `response`) never see the server. So the server keeps Node's defaults, and on Node 24 `keepAliveTimeout` 5000 is below the ALB's 60 s `idle_timeout`, which was the 502 of #545. `src/nitro/keep-alive-timeout.ts` wraps `http.createServer` from the same pre-listener plugin slot `config-check.ts` uses; the numbers and the measurements behind them are in `src/lib/_internal/keep-alive-timeout.ts`, and the decision is [ADR-0041](./adr/0041-the-task-outlasts-the-load-balancer-idle-timeout.md). Reproduce with `scripts/loadtest/pooled-connection-reuse.mjs` against a `npm run build` output.
+Nitro hands srvx no `node` options, so `keepAliveTimeout` and the other server timeouts stay at Node's defaults unless `src/nitro/keep-alive-timeout.ts` wraps `http.createServer`. The numbers are in `src/lib/_internal/keep-alive-timeout.ts`; [ADR-0041](./adr/0041-the-task-outlasts-the-load-balancer-idle-timeout.md) is why.
 
 ### Generated route tree
 
-`src/routeTree.gen.ts` is auto-regenerated by the TanStack Router plugin during `npm run dev`. To pick up new route files after editing, boot the dev server briefly. New `<Link to="/x">` calls referencing routes that do not yet exist trigger a TS error; either add the route first, or add a temporary `as string` cast and remove it once the route is in the tree (TypeScript will then flag the cast as unused).
+`src/routeTree.gen.ts` is written by the router plugin; boot `npm run dev` to regenerate it after adding a route. `.claude/hooks/guard-edits.mjs` refuses a hand edit.
 
 ---
 
@@ -117,83 +79,39 @@ Nitro's `node-server` entry calls srvx's `serve()` with a fixed options object a
 
 ### Pathless layouts nested under pathless layouts resolve to `/`
 
-`src/routes/_authed.tsx` is a pathless layout. A child `src/routes/_authed/_admin.tsx` (also pathless) resolves to the same path as `_authed` plus nothing, which is `/`, which conflicts with `src/routes/_public/index.tsx`. We use `src/routes/_authed/admin.tsx` (non-pathless, URL `/admin`) instead. `src/routes/_public.tsx` is a pathless layout too, but a sibling of `_authed` rather than a child, so it does not hit this.
-
-If a layout needs a child route to be a meaningful destination, give it at least one URL segment.
-
-### `beforeLoad` runs on both client and server
-
-A route's `beforeLoad` is executed during SSR AND on every client-side navigation. So `beforeLoad` cannot directly call any module that imports server-only deps (like `@tanstack/react-start/server`). Wrap the server-only code in a `createServerFn` and call that from `beforeLoad`. See `src/lib/auth-guards.ts` for the pattern.
+A pathless child of `_authed` resolves to `/` and collides with `src/routes/_public/index.tsx`, so the admin layout is `_authed/admin.tsx` (URL `/admin`). `_public.tsx` is a sibling of `_authed`, not a child, so it is unaffected. A layout whose children are destinations gets at least one URL segment.
 
 ### Guards below `_authed` read `context.user`, not the session
 
-A `getSession()` in a `beforeLoad` is a round trip on every load, and a nested page used to pay one per layer: three identical reads before `/admin/projects` could start its loader. `_authed.tsx` is the one read. It redirects a signed-out viewer and returns `{ user }`, and every `beforeLoad` below it guards on `context.user` (#633); `src/test/route-guards.test.ts` pins which roles each admits and that nothing below `_authed.tsx` reads the session. The parent's `beforeLoad` finishes before a child's starts (router-core's `load-client`, serially, awaited), so the child never sees a missing user. A hover preload is a load of its own and reads once too, so a hover then a click reads twice. A new page under `_authed` guards on `context.user`; a fresh read there needs a stated reason.
-
-A role guard calls `requireStaff(context.user)` or `requireAdmin(context.user)` from `src/lib/access-denied.ts` and does not redirect ([ADR-0057](./adr/0057-a-missing-role-is-refused-in-place.md), #606); `route-guards.test.ts` fails a guarded file that redirects or that lacks `requireStaff` or `requireAdmin`. Three things about how the refusal renders are easy to break. It is a thrown plain object, not an `Error`: router-core's `ShallowErrorPlugin` dehydrates an `Error` as `new Error(message)`, so a subclass reaches the browser without its fields and the page hydrates into the generic error. It renders through `defaultErrorComponent` in `src/router.tsx`, because router-core takes a route's own `errorComponent` or that default and never a parent's, so one on `_authed.tsx` would not catch a leaf's refusal on the server. And the 403 comes from `src/server.ts`: a server render answers only 200, 404 or 500, and `setResponseStatus` does not reach a rendered page, since h3 passes a returned `Response` through with its own status. `_authed.tsx` sends `location.href` as the sign-in `redirect`, and by then the router has filled in the page's search defaults, so the return path reads `?q=robotics&dateField=published&...` rather than what was typed; the page it lands on is the same. A hard load of the page logs the refusal object once to the browser console: on hydration the match rethrows it, its `CatchBoundary` renders the page, and React's default `onCaughtError` reports what a boundary caught. Any server-rendered error page does the same; the page is correct.
+`_authed.tsx` reads the session once and returns `{ user }`. Every `beforeLoad` below it guards on `context.user` with `requireStaff` or `requireAdmin` from `src/lib/access-denied.ts`, which refuse in place rather than redirect ([ADR-0057](./adr/0057-a-missing-role-is-refused-in-place.md)); `src/test/route-guards.test.ts` enforces both. The refusal is a thrown plain object, because the router dehydrates an `Error` subclass without its fields. It renders through `defaultErrorComponent` in `src/router.tsx`, since the router never falls back to a parent's `errorComponent`, and its 403 comes from `src/server.ts`. A hard load logs the refusal once in the browser console; that is React reporting a caught error.
 
 ### Route search params via `validateSearch`
 
 ```ts
-const searchSchema = z.object({
-  page: z.number().int().min(1).catch(1).default(1),
-});
-
 export const Route = createFileRoute("/projects/")({
-  validateSearch: searchSchema,
+  validateSearch: z.object({ page: z.number().int().min(1).catch(1).default(1) }),
   loaderDeps: ({ search }) => ({ page: search.page }),
-  loader: async ({ deps }) => listPublishedProjects({ data: { page: deps.page } }),
+  loader: ({ deps }) => listPublishedProjects({ data: { page: deps.page } }),
 });
 ```
 
-Search-driven loaders need `loaderDeps` so navigation with a new search param re-runs the loader.
-
-Every field takes a `.catch` (#609). A field without one fails `validateSearch` on a bad value, which is a 500 and a `Server render failed` log line, reachable by anyone with a hand-edited link. The router JSON-parses each value before the schema sees it, so no bare type is safe: `?cols=123` is a number and `?page=abc` a string. `.catch(x).default(x)` keeps the param optional for a `Link`. A `q` field is `searchParamQuerySchema` from `src/lib/search-query.ts`, which turns `?q=2024` back into the text `"2024"` rather than dropping it. `src/test/route-search-fallbacks.test.ts` fails a field under `src/routes/` without one.
-
-A param that names where to go next, `?redirect=` on `/sign-in`, goes through `sameOriginPath` from `src/lib/same-origin-path.ts` ahead of its `.catch`, so anything but a path on this site reads as absent (#702). The libraries each refuse an off-site target today: TanStack Router treats an absolute `to` as a path on this origin, and Better Auth's `originCheck` answers 403 `INVALID_CALLBACK_URL` for a `callbackURL` outside `trustedOrigins`. Neither is pinned here, and a new `trustedOrigins` entry would open the second, so `sameOriginPath` is the check the app owns.
-
-### A defaulted search param is written back to the URL as its default
-
-`navigate({ search: (prev) => ({ ...prev, acceptingOnly: checked }) })` receives the validated `prev`, so every `.default()` in the schema is spread back and serialized (`acceptingOnly=false&program=null&q=`). Setting the key to `undefined` does not remove it either: the result is validated again and the default reapplied. To keep a default out of the URL, name it in a `stripSearchParams` middleware on the route, as `/admin/projects` does for its five switches (#340):
-
-```ts
-const SWITCH_DEFAULTS = { acceptingOnly: false, includeSoftDeleted: false };
-const searchSchema = z.object({
-  acceptingOnly: z.boolean().default(SWITCH_DEFAULTS.acceptingOnly),
-  includeSoftDeleted: z.boolean().default(SWITCH_DEFAULTS.includeSoftDeleted),
-});
-export const Route = createFileRoute("/_authed/admin/projects/")({
-  validateSearch: searchSchema,
-  search: { middlewares: [stripSearchParams(SWITCH_DEFAULTS)] },
-});
-```
-
-An `.optional()` param without a default (`from`, `to`, `status`) is the exception: `undefined` removes it, which is what the date inputs and the default status set rely on.
-
-### `program` means three things on `/admin/projects` and two on `/projects`
-
-The two listings share the param name so a narrowed link can move between them (#340), but they do not share the schema. On `/admin/projects` it is `z.union([z.literal(PROGRAM_FILTER_NONE), z.string().uuid()]).nullable()`: absent is every program, `none` is a project with no `project_programs` rows at all, a UUID is a project that runs in that program among possibly others (#458, #462). The literal is `PROGRAM_FILTER_NONE` in `src/lib/admin-project-filters.ts`, not three inline copies, because the route schema, the server schema and the query branch all have to agree on it; that is what separates it from the `_all_` sentinel on the listing filters, which lives inside one component. The three states are in one field rather than a dropdown plus a switch because they are mutually exclusive, and a switch could have been on at the same time as a UUID. `buildAdminProjectScope` branches on `"none"` before the any-match, so the literal never reaches it. A caller that invents its own spelling for the third state does not get a quietly empty result: the value goes to Postgres as a uuid and comes back `22P02 invalid input syntax for type uuid`, which is the loud failure the shared literal exists to avoid needing. On `/projects` the param is still a UUID or null, and its schema carries no `.catch`, so an admin link with `program=none` pasted there errors the route the same way any bad value does; adding "No program" to the public listing was out of scope, since a student is not looking for unplaced projects.
-
-### Single canonical URL per resource
-
-One detail URL per project and per item, staff sections rendered conditionally on it. [ADR-0010](./adr/0010-single-canonical-url-per-resource.md).
+A search-driven loader needs `loaderDeps` to re-run. Every field takes a `.catch`: the router JSON-parses each value before the schema sees it, and a bad value otherwise fails `validateSearch` with a 500. `src/test/route-search-fallbacks.test.ts` enforces it. A `q` field is `searchParamQuerySchema` from `src/lib/search-query.ts`. A param naming where to go next, `?redirect=` on `/sign-in`, goes through `sameOriginPath` (`src/lib/same-origin-path.ts`) ahead of its `.catch`; that is the one off-site check the app owns.
 
 ### A route component is reused across a param change; key any child that holds a draft
 
-Navigating from `/projects/A` to `/projects/B` re-runs the loader and re-renders the same component instance with new props. Nothing remounts unless the route sets `remountDeps`, and nothing in `src/` does. So a child that keeps draft state in `useState` and loads its record in an effect keeps A's drafts on screen while B's record is in flight, and a Save clicked in that window posts A's values onto B. `StaffMentorshipSection` had exactly this until it was keyed, and `StaffProjectPanel` had the same shape one level up: its open transition dialog kept A's target status and comment, and Confirm posted them with B's id. The key now sits on the panel where `$projectId.tsx` renders it, `<StaffProjectPanel key={project.id} ... />`, which remounts the panel and every section under it on a param change; the sections carry no key of their own. Two tests in `staff-project-panel.test.tsx` rerender the panel with a second id to prove it. Key the outermost child that holds a draft, not the route: `remountDeps` would also discard state the page should keep, such as an open dialog's scroll position.
+Navigating from `/projects/A` to `/projects/B` re-renders the same component instance, and nothing remounts unless the route sets `remountDeps`. A child holding a draft in `useState` keeps A's draft while B loads, and a Save posts it onto B. Key the outermost child that holds a draft, as `$projectId.tsx` keys `StaffProjectPanel` on `project.id` (`staff-project-panel.test.tsx` pins it), rather than setting `remountDeps`, which also discards state the page should keep.
 
 ### The router blocks on a stale reload, and a `useState` seeded from loader data depends on it
 
-`src/router.tsx` sets `defaultStaleReloadMode: "blocking"`, so a revisit waits for its loader rather than painting the last visit's rows behind a refetch. [ADR-0029](./adr/0029-a-revisit-waits-for-its-loader.md) is the decision and what it costs.
-
-The gotcha it leaves behind outlives that decision: a `useState` initializer does not re-run when props change, so an input seeded from loader data keeps whatever frame it mounted on while everything rendering that data directly re-renders around it. The breadcrumb and the input on the same page can therefore disagree, reading the same field from the same source. ADR-0029's Consequences carry the census of every such seed: which are keyed on the record, which resync, which rely on the router option by decision, and the remedy if that option is ever reverted or one route opts out. A route opts out on its loader object, `loader: { handler, staleReloadMode: "background" }`, not as a route option; a loader written as a plain function always takes the router default. `src/test/loader-seed-scan.test.ts` fails on a new once-only initializer until it is classified there. Staying on the page after `await router.invalidate()` needs none of this, because the component stays mounted and no seed is involved.
+A `useState` initializer never re-runs, so an input seeded from loader data is correct only because `src/router.tsx` sets `defaultStaleReloadMode: "blocking"`. [ADR-0029](./adr/0029-a-revisit-waits-for-its-loader.md) is the decision; the census of seeds is `CENSUS` in `src/test/loader-seed-scan.test.ts`, which fails on an unclassified one. A route opts out on its loader object, `loader: { handler, staleReloadMode: "background" }`, not as a route option.
 
 ### A redirect thrown from a `queryFn` navigates the tab
 
-`setupRouterSsrQueryIntegration` in `src/router.tsx` leaves `handleRedirects` on, so it installs a query cache `onError` that calls `router.navigate` for any TanStack redirect a query throws. `requireUser` refuses with `redirect({ to: "/sign-in" })`, so once the server ends a session (expiry, a ban) without the tab hearing, the next refetch of a query over a `requireUser` server function carries the tab to `/sign-in` from whatever page it is on, unsaved edits included. `notification-bell.tsx` reads on every navigation and focus from every page (#725), so its `queryFn` returns an empty result on `isRedirect` instead (#634). The bookmark and borrow list reads do the same (#642), since a focus refetch would otherwise carry a visitor on a public listing to `/sign-in`. A new query over a `requireUser` server function catches the redirect the same way.
+`setupRouterSsrQueryIntegration` in `src/router.tsx` leaves `handleRedirects` on, so a TanStack redirect thrown by any query navigates the tab. `requireUser` refuses with `redirect({ to: "/sign-in" })`, so a background refetch after a session ends carries the tab to `/sign-in`, unsaved edits included. A query over a `requireUser` server function catches `isRedirect` and returns an empty result, as `notification-bell.tsx` does.
 
 ### `Route.useSearch()` lags `navigate()` by the loader round trip
 
-The URL changes at once; `useSearch` reads the rendered match, and a search change that alters `loaderDeps` is a new match, which renders only once its loader resolves. No route sets a `pendingComponent`, so nothing renders early and the lag is the whole round trip. A new `q` waits under either `defaultStaleReloadMode`; a revisit still in the router's cache waits only because ADR-0029 chose `"blocking"`. So code that writes a search param and watches it for outside changes sees its own write come back a round trip late, and a Back that cancels the write before it lands changes nothing it can see. `useDebouncedDraft` resynced the search box to its own previous commit and dropped every key typed in between (#501); it now compares against what it last committed or synced to, and `use-debounced-draft.test.tsx` covers the echo, the cancelled commit, and Back and Forward. Anything else that writes a search param on a timer and watches it needs the same allowance.
+The URL changes at once, but `useSearch` reads the rendered match, and a search change that alters `loaderDeps` renders only when its loader resolves. Code that writes a search param and watches it for outside changes sees its own write come back late. `useDebouncedDraft` compares against what it last committed; `src/lib/__tests__/use-debounced-draft.test.tsx` covers the echo, a cancelled commit, and Back and Forward.
 
 ---
 
@@ -201,58 +119,27 @@ The URL changes at once; `useSearch` reads the rendered match, and a search chan
 
 ### Pass the schema to `validators.onSubmit` directly; `.default()` is what breaks it
 
-```ts
-validators: {
-  onSubmit: projectFormSchema,
-},
-```
-
-`@tanstack/react-form` types the validator as `FormValidateFn<T> | StandardSchemaV1<T, unknown>`, and Zod 4 schemas declare `"~standard"`, so they are Standard Schemas. `@tanstack/zod-form-adapter` is not installed and is not the mechanism.
-
-**When this fails to type-check, the cause is almost certainly `.default()`, not the adapter.** `FormValidateOrFn<TFormData>` requires `StandardSchemaV1<TFormData, unknown>`, so the schema's INPUT type must equal the form's data type. A `.default("")` makes that field optional on input and never on output, so input stops matching and the assignment fails. The compiler names the offending field:
-
-```
-The types of 'input.description' are incompatible between these types.
-  Type 'string | undefined' is not assignable to type 'string'.
-```
-
-Neither form schema carries defaults now, and neither needs them: `defaultValues` supplies every field (`initial?.x ?? ""`) and is annotated `satisfies XFormValues`. `z.infer` reads the OUTPUT type, so removing them changed `ProjectFormValues` and `InventoryFormValues` not at all.
-
-**This entry used to say the opposite**, and it was true when written: passing a schema directly did fail, and both forms carried a hand-rolled `safeParse` loop until an architecture review found the constraint had gone. If you hit a typing error here, check your input type before you write the loop again.
+Zod 4 schemas are Standard Schemas, so `onSubmit: projectFormSchema` type-checks. If it stops, look for a `.default()`: it makes the schema's input type differ from the form's values. Supply defaults through `defaultValues` instead.
 
 ### `useForm` generics are unstable; we use a localized `any` for the `Field` helper
 
-`ReturnType<typeof useForm<ProjectFormValues, unknown>>` does not match the installed version's generics. Inside the shared `Field` component we use `// biome-ignore lint/suspicious/noExplicitAny: TanStack Form generics are unstable` plus `type AnyForm = any`. The PUBLIC API of `ProjectForm` (`initial`, `onSubmit`, `ProjectFormValues`) stays fully typed; only the internal field helper escapes.
+The `biome-ignore` reason at each `type AnyForm = any` is the explanation; the forms' public props stay typed.
 
 ### `field.state.meta.errors` is a heterogeneous array
 
-Entries can be strings or `{ message }` objects depending on which validator produced them, and since the forms pass a Standard Schema the object shape is now the common path rather than the unusual one. `FieldError` (`src/components/ui/field.tsx`) is the one place that knows this; render field errors through it rather than inline:
-
-```tsx
-<FieldError errors={field.state.meta.errors} />
-```
-
-**Every `form.Field` render prop needs this.** The one exception is a checkbox behind a `z.boolean()` (`requiresNdaIp`, `isSponsored`, `acceptingApplicants`): it cannot fail validation, so there is nothing to render. Six fields rendered through a raw `form.Field` once displayed nothing at all: type a malformed address into the proposer field, click Save, and validation failed, `canSubmit` flipped false so the button greyed out, and no message appeared anywhere, because `formError` only ever carries server errors.
+Render every field's errors through `FieldError` (`src/components/ui/field.tsx`), which handles strings and `{ message }` objects alike. A raw render shows nothing, leaving a disabled Save and no message. A `z.boolean()` checkbox cannot fail and needs none.
 
 ### Both forms own their save; the route components only navigate
 
-`InventoryForm` and `ProjectForm` import the server functions and write the row themselves. A route passes configuration in and gets a saved id back through `onSaved`; its loader still loads, but its component does nothing but navigate. `ProjectForm` took an `onSubmit` prop until 2026-09-02, so `new.tsx` and `edit.tsx` each held a copy of the payload rules, and nothing could test either: `src/test/` renders no route component, because a route is a `createFileRoute` call rather than a renderable component. A test can still import a route module to read something it exports, which is what `src/test/admin-inventory-columns.test.tsx` does with that page's column list; see the partial router mock in the Vitest section below.
-
-**The project form carries no staff-only control** since #322, and has no prop that could bring one back: no `isStaff`, `showProposer`, `showCategories` or `proposerEmail`. The proposer and the categories are set from the staff panel on `/projects/$id`, each section with its own load, draft and Save, the way mentorship already was. Three things follow, and each looks like a gap until you know why:
-
-- **The creator is the proposer on create, staff included.** `createProjectAs` writes `proposerId = viewer.id` and a null address; `ProjectInput` has no `proposerEmail`, so nothing the form sends can say otherwise. The create page tells staff so (`STAFF_CREATE_PROJECT_NOTE`) and they reassign from the project page. Until 2026-09-11 the form carried a three-state `proposerEmail` (absent, `null`, address), and create's image-saving second write had to send `undefined` or it unlinked the proposer just set; that whole distinction left with the field.
-- **`updateProjectProposerAs` is the only writer of the address after create.** Staff-only, one edit-log row per change, `proposerId` derived from the address and never from the client ([ADR-0007](./adr/0007-proposer-linking-by-email.md)); an empty string or `null` unlinks. `updateProjectAs` has no key for it, so a smuggled `proposerEmail` on an ordinary edit falls on the floor, which `projects.integration.test.ts` proves for staff as well. The bell row and the email go out only when the address changes to a non-empty value: the student-proposed mark is saved through the same writer, and flipping it alone used to re-send "A project was assigned to you" (#385).
-- **The Proposer section keys its body on the saved address.** `ProposerPicker` snapshots the saved address at mount to decide whether the field is locked, so a save that changes it has to remount the picker, or a reassigned project stays unlocked and a re-typed original re-locks. The panel owns the record, because the transition dialog's email checkbox reads the same address; `StaffProposerSection` hands its save back through `onSaved`, and the panel reloads the record and the edit log before calling the route's `onChanged`.
-
-The proposer control is staff-only and has no read-only path: `ProposerSummary` and the picker render only inside `StaffProjectPanel`, and `getProposerForEditAs` asserts staff, so no non-staff path reaches the address. #173's brief assumed a read-only state and #270 declined to add one, because drawing it would widen who can read `proposer_email`. Categories are the one public field on that panel: `setProjectCategoriesAs` is staff-only, and `StaffCategoriesSection` keeps Save disabled until the saved list has arrived, since posting an empty draft over a real list would clear it.
+`InventoryForm` and `ProjectForm` call their server functions and hand the saved id back through `onSaved`, because `src/test/` cannot render a route component. The project form has no staff-only control: staff set the proposer and the categories from the staff panel on the project page, and `updateProjectProposerAs` is the only writer of the proposer address after create ([ADR-0007](./adr/0007-proposer-linking-by-email.md)).
 
 ### Server errors via `applyServerErrors`
 
-When a server function throws a `ZodError`, the helper `src/lib/apply-server-errors.ts` maps issues back to field-level errors via `setFieldMeta`. Wrap form `onSubmit` with `try` / `catch` and call it; if it returns false (non-Zod error), surface the message in a top-level banner. Don't expect server validation errors to appear silently next to fields without this helper.
+Wrap a form's submit in `try`/`catch` and pass the error to `src/lib/apply-server-errors.ts`, which maps a `ZodError` onto field errors; when it returns false, show the message in a banner.
 
 ### `defaultValues` follows new props only until a field is touched, and a blur touches it
 
-`useForm` passes its options to `FormApi.update` in a layout effect after every render, and `update` compares the new `defaultValues` with the old by value and swaps them into the form's values only while `form.state.isTouched` is false. `FieldApi.handleBlur` sets `isTouched` without changing the value, and both forms wire `onBlur={field.handleBlur}`, so focusing a field and tabbing away stops the swap for the whole form. `update` still replaces `form.options.defaultValues` every time, so `form.resetField(name)`, which takes no value, resets a field to the newest defaults, and a field's `meta.isDefaultValue` cannot say whether the field still holds the old ones: it is recomputed only when the form's store changes, and `update` on a touched form writes nothing there, so right after a reload it still reads the old defaults and flips to the new ones at the next store write. Code that follows new defaults into a touched form has to keep the previous defaults itself and reset each field whose default moved and whose value still equals the old one; `resetField` also clears that field's errors and touched state, so leave the others alone. No form here does, because the router blocks on a stale reload; [ADR-0029](./adr/0029-a-revisit-waits-for-its-loader.md) has the census and the reason.
+`FormApi.update` swaps new `defaultValues` into a form only while nothing is touched, and a blur touches a field. No form here follows new defaults into a touched form, because the router blocks on a stale reload: [ADR-0029](./adr/0029-a-revisit-waits-for-its-loader.md) has the reason, and `CENSUS` in `src/test/loader-seed-scan.test.ts` the two form seeds.
 
 ---
 
@@ -260,144 +147,75 @@ When a server function throws a `ZodError`, the helper `src/lib/apply-server-err
 
 ### `betterAuth()` does not reject an option it does not know
 
-`betterAuth` is declared `<Options extends BetterAuthOptions>(options: Options)`, so the config literal is inferred as `Options` and TypeScript's excess-property check never runs on it. A misspelled or invented key compiles and does nothing. `emailVerification.callbackURL` sat in `src/lib/auth.ts` that way until 2026-09-01 (#149): there is no such option, and Better Auth reads the landing page from the request body of the call that mails the link. When an option seems to have no effect, check the key against `@better-auth/core/dist/types/init-options.d.mts` before looking anywhere else.
+The config literal is inferred as a type parameter, so TypeScript's excess-property check never runs and a misspelled key compiles and does nothing. When an option seems to have no effect, check its key against `@better-auth/core/dist/types/init-options.d.mts`.
 
 ### `user.id` is `text`, not `uuid`
 
-Better Auth's CLI generates `text` PKs by default. Overriding requires `advanced.database.generateId` config and risks breaking plugin assumptions about ID format. We accept the default. Every FK that previously was a `uuid` referencing the old `users.id` is now a `text` column referencing `user.id`. Drizzle declarations and integration test mocks use `text` accordingly.
+Better Auth generates `text` primary keys and we keep the default, so every FK to `user.id` is `text`.
 
 ### `additionalFields` are restored across CLI regenerations
 
-If you change Better Auth plugins or `additionalFields` and re-run `npx @better-auth/cli generate`, the CLI overwrites `src/db/auth-schema.ts`. Custom additionalFields (e.g., `affiliation`, `linkedin`) come back automatically because they live in `user.additionalFields` in `src/lib/auth.ts`. The generated file has a hand-written comment marking them so a maintainer knows what to preserve if they ever DO need to edit by hand.
+`npx @better-auth/cli generate` overwrites `src/db/auth-schema.ts`, and the custom fields come back because they live in `user.additionalFields` in `src/lib/auth.ts`. Change them there; `.claude/hooks/guard-edits.mjs` refuses an edit to the generated file.
 
 ### Console email transport in dev
 
-`EMAIL_TRANSPORT=console` (set in `.env.local`) routes every email the app sends to stderr, not just the auth ones: review notices go through the same `getEmailSender()`. Watch the dev server console for the message blocks; a sign-in code arrives there, which is how every seeded account is signed in to locally. The SES transport behind the same `EmailSender` interface (`src/lib/email/ses-sender.ts`) is what production selects in `infra/ecs.tf`, though it reaches the running container only after a `terraform apply` and a deploy.
-
-Note that `EMAIL_TRANSPORT=ses` requires `EMAIL_FROM`, and the failure is louder than it looks: `getEmailSender()` is called at module scope in `src/lib/auth.ts`, so `createSesEmailSender`'s throw happens during import and takes down the whole app rather than just email. The two are always set together by Terraform. See DEPLOYMENT.md §9.5.
-
-Every email renders through `src/lib/email/templates.ts`, which owns the HTML escaping. The README's table merges related outcomes into one row, so the count of render functions is higher than its row count; `notificationEmail` is the one generic render, mailing a bell row's own title and message for the inventory notices that also go by email. Interpolating a project title or staff comment into `html` without `escapeHtml` is an injection into the staff inbox, so the templates are the only place that builds email markup.
+`EMAIL_TRANSPORT=console` writes every email the app sends to stderr, which is where a local sign-in code arrives. `EMAIL_TRANSPORT=ses` needs `EMAIL_FROM`, and `getEmailSender()` runs at import in `src/lib/auth.ts`, so a missing one takes down the app, not just mail. All email markup comes from `src/lib/email/templates.ts`, which owns the escaping.
 
 ### `trustHost` is enabled in non-development
 
-`buildAuthConfig` in `src/lib/_internal/auth-config.ts` resolves `trustHost` as `NODE_ENV !== "development"`, and `src/lib/auth.ts` passes it straight through. Required behind the CloudFront/ALB proxy chain in production so origin detection works. Disabled in dev where `localhost:3000` is direct.
-
-Note the predicate is not the one beside it: `useSecureCookies` is `NODE_ENV === "production"`. The two agree under `development` (both off) and `production` (both on), and disagree under every other value, unset included, where `trustHost` is on and secure cookies are off. Nothing rides on the gap, because deployed code never sees a value in it: `Dockerfile` sets `NODE_ENV=production` in the runtime stage and `infra/ecs.tf` sets it again in the task definition. The difference is residue from the two lines arriving in separate commits, not a decision, so do not read intent into it or build on it.
+`trustHost` is `NODE_ENV !== "development"` while `useSecureCookies` is `=== "production"`. The gap is residue, not a decision; `buildAuthConfig` in `src/lib/_internal/auth-config.ts` says why nothing rides on it, and `auth-config.test.ts` pins it.
 
 ### Rate limiting is production-only, and needs `trustedProxies` to see a client
 
-Better Auth enables its rate limiter only under `NODE_ENV=production` (`better-auth/dist/context/create-context.mjs`), so nothing local exercises it and no test would have caught this. With no `advanced.ipAddress.trustedProxies` Better Auth believes only a single-entry `X-Forwarded-For`, and the header behind CloudFront carried more than one, so it resolved no address, keyed every request on the constant `no-trusted-ip`, and shared one bucket per path across the internet, 3 sign-ins per 10 seconds for everyone, logging one warning per task start and nothing else (#519). The same resolver feeds `session.ipAddress`, which was empty for every production session. `buildAuthConfig` now reads `TRUSTED_PROXY_CIDR` into `trustedProxies`, `auth.ts` passes it through, and production refuses to boot without it (`startup-config.ts`).
-
-The variable has to stay non-empty whatever it holds, because an empty trusted list sends Better Auth back down `if (forwardedIps.length !== 1) return null` and collapses every viewer who sits behind their own proxy into the shared bucket again. What it does NOT do is name a hop that gets skipped, and the claim that it did was the bug in #535: the ALB was appending the CloudFront **edge server's** public address rather than the VPC origin ENI ([Client IP addresses](https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/RequestAndResponseBehaviorCustomOrigin.html#RequestCustomIPAddresses)), so `var.vpc_cidr` matched nothing and the limiter keyed on an edge server: diluted across many of them per viewer, and firing on strangers when it fired. `infra/ecs.tf` now sets `xff_header_processing_mode = "preserve"`, so the ALB appends nothing, the task sees exactly what CloudFront sent, and a one-entry header is the normal case. CloudFront's own rule is documented and unconditional: it takes the viewer address from the TCP connection and appends it, so the last entry is the viewer and anything a viewer prepends sits to its left (#535).
-
-Keeping `var.vpc_cidr` as the value is deliberate. It is a private range, so it can never match a public viewer, and a value that could match one would be a way to make that viewer invisible. Note that the walk skipping trusted entries is also why anything already inside the VPC could forge a viewer address; that was equally true before `preserve` and is bounded by the ALB being internal. `src/lib/__tests__/trusted-proxies.test.ts` pins the walk, and is honest that it proves nothing about what AWS sends; the post-deploy check that does is in `DEPLOYMENT.md` under the runtime environment list. The counter is also per task, in memory, so whatever the number says it multiplies by the running task count and resets on every deploy (#535 leaves that alone deliberately: it loosens, never tightens). See the `trustHost` quirk above for the same chain from the origin-check side.
+The limiter runs only under `NODE_ENV=production`, so nothing local exercises it. With no `advanced.ipAddress.trustedProxies`, Better Auth believes only a one-entry `X-Forwarded-For` and otherwise keys every viewer into one shared bucket. `TRUSTED_PROXY_CIDR` fills the list, and production refuses to boot without it. The value names no real hop: the ALB runs `xff_header_processing_mode = "preserve"` (`infra/ecs.tf`), so the task sees CloudFront's header, whose last entry is the viewer, and the VPC range only keeps the list non-empty. `src/lib/__tests__/trusted-proxies.test.ts` pins the walk. Counters are per task and reset on deploy.
 
 ### The rate limit numbers are configured, not inherited
 
-`src/lib/_internal/auth-rate-limits.ts` holds them and `src/lib/__tests__/auth-rate-limits.test.ts` is the only thing in the repo that exercises the limiter at all; read the module before changing a number, and [ADR-0039](./adr/0039-sign-in-limits-are-sized-for-a-shared-address.md) before changing the shape. The quirk is the matcher: Better Auth's first special rule is 3 per 10 seconds over `startsWith("/sign-in") || startsWith("/sign-up") || startsWith("/change-password") || startsWith("/change-email")`, so it covers ONID and GitHub sign-in, where no password is typed here, and behind an OSU wireless NAT pool that is a lockout for the fourth student in ten seconds rather than a control. Its second rule is 3 per **60** seconds, not 10, over the mail paths. The global default is 100 per 10 seconds; #535's body says 60 seconds, which is what the upstream prose docs say and is wrong for the pinned version.
-
-Two traps when editing `customRules`. Better Auth takes the **first** key that matches (`Object.keys(...).find` in `better-auth/dist/api/rate-limiter/index.mjs`), so a wildcard beside a specific path makes behaviour depend on declaration order. And its glob treats `*` as "not a slash", so `/sign-in*` matches `/sign-in` alone and never `/sign-in/email`. Spell every path out. `customRules` also cannot change the key, because `createRateLimitKey(ip, path)` is fixed: no rule here can count per account, which is why the emailed code is bounded by a per-recipient cap on sends instead (ADR-0047). A path in `disabledPaths` needs no rule, because the 404 answers before the limiter runs.
+`src/lib/_internal/auth-rate-limits.ts` holds every number and [ADR-0039](./adr/0039-sign-in-limits-are-sized-for-a-shared-address.md) argues them. Rules apply in three layers: Better Auth's own, then each plugin's `rateLimit` array (`emailOTP()` sets 3 per 60 seconds on all nine of its paths), then `customRules`, which overrides both. In `customRules` the first matching key wins and `*` does not cross a slash, so spell every path out; a key naming an unmounted path is silently ignored, which `auth-rate-limits.test.ts` catches. A max is a budget between lulls, not a rate: every accepted request pushes the reset out. The key is always `(ip, path)`, so no rule can count per account.
 
 ### Two `APIError` classes reach an after-hook, and only one is `instanceof` yours
 
-`better-auth/api` exports an `APIError`, and the sign-in endpoints throw it, but better-call throws its OWN `APIError` (`better-call/dist/endpoint.mjs`) when a request body fails its zod schema. So in `hooks.after`, `ctx.context.returned instanceof APIError` is true for a wrong credential and **false for a malformed body**, and code that reads "not an error, therefore a success" treats a request with a required field omitted as a successful sign-in. In #552 that was a complete bypass of the password attempt counter: four wrong passwords, then one request with `password` missing, and the count was cleared. Use `isAPIError` from `better-auth/api`, which is what Better Auth's own dispatcher uses, and prefer detecting success positively over inferring it from the absence of an error: the code sign-in's after-hook in `src/lib/auth.ts` reads `ctx.context.newSession`, which only a successful sign-in sets. Related: an after-hook runs even when the endpoint threw, with the error in `ctx.context.returned`, which is undocumented. It is why the send's after-hook in `src/lib/auth.ts` issues a claim only when `returned.success` is true: a send Better Auth refused still reached it, and was handed a claim on the owner's unrotated code (#576). "Requests Better Auth refuses" in `email-otp.integration.test.ts` pins it.
-
-### A rate limit max is a budget between lulls, not a rate
-
-`decideConsume` in `better-auth/dist/api/rate-limiter/index.mjs` resets a count only when `now - data.lastRequest > windowInMs`, and every ACCEPTED request rewrites `lastRequest`, so the window slides forward on use. A trickle that never leaves a full window of silence therefore accumulates to the max and is refused, even at a fraction of the nominal rate: against a rule of 5 per 2 seconds, one request every 0.8 seconds (1.25/s, half what the rule nominally allows) is refused on the sixth. Denials write nothing, so the memory entry expires a window after the last accepted request and the count then clears. Sustained throughput does match the label, but the refusal pattern does not, and "N per 10 seconds" is the wrong mental model for sizing a number: read it as "N accepted requests since the last lull". `src/lib/__tests__/auth-rate-limits.test.ts` pins this under fake timers.
+better-call throws its own `APIError` for a body that fails validation, so `instanceof` the one from `better-auth/api` is false for a malformed request. Use `isAPIError`, or detect success positively, as the code sign-in's after-hook does with `ctx.context.newSession`. An after-hook also runs when the endpoint threw, with the error in `ctx.context.returned`, so the send's after-hook issues a claim only when `returned.success` is true. "Requests Better Auth refuses" in `email-otp.integration.test.ts` pins it.
 
 ### Session role typing
 
-`session.user.role` is typed as `string | null | undefined`, because `user.role` is a `text` column Better Auth's admin plugin owns and no enum narrows it. Ask `isStaff` or `isAdmin` from `src/lib/viewer.ts` rather than comparing the string:
-
-```ts
-isStaff(session.user)
-```
-
-Where the question is one those predicates do not answer, coerce before comparing, because `undefined` is not a role:
-
-```ts
-someRoles.includes(session.user.role ?? "")
-```
-
-The legal values are `USER_ROLES` in `src/lib/vocabularies.ts` and nowhere else, including Better Auth's own `defaultRole` and `adminRoles`, which are held to it with `satisfies` because the plugin types them as `string` and `string | string[]` (#274). No column rejects a role the tuple does not name, so `vocabulary-scan.ts` is the only thing that catches a copy, and it reads `src/` alone: a copy in `scripts/` or under `__tests__` is yours to catch. See [ADR-0016](./adr/0016-the-role-vocabulary-lives-with-the-statuses.md).
+`session.user.role` is `string | null | undefined`. Ask `isStaff` or `isAdmin` from `src/lib/viewer.ts`. The legal values are `USER_ROLES` in `src/lib/vocabularies.ts` ([ADR-0016](./adr/0016-the-role-vocabulary-lives-with-the-statuses.md)), and `vocabulary-scan.ts` fails on a copy under `src/`.
 
 ### Ban enforcement reads `user.banned`; sessions linger until next server call
 
-Better Auth's session-validation middleware checks `user.banned` on every request. Setting the row alone is enough to prevent future sign-ins, but an already-signed-in user keeps their cookie until the next server-touch. Our `banUserAs` impl wraps both writes (`UPDATE user` + `DELETE FROM session WHERE user_id = ?`) in one transaction so the next request fails session lookup and forces sign-out. Skipping the session-delete would leave a banned user nominally signed in until their cookie expired naturally.
-
-`ban_expires` is informational at write time; Better Auth's runtime check compares it to `now()` and treats a past timestamp as no-longer-banned. We do not run a cron to clear the row; the data simply ages out of relevance.
-
-### `genericOAuth` prefers the userinfo endpoint whenever the email claim is missing
-
-The default `getUserInfo` in `better-auth/dist/plugins/generic-oauth/routes.mjs` takes its ID-token branch only when the decoded token has BOTH `sub` and `email`. Anything else falls through to the provider's `userinfo_endpoint` (from `userInfoUrl`, or from discovery) with a bearer GET. That is a reasonable default and it is wrong for ONID in the one case that matters.
-
-Two facts collide. Tenant-custom claims ride in the ID token and are absent from Microsoft Graph's `/oidc/userinfo` response, which carries a fixed set (`sub`, `name`, `given_name`, `family_name`, `email`, `picture`). And Entra does not guarantee `email`. So a user without an email claim is routed to the one source that cannot supply the `username` claim we fall back to, and sign-in fails with `email_is_missing`.
-
-`src/lib/_internal/onid-profile.ts` is why: a custom `getUserInfo` that reads the ID token and nothing else. Do not "simplify" it back to the default. Note also that a tenant's discovery document is tenant-wide and says nothing about per-application claim policies, so `claims_supported` will not list a custom claim that is genuinely being released.
-
-### `genericOAuth` refetches `discoveryUrl` on the ONID sign-in path, and there it beats the static URLs
-
-Given a `discoveryUrl`, the `/sign-in/oauth2` handler and the `/oauth2/callback` handler in `better-auth/dist/plugins/generic-oauth/routes.mjs` both GET the document on every request, with no cache, and overwrite `authorizationUrl` and `tokenUrl` with what it returns, so passing both does not save the fetch on the path ONID sign-in takes. Not every path behaves that way, which is what makes it easy to misread: `/oauth2/link`, and the provider's `createAuthorizationURL` in `index.mjs` that `/sign-in/social` and `/link-social` reach, prefer a static URL and fetch only when it is missing. The provider's `validateAuthorizationCode` and `refreshAccessToken` in `index.mjs` do not; they fetch whenever `discoveryUrl` is set. ONID therefore passes no `discoveryUrl`: `onidProviderConfig` in `src/lib/_internal/onid-provider.ts` hands over endpoints derived from `ONID_DISCOVERY_URL` by string manipulation, plus `issuer`, which the callback otherwise takes from discovery; `docs/ONID-SSO.md`, "How the endpoints are resolved", says what that check does and does not enforce. `src/lib/__tests__/onid-sign-in.test.ts` counts the fetches (#553).
+Setting `user.banned` stops new sign-ins, but a signed-in user keeps their session until something next checks it, so `banUserAs` deletes the user's sessions in the same transaction. A past `ban_expires` reads as not banned, and nothing clears the row.
 
 ### The ONID callback path is not the GitHub callback path, and the version pin holds it there
 
-GitHub sits at `/api/auth/callback/github`; ONID sits at `/api/auth/oauth2/callback/onid`. Better Auth 1.6 mounts generic OAuth on the `oauth2` path, 1.7 converges the two, and Entra matches redirect URIs exactly against what UIT allowlisted. `package.json` therefore holds `better-auth` on the 1.6 line with a tilde range, and `.github/dependabot.yml` skips its minor and major updates. `@better-auth/core` has to follow it: `better-auth` depends on one exact core version, so a direct dependency on another line installs a second copy, and the 1.7 core broke the production build against the 1.6 client (`getIp` is not exported, #599). Under the old caret range a routine `npm update` would break ONID sign-in with no code change and no failing test. Upgrading to 1.7 means getting a new URI allowlisted first, and removing `genericOAuthClient()` from `src/lib/auth-client.ts`, which 1.7 deletes. See `docs/ONID-SSO.md`.
+ONID's callback is `/api/auth/oauth2/callback/onid` on Better Auth 1.6; 1.7 moves it, and Entra matches redirect URIs exactly. So `better-auth` and `@better-auth/core` stay on the 1.6 line with a tilde range, and `.github/dependabot.yml` skips their minor and major updates. The upgrade needs a new URI allowlisted first (#278).
 
 ### `user.name` is trimmed and refused blank in the create hook
 
-Better Auth validates the sign-up body's `name` with a bare `z.string()`, which accepts `""`, so `notNull` on the column guarantees a row rather than a name. `requireUserName` in `src/lib/_internal/user-name.ts` runs in `databaseHooks.user.create.before`, which is the one place every provider creates through: it trims, and throws `APIError("BAD_REQUEST")` on a blank. It runs in `user.update.before` as well, because `POST /update-user` types its own `name` as `z.any()` and the admin plugin's update takes an open record, so neither is covered by narrowing creation. That hook tests `updates.name === undefined` rather than `"name" in updates`: the update route builds its payload with every optional key present, so the `in` check refused an update that carried only an avatar. `profileSchema` in `src/server/profile.ts` says the same thing about blankness for the profile form, which does not come through Better Auth at all, with `z.string().trim().min(1)`, where the order matters: trim first and a name of spaces is refused with the message an empty one already shows. Only the form caps the length; a refused OAuth creation is a redirect carrying an error rather than a message under a field, which is no place to say a name is too long.
-
-Two things follow. No render site carries a fallback for a missing name, and none should be added: the argument is [ADR-0015](./adr/0015-addresses-are-normalized-on-write.md)'s, which is to normalize once on the way in rather than defend at every read. And nothing in this repo can produce a blank name to refuse: the two forms mark the field required, `onid-profile.ts` falls back to the address local part, and the GitHub provider falls back to the login, so the hook fires only for a direct call to the endpoint. `drizzle/0029_normalize_user_names.sql` did the rows written before it, turning a blank one into the address local part. It trims with `regexp_replace(name, '^\s+|\s+$', '', 'g')` rather than `trim()`, which strips the space character and nothing else, so a name of one tab would have survived it. See #433.
+Better Auth accepts `""` for a name, so `requireUserName` (`src/lib/_internal/user-name.ts`) runs in `databaseHooks.user.create.before` and `update.before`. No render site needs a fallback for a missing name ([ADR-0015](./adr/0015-addresses-are-normalized-on-write.md)).
 
 ### `databaseHooks` covers `user` and `session`, never `account`
 
-There is no hook that fires when an OAuth identity is linked to an existing row, which is why the ONID takeover in #554 could not be one. `handleOAuthUserInfo` in `better-auth/dist/oauth2/link-account.mjs` decides and links inline, and the only two places a config can get in front of it are the provider's own `getUserInfo` and a `hooks.after` on the callback path. This repo uses the first: `onidUserInfo` in `src/lib/auth.ts` wraps the pure mapper in `_internal/onid-profile.ts` and does the write there, because that is the first point where a verified ID token exists and it runs before the link decision, so `accountLinking.requireLocalEmailVerified` can stay at its safe default. The alternative, a `hooks.after` plus `requireLocalEmailVerified: false`, cleans up after the link and relaxes that default for every provider rather than for ONID alone. The cost of the choice taken is that something shaped like a mapper carries a database write, which is why the wrapper is named and commented rather than inlined.
-
-### `revokeUnprovenAccountAccess` exists, and only the email-proof plugins call it
-
-`better-auth/dist/db/revoke-unproven-account-access.mjs` no-ops on a verified row, deletes every `credential` account on an unverified one, and revokes its sessions, so that whoever proves control of the address inherits no password or session predating the proof. The magic link and email OTP plugins call it before flipping `emailVerified`; `oauth2/link-account.mjs` does not, so an OAuth identity resolving to an unproven row is refused with `account not linked` instead. That is why `releaseUnverifiedAddress` in `src/server/_internal/release-unverified-address.ts` exists rather than a call to the helper, and ADR-0045 records it. Two differences to keep if the two are ever merged: the helper proceeds even when a non-credential account is attached, which would leave a squatter's GitHub link on the verified owner's account, and it does not check `banned`.
-
-### `accountLinking.updateUserInfoOnLink` defaults to false, so a link never touches `name`
-
-`applyUpdateUserInfoOnLink` returns immediately unless the option is exactly `true`, and `overrideUserInfo` is off for `genericOAuth`, so linking an ONID identity into an existing row leaves whatever `name` that row already had. That matters wherever a row might not have been created by the person it now belongs to: `releaseUnverifiedAddress` writes the name from the ID token itself for exactly this reason, or a student would inherit the display name of whoever squatted their address.
-
-### `captureStderr` sees the console email transport but not `console.*`
-
-`ConsoleEmailSender` writes with `process.stderr.write`, which `src/test/shared/console-email.ts` patches, so `captureConsoleCode` works. A `console.warn` in the same block does not reach that patch, because Vitest replaces the console methods with its own interception and reports them separately. A test that wants both needs `captureStderr` for the mail and a `vi.spyOn(console, "warn")` for the line.
-
-### Deleting an account anonymizes the row, and the avatar goes after the commit
-
-[ADR-0008](./adr/0008-account-deletion-anonymizes.md) is the decision; `deleteAccountAs` in `src/server/_internal/account.ts` is the code, and `account.integration.test.ts` pins its cascade list against the schema files. Three things that are easy to get wrong when touching it: the avatar object is deleted after the commit through `deleteOwnedObject`, which swallows the failure, because an orphan is a sweep problem and a half-deleted person is a broken promise; two scrubs live outside the FK rule because the columns are addresses (`projects.proposer_email` where the proposer is this user, `projects.mentor_email` wherever it matches), while `contact_*` and `inventory_item_status_history.holder_*` stay, as the privacy page says; and the held-item block reads `heldByViewer` from `inventory-holdings.ts`, the predicate `/my/items` reads, so the page that shows a person their items and the check that refuses to delete their account while they hold one cannot disagree. See #84.
+No hook fires when an OAuth identity links to an existing row. The only seams ahead of the link are the provider's `getUserInfo` and a `hooks.after` on the callback; `onidUserInfo` in `src/lib/auth.ts` uses the first, so `requireLocalEmailVerified` keeps its safe default.
 
 ### A plugin mounts every endpoint it has, whatever its options say
 
-`emailOTP()` registers nine paths regardless of `disableSignUp`, `changeEmail` or anything else, the same way `/change-email` is mounted whatever `user.changeEmail` says, and Better Auth's core mounts `/sign-in/email`, `/verify-email` and the rest with `emailAndPassword` off. An option turns a feature off inside a handler; it does not un-mount the handler, and a direct POST is still served and still counted by the rate limiter. `/verify-email` does not even check the option: it redeems any unexpired link it ever signed. The only way to make one a flat 404 is the top-level `disabledPaths`, which Better Auth checks in the router's `onRequest` against the path with the base path stripped (`/email-otp/verify-email`, not `/api/auth/email-otp/verify-email`). It runs before routing AND before the rate limiter, so a disabled path costs nothing. The match is an exact string, so a path with a parameter, `/reset-password/:token`, cannot be listed. `src/lib/auth.ts` lists the retired password paths and six of the nine email-otp ones there, and `auth.integration.test.ts` and `email-otp.integration.test.ts` assert each one 404s, because "nothing calls it" is not "nothing reaches it".
-
-### Plugin rate-limit rules overwrite the defaults, and a rule naming a path that does not exist is silent
-
-Three layers, applied in order: Better Auth's own special rules, then each plugin's `rateLimit` array (first match wins), then `customRules`, which overrides both. `emailOTP()` ships rules at 3 per 60 seconds for all nine of its paths, which overwrite the framework defaults, including the `startsWith("/sign-in")` rule; `src/lib/_internal/auth-rate-limits.ts` then overrides the three paths this app serves. The trap is the failure mode: a `customRules` key that does not name a mounted path is not an error anywhere. The lookup finds nothing, the rule never applies, and the path silently keeps whatever default it had, so a typo is indistinguishable from a decision until somebody measures the wrong number in production, which is what #520 was. `auth-rate-limits.test.ts` holds every key to a mounted route and fails if a rule is added without being added to that list.
-
-### `revokeUnprovenAccountAccess` runs on one email-otp path, and refuses less than `releaseUnverifiedAddress`
-
-The helper in `better-auth/dist/db/revoke-unproven-account-access.mjs` is called from `/sign-in/email-otp` and from magic-link, and NOT from `/email-otp/verify-email`, the OTP password reset or the core `/verify-email`, all of which flip `emailVerified` without it. That asymmetry is why `src/lib/auth.ts` disables them rather than leaving them mounted. It also calls no hook that claims projects, so `src/lib/auth.ts` claims in the after-hook on `/sign-in/email-otp` instead. Where it does run it deletes `credential` accounts and sessions and no-ops on a verified row, but unlike `releaseUnverifiedAddress` ([ADR-0045](./adr/0045-onid-takes-an-address-off-an-unproven-account.md)) it refuses neither a banned row nor a row another provider is linked to. `src/server/_internal/otp-sign-in-guard.ts` adds both refusals ahead of it; removing it turns two cases in `email-otp.integration.test.ts` red.
+An option turns a feature off inside a handler; the route stays mounted, served and rate-counted, and `/verify-email` redeems any link it ever signed. Only top-level `disabledPaths` makes a path 404, matched exactly against the path without the base path (`/email-otp/verify-email`), before routing and the limiter, so a path with a parameter cannot be listed. `auth.integration.test.ts` and `email-otp.integration.test.ts` assert each disabled path 404s.
 
 ### `resolveOTP` rotates the record BEFORE `sendVerificationOTP` runs
 
-So a decision not to mail, taken inside the sender, is taken after the damage. The per-recipient cap lived there first and the symptom was subtle: a sixth request in an hour did not merely fail to mail, it replaced the live record with a code nobody had been told, so the person lost the working code they were already holding. Anything that can refuse a send belongs in the `hooks.before` on `/email-otp/send-verification-otp`, where the record has not moved yet. `src/lib/auth.ts` spends the cap there for exactly this reason, and `email-otp.integration.test.ts` fails if it moves back.
+So a refusal taken inside the sender has already replaced the live code with one nobody was told. Anything that can refuse a send goes in the `hooks.before` on `/email-otp/send-verification-otp`; `email-otp.integration.test.ts` fails if the per-recipient cap moves back.
 
 ### `hooks.before` sees a body Better Auth has not validated yet
 
-Better Auth validates the body inside the endpoint, after every before-hook has run, so a before-hook reads raw JSON: a missing field, a wrong type, an address with a leading space. In the code guards that was a family of holes (#576): a send with no `type` spent the owner's per-recipient budget, a padded address spent it and mailed nothing, and a redeem with no `otp`, or with a `name` that is not a string, answered differently when a code was outstanding. `isMalformedCodeRequest` in `src/lib/auth.ts` now leaves such a body to Better Auth's own validation. The endpoint also has checks of its own that run after every before-hook, the send's cross-site check among them, so the send's after-hook gives the reservation back (`refundVerificationMail`) when the send did not succeed. A new hook on an auth path should answer the same question first: what does this do with a request the handler is about to reject? The after-hook half, a claim issued on a send that failed, is under "Two `APIError` classes reach an after-hook" above.
+Validation runs inside the endpoint, after every before-hook, so a before-hook reads raw JSON: missing fields, wrong types, padded addresses. `isMalformedCodeRequest` in `src/lib/auth.ts` leaves such a body to Better Auth. The endpoint can still refuse after the hook, so the send's after-hook refunds the reservation (`refundVerificationMail`) when the send did not succeed. Ask of any new auth hook what it does with a request the handler is about to reject.
 
 ### Better Auth skips its origin and cross-site checks under a test runner
 
-With `advanced.disableOriginCheck` unset, `context.skipOriginCheck` falls back to `isTest()` (`better-auth/dist/context/create-context.mjs`), so under Vitest the origin check is off, and so is the cross-site check an endpoint runs through `formCsrfMiddleware`. An integration test cannot see a refusal those checks make unless it turns them back on: set `(await auth.$context).skipOriginCheck = false` for the one request and restore it in a `finally`, because every later test in the same file shares that context. "spends nothing on a send Better Auth refuses after the guard has run" in `email-otp.integration.test.ts` does it.
+`skipOriginCheck` defaults to `isTest()`, so under Vitest both checks are off. To test a refusal they make, set `(await auth.$context).skipOriginCheck = false` for one request and restore it in a `finally`, since every test in the file shares the context.
 
 ### `throw new APIError("OK", ...)` short-circuits a hook, but only over the router
 
-better-call's `statusCodes` includes `OK: 200`, so a `hooks.before` can answer a request without letting the handler run by throwing one. That is how the send guard returns `{success: true}` for a request it refuses to act on, which it must, because any other answer turns the send endpoint into an account enumerator. The catch that converts it lives in the ROUTER: `auth.handler` gives a real 200, and `auth.api.*` rethrows the `APIError` instead. A test written against `auth.api` therefore fails on exactly the path it means to check, which is why the send cases in `email-otp.integration.test.ts` build a `Request` and go through `auth.handler`.
-
+A `hooks.before` can answer 200 without running the handler by throwing `APIError("OK", ...)`; the send guard does so to answer `{ success: true }` to a request it refuses, since any other answer enumerates accounts. Only `auth.handler` converts it, and `auth.api.*` rethrows, so test those paths through `auth.handler` with a built `Request`.
 
 ---
 
@@ -405,104 +223,43 @@ better-call's `statusCodes` includes `OK: 200`, so a `hooks.before` can answer a
 
 ### tsvector / generated columns need `customType` + hand-written SQL
 
-Drizzle 0.45 has no built-in `tsvector` column type. Declare with the `customType` helper as read-only:
-
-```ts
-const tsvector = customType<{ data: string; driverData: string }>({
-  dataType: () => "tsvector",
-});
-
-searchVector: tsvector("search_vector").notNull(),
-```
-
-The column is created in a hand-written migration as `GENERATED ALWAYS AS (...) STORED`. Drizzle's `db:generate` will not produce this for you. Do not write the migration by tweaking the generated SQL; author it directly.
-
-If you ever need to change the weight expression, drop the column and re-add it. Generated-always-stored columns cannot be altered in place.
-
-Dropping a `GENERATED ALWAYS AS ... STORED` column also drops every index defined on it; Postgres does not preserve or warn about this. `drizzle/0010_category_domains.sql` drops and recreates `inventory_items.search_vector` and explicitly re-issues `CREATE INDEX ... USING GIN ("search_vector")` in the same file, after the `ADD COLUMN`. Skipping that step leaves full-text search working (Postgres will still plan a sequential scan) but silently un-indexed. Confirm the index exists after any such migration:
-
-```sql
-SELECT indexname FROM pg_indexes WHERE tablename = 'inventory_items';
-```
-
-### Self-referential FKs need the AnyPgColumn cast
-
-```ts
-parentId: uuid("parent_id").references(
-  (): import("drizzle-orm/pg-core").AnyPgColumn => projectComments.id,
-  { onDelete: "cascade" },
-),
-```
-
-The cast is the documented Drizzle idiom to avoid a circular initialization error.
+Drizzle has no `tsvector` type: declare it read-only with `customType`, and create the column as `GENERATED ALWAYS AS (...) STORED` in a hand-written migration. Changing the expression means dropping and re-adding the column, and dropping it silently drops every index on it, so re-issue the GIN index in the same migration, as `drizzle/0010_category_domains.sql` does.
 
 ### Pool reuse
 
-`src/db/index.ts` exports a single `db` instance, and constructs the `pg.Pool` itself rather than using the connection-string shortcut so that `logPoolErrors` can attach its listener before anything queries the pool; `drizzle({ client: pool, schema })` is the shape that allows it. Why that listener is not optional is in the `logPoolErrors` docblock and in `src/server/__tests__/db-pool.integration.test.ts`, which kills a backend and watches the pool survive (#525). The sizing, the acquisition timeout and the budget behind the numbers are in `src/lib/_internal/db-pool.ts`, with [ADR-0034](./adr/0034-the-pool-is-sized-against-the-instance.md) for why and for the one exception to "no second `pg.Pool` in app code": `src/db/traffic.ts`, the traffic writer's own pool, capped at `CONNECTION_BUDGET.trafficPerTask`. Pass `db` to Better Auth's `drizzleAdapter`.
-
-### pg-pool's `min` opens nothing, and `#/db` is not loaded until something imports it
-
-`min` only exempts clients from the idle timeout; reaching it takes connections that are already open, which is why `warmPool` opens `POOL_MIN` at once. And every server function reaches `#/db` through a dynamic import, while `/api/healthz` imports nothing from the database, so without the side-effect `import "#/db"` in `src/server.ts` the pool first opens on the first page view. With it, a new task's first health check opens the floor: measured on the built output against docker Postgres, five backends after `/api/healthz` and still five after 20 idle seconds. [ADR-0052](./adr/0052-the-pool-keeps-a-warm-floor.md) is the decision. #601.
+`src/db/index.ts` exports the one `db` and builds the `pg.Pool` itself, so `logPoolErrors` attaches before the first query. The sizing is in `src/lib/_internal/db-pool.ts`; [ADR-0034](./adr/0034-the-pool-is-sized-against-the-instance.md) says why, and names the one second pool, the traffic writer's in `src/db/traffic.ts`.
 
 ### The pool reports itself as a CloudWatch metric, through stdout
 
-Under `NODE_ENV=production`, `src/db/index.ts` starts `startPoolMetrics`, which samples `waitingCount`, `totalCount` and `idleCount` every second and prints one JSON line a minute. That line is an Embedded Metric Format document: CloudWatch Logs extracts `PoolWaiting`, `PoolTotal` and `PoolIdle` in the `eecs-capstone/db-pool` namespace from any log event carrying `_aws`, with no header, so the `awslogs` driver is the whole transport and the task has no `cloudwatch:PutMetricData`. Two things break it silently. Anything printed on the same line, a prefix from a wrapped `console` included, makes the event not JSON and the metric stops; and a dimension added to the document makes a new metric, which the `db_pool_waiting` alarm in `infra/alarms.tf` does not watch. `db-pool.test.ts` pins the names to the alarm. A line carries one calendar minute of samples, stamped with that minute, so each minute gets one datapoint; EMF rejects more than 100 values per metric (#558).
+`startPoolMetrics` prints one Embedded Metric Format line a minute, which CloudWatch Logs turns into `PoolWaiting`, `PoolTotal` and `PoolIdle`. Anything else printed on that line, or a new dimension, silently breaks the metric the `db_pool_waiting` alarm watches. `db-pool.test.ts` pins the names to `infra/alarms.tf`.
 
 ### The listing's filter options are cached per task, and a direct insert is missing from them for a minute
 
-`listProjectFilterOptions`, which the `/projects` loader reads, caches when `REFERENCE_LIST_CACHE_TTL_MS` is set; production sets 60000 and dev leaves it at 0. Only the `*As` writers clear it, and only on their own process, so a row inserted by a script, a fixture, `psql` or another task is absent from the listing's filters until the entry expires, while every other read of the two tables sees it at once. A new writer to either table must call `clearAllReferenceListCaches()`. Why, and why it is off in dev: [ADR-0051](./adr/0051-reference-lists-are-cached-per-task.md).
+A category or program inserted outside the `*As` writers (a script, a fixture, another task) is missing from the `/projects` filters until the cache expires. A new writer to either table calls `clearAllReferenceListCaches()`. [ADR-0051](./adr/0051-reference-lists-are-cached-per-task.md).
 
 ### FK rules in this project
 
-Cascade rules are encoded in the schema, not in application code. Never recompute them at runtime.
-
-**Into `user.id`.** These are the ones that decide what account deletion removes ([ADR-0008](./adr/0008-account-deletion-anonymizes.md)), so they are listed in full.
-
-| Rule | Columns |
-| --- | --- |
-| `CASCADE` | `session.user_id`, `account.user_id`, `notifications.user_id`, `user_interests.user_id`, `program_instructors.user_id`, `project_collaborators.user_id`, `project_bookmarks.user_id`, `inventory_cart_items.user_id`. Sessions, credentials, and things the account merely marked. |
-| `RESTRICT` | `project_comments.author_id`, `project_status_history.changed_by`, `project_edit_log.editor_id`, `inventory_item_status_history.changed_by`, `inventory_item_edit_log.editor_id`, `inventory_requests.user_id`. Authorship and audit trail: history has to outlive the person, so an account with any of this cannot be hard-deleted. |
-| `SET NULL` | `projects.proposer_id`, `inventory_items.current_holder_id`, `inventory_request_items.reviewed_by`, `inventory_request_items.closed_by`, `inventory_custom_lines.reviewed_by`, `inventory_custom_lines.closed_by`, `inventory_item_status_history.holder_id`. Attribution that can be lost without losing the record. |
-
-Note `inventory_items.current_holder_id`: nulling it does **not** change `status`, so deleting a user who holds an item strands it in `checked_out` with no holder and no way to return it. Return the item first.
-
-**Everywhere else.** `CASCADE` on junction tables and on anything scoped to a parent row (`project_categories`, `project_programs`, `inventory_item_categories`, and the comment, history, and edit-log tables against their project or item). `SET NULL` on `inventory_item_status_history.request_item_id` and `inventory_items.current_request_item_id`. `project_programs` cascades on both sides, which is what replaced the `SET NULL` that `projects.program_id` carried: deleting a program leaves a single-program project unplaced exactly as before, and removes only that program from a shared one (#462). `RESTRICT` on `inventory_request_items.item_id` and `inventory_custom_line_items.item_id`, so an item with request lines, or one that fulfilled a custom line, cannot be deleted.
+Cascade rules live in the schema files, never in application code, and `account.integration.test.ts` pins the ones into `user.id` ([ADR-0008](./adr/0008-account-deletion-anonymizes.md)). The trap: `SET NULL` on `inventory_items.current_holder_id` leaves `status` alone, so removing a user who holds an item by any path but `deleteAccountAs`, which refuses, strands it `checked_out` with no holder.
 
 ### `categories` uniqueness needs an expression index, not a plain UNIQUE
 
-`UNIQUE (domain, coalesce(type, ''), lower(name))`, declared in `schema.ts` and created in
-`drizzle/0015_categories_unique_name.sql`.
-
-```sql
-CREATE UNIQUE INDEX "categories_domain_type_name_unique_idx"
-  ON "categories" USING btree ("domain", coalesce("type", ''), lower("name"));
-```
-
-`coalesce(type, '')` is load-bearing: Postgres treats NULLs as distinct in a unique index
-and every inventory category carries `type = null`, so a plain `UNIQUE (domain, type, name)` leaves the whole inventory domain unconstrained. `NULLS NOT DISTINCT` says the same thing on PG15+, but Drizzle's `nullsNotDistinct` is on unique *constraints*, which cannot take expressions, so using it would mean a SQL-only index invisible in `schema.ts`. The migration dedupes before creating the index, since `CREATE UNIQUE INDEX` fails outright on existing duplicates; the two non-obvious parts of that step (a `created_at, id` tie-break, and moving junction rows by insert-then-delete rather than `UPDATE`) are commented in the file.
-
-`db-reset.ts` only truncates, so this index is schema state that outlives a test. The
-dedupe test drops it to create the duplicates it exists for and restores it in a `finally`; a test that drops it and dies without restoring disarms every uniqueness assertion after it.
+`UNIQUE (domain, coalesce(type, ''), lower(name))`, from `drizzle/0015_categories_unique_name.sql`: every inventory category has `type = null`, and Postgres treats nulls as distinct, so a plain constraint leaves inventory unconstrained. `db-reset.ts` only truncates, so the index outlives a test: the dedupe test drops it and restores it in a `finally`, and a test that drops it and dies disarms every uniqueness assertion after it.
 
 ### The status enums take their values from `src/lib/vocabularies.ts`
 
-`projectStatusEnum`, `inventoryItemStatusEnum`, `inventoryRequestItemStatusEnum`, `inventoryCustomLineStatusEnum` and `notificationTypeEnum` are declared with an `as const` tuple imported from `src/lib/vocabularies.ts` rather than an inline array, and the client-safe modules derive their unions from the same tuple with `(typeof T)[number]`. `pgEnum`'s overload is `pgEnum<U extends string, T extends Readonly<[U, ...U[]]>>`, so a readonly tuple is accepted as is. Add a status by editing the tuple and generating a migration: the union derives from it, so the two cannot disagree. Every consumer that names a whole vocabulary derives from it too, and `src/lib/__tests__/vocabulary-scan.ts` is what keeps it that way (#271): it discovers the tuples by parsing this file, then fails on any array literal, written-out union or tuple type elsewhere in `src/` that names a whole vocabulary. It covers every tuple in the file, not just the five with a `pgEnum` behind them, which is why `USER_ROLES` lives there too ([ADR-0016](./adr/0016-the-role-vocabulary-lives-with-the-statuses.md)). Complete copies only, because a copy is written complete. A subset one member short passes, which is why `ACTIVE_STATUSES` is derived rather than listed; a `Record` keyed by a vocabulary is not examined at all, because the type already forces it to be total. `__tests__` and `src/test/` are skipped, and the scan's docblock says why: it cannot tell a test's case list from its expected value, and deriving the second is a tautology. [ADR-0014](./adr/0014-status-vocabularies-live-in-src-lib.md) says why the tuples live in `src/lib` rather than being derived from `enumValues` here. `categoryDomainEnum` is still inline: nothing outside the server names a category domain, and `src/server/_internal/categories.ts` derives its type from `enumValues` directly.
+Each `pgEnum` and every union over a status set derives from an `as const` tuple in `src/lib/vocabularies.ts`; add a status by editing the tuple and generating a migration. `src/lib/__tests__/vocabulary-scan.ts` fails on a complete copy elsewhere in `src/` ([ADR-0014](./adr/0014-status-vocabularies-live-in-src-lib.md)).
 
 ### Retyping a column under a SQL-only partial index
 
-`notifications_overdue_unique_idx` (drizzle `0004`) is a partial unique index that was written in SQL and never declared in `schema.ts`, so it is in no snapshot. When `0026` retyped `notifications.type` from `text` to the `notification_type` enum, the generated `ALTER COLUMN ... SET DATA TYPE ... USING` failed with `operator does not exist: notification_type = text`, because Postgres rebuilds the index with its predicate parsed against the old column type. The migration drops the index, retypes the column, and recreates the index by hand. `drizzle-kit generate` will never write that for you, because it does not know the index exists; check `drizzle/*.sql` for hand-written indexes on any column you retype.
+`notifications_overdue_unique_idx` exists only in SQL (`drizzle/0004`), so `drizzle-kit` cannot see it, and retyping `notifications.type` failed because Postgres rebuilds the index predicate against the old type. Drop the index, retype, recreate it by hand. Check `drizzle/*.sql` for hand-written indexes before retyping any column.
 
 ### Addresses are lowercase in the four columns we write
 
-`inventory_items.current_holder_email`, `inventory_item_status_history.holder_email`, `projects.proposer_email` and `projects.mentor_email` are stored trimmed and lowercase. `normalizeEmailAddress` in `src/lib/email-address.ts` is the only normalizer, reached through `holdToColumns` for the two holder columns and through `createProjectAs`, `updateProjectAs` and `updateProjectMentorshipAs` for the two project ones. `drizzle/0023_normalize_address_columns.sql` backfilled the rows written before it. [ADR-0015](./adr/0015-addresses-are-normalized-on-write.md) is the decision and what it costs, including why the edit log now records a normalized address.
-
-**`user.email` is not one of them, and its folds stay.** Better Auth lowercases that column itself, in 1.6.25, at two layers: `api/routes/sign-up.mjs:165`, `oauth2/link-account.mjs:101` (which every OAuth provider routes through, ONID and GitHub alike) and the admin plugin's `routes.mjs:191` each lowercase before calling, and `db/internal-adapter.mjs` lowercases again inside `createUser` and `createOAuthUser`. That makes the folds in `resolveHold`, `lookupUserByEmailAs`, `resolveProposerId` and `mentorNameSql` defensive rather than load-bearing, and they stay: an upgrade changing that behavior would otherwise stop linking accounts with nothing to show for it. Only a `lower()` applied to one of the four columns above may be dropped, and only after the migration has run against a deployed database, which is why this release drops none.
-
-**Three direct writers bypass the normalizer and are held to it by hand:** `giveFixtureHold` in `src/test/e2e/fixtures.ts` and the project insert in `src/test/a11y/global-setup.ts` both write the columns straight rather than through a server function, so both call `normalizeEmailAddress` themselves. The third is `proposerEmailOf` in `scripts/import-legacy.mjs`, which cannot call it: that script runs as a one-off ECS task from the production image, which installs with `--omit=dev` and ships `.output` without `src/`, so nothing under `src/lib` resolves there. It inlines `.trim().toLowerCase()` instead, and `export.sql` applies `LOWER()` upstream of it as well. Another added without it would put a mixed-case address in a column everything else assumes is folded. The integration suites write these columns directly too, sometimes with `toUpperCase()`, and that is deliberate: those rows exist to prove the read-side folds still work, and they are torn down with the test.
+`inventory_items.current_holder_email`, `inventory_item_status_history.holder_email`, `projects.proposer_email` and `projects.mentor_email` are stored trimmed and lowercase through `normalizeEmailAddress` (`src/lib/email-address.ts`); [ADR-0015](./adr/0015-addresses-are-normalized-on-write.md) is the decision. Three direct writers fold by hand: `giveFixtureHold` in `src/test/e2e/fixtures.ts`, the project insert in `src/test/a11y/global-setup.ts`, and `proposerEmailOf` in `scripts/import-legacy.mjs`, which inlines `.trim().toLowerCase()` because the production image has no `src/`. Better Auth lowercases `user.email` itself, on sign-up, on OAuth link and in its internal adapter; the read-side folds on it stay, so an upgrade that changes that cannot silently stop linking accounts.
 
 ### A correlated subquery in a select projection: `db.$count`, aliased, mapped
 
-Inside a `.select({ ... })` whose outer query has no joins, Drizzle renders an interpolated column without its table, so a hand-written ``sql`(select count(*) from ${aiReviewUsage} where ${aiReviewUsage.userId} = ${user.id})` `` comes out as `where "user_id" = "id"`, which compares two columns of the subquery's own table. Here that fails the whole query, but only because `ai_review_usage.user_id` is `text` and its `id` is `uuid`: where the two happen to share a type, the same bug returns a silently wrong count instead. `db.$count(table, where)` survives it, because `buildSelection` rewrites only the top-level chunks of a projected `sql` and never descends into the nested `eq()` that `$count` builds. Add a join to the outer select and the rewrite stops entirely (`isSingleTable` in `pg-core/dialect.js` is `!joins || joins.length === 0`), so the hand-written form would work there; `$count` is correct either way, which is why it is the form to reach for. The listing on `/admin/users` is the live example (#413):
+In a `.select({...})` with no joins, Drizzle strips the table from every column interpolated at the top level of a `sql` template, so a hand-written correlated subquery compares two columns of its own table: an error when their types differ, a silently wrong answer when they match. `db.$count(table, where)` survives, because the strip does not descend into its nested `eq()`.
 
 ```ts
 const aiCallCount = sql<number>`${db.$count(aiReviewUsage, eq(aiReviewUsage.userId, user.id))}`
@@ -510,25 +267,19 @@ const aiCallCount = sql<number>`${db.$count(aiReviewUsage, eq(aiReviewUsage.user
   .as("aiCallCount");
 ```
 
-Both halves of the wrapper earn their place. `.as` names the output column, and a sort on the count then reads that alias rather than repeating the subquery, which Postgres would evaluate a second time because it does not notice the two copies are the same. `.mapWith(Number)` is back because wrapping `$count` drops its own mapping and node-postgres returns `count(*)` as a string. The same string problem hits any aggregate under a raw `sql`: `max(created_at)` needs `.mapWith(someTimestampColumn)` or it arrives as text where the page expected a `Date`.
-
-#462 is the silently-wrong half of that warning, and the reason to reach for one of these two forms rather than trusting a passing test. `projectCategoriesList` in `project-summary.ts` had interpolated `${projects.id}` since it was written, and was correct only because every consumer happened to `leftJoin(programs, ...)`, which switched the rewrite off. Dropping that join for the program set left `where pc.project_id = "id"`, which Postgres resolved against the subquery's own `categories c`: both sides `uuid`, so no error, a fast query, and `[]` for every project. The categories aggregate broke without one test failing, because no test read categories off a single-table select. The fix there is a third form, for a projection that must work under both shapes: a `sql.raw('"projects"."id"')` constant used in place of the interpolated column, which renders the same qualified name whether or not the outer query joins. It costs the compile-time link to the schema, so it carries a comment saying why, and it is only safe because every consumer selects from `projects` under that name. A query that aliases the outer table (the oldest-wait query in `analytics.ts` uses `from projects p`) has to pass its own alias in.
+`.as` lets a sort read the alias instead of evaluating the subquery twice, and `.mapWith` restores the number node-postgres returns as a string. A projection that must work with and without a join uses `sql.raw('"projects"."id"')`, as `project-summary.ts` does.
 
 ### Timestamps always `withTimezone: true`
 
-Every timestamp column uses `timestamp("col", { withTimezone: true })`. Stored as `timestamptz`. Required ones chain `.notNull().defaultNow()`. Optional event timestamps (`publishedAt`, `archivedAt`, `deletedAt`, `reviewedAt`, `banExpires`) are nullable but still `withTimezone`.
+Every timestamp column is `timestamp("col", { withTimezone: true })`, nullable or not.
 
 ### TRUNCATE in tests wipes dev data
 
-The integration test setup (`src/test/setup.integration.ts`) calls `TRUNCATE TABLE ... CASCADE` on every table before each test, against the same `DATABASE_URL` as dev. **Running `npm run test:integration` deletes your dev data.** If your project disappears after running tests, that is why; `npm run db:seed:dev` puts it back. [ADR-0011](./adr/0011-integration-tests-truncate-the-dev-database.md) says why there is no separate test database yet.
+`npm run test:integration` truncates every table in the dev database before each test; `npm run db:seed:dev` puts it back. [ADR-0011](./adr/0011-integration-tests-truncate-the-dev-database.md).
 
 ### A `DrizzleQueryError` carries the bound parameters, including in its message
 
-`DrizzleQueryError`'s constructor does `super(\`Failed query: ${query}\nparams: ${params}\`)` and also sets `.query` and `.params` (`node_modules/drizzle-orm/errors.cjs`). So the parameters are in three places, and `error.message`, `String(error)` and `util.inspect(error)` all carry them. The parameter of a Better Auth session lookup is the session token, which signs in whoever holds it, and a pool exhausted under load is how that lookup comes to fail and be logged at all. Addresses travel the same path. The trap is that the habit `db-pool.ts` established for pool errors, logging `error.message` and nothing else, is **not** enough here and looks like a fix: `src/lib/__tests__/redact-query-error.test.ts` pins that with a real `DrizzleQueryError` rather than asserting it. Log `redactQueryError(error)` from `src/lib/_internal/redact-query-error.ts`, never the error, and note it returns a string on purpose so no console method can walk an object back into the secret. Better Auth is wired to it through its `logger.log` option in `src/lib/auth.ts`, because its default logger writes the error object it caught, and through `onAPIError: { throw: true }` paired with `handleAuthRequest`, because the router logs the raw error again after that. The rule and both seams are [ADR-0042](./adr/0042-a-log-line-takes-a-string-never-an-error.md).
-
-### Resizing the RDS instance zeroes its burst credits
-
-The database is a burstable class (`db.t4g.small`). Changing the instance class restarts it ([ADR-0035](./adr/0035-scale-the-service-and-let-it-pick-the-instance.md) says why that is immediate rather than deferred to a maintenance window), and the restart throws away the accrued `CPUCreditBalance`: it read 288.0 five minutes before #529 resized `micro` to `small` and 0.0 five minutes after, and `CPUSurplusCreditBalance` started accruing immediately, which is the instance spending past a balance it does not have. Credits come back at a measured 18 per hour under this app's idle load, so a useful balance is hours away and a full one is most of a day. Nothing breaks at idle, because the app sits far under the 20% baseline the credits are measured against, but anything that drives real database CPU in the hours after a resize is spending surplus. Plan a resize away from anything heavy, and read the balance rather than the clock before a load test: [`load-tests/2026-09-20-term-start.md`](./load-tests/2026-09-20-term-start.md) is the run that hit this.
+Its `message` includes the parameters, and a session lookup's parameter is the session token, so logging `error.message` leaks as much as logging the error. Log `redactQueryError(error)` from `src/lib/_internal/redact-query-error.ts`. [ADR-0042](./adr/0042-a-log-line-takes-a-string-never-an-error.md) has the rule and the Better Auth seams.
 
 ---
 
@@ -536,31 +287,23 @@ The database is a burstable class (`db.t4g.small`). Changing the instance class 
 
 ### Run the tests on the Node in `.nvmrc`, not whatever is on PATH
 
-`.nvmrc` pins 24.16.0 and CI uses the same. On Node 26 the jsdom environment comes up without `localStorage`, and about 65 tests across `table-state`, `view-preference`, `use-seed-view`, `view-toggle` and `admin-data-table` die with `TypeError: Cannot read properties of undefined (reading 'clear')`, none of them related to whatever you were changing. `package.json` says `"engines": { "node": ">=24" }`, which Node 26 satisfies, so nothing warns you.
-
-The trap: if your shell loads nvm through a function (the lazy-load pattern), anything that bypasses shell function resolution silently gets the *other* Node. `env FOO=bar npx vitest ...` does exactly that, and so does a git hook, since lefthook runs its commands under `sh`. The first `pre-push` after the hook was added saw Node 26 and 79 failures while `npm test` from zsh passed. `scripts/nvmrc-node.sh` sources nvm or fnm to switch to the `.nvmrc` major and, when it cannot, fails on the version with the reason rather than on the tests; the `pre-push` commands in `lefthook.yml` go through it. Check `node --version` from inside the same invocation before believing a strange test failure.
+Another major fails about 65 jsdom tests that have nothing to do with your change. `scripts/nvmrc-node.sh` says why and is what the `pre-push` hooks run through; check `node --version` inside the same invocation before trusting a strange red.
 
 ### A test that spawns git under a hook must drop `GIT_DIR` first
 
-A git hook exports `GIT_DIR` (and under some commands `GIT_WORK_TREE` and `GIT_INDEX_FILE`) to everything it runs, and `pre-push` runs the unit suite. `src/test/claude-hooks.test.ts` builds a throwaway repository with `git init`; under the hook, with `GIT_DIR` pointing at this checkout's gitdir and no work tree named, that `git init` re-initialized this repository as bare, and every git command afterwards failed with `fatal: this operation must be run in a work tree`. The fix was `git config core.bare false`; the cause took three pushes to find. Any test that spawns git builds its environment from `process.env` with every `GIT_*` key removed, as that file does, and so does a hook script that runs git on the session's `cwd`.
-
-### The git-guard tests run in a fixture repository, because CI checks out `main`
-
-On a push to `main`, CI checks out `main` itself, so a test that ran the git guard with `cwd` at the checkout tripped the never-commit-on-main rule it was not testing; a pull request run never showed it, since that checkout is a detached merge ref. `src/test/claude-hooks.test.ts` drives the guard from a throwaway repository on `fix/test`, with a `sub` directory for the subdirectory case, and a second one on `main` for the rules that are about `main`.
+A git hook exports `GIT_DIR` to everything it runs, `pre-push` runs the unit suite, and a `git init` under it once re-initialized this repository as bare. A test or hook script that spawns git strips every `GIT_*` key from its environment, as `src/test/claude-hooks.test.ts` and `.claude/hooks/lib.mjs` do.
 
 ### Scripts get their environment from `--env-file`, not from dotenv imports
 
-ESM imports hoist above all statements. Writing `import { config } from "dotenv"; config({ path: ".env.local" }); import { db } from "..."` looks correct but is wrong: the `db` import runs BEFORE the `config()` call, so `DATABASE_URL` is unset when `src/db/index.ts` evaluates. Pass `--env-file=.env.local` to `tsx` at the command line instead, as every `db:seed:*` script in `package.json` does, and do not import dotenv in the script.
+ESM hoists imports above a `config()` call, so a script that loads dotenv and then imports `#/db` reads `DATABASE_URL` before it is set. Pass `--env-file=.env.local` to `tsx`, as the `db:seed:*` scripts do.
 
 ### Vitest needs the agent tool sandbox disabled
 
-Running Vitest inside a sandboxed tool call dies with `EMFILE: too many open files`, and `ulimit -n 8192` does not help: Vite's watcher opens more descriptors than the sandbox allows, and the failure looks like a broken test. Run the suites with the sandbox off. Two more things the sandbox refuses, both of which look like the tool being broken: `gh` fails TLS inside it, and anything that writes `.git/config`, such as `git branch -d`, `git worktree add` and `git remote`, half-completes.
-
-One harmless thing every run prints in this repo is `ReferenceError: module is not defined`, from the nitro Vite plugin loading under Vitest. The results above it and the exit code are still authoritative. Until 2026-09-10 every run also ended with `close timed out after 10000ms` and `something prevents 2 Vite servers from exiting`: that was the May nitro nightly holding a handle open, found by bisecting `vite.config.ts` plugins against a one-file run, and the September nightly closes cleanly. If it comes back, bisect the plugins again before blaming Vitest.
+Inside the agent's command sandbox Vitest dies with `EMFILE`, `gh` fails TLS, and anything that writes `.git/config` (`git branch -d`, `git worktree add`, `git remote`) half-completes. Run them with the sandbox off, Vitest with `ulimit -n 8192` as well. Every Vitest run prints a harmless `ReferenceError: module is not defined` from the nitro plugin.
 
 ### A scratch script that reaches `src/lib/brand.ts` needs an `.svg` loader stub
 
-A one-off probe under `$TMPDIR` that imports a `src/lib` module by absolute path, extension included, runs with `node --import tsx/esm "$TMPDIR/probe.mts"`, from the repository root so that `tsx` resolves. `#/` works in the probe too, but only because `tsx` applies the tsconfig paths from the cwd; the absolute path is what survives without it. What Node has no loader for is Vite's `.svg?url` asset import in `src/lib/brand.ts`, so any module that reaches it dies with `ERR_UNKNOWN_FILE_EXTENSION`. Register a load hook that answers `.svg` with an empty string, and pass it as a second `--import`:
+Run a `$TMPDIR` probe as `node --import tsx/esm "$TMPDIR/probe.mts"` from the repository root. A module that reaches the `.svg?url` import in `src/lib/brand.ts` also needs a load hook that answers `.svg` with an empty string, passed as a second `--import`:
 
 ```js
 // svg-stub.mjs
@@ -573,171 +316,109 @@ register(
 );
 ```
 
-`node --import tsx/esm --import "$TMPDIR/svg-stub.mjs" "$TMPDIR/probe.mts"`, from the repository root, then runs `social-meta.ts` and its neighbours.
-
 ### Vitest 5 and better-auth's optional peer range
 
-`better-auth` 1.6 declares an optional peer on `vitest` `^2 || ^3 || ^4`, and 1.7 is the first line that admits 5. Optional or not, npm refuses to place `vitest` 5 next to it with `ERESOLVE`, and the refusal surfaces only on the next `npm install` or `npm update` that re-resolves that edge, so a lockfile can look fine until something unrelated moves. `package.json` carries `"overrides": { "better-auth": { "vitest": "$vitest" } }`, which tells npm the edge is satisfied by whatever `devDependencies.vitest` says. Drop the override when the 1.7 upgrade (#278) lands.
+`better-auth` 1.6 declares an optional `vitest` peer that excludes 5, and npm refuses the pair with `ERESOLVE` on the next install that re-resolves the edge. The `overrides` entry in `package.json` satisfies it with `$vitest`; drop it with the 1.7 upgrade.
 
 ### A test that spawns a subprocess needs a budget above the subprocess's own
 
-Vitest's default `testTimeout` is 5000ms, which was also the cap `.claude/hooks/session-context.mjs` put on each thing it shells out to, so one slow `docker compose ps` spent the entire test budget before the hook printed a line and the test failed on CI while passing on every developer machine (#252). When a test drives a process that has its own timeouts, give that test an explicit ceiling above their sum, as the third argument to `it`; do not raise the global `testTimeout`, which hides slow tests everywhere else. The Playwright `globalTimeout` and `actionTimeout` entries below are the same shape one layer up. And a probe whose answer is a convenience should fail visibly: `session-context.mjs` reports a compose check that timed out as a timeout, because folding it into "nothing running" would tell a session to start a stack that is already up.
-
-### A missing DATABASE_URL fails every route, including `/api/healthz`
-
-`src/routes/api/healthz.ts` returns a hardcoded 200 and avoids the database on purpose, for the ALB. That is true of the route and false of the server: `src/db/index.ts` throws at module scope, so in the built output a missing `DATABASE_URL` fails the whole SSR graph, and the process binds the port, stays up, and answers 500 on every route, healthz included. With `NODE_ENV=production`, `src/nitro/config-check.ts` stops the process first with one message naming every missing variable. This is why `playwright.e2e.config.ts` uses healthz as its `webServer.url`: a misconfigured server never goes ready and the run fails as "server did not start" rather than as five confusing test failures.
+When a test drives a process that has its own timeouts, give that test a ceiling above their sum as the third argument to `it`. Do not raise the global `testTimeout`, which hides slow tests everywhere else.
 
 ### `npm run start` gets no dotenv, unlike the dev server
 
-`start` is bare `node .output/server/index.mjs`, while the dev server gets `.env.local` through Vite. `playwright.e2e.config.ts` calls `loadDotenv` at module scope for this reason, and Playwright passes its `process.env` down to `webServer`; remove that call and you get the 500-on-every-route behaviour above. Related: `VITE_STORAGE_PUBLIC_BASE` is inlined at build time and `src/lib/storage.ts` falls back to `/storage`, so a build without it produces working-looking relative URLs against an origin that serves nothing. The CI job writes `.env.local` before the build.
-
-### A Playwright bump needs its browser installed before the browser suites run
-
-`@playwright/test` pins a browser build per version. After a bump, `npm run test:smoke` and `npm run test:accessibility:smoke` both fail before the first test with `Executable doesn't exist at .../ms-playwright/chromium_headless_shell-<n>`, which reads like a broken suite. Run `npx playwright install chromium` once per machine and rerun. CI installs it in the workflow, so a green PR says nothing about your checkout.
-
-### The smoke suite runs on port 3001 and never reuses a server
-
-`reuseExistingServer: false` unconditionally, because a dev server left on 3000 would substitute the dev build for the production build the suite exists to exercise, and report green. Port 3001 keeps both runnable at once. `BETTER_AUTH_URL` moves with it, because Better Auth checks the request origin and a mismatch fails sign-in for a reason that looks nothing like a port problem.
+`playwright.e2e.config.ts` loads dotenv at module scope for that reason, and its comment says what breaks without it. `VITE_STORAGE_PUBLIC_BASE` is inlined at build time, so a build without it serves relative `/storage` URLs that resolve to nothing.
 
 ### Smoke fixtures are created per attempt, and swept by prefix
 
-`src/test/e2e/fixtures.ts` creates mutated rows inside the test; global setup only sweeps `E2E-` orphans, and it runs before the first attempt, so it cannot repair what an attempt left behind. The inventory flow walks an item through `available -> requested -> reserved -> checked_out -> available`, and an attempt dying at check-out leaves it `reserved`. Sweep order matters: `inventory_request_items.item_id` is the one FK in that graph declared `onDelete: "restrict"`, so request lines and their requests go before the items. Custom lines carry the prefix on the line's name, and the sweep deletes the request holding the line, which cascades. Categories are matched on `name` and programs on `course_name`; their junction rows cascade. Four things outlive the rows and are swept separately: notifications, matched on the prefix inside their title; the accounts the sign-up flow creates, on an `e2e-` address prefix, with their `verification` rows; and the avatar column on the two seeded students, because the upload flow writes to a seeded row. One row escapes the sweep on purpose: the account the lifecycle flow deletes is anonymized rather than removed (ADR-0008) and its address loses the prefix, so that test reads the id before the deletion and removes the row itself. Two more are removed by their test rather than left for the sweep: the category and the program the catalog create flow makes, because a category is a checkbox on every item form and a program an option on every project form until the next run, and a leftover label once matched another test's `getByLabel("Name")`. Objects in the bucket are not swept, deliberately.
+`src/test/e2e/fixtures.ts` creates mutated rows inside the test, because global setup runs once before the first attempt and cannot repair what a retry inherits. The sweep's docblock in `fixtures.ts` says what it removes, in what order, and what escapes it on purpose.
 
 ### Assert that a transition landed, not that its dialog closed
 
-A popover closes on failure as readily as on success, so `expect(confirmButton).toBeHidden()` is not evidence a write happened; the inventory test approved a request on that assertion and died four steps later on a missing `Check out` button. Assert what the page shows only on success: here, the row leaving a list filtered to pending. `actionTimeout` is set, because without it a stuck click is bounded only by the test timeout and names no locator.
-
-### The smoke budget is read, not enforced
-
-The job targets 5 minutes; `globalTimeout` is 8, a hang catcher, because two identical CI runs took 2m31s and 3m33s and a timeout sized to the budget fails on a slow runner rather than on a broken test. Three consecutive runs over the budget is the signal to demote a flow to #143. `test:smoke` and `test:e2e` share `playwright.e2e.config.ts`; `test:e2e` passes `--global-timeout` on the npm script rather than changing the config, which would quietly lengthen the pull-request path's catcher. Only the smoke subset runs on pull requests; the full suite is `workflow_dispatch` in `.github/workflows/full-e2e.yml`, and the trigger is "before a release".
+A popover closes on failure as readily as on success. Assert something the page shows only on success, such as the row leaving a list filtered to pending.
 
 ### The browser suites read a sign-in code from the log in one place and the database in the other
 
-The console email transport writes to stderr, and there is no file transport. So `playwright.e2e.config.ts` tees the built server's output into `src/test/e2e/.server.log`, and the tests that sign somebody in through the form (`account`, `auth` and `email-code`) poll that file for the code mailed to the address they typed, through `src/test/e2e/mail.ts`; `tee` truncates on open, so each run starts empty, and the sweep deletes the accounts by prefix. Read only what was appended after the click: a test that mails one address twice finds the spent code first otherwise, and the symptom is "Invalid OTP" on the right code.
-
-The storage-state capture in both suites' global setup cannot do that, because the accessibility suite runs against whatever `npm run dev` a developer already has open and its output goes to their terminal. `src/test/shared/sign-in-code.ts` reads the `verification` row instead and decrypts it (`storeOTP: "encrypted"`), which needs `BETTER_AUTH_SECRET` to match the server's; both read `.env.local`, so it does. It also clears the address's `verification_sends` rows first, or a few local runs in an hour exhaust the five-a-hour cap and the send is swallowed with a success.
+The end-to-end flows read the code from `src/test/e2e/.server.log` through `src/test/e2e/mail.ts`, and must read only what was appended after the click or they find a spent code. The storage-state capture reads the `verification` row instead (`src/test/shared/sign-in-code.ts`), which needs the server's `BETTER_AUTH_SECRET` and clears the address's `verification_sends` rows first so the hourly cap does not swallow the send.
 
 ### Browser suites select by role and name, and add no test IDs
 
-Both Playwright suites locate by accessible role and name first, falling back to `data-slot`, and never to a test id added to a production component: a selector nobody can reach with a screen reader says nothing about whether the page works. Where the markup offers no role, a structural or attribute selector appears with the reason inline (`time[datetime]` for a rendered date, `p.text-destructive` for a form error); `src/test/e2e/locators.ts` holds the ones more than one flow needs.
+Locate by accessible role and name, then `data-slot`, never by a test id added to a production component. A structural or attribute selector carries its reason inline; the shared ones live in `src/test/e2e/locators.ts`.
 
 ### A structural selector fails open when the markup under it changes
 
-When the `/my/items` entries went from plain divs to table rows, the `> div > div` chain that had reached an entry kept matching, on the table's wrapper, so a test that looked for one button inside it stayed green and only the test that asserted on a `time` element went red. The tell is a locator that still finds something after the markup it described is gone; check the accessibility snapshot in the failure's error context before trusting a structural selector's green.
+A `> div > div` chain kept matching the table wrapper after the markup it described was gone, and its test stayed green. Check the failure's accessibility snapshot before trusting a structural selector.
 
 ### `getByText` is case-insensitive substring matching, so status words need `exact`
 
-A status word is rarely unique on the page that shows it. On a staff item page the Danger zone reads "allowed only when status is available or retired" from first paint, and the override select renders a lowercase status name in its trigger for the length of an in-flight transition; two assertions passed on those decoys. Pass `{ exact: true }` whenever the text is a status label, and scope to `statusSection` from `locators.ts` when the badge is what you mean: `exact` excludes the decoys, scoping disambiguates the two legitimate badges a staff viewer gets (header and panel, both reading `Retired`), which an unscoped exact match resolves to both and trips strict mode.
+A status word also appears in prose and in select triggers on the pages that show it. Pass `{ exact: true }` for a status label, and scope to `statusSection` from `locators.ts` where a staff page shows the badge twice.
 
 ### Do not navigate away from a write that has not answered
 
-A `goto` or `reload` over an in-flight server function aborts it, and the page then looks exactly as it does after the write succeeded. Where the app navigates on success, wait for the URL; where it does not, wait for the response. Server functions POST to `/_serverFn/<hash>`, whose hash is a build artifact, so match the prefix on a page that fires only the one request. Three flows were green against code that had done nothing: the avatar upload, a password reset since removed (the test then signed in with the old password and passed), and an item edit.
+A `goto` or `reload` over an in-flight server function aborts it, and the page looks as if the write succeeded. Wait for the URL where the app navigates on success, or for the `/_serverFn/` response where it does not.
 
 ### `getByText` finds a draft typed into a controlled textarea
 
-React mirrors a controlled `<textarea>`'s value into its `defaultValue`, which is the element's text content, so `page.getByText(draft)` resolves on the composer the moment the draft is typed, before any post has answered. That is how #188 looked like a remount. Assert that a comment rendered on the node that renders it, `page.getByRole("paragraph").filter({ hasText })`, and keep the broad `getByText(...).toHaveCount(0)` for absences. A form that clears itself after a write disables its fields while the write is in flight, as both comment forms in `src/components/comment-thread.tsx` do: a `fill` on a disabled field waits for it.
+React mirrors a controlled textarea's value into its text content, so `getByText(draft)` matches the composer before anything posts. Assert on the node that renders the comment, `page.getByRole("paragraph").filter({ hasText })`.
 
 ### The header avatar is a page load behind the profile page
 
-`site-header.tsx` reads `authClient.useSession()`, Better Auth's own client session cache, which `router.invalidate()` does not refresh. Uploading an avatar updates the profile page's preview immediately and leaves the header showing initials until the next full load. The end-to-end test asserts the header only after a reload.
+`site-header.tsx` reads `authClient.useSession()`, which `router.invalidate()` does not refresh, so a new avatar reaches the header on the next full load. Assert the header after a reload.
 
 ### The smoke and accessibility suites share one local database
 
-In CI they never meet. Locally they share the dev database and both act as `user@example.com`, and `sweepOrphans` runs at the *start* of an end-to-end run, so the database is dirty for whatever runs next: leftover `E2E-` rows, and notifications the smoke flows created, which make the bell render a badge that fails contrast in dark mode (#145). `npm run test:e2e:sweep` runs the sweep on its own; do that before treating a red accessibility run after an end-to-end run as a regression. `db:seed:dev` is not an alternative, because it removes nothing.
-
-### The accessibility suite retries in CI, and only in CI
-
-`playwright.a11y.config.ts` sets `retries: process.env.CI ? 2 : 0`, so a flake stays visible locally and a shared runner gets two tries. The failure that prompted this does not look like what it is:
-
-```
-- <vite-error-overlay></vite-error-overlay> intercepts pointer events
-```
-
-That is not an accessibility violation and axe never ran: the dev server hit a transient `[vite] Internal server error: socket hang up`, Vite painted its overlay over the page, and the overlay swallowed the click, which failed 30 seconds later as a locator timeout. Search the job log for `vite-error-overlay` before suspecting the element.
+Locally both use the dev database as `user@example.com`, and the end-to-end sweep runs at the start of a run, so an accessibility run after one meets its leftover rows and notifications. Run `npm run test:e2e:sweep` before treating that red as a regression.
 
 ### One hydrated button does not mean a hydrated page
 
-`waitForHydration` in `src/test/shared/playwright.ts` polls for React's fiber keys on every element matching its selector, `button` by default, and returns only when all of them carry one. It used to check the first match alone, and that held because the first button is almost always the header's. Route components are code-split, so the root layout hydrates as soon as its chunk arrives while the route's content is still fetching modules through Vite's unbundled dev server; on a cold CI runner the gap ran to a few hundred milliseconds, and `inventory hard delete confirmation` in `admin.a11y.test.ts` clicked "Hard delete item" inside it, three attempts running. The trace is the tell: the click succeeds on an enabled button, no dialog appears, and the route's first server calls (`getCart`, the edit log) fire *after* the click. A failure with that shape is the race, not the component; the a11y report's `error-context.md` and the trace's network tab settle it in a minute. The one subtree the helper skips is TanStack Devtools: its trigger and panel chrome are Solid-rendered and never carry a fiber key, and the plugin panels inside are React portals on their own schedule; without the exclusion, any page where the devtools had already mounted waited the full 15 seconds and failed.
+Route chunks hydrate after the root layout, so a click on a route's button can land before its handler exists: the click succeeds and nothing happens, and the route's first server calls fire after it. `waitForHydration` in `src/test/shared/playwright.ts` waits for every match, and skips the Solid-rendered TanStack Devtools.
 
 ### A Columns menu that scrolls must be focusable itself
 
-`AdminTableControls` in `admin-data-table.tsx` passes `tabIndex={0}` to the Columns menu's `DropdownMenuContent`. Radix gives menu content `tabindex="-1"` and honours a caller's `tabIndex` because the prop is spread last. With four hideable columns the menu never scrolls; the public projects table has fourteen, the menu is taller than Radix's space, and axe reports `scrollable-region-focusable`, since a pointer-opened menu keeps focus on the content with every item at `-1`. Making the region tabbable satisfies the rule and changes nothing a keyboard user does, because Radix focuses the content on open regardless and unmounts it on close. The scan that catches it, `projects table interactions` in `public.a11y.test.ts`, is not `@smoke`. The neighbouring `modal={false}` comment in `admin-data-table.tsx` is the other Radix menu lesson: a modal menu puts the rest of the page under `aria-hidden`, a different rule with a different fix.
+A Columns menu tall enough to scroll fails axe's `scrollable-region-focusable` unless its content is tabbable, so `admin-data-table.tsx` passes it `tabIndex={0}`.
 
 ### A Radix surface is visible before it has finished entering
 
-`DialogContent`, `AlertDialogContent`, `SheetContent` and `DropdownMenuContent` mount with `data-state="open"` and an `animate-in fade-in` CSS animation, and Playwright's `toBeVisible` is satisfied at that animation's first frame. A `checkA11y` that follows at once can sample a button at partial opacity, and axe reports `color-contrast` on colours that pass once settled: `my items opens by saying what needs attention` in `user.a11y.test.ts` failed that way once in twelve local runs (#294). It is the enter side of the transient `closeMenu` in `src/test/shared/playwright.ts` guards on the way out. `waitForSurfaceSettled` there takes the surface's locator and resolves when every finite animation on it and on any open overlay has finished (Radix portals the overlay and the content as separate children of `document.body`, so there is no shared wrapper to scope to); every scan with a dialog, alert dialog, sheet or menu open calls it first. A `color-contrast` failure on such a surface after that wait is a real one.
+`toBeVisible` passes at the first frame of a Radix enter animation, and axe can then measure contrast at partial opacity. Call `waitForSurfaceSettled` from `src/test/shared/playwright.ts` before scanning an open dialog, sheet or menu.
 
 ### A Select item's `aria-selected` is selected *and* focused
 
-`@radix-ui/react-select` sets `"aria-selected": isSelected && isFocused` on a `SelectItem`, where `isSelected` is `context.value === value`. It is a conjunction, so it does answer what the Select's value is, and an assertion on it goes red when the value breaks. What makes it the wrong thing to assert is the other half: it also pins which item Radix has focused, and the listbox moves that focus on its own. A mouse `pointermove` over an enabled option calls `focus()` on it, over a disabled one hands focus back to the content, and leaving one does the same, so a stray pointer during the assertion flips the selected item's `aria-selected` to false by either route while the value is untouched. (`position="popper"` is not a cause, whatever it looks like: `SelectPopperPosition` spreads `onPlaced` straight through and `focusSelectedItem` runs off the same `isPositioned` effect in both position modes.) `data-state="checked"` is the pure selection signal on the same element if you need one in the listbox. Better still, read the trigger, which renders the value as its own text and needs no listbox open at all. Opening one costs a second thing in a browser suite: the listbox is modal, so it `aria-hidden`s the rest of the page and every role query outside it returns nothing until it closes, which is why a helper that opens one should close it rather than leaving that to the caller. `src/test/e2e/recommendations.e2e.test.ts` is the worked example, from #424.
+Radix sets it to `isSelected && isFocused`, and a stray pointer moves focus, so it flips while the value stays put. Read the trigger's text, or `data-state="checked"`. An open Select is modal and hides the rest of the page from role queries, so a helper that opens one closes it.
 
 ### A `waitForURL` pattern that matches the page it is called from is a no-op
 
-`page.waitForURL` resolves as soon as the current URL matches, so a pattern that the starting page already satisfies never waits for the navigation it was written for. The regexes here are unanchored substrings, which is what makes it easy: `/\/admin\/categories/` matches `/admin/categories/<id>`, the detail page a delete is clicked from, so the wait returned immediately and every assertion after it raced the redirect (#484). It fails intermittently rather than always, because on a fast runner the work has landed anyway. End the pattern at something only the destination has: `$` where the list takes no search params, `\?` where it always carries one, as the category list does because `onDelete` navigates with `search: { tab }`. `src/test/e2e/admin-catalog.e2e.test.ts` has both shapes.
-
-A negative assertion downstream of such a wait cannot catch it, and hides it instead. `expect(locator).toHaveCount(0)` retries only until its condition holds, and an absence is trivially true of a page that never rendered the thing, so it passes on the wrong page for the wrong reason. Read something the destination has before reading something it lacks: a present row, or the table itself. The same applies to any absence in a browser suite, including one behind a surface that has not opened yet.
+`waitForURL` resolves at once when the current URL matches, and an unanchored pattern like `/\/admin\/categories/` matches the detail page the action starts from. End the pattern at something only the destination has (`$` or `\?`), and read something the destination has before asserting an absence, which passes trivially on the wrong page.
 
 ### axe skips a disabled control, so a disabled pill's colours are yours to measure
 
-axe-core's `color-contrast` rule does not evaluate a disabled form control, since WCAG 1.4.3 exempts inactive components. The current-status pill in `staff-project-panel.tsx` is a `<button disabled>`, so the scan was green with the old white on brand orange, which measures 3.48:1 and fails (#208). When a disabled element carries text a person still has to read, compute the ratio yourself and say so in the PR.
+axe's `color-contrast` does not evaluate a disabled control. When one carries text a person must read, compute the ratio yourself and say so in the PR.
 
 ### The unit suite sees your dotenv files, so an env-dependent test is machine-dependent
 
-`vite.config.ts` declares no `test` block, which makes it easy to assume the unit run sees no dotenv. It does: the runner populates `process.env` from `.env` and `.env.local` before any test executes, and a plan under `docs/superpowers/plans/` asserts the opposite. So an assertion on a value the process resolved is an assertion about the author's `.env.local`, and CI never catches it, because the `verify` job writes no dotenv file. `bedrock-embed.test.ts` compared `EMBEDDING_DIMENSIONS` against the literal `1024` and went red for anyone who had set the variable; it now asserts the constant matches `buildEmbedConfig(process.env)`. For config generally, assert through a builder handed a literal environment, the way `aws-config.test.ts` calls `buildS3Config({ S3_REGION: "us-west-2" } as NodeJS.ProcessEnv)`.
-
-### Integration tests need DATABASE_URL at config-load time
-
-`src/db/index.ts` reads `DATABASE_URL` at module-import time and throws if missing. Vitest `setupFiles` run AFTER the test files start importing, so loading dotenv from `setup.integration.ts` is too late. Load it from `vitest.integration.config.ts` itself:
-
-```ts
-import { config as loadDotenv } from "dotenv";
-loadDotenv({ path: [".env.local", ".env"] });
-
-export default defineConfig({ /* ... */ });
-```
+The unit run reads `.env` and `.env.local` into `process.env`, and CI writes neither, so an assertion on a value the process resolved tests the author's machine. Assert through a builder handed a literal environment, as `aws-config.test.ts` calls `buildS3Config({ S3_REGION: "us-west-2" } as NodeJS.ProcessEnv)`.
 
 ### A unit test that transitively imports `#/db` passes locally and fails in CI
 
-Same root cause from the other direction: locally the value is present because the app's Vite config picks up `.env`, and CI has no `.env` at all. So a unit test importing any module that imports `#/db`, even for a pure function, passes on your machine and fails on the PR. Keep pure logic in a module that imports nothing, and let the query layer import it rather than the reverse: `src/lib/ai-review-limits.ts` holds the rate limit decision, `server/_internal/ai-review-usage.ts` the queries around it. To reproduce a CI run locally, `DATABASE_URL= npm test`: the check is falsy, and dotenv will not overwrite a variable that is already set.
+`src/db/index.ts` throws at import without `DATABASE_URL`, which the unit run gets locally from your dotenv files and CI does not have. Keep pure logic in a module that imports nothing, and let the query layer import it. `DATABASE_URL= npm test` reproduces CI.
 
 ### The integration suite refuses to run with embeddings enabled
 
-`vitest.integration.config.ts` sets `BEDROCK_EMBEDDINGS_ENABLED=false` in its `env` block, and `src/test/setup.integration.ts` throws at collection if that did not arrive. Unset counts as enabled, because `embeddingsEnabled()` treats anything but that exact string as on, so a deleted config line trips it. Fix the config, not your environment: `test.env` beats the shell. [ADR-0012](./adr/0012-bedrock-mantle-by-sigv4-embeddings-behind-a-flag.md) says why the flag exists; the switch lives in `src/lib/_internal/embeddings-flag.ts` rather than beside the adapter, so reading it costs no `@aws-sdk/client-bedrock-runtime` import.
+`vitest.integration.config.ts` sets `BEDROCK_EMBEDDINGS_ENABLED=false`, and `src/test/setup.integration.ts` throws if it did not arrive. Fix the config, not your shell.
 
 ### An integration test reads a refresh only after `settleProjectRefreshes()`
 
-`updateProjectAs` and `commitTransition` start the embedding and social summary refresh and return without it ([ADR-0053](./adr/0053-a-save-does-not-wait-for-its-ai-refresh.md)), so a test that asserts on `embedding`, `socialSummary` or on the injected `embed` or `summarize` spy right after a save or publish reads the row before the refresh has run. A positive assertion fails, which is loud; `expect(embed).not.toHaveBeenCalled()` passes without testing anything, which is not. Await `settleProjectRefreshes()` from `src/server/_internal/project-refresh.ts` between the trigger and the assertion. `setup.integration.ts` also settles before each truncate, so within a file a refresh never writes into the next test's rows. The queue is per module and each file runs in its own fork, so the settle cannot see the previous file's last refresh; a late write there targets a truncated id and matches nothing.
+A save returns before its embedding and summary refresh run ([ADR-0053](./adr/0053-a-save-does-not-wait-for-its-ai-refresh.md)), so await `settleProjectRefreshes()` from `src/server/_internal/project-refresh.ts` before asserting on either. Without it, `expect(embed).not.toHaveBeenCalled()` passes without testing anything.
 
 ### The browser suites get their vectors from the seed, never from Bedrock
 
-`playwright.e2e.config.ts` runs the built server with `BEDROCK_EMBEDDINGS_ENABLED=false` (and `BEDROCK_SOCIAL_SUMMARY_ENABLED=false`), and the only fake the embedding writers accept is the `EmbedFn` parameter, which nothing can inject across HTTP into that server. So a project published in a browser test has a null `projects.embedding`, and `projects.e2e.test.ts` asserts exactly that as the degraded path. What the recommended sort needs comes from `npm run db:seed:dev` instead: `scripts/seed-recommendations.ts` holds an interest vector for `user@example.com` and one vector per published seed project at increasing cosine distance, and the seed writes them straight into the two `embedding` columns with `embedding_source_hash = 'seed'`, the same shape `recommended-sort.integration.test.ts` uses. `recommendations.e2e.test.ts` imports the title list from that module, so the order the seed encodes and the order the test expects cannot drift. A reseed leaves a row that already has a vector alone; a real backfill replaces the seed's because its hash never matches. The integration suite, with an injected embedder, is what proves the writers themselves (#321).
-
-### Vitest 4 `poolOptions` moved
-
-Older docs show `test.poolOptions.forks.singleFork: true`. Vitest 4 removed that path. Use top-level `test.fileParallelism: false` instead.
+The browser suites run with embeddings off, so the recommended sort relies on the vectors `scripts/seed-recommendations.ts` writes through `npm run db:seed:dev`. `recommendations.e2e.test.ts` imports its expected order from that module.
 
 ### Radix Popover / cmdk need jsdom polyfills
 
-Component tests that mount a Radix Popover or a cmdk `Command` throw on render unless you stub the DOM APIs jsdom omits. Add them in a `beforeAll`: `Element.prototype.scrollIntoView`, `hasPointerCapture`, `setPointerCapture`, `releasePointerCapture` (each `vi.fn()`), plus a no-op `globalThis.ResizeObserver` class. `PopoverContent` only mounts when the popover is open, so click the trigger before querying inside it. The canonical setup is in `src/test/proposer-picker.test.tsx`; most form tests dodge this by mocking the heavy Radix children instead (`src/test/project-form-ai-review.test.tsx`).
-
-A Radix `Select` needs the same stubs and a different gesture: its trigger opens on `pointerdown`, not `click`, and only for a primary mouse button with no ctrl key, so `fireEvent.pointerDown(trigger, { button: 0, ctrlKey: false, pointerType: "mouse" })` is what opens it. A `fireEvent.click` there does nothing and the `findByRole("option")` that follows times out. The trigger answers to `getByRole("combobox")`, named by its `Label`. `src/test/inventory-lifecycle-panel.test.tsx` drives one.
-
-### `as ReturnType<typeof vi.fn>` triggers TS2352
-
-Use the double-cast variant for mock typings:
-
-```ts
-(auth.api.getSession as unknown as ReturnType<typeof vi.fn>)
-  .mockResolvedValueOnce({ /* ... */ });
-```
-
-### `vi.spyOn` mock-calls callback typing
-
-If you get TS7006 ("Parameter implicitly has 'any' type") on `mock.calls.map((c) => ...)`, annotate as `(c: unknown[])`.
+Call `installResizeObserver()` from `src/test/radix-jsdom.ts` before rendering a Radix primitive. A Popover or a cmdk `Command` also needs `scrollIntoView` and the three pointer-capture methods stubbed with `vi.fn()`, as `src/test/proposer-picker.test.tsx` does. A Radix `Select` opens on `pointerdown`, not `click`: `fireEvent.pointerDown(trigger, { button: 0, ctrlKey: false, pointerType: "mouse" })`.
 
 ### A route module under test needs a partial router mock, not a full one
 
-A unit test that imports a route module to reach its column list cannot `vi.mock("@tanstack/react-router")` with a plain factory. The TanStack Start plugin rewrites route files and injects its own router imports (`lazyRouteComponent` among them), so a full mock fails the import with "No \"lazyRouteComponent\" export is defined". Spread the real module and override only what the cells render:
+The Start plugin injects router imports into a route file, so a full `vi.mock("@tanstack/react-router")` fails the import. Spread the real module and override only what the test renders, as `src/test/admin-inventory-columns.test.tsx` does:
 
 ```ts
 vi.mock("@tanstack/react-router", async (importOriginal) => ({
@@ -746,78 +427,50 @@ vi.mock("@tanstack/react-router", async (importOriginal) => ({
 }));
 ```
 
-The real `createFileRoute` runs fine at import time, so nothing else needs stubbing. `src/test/admin-inventory-columns.test.tsx` is the canonical one. Reaching a route's column list also means exporting it: `/admin/inventory` exports `COLUMNS` and `DEFAULT_SORT` for this, and every other admin route still keeps them private, so a second consumer test starts by adding that export. A column module under `src/components/` (`inventory-table-columns.tsx`) has neither constraint: it exports its columns already and mocks the whole router.
-
 ### Integration tests call the `*As(viewer, ...)` seam, never `requireUser()`
 
-`requireUser()` reads TanStack Start's AsyncLocalStorage request context, which the Vitest integration harness cannot provide. Tests construct a synthetic viewer (`{ id, role }`) with a local `makeUser` helper and call the `*As` variant directly; [ADR-0002](./adr/0002-one-named-wrapper-per-action.md) is the convention that guarantees one exists. `uploadProjectImageAs` / `uploadProjectImageForCurrentUser` in `src/server/_internal/uploads.ts` is the canonical pair.
+`requireUser()` needs Start's request context, which Vitest cannot provide, so a test builds a viewer and calls the `*As` function ([ADR-0002](./adr/0002-one-named-wrapper-per-action.md)). `seam-convention.test.ts` enforces the pairing.
+
+### `captureStderr` sees the console email transport but not `console.*`
+
+`captureStderr` in `src/test/shared/console-email.ts` patches `process.stderr.write`, and Vitest intercepts `console.*` before it gets there, so spy on `console.warn` separately.
 
 ---
 
 ## Biome / Ultracite and code style
 
-Linting and formatting run through **Ultracite** (a strict Biome preset). `biome.json` extends `ultracite/biome/core` + `ultracite/biome/react`. `npm run check` runs `ultracite check`; `npm run format` runs `ultracite fix`.
+`biome.json` extends Ultracite's core and React presets. `npm run check` runs `ultracite check`; `npm run format` runs `ultracite fix`.
 
 ### Hard rules
 
-- 2-space indent.
-- Double quotes for JS / TS strings.
-- Imports auto-sorted by the Biome assist organize-imports rule. Don't fight it.
-- Everything is checked except generated / tool-managed paths excluded in `biome.json`: `src/routeTree.gen.ts`, `src/styles.css`, `scripts/`, `drizzle/` and `**/*.svg`. (Biome respects `.gitignore` via `vcs.useIgnoreFile`, so `playwright-report/` etc. are skipped too.)
-- `npm run check` must be clean before committing. Run `npm run format` (or `npx ultracite fix`) to auto-fix.
+Biome owns the formatting (2-space indent, double quotes) and the import order; do not fight either. `biome.json` excludes `src/routeTree.gen.ts`, `src/styles.css`, `scripts/`, `drizzle/` and `**/*.svg`.
 
 ### The git hooks
 
-`lefthook.yml` runs `npx ultracite check` on the staged files at pre-commit, so the
-rule above is enforced rather than remembered; `CONTRIBUTING.md` has the table of
-the other gates it runs. `npm install` installs the hooks via the `prepare` script;
-nobody runs anything by hand.
-
-- **`prepare` is `lefthook install || true`, and the guard is load-bearing.**
-  `.dockerignore` excludes `.git`, and the Dockerfile's runtime stage runs
-  `npm ci --omit=dev`, so `lefthook install` fails in both image stages. Without
-  the guard, the image build fails with it.
-- **A missing `node_modules` does not block commits.** The generated
-  `.git/hooks/pre-commit` falls through to `echo "Can't find lefthook in PATH"`
-  and exits 0, so committing before `npm install` warns instead of failing.
-- **To skip it:** `LEFTHOOK=0 git commit ...`, or `git commit --no-verify`.
-
-The message and prose checks are `scripts/check-commit-message.mjs` and
-`scripts/check-prose.mjs`, the same files CI's `verify` and `pr-text` jobs and the
-Claude Code hooks under `.claude/hooks/` run, so a rule has one implementation.
-`src/test/check-scripts.test.ts` drives them as processes, exit code and all,
-because the exit code is the contract every caller reads. They are written with
-`\u` escapes for the characters they reject, which is not decoration: the
-scripts are tracked, so a literal emdash in them fails `--all`.
+`lefthook.yml` runs the checks and `CONTRIBUTING.md` has the table. `prepare` is `lefthook install || true` because neither image stage has `.git`, and the install would otherwise fail the build. `scripts/check-commit-message.mjs` and `scripts/check-prose.mjs` are the one implementation lefthook, CI and the Claude Code hooks share, and `src/test/check-scripts.test.ts` drives them as processes, because the exit code is the contract. They spell the characters they reject as `\u` escapes, since a literal one would fail their own `--all` run.
 
 ### Rules deliberately relaxed or deferred
 
-Tuned in `biome.json` rather than fought file-by-file:
+`biome.json` turns these off on purpose:
 
-- **Disabled (idiom / framework conflict):** `noVoid` (intentional fire-and-forget `void promise()`), `useFilenamingConvention` under `src/routes/**` (TanStack `$param` / `__root` files), plus inline ignores for `noNamespaceImport` (drizzle `import * as schema`, shadcn) and `noBarrelFile` (the schema re-export).
-- **Relaxed in tests** (`*.test.ts(x)`, `__tests__/`, `src/test/`): `useTopLevelRegex`, `noEmptyBlockStatements`, `useAwait`, `noNonNullAssertion`.
-- **Deferred (needs real a11y/UX work, tracked as a finding):** `useImageSize` (add intrinsic image dimensions). Re-enable when addressed.
-- **Turned off 2026-09-10, when ultracite 7.11 switched them on:** `noJsxPropsBind` (an inline arrow in a JSX prop is the idiom this codebase and React 19 use, and the render-cost argument behind the rule predates the compiler), `noLeakedRender` (the strict types already make `cond && <X />` a boolean in all but a handful of places, and the rule wanted `Boolean()` around 121 of them), `noAwaitInLoops` (the seeds, the migration script and the Bedrock callers await in sequence on purpose, to keep one connection or one request in flight), `noIncrementDecrement` and `useDestructuring` (style with no defect behind it). Two assists went off with them: `useSortedKeys` and `useSortedTypeFields`, because object literals here are ordered by meaning (form fields in display order, a status map in workflow order, a select projection in the order the row reads) and 1224 alphabetical rewrites would have erased that for nothing. `useSortedPackageJson` stays on.
-- **`**/*.svg` is excluded.** Biome 2.5 parses SVG as HTML, wanted to reflow the two logo files, and asked `logo-institution.svg` for a `<title>`. They are assets, not source.
-- **Re-enabled 2026-08-22:** `noAlert`. It was off while the app still used native `alert()`/`confirm()`; those are now `ConfirmDialog` and `sonner` toasts, so the rule passes and catches a regression at edit time. `src/test/no-native-modals.test.ts` guards the same thing at test time, including the `window.`-prefixed forms the linter also sees.
+- `noVoid`: fire-and-forget `void promise()` is intended.
+- `useFilenamingConvention` under `src/routes/**`: TanStack's `$param` and `__root` names.
+- `useImageSize`: off everywhere except `institution-logo.tsx`.
+- `noJsxPropsBind` and `noLeakedRender`: inline arrows and `cond && <X />` are the idiom here.
+- `noAwaitInLoops`: the seeds, migrations and Bedrock callers await in sequence on purpose.
+- `noIncrementDecrement` and `useDestructuring`: style with no defect behind it.
+- The assists `useSortedKeys` and `useSortedTypeFields`: object literals here are ordered by meaning.
+- In tests (`*.test.ts(x)`, `__tests__/`, `src/test/`): `useTopLevelRegex`, `noEmptyBlockStatements`, `useAwait` and `noNonNullAssertion`.
+
+Inline ignores cover `noNamespaceImport` (`import * as schema`, shadcn) and `noBarrelFile` (the schema re-export).
 
 ### Do not run `biome check --write --unsafe` blindly
 
-The unsafe autofix rewrote `viewer!.id` to `viewer?.id` (changing a throw into a silent `undefined`) and converted a `type` alias to an `interface` (which broke a `Record<string, unknown>` cast). Review unsafe fixes diff-by-diff; prefer `npm run format` (safe fixes only).
+Its unsafe fixes changed behaviour here: `viewer!.id` became `viewer?.id`, and a `type` became an `interface` that broke a cast. Use `npm run format`, and review any unsafe fix diff by diff.
 
 ### Soft rules / project conventions
 
-The prose and commit-message rules (no emdashes, no emojis, lowercase imperative
-subject) bind every turn, so they live in [`../AGENTS.md`](../AGENTS.md) instead of
-here.
-
-- **Component file naming** is `kebab-case.tsx` (`project-card.tsx`, `status-badge.tsx`).
-- **`#/` import alias** for cross-directory imports inside `src/` (defined in `package.json`). Avoid `../../../...` chains.
-
-### Biome formatter quirks we hit
-
-- Single-line index entries in Drizzle table configs sometimes get reformatted across runs. Accept the format Biome wants.
-- TanStack Router `<Link>` JSX with three or more attributes will be split to multi-line. Don't pre-format yourself; let `npx biome format --write` handle it.
+Component files are `kebab-case.tsx`, and cross-directory imports inside `src/` use the `#/` alias. The prose and commit rules are in [`../AGENTS.md`](../AGENTS.md).
 
 ---
 
