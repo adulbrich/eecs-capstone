@@ -162,8 +162,9 @@ export const mentorNameSql = sql<string | null>`(
  * to use it.
  *
  * What may be in here is decided by `projectDetailView` and pinned by a
- * key-set test; `docs/QUIRKS.md` ("The listing projection is bounded by
- * projectDetailView") is the one place that rule is written out.
+ * key-set test; `docs/QUIRKS.md` ("Both domains name the fields their reads
+ * return, and a key-set test pins each") is the one place that rule is
+ * written out.
  */
 export const projectSummarySelect = {
   id: projects.id,

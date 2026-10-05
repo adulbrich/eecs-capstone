@@ -27,9 +27,9 @@ spawning anything. Note whether the user passed `mutate`.
 
 The spec is what the "State, not sequence" entry reads. Look in this order: issue
 references in the commit messages, fetched by the workflow in
-`docs/agents/issue-tracker.md`; a path the user passed; a design doc under
-`docs/superpowers/specs/` matching the branch. If none exists, that entry reports
-"no spec".
+`docs/agents/issue-tracker.md`; a path the user passed; for pre-2026-10 work only,
+a design doc under `docs/superpowers/specs/` matching the branch. If none exists,
+that entry reports "no spec".
 
 ### 3. The checklist
 

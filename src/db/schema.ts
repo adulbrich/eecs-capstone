@@ -936,7 +936,7 @@ export const trafficEvents = pgTable(
      * rollup reads one day from the index on it rather than converting
      * every row (#592). Never written by the traffic writer. The zone is a
      * literal because a generated column cannot take a parameter;
-     * `traffic-day.test.ts` holds it to `OFFICE_TIME_ZONE`.
+     * `src/test/traffic-filters.test.ts` holds it to `OFFICE_TIME_ZONE`.
      */
     day: date("day").generatedAlwaysAs(
       sql`(occurred_at AT TIME ZONE 'America/Los_Angeles')::date`
