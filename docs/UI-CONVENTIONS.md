@@ -20,6 +20,7 @@ Companion docs: [`QUIRKS.md`](./QUIRKS.md) for framework gotchas and code style,
 9. [Admin tables](#admin-tables)
 10. [Component patterns](#component-patterns)
 11. [Destructive actions](#destructive-actions)
+12. [Mutations and feedback](#mutations-and-feedback)
 
 ---
 
@@ -41,16 +42,16 @@ silently breaks both.
 
 Import from `#/components/ui/button` (or `./ui/button` from inside `src/components/`).
 A raw `<button className="bg-brand ...">` misses the focus ring, the disabled state,
-and the dark-mode variants that `Button` carries.
+and the dark-mode variants that `Button` carries. `src/test/button-conventions.test.ts`
+refuses a raw `<button>` outside its allow list.
 
 `type` is required: `type="submit"` on the one button that submits its form, and
 `type="button"` on everything else, inside a form or not. The HTML default for a
-typeless button is `submit`, which is how the image uploader's "Upload image" saved
-the project edit form on its way to the file picker (#305), and how the admin
-category and program pages' Delete buttons saved the form while opening their
-confirm dialog. `Button` does not default the prop, because a default of `"button"`
-would turn an implicit form submit into a no-op just as silently. An `asChild`
-`Button` takes no `type`; the child it renders is a link.
+typeless button is `submit`, so an Upload or Delete button inside a form silently
+saves it. `button.tsx` makes `type` a required prop on a rendered `Button` and
+forbids it on an `asChild` one (the child is a link), so `npm run typecheck` fails a
+`Button` that does not say. It has no default, because a default of `"button"` would
+turn an implicit form submit into a no-op just as silently.
 
 | Variant | Use when |
 | --- | --- |
@@ -61,21 +62,20 @@ would turn an implicit form submit into a no-op just as silently. An `asChild`
 | `secondary` | Muted fill, when `outline` reads too light against the surface |
 | `link` | Inline text that behaves as a button |
 
+### Sizes and icons
+
 Sizes are `xs` (h-6, inline micro-actions like Post reply), `sm` (h-8, most
 contextual buttons), `default` (h-9, standalone form submits), and `lg` (h-10,
 hero / landing CTAs). Icon-only buttons use `icon-xs`, `icon-sm`, `icon`, or
-`icon-lg` to stay square. `bare` is the odd one out of the height scale: no
-height and no padding at all, for a Button that reads as a line of text: a
-`link` one in a panel, as `ClearFiltersButton` is, or a `ghost` one that is a
-row's own title, as a student's name on the placement board is.
+`icon-lg` to stay square. `bare` has no height and no padding, for a Button that
+reads as a line of text: a `link` one in a panel (`ClearFiltersButton`), or a
+`ghost` one that is a row's own title.
 
-The size variant also sets the icon size, so pass no size class on an icon
-inside a `Button`. The base class carries
-`[&_svg:not([class*='size-'])]:size-4`, which `xs` and `icon-xs` override to
-`size-3`. That selector stands down only for a class containing `size-`:
-`h-5 w-5` does not match it and loses to it on specificity, so it renders 16px
-while reading as 20. If a call site genuinely needs a different size, write
-`size-5`, which the rule is built to yield to.
+The size variant also sets the icon size, so pass no size class on an icon inside a
+`Button`; the scan refuses one. The base class carries
+`[&_svg:not([class*='size-'])]:size-4` (`size-3` under `xs` and `icon-xs`), which
+yields only to a class containing `size-`: `h-5 w-5` loses to it and renders 16px.
+A call site that genuinely needs another size writes `size-5`.
 
 ### A link styled as a button uses `asChild`
 
@@ -91,9 +91,7 @@ activation.
 
 ### One kind of action is one button everywhere
 
-The variant table above says which variant an action takes. These four drifted
-across pages often enough to be worth naming, because the eye reads a different
-button as a different action:
+The eye reads a different button as a different action, so these four are fixed:
 
 | Action | Button |
 | --- | --- |
@@ -102,38 +100,24 @@ button as a different action:
 | Save | `default` |
 | Clear all | `<ClearFiltersButton>` from `#/components/clear-filters-button` |
 
-Size is the row's to decide, not the action's. Cancel takes the size of the
-button it sits beside; Remove is `sm` in a list or a table row and `default`
-beside the mentor capacity `Input`; Save is `default` under a form and `sm`
-beside the `sm` `SelectTrigger` on the admin user page. Where the two rules
-meet, the row wins, because a button half a step off the control next to it is
-the misalignment this section exists to stop. See "Size follows the row" below.
-
-Cancel was `ghost` in four dialogs and `outline` in ten, Remove was six
-different buttons including two hand-rolled red palettes, and Clear all was a
-`link` Button with `h-auto p-0` copied five times. `ClearFiltersButton` exists
-so the sixth copy is an import rather than a paste.
+Size is the row's to decide, not the action's: Cancel takes the size of the button
+beside it, Remove is `sm` in a table row and `default` beside an `Input`. Where the
+two rules meet, the row wins. See "Size follows the row" below.
 
 ### A button shows the hand cursor, whichever element it renders
 
-Tailwind's preflight leaves `button` at the browser's default arrow, while an
-anchor gets the hand. An `asChild` Button renders a `<Link>`, so before the
-base rule in `styles.css` the cursor told the user which element the code
-happened to choose. `button:not(:disabled) { cursor: pointer }` in the base
-layer covers every button on the page, the deliberate raw ones included; a
-button that is genuinely not pressable says so with `cursor-default`, which is
-a utility and so outranks the base rule (the current status pill in
-`staff-project-panel.tsx` does this).
+`button:not(:disabled) { cursor: pointer }` in the base layer of `styles.css` gives
+every button the hand an anchor already gets, so an `asChild` Button and a rendered
+one look the same under the pointer. A button that is not pressable says so with
+`cursor-default`, which as a utility outranks the base rule.
 
 ### A variant owns its text colour at rest
 
-`outline` and `ghost` carry `text-foreground` rather than leaving the colour to
-be inherited. Without it a rendered `<button>` inherited the body colour and an
-`asChild` anchor inherited the global `a` rule, brand orange, so the same
-variant was two different buttons depending on the element underneath it.
-`secondary`, `default` and `destructive` already carried their foreground
-token; `link` is the one variant that is meant to read as a link and keeps
-`text-brand-dark`.
+`outline` and `ghost` carry `text-foreground` rather than inheriting a colour.
+Inherited, a rendered `<button>` took the body colour and an `asChild` anchor took
+the global `a` rule's brand orange, so one variant looked like two buttons.
+`secondary`, `default` and `destructive` carry their foreground token; `link` is
+meant to read as a link and keeps `text-brand-dark`.
 
 ### A filled variant hovers to a solid colour
 
@@ -149,35 +133,28 @@ A button on a row with a form control is `default` (h-9), so it aligns with the
 `Input` and `SelectTrigger` beside it: the search row's Export CSV, Columns and
 view toggle are all `default` for this reason. A contextual button with no form
 control on its row is `sm` (h-8): the title-row actions, the buttons inside a
-table row or a panel. The rule was previously a comment in
-`export-csv-button.tsx`, which meant the next page picked either.
+table row or a panel.
 
 ### `className` on a Button never restyles it
 
 A Button's `className` may position it (`w-full`, `mt-2`, `xl:hidden`,
-`relative`), and may not set a colour, a height, a padding or a radius. Font
-weight is not on that list, and the combobox triggers use it:
-`category-type-combobox.tsx` and `proposer-filter-combobox.tsx` both carry
-`font-normal`, because a trigger that displays a selected value reads as an
-input rather than as a button. Those four are what the variant and size own,
-so a call site that sets them has forked the primitive in one file: a Remove
-in a destructive palette here, an `h-auto p-0` there, until no two pages
-agree. If a call site needs a look the variants do not offer, the variant is
-what changes, or a shared component wraps it.
-`src/test/button-conventions.test.ts` scans for the four.
+`relative`), and may not set a colour, a height, a padding or a radius. Those four
+are what the variant and size own, and a call site that sets them forks the
+primitive in one file. If a call site needs a look the variants do not offer, the
+variant changes, or a shared component wraps it.
+`src/test/button-conventions.test.ts` scans for the four. Font weight is allowed: a
+combobox trigger that displays a selected value carries `font-normal` so it reads
+as an input.
 
-A pressed toggle is the case this most often tempts. Style it from
-`aria-pressed` in the primitive, which the base class handles, not from a
-conditional `bg-secondary` at the call site: the attribute is what a screen
+Style a pressed toggle from `aria-pressed`, which the base class handles, not from
+a conditional `bg-secondary` at the call site: the attribute is what a screen
 reader reads, so styling from anything else lets the two disagree. `ViewToggle`
-and the markdown Edit/Preview pair are the two.
+and the markdown Edit/Preview pair do this.
 
 A segmented group (buttons that read as one control) gets its radius from the
 wrapper, which carries `[&>*:not(:first-child)]:rounded-l-none`,
-`[&>*:not(:last-child)]:rounded-r-none` and `[&>*+*]:-ml-px`, so no call site
-sets a radius. Written against `:not()` rather than `:first-child` and
-`:last-child` so a third button squares on both sides instead of keeping the
-base radius in the middle of the group.
+`[&>*:not(:last-child)]:rounded-r-none` and `[&>*+*]:-ml-px`, so no call site sets
+a radius. The `:not()` form squares a middle button on both sides.
 
 ### Labels
 
@@ -193,40 +170,28 @@ is what every role query in the test suite matches on.
 
 ### A link inside running text is underlined at rest
 
-A link with words beside it on the line, in a paragraph, a list item, a
-callout or a label-and-value row, carries `text-brand-dark underline`, not
-`hover:underline`. WCAG 1.4.1 lets color alone mark a link only at 3:1
-against the surrounding text, and the brand color does not reach it anywhere
-that matters: about 1.05:1 against muted text and 1.07:1 against destructive
-text in light mode, and against ordinary body text about 3.1:1 in light and
-1.9:1 in dark (`#FF8C5A` on `#EDE9E5`). The global `a` rule in `styles.css`
-already sets the underline's color, thickness and offset, so the class only
-turns the line on, and `underline-offset-` at a call site is the global rule
-restated. These links show no hover change, because `text-brand-dark` outranks
-the base `a:hover` color and the line is already there; that is the intended
-state. Colored prose came first (#361) and body copy followed (#364), each PR
-listing the links it found. Thirteen were missed by both, on the auth pages,
-`/profile`, the account deletion dialog and two admin inventory routes: they
-carried a bare `underline` with no color class at all, which the scan looked
-for `text-brand` to find and so could not see, and hovered to the vivid orange
-this rule exists to keep off a link. This doc claimed those pages had no hover
-change while they did, from #361 until #411 made it true.
+A link with words beside it on the line, in a paragraph, a list item, a callout or
+a label-and-value row, carries `text-brand-dark underline`, not `hover:underline`.
+WCAG 1.4.1 lets color alone mark a link only at 3:1 against the surrounding text,
+and the brand color does not reach it: about 1.05:1 against muted text, and against
+body text about 3.1:1 in light and 1.9:1 in dark. The global `a` rule in
+`styles.css` already sets the underline's color, thickness and offset, so the class
+only turns the line on, and `underline-offset-` at a call site restates it. These
+links show no hover change, because `text-brand-dark` outranks the base `a:hover`
+color; that is intended. A bare `underline` with no color class hovers to the vivid
+orange this rule keeps off a link.
 
-`hover:underline` stays for a link that is the whole content of its cell,
-title or block, where nothing sits beside it to be confused with: the title
-and action links in the tables, the card title that wraps the whole card,
-the "All inventory" back link. A shared component that lands in running text
-anywhere carries the underline everywhere, as `SupportEmailLink` does: one
-look per component, no prop to get wrong. Breadcrumbs are a navigation
-landmark rather than prose; `BreadcrumbLink` underlines in no state and
-changes color on hover instead, and stays that way. Markdown body copy is
-covered by the typography plugin, which underlines its links. Whether a class
-sits in a `<td>` or a `<p>` is not something a regex over a file can tell, so
-no scan can enforce where this rule applies; what
-`src/test/brand-link-scan.test.ts` does enforce is the half that is decidable,
-that a class string turning an underline on carries `text-brand-dark` with it
-and does not restate `underline-offset-`. Color against the background is the
-separate rule under "Color tokens".
+`hover:underline` stays for a link that is the whole content of its cell, title or
+block: the title and action links in the tables, the card title, the "All
+inventory" back link. A shared component that lands in running text anywhere
+carries the underline everywhere, as `SupportEmailLink` does. `BreadcrumbLink`
+underlines in no state and changes color on hover, because breadcrumbs are a
+navigation landmark, not prose. Markdown body copy gets its underline from the
+typography plugin. No regex can tell a `<td>` from a `<p>`, so where the rule
+applies is not enforced; `src/test/brand-link-scan.test.ts` enforces the decidable
+half, that a class string turning an underline on carries `text-brand-dark` and no
+`underline-offset-`. Color against the background is the separate rule under
+"Color tokens".
 
 ### Plain navigation links use `.nav-link`
 
@@ -253,82 +218,75 @@ every input an `id` that the `Label`'s `htmlFor` matches, and render errors with
 </div>
 ```
 
-**A one-time code is `InputOTP`, not `Input`** (`#/components/ui/input-otp`,
-#600). Put the `id`, `name`, `autoComplete="one-time-code"` and `aria-*` on
-`InputOTP`, which hands them to the one real input under the slots, and pass
-`aria-invalid` to each `InputOTPSlot` as well, since the slots are what shows
-the red border. Keep a submit button: no `onComplete` auto-submit, which spends
-a guess on a typo nobody saw and changes context on input (WCAG 3.2.2). Center
-it, with what the code was sent to above the slots and the error under them.
-
-**On the project and inventory forms, field labels are Title Case; nothing
-else is.** "Problem Statement", "Contact Email", "Private Notes". A checkbox
-label is a sentence and stays one. Page headings, section headings, table
-headers, legends, badges and buttons stay sentence case, so a label reads as
-the name of a box and a heading as a line of prose. The rule is scoped to the
-two long forms on purpose (#375): the labels in dialogs, panels and the
-profile page are still sentence case, and moving them is a separate change.
-Where a form label and a page heading name the same field, the two are
-sibling constants pinned to the same words by a unit test, since a case
-transform would lowercase "IP" and "NDA": `FIELD_LABELS` and `FIELD_HEADINGS`
-in `src/lib/project-review-fields.ts`, and `PRIVATE_NOTES_FIELD_LABEL` beside
-`PRIVATE_NOTES_LABEL` in `src/lib/private-notes.ts`.
-
-**The project and inventory forms set their labels at `text-base`** through
-their local `Field` helpers and the raw `Label` uses beside them, and space
-their fields at `space-y-6`. The shared `Label` stays at `text-sm`: a dialog
-or a filter has one or two labels and no scanning problem, and the two long
-forms had one (#375). The project form is also split into three groups by a
-hairline `hr`: the story of the project, how to reach the proposer, and the
-terms; no group headings, which were considered and declined.
-
 `FieldError` takes `errors: readonly unknown[]` because a validation error can
 arrive as either shape depending on which validator produced it: a Standard
 Schema (what both forms in this app pass) produces `{ message }` issues, while a
 hand-written validator or a server error can produce a bare string. `FieldError`
 renders both so no call site has to know which it has.
 
+### One-time codes
+
+**A one-time code is `InputOTP`, not `Input`** (`#/components/ui/input-otp`). Put
+the `id`, `name`, `autoComplete="one-time-code"` and `aria-*` on `InputOTP`, which
+hands them to the one real input under the slots, and pass `aria-invalid` to each
+`InputOTPSlot` as well, since the slots show the red border. Keep a submit button:
+no `onComplete` auto-submit, which spends a guess on a typo nobody saw and changes
+context on input (WCAG 3.2.2). Center it, with what the code was sent to above the
+slots and the error under them.
+
+### Title Case on the two long forms
+
+**On the project and inventory forms, field labels are Title Case; nothing else
+is.** "Problem Statement", "Contact Email", "Private Notes". A checkbox label is a
+sentence and stays one. Headings, table headers, legends, badges, buttons and the
+labels in dialogs, panels and the profile page stay sentence case, so a label reads
+as the name of a box and a heading as a line of prose. Where a form label and a
+page heading name the same field, the two are sibling constants pinned to the same
+words by a unit test, since a case transform would lowercase "IP" and "NDA":
+`FIELD_LABELS` and `FIELD_HEADINGS` in `src/lib/project-review-fields.ts`, and
+`PRIVATE_NOTES_FIELD_LABEL` beside `PRIVATE_NOTES_LABEL` in
+`src/lib/private-notes.ts`.
+
+**The project and inventory forms set their labels at `text-base`** through their
+local `Field` helpers and the raw `Label` uses beside them, and space their fields
+at `space-y-6`, because a long form needs scanning. The shared `Label` stays at
+`text-sm`. The project form is split into three groups by a hairline `hr` (the
+project, how to reach the proposer, the terms), with no group headings.
+
 `inventory-form.tsx` and `project-form.tsx` each have their own local `Field`, a
 TanStack Form binding wrapper (it renders `<form.Field>` and wires
-`handleChange`/`handleBlur`), not a layout primitive. They share about 31
-identical lines. Consolidating them was considered in 2026-08 and declined: the
-options were a layout-only shell (which leaves the `aria-describedby` wiring
-duplicated, so it removes the lines without removing the risk), a shared binding
-with a control slot (a render prop inside TanStack's own render prop, across 17
-call sites), or one component carrying every prop both forms need (which puts
-the AI review suggestion UI inside a component `inventory-form` also renders).
-None was worth the churn against two wrappers that are currently in sync. Keep
-them separate, and if you change the label, description or error handling in one,
-change it in the other.
+`handleChange`/`handleBlur`), not a layout primitive. They stay separate: every
+consolidation considered either left the `aria-describedby` wiring duplicated or
+put the AI review suggestion UI inside a component `inventory-form` also renders.
+If you change the label, description or error handling in one, change it in the
+other.
+
+### Placeholders
 
 **A placeholder is not a label.** Every `Input` and `Textarea` needs an `id`
 matched by a `Label`'s `htmlFor`, or an `aria-label` when there is no visible
 label. A placeholder disappears the moment the user types, and axe will not
 report its absence, because `placeholder` is a fallback in the accessible-name
-computation, so the name reads as non-empty. Six controls shipped this way.
-`src/test/field.test.tsx` enforces it.
+computation, so the name reads as non-empty. `src/test/field.test.tsx` enforces
+it.
 
-**A placeholder is not documentation either.** It has no tooltip, it clips
-without saying so, and it is gone once the reader types. A listing search
-placeholder is a name for the box, "Search projects" or "Search inventory",
-at most about 25 characters: the search row gives `/projects` about 28 at
-768 in table view, and the two long placeholders it replaced clipped there and
-at 375 (#369). What the box searches and the syntax it takes go on a
-`SearchHint` line (`#/components/search-hint`) rendered right after the input
-in the same row, which the input names through `aria-describedby`. The
-component carries the syntax sentence, because every listing search runs
-through `websearch_to_tsquery`; the caller passes the fields sentence, which
-must be true of that page's query. The line is text only, so the tab order
-from the search to the Filters button is what the a11y suite asserts.
+**A placeholder is not documentation either.** It has no tooltip, it clips without
+saying so, and it is gone once the reader types. A listing search placeholder is a
+name for the box, "Search projects" or "Search inventory", at most about 25
+characters, which is what the `/projects` search row fits at 768 in table view.
+What the box searches and the syntax it takes go on a `SearchHint` line
+(`#/components/search-hint`) rendered right after the input in the same row, which
+the input names through `aria-describedby`. The component carries the syntax
+sentence, because every listing search runs through `websearch_to_tsquery`; the
+caller passes the fields sentence, which must be true of that page's query. The
+line is text only, so the tab order goes from the search to the Filters button.
 
 ### Error text goes through one component
 
 A message about something that failed renders through `FieldError` from
 `#/components/ui/field`, never as a hand-written
-`<p className="text-destructive text-sm">`. About forty call sites wrote that
-paragraph themselves and drifted: `mt-2` in five, `mt-3` in two, no margin in
-the rest, `text-xs` in two, no size class at all in one, and only two of them
-announced anything to a screen reader (#411).
+`<p className="text-destructive text-sm">`, so every error has one margin, one size
+and one announcement. `src/test/error-text-scan.test.ts` refuses the paragraph.
 
 `FieldError` takes either shape, and never both:
 
@@ -338,26 +296,21 @@ announced anything to a screen reader (#411).
 ```
 
 It renders nothing when there is nothing to say, so a caller does not guard it
-with `{error && ...}`, and it takes no `className`: one margin is the point,
-and none of the fifty-nine call sites needed a different one.
+with `{error && ...}`, and it takes no `className`: one margin is the point.
 
-It carries `role="alert"`, not `aria-live="polite"`. Both announce, but these
-messages are inserted in response to something the reader just did, a save they
-pressed and a server that refused it, and the assertive role is what interrupts
-to say so; a polite region waits for a pause that a form with focus still in it
-may not reach. The trade is that `role="alert"` on an element already in the
-DOM announces on every content change, which is why the component returns
-`null` rather than rendering an empty paragraph.
+It carries `role="alert"`, not `aria-live="polite"`. These messages answer
+something the reader just did, and the assertive role interrupts to say so; a
+polite region waits for a pause that a form with focus still in it may not reach.
+`role="alert"` on an element already in the DOM announces on every content change,
+which is why the component returns `null` rather than an empty paragraph.
 
 An error about a whole form or panel rather than one field renders through
-`ErrorBanner` from `#/components/error-banner`, which is the same message in a
-tinted box with one opacity pair. Three copies of that box had drifted to two
-different opacity pairs before it existed.
+`ErrorBanner` from `#/components/error-banner`: the same message in a tinted box
+with one opacity pair.
 
-A status panel is not an error banner even when it is tinted with the
-destructive color. The ban notice in `ban-form.tsx` is a `<section>` with a
-heading, a reason and an expiry, describing a state the account is in rather
-than an action that failed, so it keeps its own markup.
+A status panel is not an error banner even when it is tinted with the destructive
+color. The ban notice in `ban-form.tsx` describes a state the account is in, not an
+action that failed, so it keeps its own markup.
 
 ### Why not shadcn `form`
 
@@ -385,16 +338,13 @@ Semantic aliases adapt to dark mode; raw palette classes do not.
 | `dark:border-neutral-800` | `dark:border-border` |
 
 A brand-colored link uses `text-brand-dark`, not `text-brand`. Beaver Orange on
-white is 4.56:1, a margin of 0.06 over AA, so the moment a row hover, a selected
-state or a status background sits under it the link fails, and on the page
-surface itself it is already 4.27:1; `text-brand-dark` is 6.0:1 on white and
-about 5.6:1 on a hovered table row, and the `link` Button variant already uses it
-in both modes. Keep the class rather than dropping it and trusting the global `a`
-rule: that rule's hover state switches back to `--brand-primary`, and a utility
-outranks it. Table cells were the first case (#357) and the rest followed in
-#358, so `text-brand` on a link is a regression. `text-brand` stays for icons
-and decoration, where no contrast ratio applies; each such file is named in
-`src/test/brand-link-scan.test.ts`, which fails on any other.
+white is 4.56:1, a margin of 0.06 over AA, so a row hover, a selected state or a
+status background under it fails, and on the page surface it is already 4.27:1;
+`text-brand-dark` is 6.0:1 on white and about 5.6:1 on a hovered table row. Keep the
+class rather than trusting the global `a` rule, whose hover state switches back to
+`--brand-primary`. `text-brand` stays for icons and decoration, where no contrast
+ratio applies; each such file is named in `src/test/brand-link-scan.test.ts`, which
+fails on any other.
 
 Status colors have no Tailwind alias, so reference the variable directly:
 
@@ -426,39 +376,32 @@ Interactive elements are `rounded-md` (8px), which is already the default inside
 
 Write the small-screen styles first, then add `md:` (768px and up) overrides. This is
 a deliberate two-tier system, mobile and desktop, so `sm:`, `lg:`, and `xl:` overrides
-are reserved for the rare case that genuinely needs a third tier.
+are reserved for the rare case that genuinely needs a third tier. Two cases do, and
+any other `xl:` needs a reason neither gives:
 
-One case does: a listing's filters. `ListingLayout` (see
-[Listing layout](#listing-layout)) puts them in a left aside from `xl` (1280px)
-and in a `Sheet` below it. The tier is `xl` and not `lg` by arithmetic, not
-taste: the card column is `max-w-4xl` (896px), the aside is 18rem (288px), the
-gap 2rem and the page padding 4rem, and 288 + 32 + 896 + 64 is 1280. At `lg`
-the cards would have to shrink to make room. The `xl:` layout classes live in
-that one component; a route passes at most its width pair through `className`
-(`mx-auto max-w-4xl xl:max-w-7xl` on `/projects` and `/inventory`). Any other `xl:` still needs
-a reason this paragraph does not already give (#350).
+- A listing's filters. `ListingLayout` (see [Listing layout](#listing-layout)) puts
+  them in a left aside from `xl` and in a `Sheet` below it. 288 (aside) + 32 (gap) +
+  896 (card column) + 64 (padding) is 1280, so `lg` cannot hold it
+  ([ADR-0020](./adr/0020-listing-filters-in-a-left-aside-from-xl.md)). The `xl:`
+  layout classes live in that one component; a route passes at most its width pair
+  through `className` (`mx-auto max-w-4xl xl:max-w-7xl`).
+- The project page's similar-projects aside: 768 + 32 + 288 + 64 is 1152, so it
+  takes `xl` rather than adding a tier
+  ([ADR-0054](./adr/0054-similar-projects-float-below-xl-and-sit-beside-from-it.md)).
+  Its `xl:` classes live in `SimilarProjectsLayout`; below `xl` it floats (see
+  [Floating panel](#floating-panel)).
 
-The second case is the project page's similar-projects aside (#614,
-[ADR-0054](./adr/0054-similar-projects-float-below-xl-and-sit-beside-from-it.md)):
-768 + 32 + 288 + 64 is 1152, which `lg` cannot hold, so it takes the smallest
-tier above that rather than adding one. Its `xl:` classes live in
-`SimilarProjectsLayout`, and below `xl` it floats; see
-[Floating panel](#floating-panel).
-
-There is no card grid any more. The listing cards (`project-card.tsx`,
-`inventory-card.tsx`) are one component at both widths: image on top at 16:9
-below `md`, image on the left at 3:2 and `w-40` from `md` up, in a single column
-bounded to `max-w-4xl`. The image is letterboxed inside that box, `object-contain`
-on `bg-muted`, so the whole picture shows at every width and the bars read as
-part of the card; `object-cover` cropped anything that was not the box's ratio
-(#314). The detail page hero and the table thumbnails still crop. A five-tier grid ladder used to hold the mobile-shaped
-card at every width; it left with the two display modes on 2026-09-02, because a
-card that turns into a row at `md` cannot sit in a three-column grid.
+The listing cards (`project-card.tsx`, `inventory-card.tsx`) are one component at
+both widths, in a single column bounded to `max-w-4xl`: image on top at 16:9 below
+`md`, image on the left at 3:2 and `w-40` from `md` up. The image is letterboxed,
+`object-contain` on `bg-muted`, so the whole picture shows at every width;
+`object-cover` would crop anything not at the box's ratio. The detail page hero and
+the table thumbnails still crop.
 
 ### Page wrapper padding
 
 Every route page root other than the auth cards (see [Auth pages](#auth-pages))
-carries this padding signature, with `max-w-*` chosen per page (see below):
+carries this padding signature, with `max-w-*` chosen per page:
 
 ```tsx
 <div className="mx-auto max-w-4xl px-4 py-6 md:p-8">
@@ -467,31 +410,16 @@ carries this padding signature, with `max-w-*` chosen per page (see below):
 `px-4 py-6` gives comfortable touch margins; `md:p-8` expands to the desktop-standard
 32px. A bare `p-8` wrapper wastes a third of the width on a phone.
 
-Page width is chosen by content, not fixed. Counting the 18 route roots that carry
-this `px-4 py-6 md:p-8` signature: `max-w-2xl` on the 8 form, dashboard and prose pages
-(`projects/new`, `projects/$projectId/edit`, `admin/index`, `admin/programs/$programId`,
-`admin/users/$userId`, `inventory/new`, `inventory/$itemId/edit`, `privacy`), `max-w-4xl` on 7
-pages that hold a list, a two-column detail layout or a grid of figures, `max-w-3xl` on the one
-long-form page (`projects/$projectId.tsx`, through `SimilarProjectsLayout`, which
-widens it to `xl:max-w-6xl` for the aside), and `max-w-md` on two narrow-content
-pages (`profile.tsx`, `admin/categories/$categoryId.tsx`). Of the seven `max-w-4xl` pages, three hold a single-column
-card list (`projects/index.tsx`, `inventory/index.tsx`, `my/projects.tsx`),
-`my/items.tsx` holds an attention region and one grouped table with a filter
-above it, all bounded to the title width since a borrower's list is
-short, `my/bookmarks.tsx`
-bounds only its title, `inventory/$itemId.tsx` holds a two-column detail
-layout, and `admin/analytics.tsx` holds a two-column grid of figure cards.
-`my/bookmarks.tsx` lets the table run full width below the bounded
-title, the way the admin tables do. `projects/index.tsx` and
-`inventory/index.tsx` used to as well; since #350 and #352 they pass
-`mx-auto max-w-4xl xl:max-w-7xl` to `ListingLayout`, so the table is bounded
-with the cards below `xl` and shares the wider grid with the aside from `xl`.
-`/admin/projects` and `/admin/inventory` pass no width and run full, as before. The sign-in card
-is narrower still but lives inside the separate `island-shell` container below, not
-this padding pattern.
+Page width is chosen by content. Pick the narrowest that fits; a form at
+`max-w-4xl` has an uncomfortably long measure.
 
-Pick the narrowest that fits the content; a form at `max-w-4xl` has an
-uncomfortably long measure.
+| Width | For | Example |
+| --- | --- | --- |
+| `max-w-md` | one narrow form or card | `profile.tsx` |
+| `max-w-2xl` | forms, dashboards, prose | `projects/new.tsx`, `privacy.tsx` |
+| `max-w-3xl` | the long-form project page | `SimilarProjectsLayout`, widening to `xl:max-w-6xl` for its aside |
+| `max-w-4xl` | lists, two-column detail, grids of figures | `my/projects.tsx`, `inventory/$itemId.tsx`, `admin/analytics.tsx` |
+| none | admin tables that run full width | `/admin/projects`, `my/bookmarks.tsx` below its bounded title |
 
 ### Interactive element height
 
@@ -505,17 +433,12 @@ sits inline beside them.
 ## Site header
 
 The header carries site-wide chrome: navigation, the source link, notifications,
-and the account menu. Anything scoped to one page's contents, such as a
-collection count, lives on that page. The borrow list count sits on the
-`/inventory` title row (`BorrowListButton`) and the bookmark count on the
-`/projects` title row (`BookmarksButton`), opposite the `h1` and above the
-filter bar. The header used to carry the borrow list as a shopping cart icon,
-which both claimed something was being bought and reminded you of a list scoped
-to one page from every other one.
-
-Site-wide versus page-scoped is the distinction, not global state versus
-static: a static link to the source repository belongs in the header, and a
-live count of a page's own collection does not.
+and the account menu. Anything scoped to one page's contents, such as a collection
+count, lives on that page: the borrow list count on the `/inventory` title row
+(`BorrowListButton`) and the bookmark count on the `/projects` title row
+(`BookmarksButton`), opposite the `h1`. Site-wide versus page-scoped is the
+distinction, not global state versus static: a static link to the source repository
+belongs in the header, and a live count of a page's own collection does not.
 
 ---
 
@@ -532,9 +455,8 @@ live count of a page's own collection does not.
 ```
 
 The mobile drawer is a shadcn `Sheet` with `side="left"`, opened by a hamburger
-`<Button variant="ghost">`. It shares the component with the line sheet under
-Admin tables below and the filters sheet in `ListingLayout`, and nothing else. It is a Radix Dialog underneath, so it is focus-trapped
-and escape-dismissible for free. Four rules keep it correct:
+`<Button variant="ghost">`. It is a Radix Dialog underneath, so it is focus-trapped
+and escape-dismissible. Four rules keep it correct:
 
 - Call `setOpen(false)` in every `<Link>` click handler, so the drawer closes once
   navigation completes.
@@ -568,27 +490,18 @@ and escape-dismissible for free. Four rules keep it correct:
 Render admin tables with `<AdminDataTable>` from `#/components/admin-data-table`,
 and drive it with the `useAdminTable` hook from `#/lib/use-admin-table`. The component
 handles sorting, column hiding, and the responsive card layout; the hook owns the
-URL-backed sort and visibility state.
+URL-backed sort and visibility state. A hand-rolled `<table>` in an admin route
+collapses to an unreadable horizontal scroll on a phone.
 
-The one exception is a short summary inside a `Sheet`: a few fixed rows with nothing
-to sort, hide or restack, such as the tables in `/admin/placement`'s analytics
-Sheet. Those use the plain `Table` from `#/components/ui/table`, because the Columns
-menu and the card layout would only crowd a panel that narrow. A title column there
-does not follow "A free-text column is bounded and clamped", which is written for
-the card layout: the table is `table-fixed`, each count column has a set width, and
-the title cell is `truncate whitespace-nowrap` at every width with the full text in
-a native `title` attribute, so the counts stay in the Sheet at any width (#660).
+The one exception is a short summary inside a `Sheet` (`/admin/placement`'s
+analytics): a few fixed rows with nothing to sort, hide or restack use the plain
+`Table` from `#/components/ui/table`. It is `table-fixed` with set count-column
+widths, and its title cell is `truncate whitespace-nowrap` with the full text in a
+`title` attribute, so the counts stay in the Sheet at any width.
 
-Give the hook `columns`, `defaultSort` and `storageKey`, then spread what it hands back.
-Those three used to be passed twice, once to the hook and once to the table, with nothing
-checking that the two agreed: a mismatched `storageKey` writes column preferences under
-one key and clears them under another, and a mismatched `defaultSort` leaves the URL and
-the rendered order disagreeing. Spreading makes disagreeing impossible.
-
-Row data does not go through the hook. `data` and `getRowId` are props of the table,
-because the hook never read them and routing them through it bought nothing but a generic
-parameter (#97). The hook does take one option it only forwards, `serverSorted`; it is described
-below.
+Give the hook `columns`, `defaultSort` and `storageKey`, then spread `tableProps`
+into the table, so the hook and the table cannot disagree about them. Row data
+(`data`, `getRowId`) are props of the table, not the hook.
 
 ```tsx
 const { orderRows, tableProps } = useAdminTable({
@@ -608,102 +521,83 @@ const { orderRows, tableProps } = useAdminTable({
 />;
 ```
 
-`navigate` is the route's own `useNavigate({ from })`, passed in rather than called
-inside the hook so it typechecks against the real route path. Two options carry the
-variations: `resetPageOnSort` for a paginated listing, whose page number stops meaning
-anything once the server reorders, and `serverSorted` for a listing the server ordered,
-which turns off local reordering. They are separate because server-ordered does not
-imply paginated. `orderRows(rows, getId)` puts exported rows in the order the table is
-rendering, so a CSV matches the screen; it is a no-op under `serverSorted`.
-
-The hook hands back a second bag, `controlsProps`, for the listings whose Export CSV
-and Columns menu sit in the search row rather than on the table's own row. Pass
-`controls="listing"` to the table, which then draws no row above itself, and render
-`<AdminTableControls actions={<ExportCsvButton />} filtered={filtered} rowCount={rows.length} {...controlsProps} />`
-where the controls should go. The component is built from the column list and the hidden
-set rather than from the table instance, which is what lets it render in another subtree;
-it hides itself under the same rule as the table (no rows and no filter, #260), and
-the `rowCount` and `filtered` it takes are the table's own. Every other table leaves
-`controls` at its default and gets the table's own row: whatever it passes as `toolbar`
-on the left, its `actions` and the Columns menu on the right, and nothing visible when
-it passes neither and no column can hide (the bookmarks shortlist).
-
-`resetPageOnSort` is unsatisfiable unless the route's own search type declares a `page`,
-so setting it on a route that paginates nothing is a compile error rather than a stray
-`page: 1` pushed into a schema with no `page` in it. The compiler prints the reason,
-because the false branch of that conditional is a sentence rather than `never`.
-
-That is all the route's search type is used for. Typing `navigate`'s reducer against it
-as well was built and thrown away: the reducer spreads over a generic, so its return needs
-a cast, and the cast silences the check the typing was for. It caught nothing the
-conditional does not. That is what the hook's `TSearch`
-parameter is for. It does not restore full search-schema checking on the patch: the
-reducer spreads over a generic, TypeScript cannot prove that preserves it, and the cast
-that makes it compile is what stops the compiler seeing the rest. One named failure
-caught beats a boundary that looks typed and checks nothing.
-
-`cardHeader` marks the one column that titles the record. On mobile its cell becomes the
-card's header strip: full width, with no field name in front of it. Use it for a column
-whose content already says what it is, usually a name or title beside a thumbnail, where a
-"Name" label would only squeeze the title into what is left of the row. At most one column
-per table may set it. A second one is logged and does not become a header strip; its cell
-still renders as an ordinary labelled field. Two title rows on one card read as a styling
-oddity and get lived with instead of reported, which is why this is checked at all.
-A row action inside that header strip is icon-only below `md`, with the label as
-its `aria-label` and `title` and the text `hidden md:inline`, so the title keeps the
-row: the public inventory table's Borrow button does this through
-`AddToCartButton`'s `compact` prop (#401). It keeps its text size rather than
-taking an `icon-*` size: the same element shows its text from `md`, and swapping
-the size at the breakpoint would cost a second class set for a button that is
-square enough at `sm` with the text hidden. A pending or error label stays visible
-at every width, because an icon alone says too little about a failure.
+`navigate` is the route's own `useNavigate({ from })`, passed in so it typechecks
+against the real route path. `resetPageOnSort` is for a paginated listing and is a
+compile error on a route whose search type has no `page`; `serverSorted` is for a
+listing the server ordered and turns off local reordering. They are separate because
+server-ordered does not imply paginated. `orderRows(rows, getId)` puts exported rows
+in the order the table renders, so a CSV matches the screen. The hook's docblocks
+say why each is typed the way it is.
 
 `headerHint` is one sentence about what a column means, for a column whose name
-alone would mislead: `/admin/projects`' "Updated" moves only for a change a visitor
-can see, not for every save (#502). It renders as a ghost `icon-xs` info button
-beside the header, named "About the <header> column", with the sentence in a
-`Tooltip` from `#/components/ui/tooltip`, so it takes no width. It opens on focus as
-well as on hover. It is desktop only by construction: below `md` the header row is
-hidden and the header travels as each card's field label, and a tooltip does not
-open on touch. Anything a staff member must know to act correctly belongs on the
-page, not in a hint.
+alone would mislead (`/admin/projects`' "Updated" moves only for a change a visitor
+can see). It renders as an info button with a `Tooltip` beside the header, so it is
+desktop only: below `md` the header row is hidden. Anything a staff member must know to act correctly belongs on the page, not
+in a hint.
+
+### Where Export CSV and the Columns menu go
+
+A listing whose Export CSV and Columns menu sit in the search row passes
+`controls="listing"` to the table, which then draws no row above itself, and renders
+`<AdminTableControls actions={<ExportCsvButton />} filtered={filtered} rowCount={rows.length} {...controlsProps} />`
+where the controls go, from the hook's second bag, `controlsProps`. It hides itself
+under the same rule as the table. Every other table keeps the default and gets the
+table's own row: its `toolbar` on the left, its `actions` and the Columns menu on
+the right.
+
+### More than one table on a page
+
+`useAdminTableState` in `#/lib/table-state` is the router-agnostic core underneath,
+directly unit-testable; reach past `useAdminTable` to it only from somewhere with no
+`navigate`. A page with more than one table cannot keep them all in the URL, because
+they would share `sort` and `cols`: pass each one `useLocalTableSearch()` from
+`#/lib/use-local-table-search` as its `search` and `navigate`, which holds the state
+in the component with the same localStorage column seed. `/admin/placement` does this.
+
+### The mobile card layout
+
+Responsive behavior is automatic: the component applies `className="admin-table"`
+and derives each body cell's `data-label` from its column header. Below 768px the
+`.admin-table` rules in `styles.css` hide the `<thead>`, turn each `<tr>` into a
+card, and inject the label via `content: attr(data-label)`. The `table` keeps
+`display: table`, so assistive tech still gets a table with a caption, and carries
+`table-layout: fixed` in that media query, without which it sizes to its content and
+the cards run past a 375px viewport. Keep both; the signed-in scans in
+`user.a11y.test.ts` measure the overflow.
+
+`cardHeader` marks the one column that titles the record. On mobile its cell becomes
+the card's header strip: full width, with no field name in front of it. Use it for a
+column whose content already says what it is, usually a name or title beside a
+thumbnail. At most one column per table sets it; a second is logged and renders as
+an ordinary labelled field. A row action inside the header strip is icon-only below
+`md`, with the label as its `aria-label` and `title` and the text `hidden md:inline`,
+so the title keeps the row (`AddToCartButton`'s `compact` prop). It keeps its text
+size rather than an `icon-*` size, and a pending or error label stays visible at
+every width, because an icon alone says too little about a failure.
 
 ### A free-text column is bounded and clamped
 
-From `md` up every `TableCell` is `md:whitespace-nowrap`, so a cell cannot wrap
-on its own: one 200-character title sets the width of the whole column and
-pushes every other column right. A column whose value is free text therefore
+From `md` up every `TableCell` is `md:whitespace-nowrap`, so one 200-character title
+sets the width of the whole column. A column whose value is free text therefore
 bounds itself and clamps, and every class it uses for that carries the `md:`
-prefix, because below `md` the cell is the card header strip, which wraps in
-full and must stay exactly as wide as the card.
+prefix, because below `md` the cell is the card header strip, which wraps in full.
 
 The title or name cell puts `md:min-w-xs md:max-w-md` on its outer flex
 container and `min-w-0 md:line-clamp-2 md:whitespace-normal` on the link, with
 the full text in a native `title` attribute so a mouse user can hover for it.
-Two of those classes are load-bearing in ways that are easy to drop.
-`md:whitespace-normal`: `line-clamp` does not reset the inherited `nowrap`, and
-a clamp on one unbreakable line clips it with no ellipsis. `md:min-w-xs`: an
-auto-layout table that is wider than its container shrinks the column with the
-most slack, and a clamped cell with no minimum is that column, so with the
-maximum alone the title column collapses to its longest word while every
-nowrap column keeps its full width. Two lines rather than one because titles
-here often differ only in their tail, and two lines match the height of the
-3:2 thumbnail at `w-16`. The clamp is CSS, so the full value stays in the DOM
-for screen readers, Find-in-page and the CSV export.
+Two of those classes are easy to drop. `md:whitespace-normal`: `line-clamp` does
+not reset the inherited `nowrap`, and a clamp on one unbreakable line clips it with
+no ellipsis. `md:min-w-xs`: an auto-layout table wider than its container shrinks
+the column with the most slack, and a clamped cell with no minimum is that column,
+so the title collapses to its longest word. Two lines because titles here often
+differ only in their tail, and two lines match the 3:2 thumbnail at `w-16`. The
+clamp is CSS, so the full value stays in the DOM for screen readers, Find-in-page
+and the CSV export.
 
-A description cell is `line-clamp-3 max-w-xs md:whitespace-normal`: narrower
-and three lines, because it is hidden by default and read on purpose rather
-than scanned, and no minimum, because it competes with nothing when shown. The
-`md:whitespace-normal` is the same fix as above; the `Prose` cell behind the
-six hidden prose columns of `/projects` and the inventory description cell
-shipped without it and clipped to one line.
-
-The cells that do this: the title cells of the two projects listings, the
-bookmarks table and the two inventory listings, and the programs description,
-which follows the title recipe with no thumbnail (#371). A short-capped name
-column (categories, users, mentors) has not needed it. Classes on each cell
-rather than an `AdminColumn` option or a shared cell component: six cells, one
-pattern, and the triage on #371 chose the pattern over the abstraction.
+A description cell is `line-clamp-3 max-w-xs md:whitespace-normal`: narrower and
+three lines, because it is hidden by default and read on purpose, and no minimum,
+because it competes with nothing when shown. Apply the classes per cell rather than
+through an `AdminColumn` option or a shared cell component.
 
 ### Grouping rows that arrived together
 
@@ -724,33 +618,24 @@ Absent means the flat table every other admin route renders.
 
 Grouped-ness is derived from the sort, never stored: rows are grouped while the
 table's sort equals its `defaultSort` and flat the moment the reader sorts by
-anything else. Nothing enters the URL. Grouping and sorting genuinely conflict,
-because a group stops being contiguous once rows are ordered by another column,
-so sorting is the escape hatch rather than a mode a reader can get stuck in. A
-page that needs a fixed group order returns its rows in that order and declares
-every column `enableSorting: false`; it still passes a `defaultSort`, which is
-inert there.
+anything else, because a group stops being contiguous once rows are ordered by
+another column. A page that needs a fixed group order returns its rows in that
+order and declares every column `enableSorting: false`; its `defaultSort` is inert.
 
-Groups are formed from the sorted row model, so a page that sorts client-side
-groups what the reader sees. `header(rows)` receives the group's rows and nothing
-else, which means whatever identifies the group is denormalized onto every row in
-it. `getRowId` and `highlightedRowId` keep addressing data rows, so a deep link
-still lands inside a group. On mobile the header renders as a strip above its
-cards rather than a card of its own. One level only: no nesting or sorting
-within a group. CSV export is per-route and unaffected.
+`header(rows)` receives the group's rows and nothing else, so whatever identifies
+the group is denormalized onto every row in it. `getRowId` and `highlightedRowId`
+keep addressing data rows, so a deep link still lands inside a group. On mobile the
+header renders as a strip above its cards. One level only: no nesting or sorting
+within a group.
 
-`collapse` folds a group to its header, from a chevron in front of the header
-that carries `aria-expanded`, and `aria-controls` naming the group's `tbody`
-while it is open. The page holds which groups are open, in component state as
-it holds open `detail` rows: `isOpen(key)` reads it, `onToggle(key)` changes
-it, and `label(rows)` names the group for the chevron. `isOpen` gets the key
-alone, so a rule over a group's rows, such as the placement board folding a
-project whose students are all pinned (#713), reads the page's own rows rather
-than the ones a filter left the table. When a control inside a group closes it,
-the focus moves to that group's chevron instead of falling to the page. A
-closed group renders no rows and no detail, so a highlighted row inside one is
-not shown until the page opens it. `collapse` is part of `group`, not a third
-extension: it folds what `group` draws and does nothing without it.
+`collapse` folds a group to its header, from a chevron that carries
+`aria-expanded`, and `aria-controls` naming the group's `tbody` while it is open.
+The page holds which groups are open in component state: `isOpen(key)` reads it,
+`onToggle(key)` changes it, and `label(rows)` names the chevron. `isOpen` gets the
+key alone, so a rule over a group's rows reads the page's own rows, not the ones a
+filter left the table. When a control inside a group closes it, focus moves to that
+group's chevron. A closed group renders no rows and no detail. `collapse` is part
+of `group` and does nothing without it.
 
 ### A row's detail under it
 
@@ -763,21 +648,22 @@ own.
 
 It is for detail read against the row and its neighbours, where a Sheet would
 cover what the reader is comparing: the placement board's bids under a student,
-read beside the team they are on (#687). A record read or acted on alone still
-opens a Sheet, as the next section says. `detail` is the table's second
-extension after `group`; add a third only for a need neither covers.
+read beside the team they are on. A record read or acted on alone still opens a
+Sheet, as the next section says. `detail` is the table's second extension after
+`group`; add a third only for a need neither covers.
 
 ### The line sheet
 
 Reading or acting on one request line opens a `Sheet` beside the table, not a
 row's `detail` under it: a line is read and acted on alone, not against its
-neighbours (see "A row's detail under it"). `LineSheet` in
-`#/components/line-sheet` is the shell: a title, a description, a definition list
-of fields, the timeline, and an actions slot in the footer. `LineTimeline` draws the `TimelineEvent[]` that
-`lineTimeline` in `#/lib/inventory-timeline` builds from the line's own columns,
-so the staff queue and `/my/items` cannot disagree about what happened to a line.
-A row opens it through a `Details` button in its Actions cell; the sheet closes
-without navigating.
+neighbours. `LineSheet` in `#/components/line-sheet` is the shell: a title, a
+description, a definition list of fields, the timeline, and an actions slot in the
+footer. `LineTimeline` draws the `TimelineEvent[]` that `lineTimeline` in
+`#/lib/inventory-timeline` builds from the line's own columns, so the staff queue
+and `/my/items` cannot disagree about what happened to a line. A row opens it
+through a `Details` button in its Actions cell; the sheet closes without
+navigating. The sheet is where a fulfill flow's actions fit, rather than a seventh
+column.
 
 ```tsx
 <LineSheet
@@ -791,38 +677,27 @@ without navigating.
 />
 ```
 
-What choosing a sheet buys is room for the actions: a fulfill flow wants more
-than a table cell, and the sheet is where it lives rather than a seventh column.
-
 ### Two empty states
 
 A table with no rows is one of two things, and the route says which with `filtered`.
 
 Unfiltered and empty is a listing with nothing in it. The component renders
 `emptyMessage` and nothing else: no headers, no Columns menu, and nothing from the
-`actions` slot, because a column picker over headers that are not on the page and an
-Export CSV of no rows are controls that exist to be ignored (#260). The two are gated
-together inside the component so they cannot drift apart.
+`actions` slot, because a column picker over absent headers and an Export CSV of no
+rows are controls that exist to be ignored.
 
-Filtered and empty is a search or filter that matched nothing. The headers, the Columns
-menu and `actions` stay, because the reader is mid-search and they are what is being
-searched over, and one row across every visible column says `noMatchMessage`
-("Nothing matches these filters." unless the route has better words). On the mobile
-card layout that row is a single card with no field label.
+Filtered and empty is a search or filter that matched nothing. The headers, the
+Columns menu and `actions` stay, because the reader is mid-search, and one row
+across every visible column says `noMatchMessage` ("Nothing matches these filters."
+unless the route has better words).
 
-Only the route can tell the two apart, because the loader did the filtering. Derive
-`filtered` from the search params that narrow the result, and leave out a switch that
-widens it (`includeSoftDeleted` on projects, `includeBanned` on users): an empty result
-with a widening switch on is still nothing at all. A default that narrows counts as a
-filter: the request queue opens on `pending`, and a staff member with no pending
-requests still wants the status select and the headers rather than a bare message.
-The one exception is the status set on `/admin/projects`, which opens on every status
-but archived and reports itself unfiltered (#335): that set is what the listing is,
-not a search over it, and archived rows are the bulk the legacy import adds. The cost
-is that a program with nothing but archived projects sees the bare message; a
-reader who wants the archive follows the link from `/admin/analytics` or edits the
-URL. A route with no filters (programs, categories, bookmarks, My Items) never sets
-it.
+Derive `filtered` from the search params that narrow the result, and leave out a
+switch that widens it (`includeSoftDeleted` on projects, `includeBanned` on users).
+A default that narrows counts: the request queue opens on `pending`, and a staff
+member with no pending requests still wants the status select and the headers. The
+one exception is `/admin/projects`, which opens on every status but archived and
+reports itself unfiltered, because that set is what the listing is, not a search
+over it. A route with no filters never sets it.
 
 ```tsx
 const filtered = q !== "" || status !== null || categories.length > 0;
@@ -834,25 +709,6 @@ const filtered = q !== "" || status !== null || categories.length > 0;
   {...rest}
 />;
 ```
-
-`useAdminTableState` in `#/lib/table-state` is the router-agnostic core underneath, and
-stays directly unit-testable. Every admin route goes through `useAdminTable`; reach past
-it to the core only if you are driving a table from somewhere that has no `navigate`.
-
-A page with more than one table cannot keep them all in the URL, because they would share
-`sort` and `cols`. Pass each one `useLocalTableSearch()` from `#/lib/use-local-table-search`
-as its `search` and `navigate`: the same hook and the same column seed from localStorage,
-with the state held in the component. `/admin/placement` does this for every
-one of its tables, two of them on the Results tab alone.
-
-Responsive behavior is automatic: the component applies `className="admin-table"` and
-derives each body cell's `data-label` from its column header. Below 768px the
-`.admin-table` rules in `styles.css` hide the `<thead>`, turn each `<tr>` into a card,
-and inject the label via `content: attr(data-label)`. No JavaScript, no duplicated
-markup, and nothing to add by hand.
-
-A hand-rolled `<table>` in an admin route collapses to an unreadable horizontal
-scroll on a phone, which is the whole reason this component exists.
 
 ### An admin route's column list goes through `defineAdminColumns<Row>()`
 
@@ -869,14 +725,12 @@ const COLUMNS = defineAdminColumns<Row>()([
 ]);
 ```
 
-The builder turns two rules about what an `accessorFn` returns into compile
-errors. Both used to be prose, and both fail the same way: the table renders,
-sorts, and looks fine, in the wrong order.
+The builder turns two rules about what an `accessorFn` returns into compile errors.
+Both fail quietly otherwise: the table renders and sorts, in the wrong order.
 
 **A column that is not text sets its own `sortFn`.** `AdminDataTable` defaults
 every column without one to a locale-aware **string** comparator, so whatever the
-accessor returns is sorted through `String(value)`. That is correct for text and
-wrong for everything else:
+accessor returns is sorted through `String(value)`:
 
 | Column value | `sortFn` | What the default does instead |
 | --- | --- | --- |
@@ -889,34 +743,38 @@ wrong for everything else:
 it does not special-case `null`, so a `null` sorts as the string "null" among the
 real values. Map it at the accessor: `(row) => row.label ?? undefined`.
 
-Both are easy to ship and hard to notice. Seeded rows written in one run share a
-timestamp, and the numeric cases are ordinals that stay single-digit for a long
-time, so the column looks sorted until real data arrives. Two columns were
-already breaking a rule when the check landed, one of them the users table's
-Banned flag, which is nullable in the auth schema.
-
 The error names the column: `COLUMN_NEEDS_ITS_OWN_SORT_FN: "createdAt"` or
 `ACCESSOR_RETURNS_NULL_USE_UNDEFINED: "note"`. `npm run typecheck`, not
-`npm test`, is what enforces it, and `src/test/admin-columns.test.ts` holds a
+`npm test`, enforces it, and `src/test/admin-columns.test.ts` holds a
 `@ts-expect-error` per rejection case so the check cannot degrade to a no-op
-unnoticed. Vitest reports those blocks green whatever the types do; tsc reads
-the file because `tsconfig.json` includes `**/*.ts`.
+unnoticed.
 
-A shared column const declared outside the array uses `satisfies
-AdminColumn<Row>` with `id: "..." as const`, never an `AdminColumn<Row>`
-annotation, which breaks the check in a way that reads as a bug in the check.
-[`QUIRKS.md`](./QUIRKS.md#a-shared-admin-column-const-uses-satisfies-not-an-annotation)
-says why; this section says only that the rule exists, so there is one copy to
-keep true.
+`accessorKey` and grouped (`columns`) definitions are banned outright: the first
+carries a value type the check cannot read, the second hides its real columns a
+level down where nothing inspects them.
 
-`accessorKey` and grouped (`columns`) definitions are banned outright. Both used
-to compile with no rule applied at all, which is the one failure this check
-cannot afford: the first carries a value type the check cannot read, the second
-hides its real columns a level down where nothing inspects them.
+The component's own fixtures in `src/test/admin-data-table.test.tsx` stay plain
+`AdminColumn<Row>[]` literals, because they exercise the table, not a route.
 
-The component's own test fixtures in `src/test/admin-data-table.test.tsx` stay
-plain `AdminColumn<Row>[]` literals. They exercise the table, not a route, and
-some of them are deliberately shaped in ways a route's columns never are.
+### A shared column const uses `satisfies`, not an annotation
+
+A column const declared outside the array uses `satisfies AdminColumn<Row>` with
+`id: "..." as const`, never an `AdminColumn<Row>` annotation. The annotation erases the accessor's return type to `unknown`, and
+`[null] extends [unknown]` is true, so every annotated column reports
+`ACCESSOR_RETURNS_NULL_USE_UNDEFINED`, which reads as a bug in the check. Without
+`as const` the `id` widens to `string` and the error stops naming the column.
+Annotating the array the builder returns is redundant but harmless. A factory that
+builds columns for several row types (`projectSummaryColumns<Row>()`) follows the
+same rule. The `defineAdminColumns` docblock in `admin-data-table.tsx` carries the
+type-level detail.
+
+```tsx
+const NAME_COLUMN = {
+  accessorFn: (row) => row.name,
+  header: "Name",
+  id: "name" as const,
+} satisfies AdminColumn<Row>;
+```
 
 ---
 
@@ -924,35 +782,30 @@ some of them are deliberately shaped in ways a route's columns never are.
 
 ### The email skip
 
-Every staff action that emails someone names the recipient before the click
-and can be told not to send (#379, ADR-0019). Render `SendEmailCheckbox` from
-`#/components/send-email-checkbox` inside the dialog or popover the action
-already has: "Email <address>", checked by default, over a line saying what
-unchecking leaves in place. Pick the line from `EMAIL_SKIP_HINT`: `withBell`
-when the action also writes an in-app notification, `emailOnly` when email is
-the only channel (a mentor named, a hard delete, a role change, a ban), and
-`holder` for a hold, where an account holder gets the row and a walk-in does
-not. With `address={null}` the box is disabled and reads "No address on file,
-no email will be sent"; keep sending `true` in that state and let the server
-decide who is reachable. A popover carries it the same way a dialog does: the
-inventory queue's approve and reject popovers do.
+Every staff action that emails someone names the recipient before the click and can
+be told not to send ([ADR-0019](./adr/0019-every-email-is-mandatory-and-staff-share-one-inbox.md)). Render `SendEmailCheckbox` from
+`#/components/send-email-checkbox` inside the dialog or popover the action already
+has: "Email <address>", checked by default, over a line saying what unchecking
+leaves in place. Pick the line from `EMAIL_SKIP_HINT`: `withBell` when the action
+also writes an in-app notification, `emailOnly` when email is the only channel (a
+mentor named, a hard delete, a role change, a ban), and `holder` for a hold, where
+an account holder gets the row and a walk-in does not. With `address={null}` the box
+is disabled and reads "No address on file, no email will be sent"; keep sending
+`true` in that state and let the server decide who is reachable.
 
 A Save that had no dialog opens `SendEmailDialog` from
-`#/components/send-email-dialog`, and only when the pending change would
-actually send mail; a save that mails nobody goes straight through, or the
-dialog announces an email that never goes out. The one inline exception is
-the comment form, where staff post many: a plain "Email the proposer" box
-beside "Internal (staff only)", unchecked and disabled while Internal is on,
-since an internal comment mails nobody; unchecking Internal checks it again.
+`#/components/send-email-dialog`, and only when the pending change would actually
+send mail; a save that mails nobody goes straight through. The one inline exception
+is the comment form: a plain "Email the proposer" box beside "Internal (staff
+only)", unchecked and disabled while Internal is on, since an internal comment mails
+nobody; unchecking Internal checks it again.
 
-The box is checked again every time its dialog opens: the skip is a decision
-about one action, and a Cancel must not carry an unchecked box into the next.
-`SendEmailDialog` gets this for free by holding the state inside the content
-Radix unmounts. A `ConfirmDialog` body or a popover holds the state in the
-caller, so the caller resets it where the dialog opens or closes: the
-trigger's `onClick` (the ban form, the project hard delete), the function that
-opens it (the checkout dialog), or the `onOpenChange` that handles the close
-(the inventory popovers and dialogs).
+The box is checked again every time its dialog opens: the skip is a decision about
+one action, and a Cancel must not carry an unchecked box into the next.
+`SendEmailDialog` gets this by holding the state inside the content Radix unmounts.
+A `ConfirmDialog` body or a popover holds the state in the caller, so the caller
+resets it where the dialog opens or closes: the trigger's `onClick`, the function
+that opens it, or the `onOpenChange` that handles the close.
 
 ```tsx
 <SendEmailDialog
@@ -971,39 +824,35 @@ opens it (the checkout dialog), or the `onOpenChange` that handles the close
 
 ### Detail page header
 
-A detail page (`/projects/$projectId` since #400; the inventory item page is
-meant to follow) opens with one header block, top to bottom: the title row,
-`flex items-start justify-between gap-3`, with the title left and the actions
-right; one `flex flex-wrap` badge row under it holding the status badge, the
-program badge, the team-full badge and the public marks in that order with one
-gap, which `ProjectBadges` renders from its `children` slot plus the marks; the
-program badge sits with the status because both name a value, where team-full
-and the marks assert a fact about the project, and it is absent rather than
-empty for a project filed under none (#449); the category
-chips; the owner actions; then the image. The actions are Bookmark and, for a
-viewer who can edit, Edit. Bookmark keeps its icon at every width and hides its
-text below `md`, with `aria-label` and `title` as the accessible name, so it is
-the small icon button right of the title on a phone. Edit sits right of
-Bookmark from `md`; below `md` it leaves the title row and renders full width
-directly above the image. Render it twice, `hidden md:inline-flex` in the row
-and `md:hidden w-full` above the image: a display-none link is out of the
+A detail page (`/projects/$projectId`; the inventory item page is meant to follow)
+opens with one header block, top to bottom:
+
+1. The title row, `flex items-start justify-between gap-3`, title left, actions
+   right.
+2. One `flex flex-wrap` badge row: status, program, team-full, then the public
+   marks, which `ProjectBadges` renders. The program badge sits with the status
+   because both name a value, and is absent rather than empty for a project filed
+   under none.
+3. The category chips, then the owner actions, then the image.
+
+The actions are Bookmark and, for a viewer who can edit, Edit. Bookmark keeps its
+icon at every width and hides its text below `md`, with `aria-label` and `title` as
+the accessible name. Edit sits right of Bookmark from `md`; below `md` it renders
+full width directly above the image. Render it twice, `hidden md:inline-flex` in the
+row and `md:hidden w-full` above the image: a display-none link is out of the
 accessibility tree, so a role query still finds exactly one.
 
 ### Status tabs
 
 Use `Tabs`, `TabsList`, `TabsTrigger`, and `TabsContent` from
-`#/components/ui/tabs`, not a row of `<button>` elements. The primitive wraps
-Radix's `Tabs`, so it gives the tablist real semantics for free: `role="tablist"`,
-`aria-selected`, one tab stop for the whole strip, and arrow-key movement between
-triggers. A hand-rolled button row has none of that: a screen reader announces
-unrelated buttons, and a keyboard user has to tab through every tab individually.
+`#/components/ui/tabs`, not a row of `<button>` elements. Radix gives the tablist
+`role="tablist"`, `aria-selected`, one tab stop for the strip, and arrow-key
+movement; a hand-rolled button row has none of that.
 
 The tab state usually lives in a URL search param, so `Tabs` is controlled. Pass
-`activationMode="manual"` whenever activating a tab has a side effect beyond
-showing its panel, such as a navigation: activating pushes a URL change, and the
-ARIA authoring practices recommend manual activation whenever activation carries
-a side effect. Under the default `automatic` mode, arrowing across a three-tab
-strip fires that side effect on every keypress; under `manual`, arrows only move
+`activationMode="manual"` whenever activating a tab has a side effect beyond showing
+its panel, such as a navigation. Under the default `automatic` mode, arrowing across
+the strip fires that side effect on every keypress; under `manual`, arrows only move
 focus, and Enter or Space activates.
 
 ```tsx
@@ -1023,20 +872,16 @@ focus, and Enter or Space activates.
 ```
 
 `onValueChange` hands back a plain `string`; cast it at the `navigate` boundary
-when the search schema wants a narrower union. `TabsList` carries no margin of
-its own, so give `Tabs` a `className="mt-4"` for the gap above the strip;
-`TabsContent` already ships `mt-4` for the gap below it, so do not add another
-`mt-4` to the panel body or the two will stack. The active trigger still gets the
-brand-colored bottom border and the rest go muted, but that styling lives inside
-`tabs.tsx` now, keyed off Radix's `data-[state=active]`, rather than being
-hand-written at every call site.
+when the search schema wants a narrower union. `TabsList` carries no margin, so give
+`Tabs` a `className="mt-4"`; `TabsContent` already ships `mt-4`, so do not add
+another to the panel body. The active trigger's styling lives in `tabs.tsx`, keyed
+off `data-[state=active]`, not at the call site.
 
 A strip with more tabs than a 375px screen fits scrolls sideways inside itself,
 with `className="overflow-x-auto [&>*]:shrink-0 [&>*]:whitespace-nowrap
-[&>*]:focus-visible:ring-inset"` on `TabsList`, rather than wrapping each label
-onto two lines or widening the page. The inset ring is not optional: a scroll
-box clips on both axes, so the triggers' outset focus ring would be cut off.
-The placement page's five tabs are the case (#717).
+[&>*]:focus-visible:ring-inset"` on `TabsList`, rather than wrapping labels or
+widening the page. The inset ring is not optional: a scroll box clips on both axes,
+so an outset focus ring would be cut off. The placement page's tabs do this.
 
 ### Pagination
 
@@ -1045,9 +890,7 @@ route links and `PaginationButton` for in-place navigation.
 
 Never disable a pagination control with `pointer-events-none` alone. That
 suppresses mouse events and nothing else: the anchor stays in the tab order, is
-still announced as a link, and Enter still activates it, so a keyboard user on
-page 1 could focus a control that looks disabled and activate it to no effect.
-Two of the three pagers in this app shipped that way, and no axe rule reports
+still announced as a link, and Enter still activates it, and no axe rule reports
 it. `PaginationLink` drops `href` and sets `aria-disabled` and `tabIndex={-1}`
 when disabled, which is what actually removes it from the tab order.
 
@@ -1076,46 +919,38 @@ when disabled, which is what actually removes it from the tab order.
 `47 results` when everything fits on one page, `Page 2 of 3 · 20 of 47
 results` otherwise, nothing when the total is zero. The route renders it, never
 the table, because on `/projects` the same footer serves the card view. A list
-the server does not page renders `ListCount` under its table, which is the
-same component with everything shown on one page, so the count sits in the
-same place with the same format everywhere. `AdminDataTable` announces only
-the sort order, so a screen reader hears one number (#209).
+the server does not page renders `ListCount` under its table, the same component
+with everything on one page. `AdminDataTable` announces only the sort order, so a
+screen reader hears one number.
 
 ### Badges
 
 Every badge renders through `<Badge>` from `#/components/ui/badge`. A badge that
-carries a domain status uses `variant="status"` and supplies its own
-`--status-*` foreground and background through `style`, because the upstream
-variants (`default`, `secondary`, `outline`) paint a fixed color and cannot
-express a status mapping. Four components wrote this box independently before
-this rule existed, and two had already drifted apart on details like
-`inline-flex` versus `inline-block`. `CountBadge` is the one non-status use of
-`variant="status"`: it wants the blank canvas, and paints it with the
-`bg-primary text-primary-foreground` tokens rather than a status pair.
+carries a domain status uses `variant="status"` and supplies its own `--status-*`
+foreground and background through `style`, because the upstream variants paint a
+fixed color and cannot express a status mapping. `CountBadge` is the one non-status
+use of `variant="status"`: it wants the blank canvas, and paints it with
+`bg-primary text-primary-foreground`.
 
 A badge that reports a number is silent at the value nearly every row holds.
 `TeamFullBadge` renders nothing for a team with room, and the teams badge in
-`ProjectBadges` renders nothing at one team, which is the default and the
-common case; #434 deleted two columns that spelled facts out on every row, and
-a badge that is always there is the same filler in a smaller box. The
-consequence is that a row of badges can be empty, so the component returns
-null rather than an empty flex row, and a caller passing `children` has to
-handle that case itself, because an element is truthy even when it renders
-nothing.
+`ProjectBadges` renders nothing at one team; a badge that is always there is
+filler. So a row of badges can be empty: the component returns null rather than an
+empty flex row, and a caller passing `children` handles that case itself, because
+an element is truthy even when it renders nothing.
 
 A badge does not repeat a value the same surface already prints. Both project
-tables carry a Teams supported column, so their Badges cell passes
-`ProjectBadges` no count; the card and the detail page have no such column,
-which is what the badge is for. `src/test/project-table-columns.test.tsx`
-pins that, because the rule otherwise lives only in a comment.
+tables carry a Teams supported column, so their Badges cell passes `ProjectBadges`
+no count; the card and the detail page have no such column.
+`src/test/project-table-columns.test.tsx` pins that.
 
 ### Listing layout
 
 A page that lists and filters renders through `ListingLayout` from
-`#/components/listing-layout`, with four slots and an optional fifth. The four listings on it are
-`/projects`, `/admin/projects`, `/inventory` and `/admin/inventory`; the
-filters components are `projects-filters.tsx` and `inventory-filters.tsx`,
-with the admin forms inline in their routes.
+`#/components/listing-layout` ([ADR-0020](./adr/0020-listing-filters-in-a-left-aside-from-xl.md)):
+`/projects`, `/admin/projects`, `/inventory` and `/admin/inventory`. The filters
+components are `projects-filters.tsx` and `inventory-filters.tsx`, with the admin
+forms inline in their routes.
 
 ```tsx
 <ListingLayout
@@ -1135,55 +970,47 @@ with the admin forms inline in their routes.
 </ListingLayout>
 ```
 
-`search` holds what does not narrow the list: the search input, its
-`SearchHint` right after it, the sort, the card/table `ViewToggle`. The row
-renders on top at every width, beside a "Filters" button that is gone from
-`xl`. `tableControls` is that table's `AdminTableControls` (Export CSV, the
-Columns menu) when a table is showing, and nothing in card view; the layout
-renders it after the Filters button, at the end of the same row. The row wraps
-at every width and the hint is a `basis-full` item, so below `md` the input has
-a line, the hint the next, and the buttons follow it left-aligned in DOM order,
-which is also the tab order; from `md` the hint takes `order-last` and the
-input and the buttons share one line, which each input's `basis` is sized to
-allow at 768 (`/projects` carries `basis-40` because its row is the fullest).
-On `/projects` the recommendation prompt renders from the route as the first
-child under the row, outside it, so its link does not land between the toggle
-and the Filters button in the tab order. `filters` holds what narrows: program, the
-switches, the category or status lists, Clear all. It renders in a sticky
-`aside` from `xl` and inside a left `Sheet` below it; pass one element and the
-layout renders it in both places, only one of which is ever displayed. Stack the
-controls (`space-y-4`) and give each `w-full`; a fixed `w-56` that fit a toolbar
-overflows an 18rem column. A `FilterSwitch` label is one line under a
-`fieldset` legend that carries the "Only show projects that", because the full
-sentence wrapped to two lines beside its switch at that width; each label
-completes the legend as a lowercase predicate ("are looking for team members"),
-and
-both project listings read legend and labels from `PROJECT_SWITCH_LEGEND` and
-`PROJECT_SWITCH_LABEL` in `projects-filters.tsx`, so they cannot drift (#383).
-A switch whose label does not say what it hides takes a `hint`, one muted line
-under the label that the switch names through `aria-describedby`, the way
-`SearchHint` is wired to its input; `PROJECT_SWITCH_HINT` carries the one in
-use. A control that swaps the set rather than narrowing it is not a switch
-under that legend: the public listing's archive is a two-option `RadioGroup`
-("Show: Current projects / Archived projects") above the switches, with its own
-hint line, over the same `archivedOnly` param.
+`search` holds what does not narrow the list: the search input, its `SearchHint`
+right after it, the sort, the card/table `ViewToggle`. The row renders on top at
+every width, beside a "Filters" button that is gone from `xl`. `tableControls` is
+the table's `AdminTableControls` when a table is showing and nothing in card view;
+it renders at the end of the same row. The row wraps and the hint is a `basis-full`
+item, so below `md` the input, the hint and the buttons each take a line in DOM
+order, which is also the tab order; from `md` the hint takes `order-last` and the
+input and buttons share one line, which each input's `basis` is sized to allow at
+768. On `/projects` the recommendation prompt renders under the row, outside it, so
+its link does not land between the toggle and the Filters button in the tab order.
 
-`activeFilterCount` is what the button shows below `xl`, so a reader knows the
-list is narrowed without opening the sheet. Count decisions, not values: a
-category set counts once however many it holds. The public route derives it
-from the same booleans as `filtered`; the admin route also counts the
-soft-deleted switch, which widens rather than narrows and so stays out of
-`filtered`.
+The public listings render the table controls only in table view, from a
+`useAdminTable` call that lives in the route at every view with
+`seedColumns: view === "table"`, so card view's URL never picks up a stored column
+layout. Do not give `AdminDataTable` a filters slot: its extensions stay few
+(grouping and a row's detail).
 
-The admin route stopped passing `toolbar` to `AdminDataTable` when its filters
-moved into the aside, which left Export and Columns alone on a row of their own
-under the search; #366 and #367 moved them into the search row through
-`controls="listing"` and `AdminTableControls` ("Admin tables" above). The public
-listings render the controls only in table view, from a `useAdminTable` call that
-lives in the route at every view with `seedColumns: view === "table"`, so card
-view's URL never picks up a stored column layout. Growing the table with a filters
-slot was the alternative and was declined, because the table's extensions are
-meant to stay few: grouping, and since #687 a row's detail.
+### A listing's filters
+
+`filters` holds what narrows: program, the switches, the category or status lists,
+Clear all. It renders in a sticky `aside` from `xl` and inside a left `Sheet` below
+it; pass one element and the layout renders it in both places, only one ever
+displayed. Because it can be mounted twice, every `id` inside it comes from
+`useId`, never a literal, or the sheet copy's labels point at the hidden aside.
+Stack the controls (`space-y-4`) and give each `w-full`; a fixed `w-56` overflows
+an 18rem column.
+
+A `FilterSwitch` label is one line under a `fieldset` legend carrying "Only show
+projects that", and each label completes the legend as a lowercase predicate ("are
+looking for team members"). Both project listings read legend and labels from
+`PROJECT_SWITCH_LEGEND` and `PROJECT_SWITCH_LABEL` in `projects-filters.tsx`, so
+they cannot drift. A switch whose label does not say what it hides takes a `hint`,
+one muted line the switch names through `aria-describedby` (`PROJECT_SWITCH_HINT`).
+A control that swaps the set rather than narrowing it is not a switch under that
+legend: the public listing's archive is a two-option `RadioGroup` ("Show: Current
+projects / Archived projects") above the switches, over the `archivedOnly` param.
+
+`activeFilterCount` is what the button shows below `xl`. Count decisions, not
+values: a category set counts once however many it holds. The public route derives
+it from the same booleans as `filtered`; the admin route also counts the
+soft-deleted switch, which widens and so stays out of `filtered`.
 
 ### Floating panel
 
@@ -1212,10 +1039,10 @@ unique for a screen reader.
 
 ### Charts
 
-There is one chart in the app, on `/admin/traffic`, and ADR-0049 says why
-the rest of the admin pages use numbers and tables instead. A new chart
-needs the same argument: a shape over time that a column of numbers cannot
-show at a glance.
+There is one chart in the app, on `/admin/traffic`, and
+[ADR-0049](./adr/0049-one-chart-on-admin-traffic.md) says why the rest of the admin
+pages use numbers and tables instead. A new chart needs the same argument: a shape
+over time that a column of numbers cannot show at a glance.
 
 Draw it with `ChartContainer` from `#/components/ui/chart`, the trimmed
 shadcn component. Give each series a token in its `ChartConfig`, such as
@@ -1233,15 +1060,12 @@ deliberately separate and must not be folded into it:
 
 - `panel.tsx` for the audience-gated panels, which carry their own tone variants
 - `.island-shell` for the auth cards
-- `.feature-card` for the landing page panels. It has no hover state on purpose:
-  the panel is not a link, and a lift on hover is what made the old tiles look
-  like one (#393).
+- `.feature-card` for the landing page panels, with no hover state, because the
+  panel is not a link and a lift on hover makes it look like one.
 
-`Card` also takes an `asChild` prop. Admin's `NavCard` (in `admin/index.tsx`)
-has a `<Link>` as its root element; wrapping it in a plain `<Card>` would nest a
-`<div>` around the `<a>` instead of merging onto it, which silently breaks the
-click target. Reach for `asChild` any time the thing a card wraps is itself the
-navigable element and nothing else:
+`Card` takes `asChild` for a card whose root is the navigable element and nothing
+else, such as Admin's `NavCard`; a plain `<Card>` would nest a `<div>` around the
+`<a>` instead of merging onto it:
 
 ```tsx
 <Card asChild className="flex flex-col overflow-hidden" interactive>
@@ -1249,12 +1073,11 @@ navigable element and nothing else:
 </Card>
 ```
 
-`project-card.tsx` and `inventory-card.tsx` used to be `asChild` too and no
-longer are: each carries a control beside its link (the bookmark toggle, the
-add-to-cart button), and a button inside an anchor is invalid HTML that axe
-reports as a nested interactive. There the `Card` is a `div`, the `Link` is its
-first child and takes the whole image-and-text area, and the control is a
-sibling.
+A card that carries a control beside its link (`project-card.tsx` with its bookmark
+toggle, `inventory-card.tsx` with its add-to-cart button) is not `asChild`: a button
+inside an anchor is invalid HTML that axe reports as a nested interactive. There the
+`Card` is a `div`, the `Link` is its first child and takes the whole image-and-text
+area, and the control is a sibling.
 
 ### Select with an "All" option
 
@@ -1313,62 +1136,58 @@ hard delete puts the email skip there, since that delete emails the proposer
 </ConfirmDialog>
 ```
 
-Two exceptions add a step `ConfirmDialog` does not have: the user must type
-something exact into an `Input` before the destructive `Button` un-disables.
-The inventory hard delete in `inventory-lifecycle-panel.tsx` asks for the
-item's name (`disabled={busy || delConfirm !== item.name}`); the account
-deletion in `delete-account-dialog.tsx` asks for the person's own email,
-compared case-insensitively. A single confirm click is an easy reflex to fire
-without reading; typing the exact value is a deliberate extra brake. Both
-reset the typed value before the dialog shows again (the inventory panel when
-its trigger opens it, the account dialog on every open and close), so a Cancel
-never leaves the next opening pre-armed. Reach for this shape only when a
-single confirmation is not enough friction for the action at hand, not as the
-default: the project hard delete in `staff-project-panel.tsx` is equally
-permanent and still confirms through plain `ConfirmDialog`.
+`ConfirmDialog` and both dialogs under "Typing the value to confirm" are built on
+`AlertDialog` from `#/components/ui/alert-dialog`, never `Dialog`. An irreversible
+action wants `role="alertdialog"`, which screen readers announce more assertively
+and which does not dismiss on an outside click; Escape still closes it. axe does not
+report a plain `dialog` on a destructive prompt, so the role is asserted by the
+component tests and the accessibility suite rather than a scan. The destructive
+button is a plain `Button`, not `AlertDialogAction`: the action closes the dialog on
+click unless the handler calls `preventDefault`, and these dialogs stay open to show
+a failure, so an explicit `open` state is clearer than an opt-out.
 
-Both are built on `AlertDialog` from `#/components/ui/alert-dialog`, never
-`Dialog`. `Dialog` renders `role="dialog"`; an irreversible action wants
-`role="alertdialog"`, which screen readers announce more assertively and which
-does not dismiss on an outside click. Escape still closes it; Radix blocks
-only outside interaction. axe does not report a plain `dialog` on a
-destructive prompt, so the role is a rule here, asserted by the component
-tests and the accessibility suite rather than found by a scan. The
-destructive button is a plain `Button`, not `AlertDialogAction`: the action
-closes the dialog on click unless the handler calls `preventDefault`, and both
-dialogs keep theirs open to show a failure, so an explicit `open` state is
-clearer than an opt-out.
-
-Radix moves initial focus to the cancel action. That is right for a one-click
-prompt and for the account dialog, whose input sits under a list of
-consequences the reader should get through first. It is wrong for the
-inventory panel, where only a one-line reminder of the item's name stands
-before the input, so that one points `AlertDialogContent`'s `onOpenAutoFocus`
-at the input (#66). Decide per dialog by what stands between the top of the
-body and the input.
-
-What a confirmed action reports when it succeeds, fails or is still running
-is "Mutations and feedback" below; `ConfirmDialog` implements that part, so
-a caller passes a handler and nothing else.
+What a confirmed action reports when it succeeds, fails or is still running is
+"Mutations and feedback" below; `ConfirmDialog` implements that part, so a caller
+passes a handler and nothing else.
 
 **Native `confirm()` and `alert()` are banned.** They are unstyled, ignore the
 brand and the dark palette, block the main thread, and cannot be scanned by the
 accessibility suite, because axe cannot reach a page whose script is parked on a
 modal browser prompt. `src/test/no-native-modals.test.ts` enforces this.
 
+### Typing the value to confirm
+
+Two dialogs make the user type something exact into an `Input` before the
+destructive `Button` un-disables: the inventory hard delete in
+`inventory-lifecycle-panel.tsx` asks for the item's name
+(`disabled={busy || delConfirm !== item.name}`), and the account deletion in
+`delete-account-dialog.tsx` asks for the person's own email, compared
+case-insensitively. A confirm click is an easy reflex; typing the exact value is a
+deliberate brake. Both reset the typed value before the dialog shows again, so a
+Cancel never leaves the next opening pre-armed. Reach for this shape only when one
+confirmation is not enough friction, not as the default: the project hard delete in
+`staff-project-panel.tsx` is equally permanent and confirms through plain
+`ConfirmDialog`.
+
+Radix moves initial focus to the cancel action. That is right for a one-click
+prompt and for the account dialog, whose input sits under a list of consequences
+the reader should get through first. The inventory panel has only a one-line
+reminder above its input, so it points `AlertDialogContent`'s `onOpenAutoFocus` at
+the input. Decide per dialog by what stands between the top of the body and the
+input.
+
+---
+
 ## Mutations and feedback
 
-Everything a trigger does between the click and the result. An audit found five
-ways of wiring one mutation and the same kind of action wired differently in
-neighbouring files (#410), so the rules below are the contract and
-`src/lib/use-action.ts` is the shared piece that keeps a handler to them.
+Everything a trigger does between the click and the result. The rules below are the
+contract, and `src/lib/use-action.ts` is the shared piece that keeps a handler to
+them.
 
 **New code uses the hook.** A handler that writes the same shape by hand
-(`setBusy(true)`, `try` / `catch` / `finally`, an inline error) is not wrong,
-and about a dozen older ones still do; what is wrong is any of the rules
-below going unmet. The hook exists so that meeting them is the short path
-rather than the careful one, and so the guard below is a ref rather than
-whatever each handler remembered.
+(`setBusy(true)`, `try` / `catch` / `finally`, an inline error) is not wrong, and
+some older ones do; what is wrong is any rule below going unmet. The hook makes
+meeting them the short path, and makes the guard below a ref.
 
 ### The flight
 
@@ -1477,27 +1296,20 @@ forgotten. Loader data is what the control is about to be re-enabled over; a
 fire-and-forget invalidate re-enables it over the stale copy, and the reader
 sees the old value with a live button beside it.
 
-**A refresh a component takes as a prop returns a promise, and the child
-awaits it.** `onChanged`, `onDone` and their kin are typed `() => Promise<void>`,
-never `() => void`: a `void` return type discards the parent's
-`router.invalidate()` at the prop boundary, which is the same stale-data bug one
-hop further out and harder to see (#421). The parent returns the promise
-(`onChanged={() => router.invalidate()}`) rather than voiding it.
+**A refresh a component takes as a prop returns a promise, and the child awaits
+it.** `onChanged`, `onDone` and their kin are typed `() => Promise<void>`, never
+`() => void`: a `void` return type discards the parent's `router.invalidate()` at
+the prop boundary, the same stale-data bug one hop further out. The parent returns
+the promise (`onChanged={() => router.invalidate()}`) rather than voiding it.
 
 **A handler that closes a surface awaits the refresh first, then closes**, where
 the control behind that surface is not itself disabled while the handler runs.
 `close(); await onDone();` hands the reader back a live popover trigger, status
-pill or table-row action over the row the refetch has not reached yet, which is
-the stale-data bug again with the busy window pointing at a surface that is no
-longer on screen. Awaiting first keeps the window over something the reader can
-see. Where the trigger does carry `disabled={busy}` (`role-select.tsx`,
-`staff-mentorship-section.tsx`) the order does not matter and closing first is
-the kinder one, because a modal whose buttons are all disabled has no visible
-way out.
-
-Note what this is not about: `router.invalidate()` does not reject. A loader that
-throws becomes the match's error state and renders through `errorComponent`,
-which is why `invalidate()` is what that component calls to retry. Ordering here
+pill or row action over a row the refetch has not reached yet. Where the trigger
+does carry `disabled={busy}` (`role-select.tsx`, `staff-mentorship-section.tsx`)
+the order does not matter and closing first is kinder, because a modal whose
+buttons are all disabled has no visible way out. `router.invalidate()` does not
+reject (a loader that throws renders through `errorComponent`), so the ordering
 buys a correct busy window, not a place for a refusal to land.
 
 Go through the hook that owns a key rather than calling the server function
