@@ -281,8 +281,9 @@ function ProjectDetail() {
         // route component is reused across a param change (see QUIRKS), and
         // the panel holds the transition dialog's target and comment, which
         // would otherwise be posted onto the next project. The sections that
-        // hold a draft each load their own record on mount (#762), so the
-        // dialog's state is all the key protects.
+        // hold a draft load their own record on mount (#762), and the remount
+        // is also what clears each draft before the next project's load
+        // lands, so a Save in between cannot post A's draft onto B.
         <StaffProjectPanel
           key={project.id}
           onChanged={() => router.invalidate()}

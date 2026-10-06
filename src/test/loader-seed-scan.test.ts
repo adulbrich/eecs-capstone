@@ -976,24 +976,34 @@ describe("the stale reload mode the census rests on", () => {
  * without one.
  */
 describe("the preload window ADR-0062 allows", () => {
+  it("is off by default, in src/router.tsx", () => {
+    const router = blankComments(
+      readFileSync(join(SRC_DIR, "router.tsx"), "utf8")
+    );
+    expect(
+      /\bdefaultPreloadStaleTime:\s*0\s*,/.test(router),
+      "src/router.tsx no longer sets defaultPreloadStaleTime: 0, which opts\n" +
+        "every route into a preload window. ADR-0062 allows one only on a page\n" +
+        "that seeds no form from its loader; set it per route instead."
+    ).toBe(true);
+  });
+
   it("is kept only by a route whose page no census reason names", () => {
-    const WINDOW = /\bpreloadStaleTime:\s*([\d_]+)/;
+    // Any value but a literal zero counts, so a named constant is a window.
+    const WINDOW = /\bpreloadStaleTime:\s*([^,}\n]+)/;
     const ROUTE_PATH = /\bcreateFileRoute\(\s*["']([^"']+)["']/;
     const named: string[] = [];
     for (const path of sourceFiles(join(SRC_DIR, "routes"))) {
       const code = blankComments(readFileSync(path, "utf8"));
-      const window = WINDOW.exec(code)?.[1];
+      const window = WINDOW.exec(code)?.[1].trim();
       const routeId = ROUTE_PATH.exec(code)?.[1];
-      if (
-        window === undefined ||
-        Number(window.replaceAll("_", "")) <= 0 ||
-        routeId === undefined
-      ) {
+      if (window === undefined || window === "0" || routeId === undefined) {
         continue;
       }
-      // `/_public/projects/` is the page at `/projects`: the pathless layout
-      // is no part of the URL a census reason names, nor is the slash.
-      const page = routeId.replace(/^\/_[^/]+/, "").replace(/\/$/, "");
+      // `/_public/projects/` is the page at `/projects`: no pathless layout
+      // is part of the URL a census reason names, nor is the slash.
+      const page =
+        routeId.replace(/^(?:\/_[^/]+)+/, "").replace(/\/$/, "") || "/";
       const escaped = page.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
       const names = new RegExp(`${escaped}(?![\\w/$])`);
       for (const [site, { why }] of CENSUS) {
