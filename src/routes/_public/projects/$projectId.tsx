@@ -45,6 +45,12 @@ interface ProjectDetailData {
 }
 
 export const Route = createFileRoute("/_public/projects/$projectId")({
+  // A hover preload is reused by the click for five minutes instead of
+  // fetched again (#762). Safe here because this page seeds no form from its
+  // loader: the staff panel's sections load their own records (ADR-0062).
+  // Five minutes is the default `preloadGcTime`, the longest window that fits
+  // it; raise neither without measuring the calls again.
+  preloadStaleTime: 300_000,
   head: ({ loaderData, params }) => {
     const project = (loaderData as ProjectDetailData | undefined)?.project;
     const title = project?.title ?? "Project";
@@ -274,10 +280,9 @@ function ProjectDetail() {
         // Keyed so a navigation between two project pages remounts it: the
         // route component is reused across a param change (see QUIRKS), and
         // the panel holds the transition dialog's target and comment, which
-        // would otherwise be posted onto the next project. The Program
-        // section depends on this too, and less obviously: it seeds its draft
-        // from `programs` once, with no load of its own, so without the
-        // remount it would show the previous project's programs (#450).
+        // would otherwise be posted onto the next project. The sections that
+        // hold a draft each load their own record on mount (#762), so the
+        // dialog's state is all the key protects.
         <StaffProjectPanel
           key={project.id}
           onChanged={() => router.invalidate()}
@@ -285,9 +290,6 @@ function ProjectDetail() {
             id: project.id,
             status: project.status,
             deletedAt: project.deletedAt,
-            programs: project.programs,
-            teamsSupported: project.teamsSupported,
-            acceptingApplicants: project.acceptingApplicants,
           }}
           viewerIsOwner={viewerIsOwner}
         />

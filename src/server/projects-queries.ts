@@ -153,6 +153,17 @@ export const getProjectMentorship = createServerFn({ method: "GET" })
     return getProjectMentorshipImpl(data);
   });
 
+export const getProjectPrograms = createServerFn({ method: "GET" })
+  .validator((data: unknown) =>
+    z.object({ projectId: z.string().uuid() }).parse(data)
+  )
+  .handler(async ({ data }) => {
+    const { getProjectProgramsImpl } = await import(
+      "./_internal/projects-queries"
+    );
+    return getProjectProgramsImpl(data);
+  });
+
 export const listProjectEditLog = createServerFn({ method: "GET" })
   .validator((data: unknown) => projectIdSchema.parse(data))
   .handler(async ({ data }) => {

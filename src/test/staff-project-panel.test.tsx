@@ -82,12 +82,17 @@ vi.mock("#/server/users", () => ({
 }));
 const CATEGORY_ID = "22222222-2222-4222-8222-222222222222";
 
-const { listProjectEditLog, getProposerForEdit, getProjectMentorship } =
-  vi.hoisted(() => ({
-    listProjectEditLog: vi.fn(),
-    getProposerForEdit: vi.fn(),
-    getProjectMentorship: vi.fn(),
-  }));
+const {
+  listProjectEditLog,
+  getProposerForEdit,
+  getProjectMentorship,
+  getProjectPrograms,
+} = vi.hoisted(() => ({
+  listProjectEditLog: vi.fn(),
+  getProposerForEdit: vi.fn(),
+  getProjectMentorship: vi.fn(),
+  getProjectPrograms: vi.fn(),
+}));
 vi.mock("#/server/scope-assessment", () => ({
   assessProjectScope: vi.fn(() => Promise.resolve(null)),
   getScopeAssessment: vi.fn(() => Promise.resolve(null)),
@@ -138,6 +143,7 @@ vi.mock("#/server/projects-queries", () => ({
   listProjectEditLog,
   getProposerForEdit,
   getProjectMentorship,
+  getProjectPrograms,
 }));
 
 // Radix's Checkbox measures itself on mount; jsdom ships no ResizeObserver.
@@ -167,6 +173,7 @@ beforeEach(() => {
   listProjectEditLog.mockReset();
   getProposerForEdit.mockReset();
   getProjectMentorship.mockReset();
+  getProjectPrograms.mockReset();
   updateProjectMentorship.mockReset();
   updateProjectProposer.mockReset();
   listProjectCategories.mockReset();
@@ -183,6 +190,7 @@ beforeEach(() => {
     mentorEmail: "",
     mentorName: null,
   });
+  getProjectPrograms.mockResolvedValue(programsRecord());
   getProposerForEdit.mockResolvedValue({
     accountLinked: true,
     accountName: "proposer@example.com",
@@ -193,39 +201,46 @@ beforeEach(() => {
 
 const PROJECT_ID = "00000000-0000-0000-0000-0000000000p1";
 
-function project(
-  status: string,
-  id = PROJECT_ID,
-  programs: { courseId: string; courseName: string; id: string }[] = [],
-  acceptingApplicants = true
+const PROGRAM_B = "00000000-0000-0000-0000-00000000pg02";
+
+/** What `getProjectPrograms` answers, a project in no program by default. */
+function programsRecord(
+  programIds: string[] = [],
+  { acceptingApplicants = true, teamsSupported = 1 } = {}
 ) {
   return {
-    id,
-    status,
-    deletedAt: null,
-    programs,
-    teamsSupported: 1,
     acceptingApplicants,
+    programs: programIds.map((id) => ({
+      id,
+      courseId: "Program",
+      courseName: id === PROGRAM_A ? "A" : "B",
+    })),
+    teamsSupported,
   };
+}
+
+function project(status: string, id = PROJECT_ID) {
+  return { id, status, deletedAt: null };
 }
 
 // Keyed on the id, as the route renders it: a rerender with a new id is the
 // remount the route relies on to drop the previous project's drafts.
-function panel(
-  status: string,
-  id = PROJECT_ID,
-  viewerIsOwner = false,
-  programs: { courseId: string; courseName: string; id: string }[] = [],
-  acceptingApplicants = true
-) {
+function panel(status: string, id = PROJECT_ID, viewerIsOwner = false) {
   return (
     <StaffProjectPanel
       key={id}
       onChanged={() => Promise.resolve()}
-      project={project(status, id, programs, acceptingApplicants)}
+      project={project(status, id)}
       viewerIsOwner={viewerIsOwner}
     />
   );
+}
+
+/** The Programs and teams Save, enabled once the section's load lands. */
+async function enabledProgramsSave() {
+  const save = screen.getByRole("button", { name: "Save programs and teams" });
+  await waitFor(() => expect(save.hasAttribute("disabled")).toBe(false));
+  return save;
 }
 
 function renderPanel(status: string, viewerIsOwner = false) {
@@ -998,28 +1013,105 @@ describe("StaffProjectPanel proposer and categories across a project change", ()
     ).toBe(true);
   });
 
-  // The Programs section seeds its draft from the payload once and never
-  // loads, so the panel's key is the only thing that stops it showing the
-  // previous project's programs. That key is on the route for the transition
-  // dialog's sake, which is why this asserts the consequence rather than
-  // trusting the comment beside it (#450).
-  it("shows the next project's programs rather than the previous one's", async () => {
-    const view = render(
-      panel("submitted", PROJECT_ID, false, [
-        { id: PROGRAM_A, courseId: "Program", courseName: "A" },
-      ])
+  // The Programs section loads its own record on mount rather than seeding
+  // from the page's loader, which may be a five-minute-old preload (#762).
+  it("renders the programs, teams supported and openings it loads", async () => {
+    getProjectPrograms.mockResolvedValue(
+      programsRecord([PROGRAM_A], {
+        acceptingApplicants: false,
+        teamsSupported: 2,
+      })
     );
-    await screen.findByLabelText("Proposer email");
+    render(panel("submitted"));
+
+    await waitFor(() =>
+      expect(
+        screen
+          .getByRole("checkbox", { name: "Program A" })
+          .getAttribute("aria-checked")
+      ).toBe("true")
+    );
+    expect(getProjectPrograms).toHaveBeenCalledWith({
+      data: { projectId: PROJECT_ID },
+    });
     expect(
       screen
-        .getByRole("checkbox", { name: "Program A" })
-        .getAttribute("aria-checked")
-    ).toBe("true");
+        .getByRole("checkbox", { name: "Team is full" })
+        .getAttribute("data-state")
+    ).toBe("checked");
+    expect(
+      (screen.getByLabelText("Teams supported") as HTMLInputElement).value
+    ).toBe("2");
+  });
 
-    view.rerender(
-      panel("submitted", "00000000-0000-0000-0000-0000000000p2", false, [])
+  // The draft starts blank, so a Save before the load lands would post an
+  // empty set over the real one and read as a decision.
+  it("keeps Save disabled until the load lands", async () => {
+    let land: (record: ReturnType<typeof programsRecord>) => void = () =>
+      undefined;
+    getProjectPrograms.mockReturnValue(
+      new Promise((resolve) => {
+        land = resolve;
+      })
+    );
+    render(panel("submitted"));
+    await screen.findByLabelText("Proposer email");
+    const save = screen.getByRole("button", {
+      name: "Save programs and teams",
+    });
+    expect(save.hasAttribute("disabled")).toBe(true);
+
+    land(programsRecord([PROGRAM_A]));
+
+    await waitFor(() => expect(save.hasAttribute("disabled")).toBe(false));
+  });
+
+  it("says so in the section when the load fails, and keeps Save disabled", async () => {
+    getProjectPrograms.mockRejectedValue(new Error("Forbidden"));
+    render(panel("submitted"));
+
+    expect(await screen.findByText("Forbidden")).toBeTruthy();
+    expect(
+      screen
+        .getByRole("button", { name: "Save programs and teams" })
+        .hasAttribute("disabled")
+    ).toBe(true);
+  });
+
+  it("loads the record again after its own save", async () => {
+    updateProjectPrograms.mockResolvedValue({ id: PROJECT_ID, updated: true });
+    render(panel("submitted"));
+    fireEvent.click(await enabledProgramsSave());
+
+    await waitFor(() => expect(getProjectPrograms).toHaveBeenCalledTimes(2));
+  });
+
+  // The panel's key remounts the section on a project change, and the mount
+  // loads the next project's record. This asserts the consequence rather than
+  // trusting the key's comment on the route (#450).
+  it("shows the next project's programs rather than the previous one's", async () => {
+    const next = "00000000-0000-0000-0000-0000000000p2";
+    getProjectPrograms.mockImplementation(({ data }) =>
+      Promise.resolve(
+        programsRecord(data.projectId === PROJECT_ID ? [PROGRAM_A] : [])
+      )
+    );
+    const view = render(panel("submitted"));
+    await waitFor(() =>
+      expect(
+        screen
+          .getByRole("checkbox", { name: "Program A" })
+          .getAttribute("aria-checked")
+      ).toBe("true")
     );
 
+    view.rerender(panel("submitted", next));
+
+    await waitFor(() =>
+      expect(getProjectPrograms).toHaveBeenCalledWith({
+        data: { projectId: next },
+      })
+    );
     await waitFor(() =>
       expect(
         screen
@@ -1032,75 +1124,70 @@ describe("StaffProjectPanel proposer and categories across a project change", ()
   // Advisory, computed from the saved set rather than the draft, so it is
   // there on every visit to the panel and not only after an edit (#462).
   it("warns when the saved programs outnumber the teams supported", async () => {
-    render(
-      panel("submitted", PROJECT_ID, false, [
-        { id: PROGRAM_A, courseId: "Program", courseName: "A" },
-        {
-          id: "00000000-0000-0000-0000-00000000pg02",
-          courseId: "Program",
-          courseName: "B",
-        },
-      ])
+    getProjectPrograms.mockResolvedValue(
+      programsRecord([PROGRAM_A, PROGRAM_B])
     );
-    await screen.findByLabelText("Proposer email");
+    render(panel("submitted"));
     expect(
-      screen.getByText(/supports 1 team but runs in 2 programs/)
+      await screen.findByText(/supports 1 team but runs in 2 programs/)
     ).toBeTruthy();
   });
 
   it("stays quiet when the programs fit the teams supported", async () => {
-    render(
-      panel("submitted", PROJECT_ID, false, [
-        { id: PROGRAM_A, courseId: "Program", courseName: "A" },
-      ])
-    );
-    await screen.findByLabelText("Proposer email");
+    getProjectPrograms.mockResolvedValue(programsRecord([PROGRAM_A]));
+    render(panel("submitted"));
+    await enabledProgramsSave();
     expect(screen.queryByText(/but runs in/)).toBeNull();
+  });
+
+  it("follows the saved values, not the draft", async () => {
+    getProjectPrograms.mockResolvedValue(
+      programsRecord([PROGRAM_A, PROGRAM_B])
+    );
+    render(panel("submitted"));
+    await screen.findByText(/supports 1 team but runs in 2 programs/);
+
+    // Raising the draft alone does not clear it: nothing is saved yet.
+    fireEvent.change(screen.getByLabelText("Teams supported"), {
+      target: { value: "2" },
+    });
+    expect(
+      screen.getByText(/supports 1 team but runs in 2 programs/)
+    ).toBeTruthy();
+
+    // The save's reload brings the saved values, and the warning with them.
+    updateProjectPrograms.mockResolvedValue({ id: PROJECT_ID, updated: true });
+    getProjectPrograms.mockResolvedValue(
+      programsRecord([PROGRAM_A, PROGRAM_B], { teamsSupported: 2 })
+    );
+    fireEvent.click(await enabledProgramsSave());
+
+    await waitFor(() => expect(screen.queryByText(/but runs in/)).toBeNull());
   });
 
   // The checkbox reads in the glossary's direction and the column stores the
   // inverse, so a project still taking students shows an unchecked box (#491).
   it("shows the team as full only when the project stopped accepting", async () => {
-    const view = render(panel("submitted", PROJECT_ID, false, []));
-    await screen.findByLabelText("Proposer email");
+    render(panel("submitted"));
+    await enabledProgramsSave();
     expect(
       screen
         .getByRole("checkbox", { name: "Team is full" })
         .getAttribute("data-state")
     ).toBe("unchecked");
-
-    view.rerender(
-      panel(
-        "submitted",
-        "00000000-0000-0000-0000-0000000000p3",
-        false,
-        [],
-        false
-      )
-    );
-
-    await waitFor(() =>
-      expect(
-        screen
-          .getByRole("checkbox", { name: "Team is full" })
-          .getAttribute("data-state")
-      ).toBe("checked")
-    );
   });
 
   // Staff write this and so does the proposer, which is the dual write
   // ADR-0032 accepts. It rides the same Save as the other two (#468).
   it("saves teams supported through the same endpoint", async () => {
     updateProjectPrograms.mockResolvedValue({ id: PROJECT_ID, updated: true });
-    render(panel("submitted", PROJECT_ID, false, []));
-    await screen.findByLabelText("Proposer email");
+    render(panel("submitted"));
+    const save = await enabledProgramsSave();
 
     fireEvent.change(screen.getByLabelText("Teams supported"), {
       target: { value: "3" },
     });
-    fireEvent.click(
-      screen.getByRole("button", { name: "Save programs and teams" })
-    );
+    fireEvent.click(save);
 
     await waitFor(() =>
       expect(updateProjectPrograms).toHaveBeenCalledWith({
@@ -1117,7 +1204,7 @@ describe("StaffProjectPanel proposer and categories across a project change", ()
   // The panel says the proposer owns the field, which is the whole mitigation
   // ADR-0032 rests on: nothing tells either writer the other moved it.
   it("says the proposer can set teams supported back", async () => {
-    render(panel("submitted", PROJECT_ID, false, []));
+    render(panel("submitted"));
     await screen.findByLabelText("Proposer email");
 
     expect(
@@ -1129,17 +1216,12 @@ describe("StaffProjectPanel proposer and categories across a project change", ()
   // second writer here would mean a second button (#491).
   it("saves the flag and the program set through one endpoint", async () => {
     updateProjectPrograms.mockResolvedValue({ id: PROJECT_ID, updated: true });
-    render(
-      panel("submitted", PROJECT_ID, false, [
-        { id: PROGRAM_A, courseId: "Program", courseName: "A" },
-      ])
-    );
-    await screen.findByLabelText("Proposer email");
+    getProjectPrograms.mockResolvedValue(programsRecord([PROGRAM_A]));
+    render(panel("submitted"));
+    const save = await enabledProgramsSave();
 
     fireEvent.click(screen.getByRole("checkbox", { name: "Team is full" }));
-    fireEvent.click(
-      screen.getByRole("button", { name: "Save programs and teams" })
-    );
+    fireEvent.click(save);
 
     await waitFor(() =>
       expect(updateProjectPrograms).toHaveBeenCalledWith({

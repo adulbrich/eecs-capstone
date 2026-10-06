@@ -83,27 +83,6 @@ const CENSUS = new Map<string, { class: SeedClass; why: string }>([
     },
   ],
   [
-    "src/components/staff-program-section.tsx: useState(() => programs.map((p) => p.id))",
-    {
-      class: "A",
-      why: "the project's programs, from the record /projects/$projectId loads",
-    },
-  ],
-  [
-    "src/components/staff-program-section.tsx: useState(teamsSupported)",
-    {
-      class: "A",
-      why: "the project's teams supported, from the record /projects/$projectId loads",
-    },
-  ],
-  [
-    "src/components/staff-program-section.tsx: useState(() => !acceptingApplicants)",
-    {
-      class: "A",
-      why: "the team-full flag, from the record /projects/$projectId loads",
-    },
-  ],
-  [
     "src/routes/_authed/admin/mentors/index.tsx: useState(mentor.mentorTeamCount)",
     { class: "A", why: "a mentor's team count, from the listing's loader" },
   ],
@@ -982,6 +961,54 @@ describe("the stale reload mode the census rests on", () => {
       overrides,
       `These files set staleReloadMode on a loader.\n${remedy}\n\n` +
         overrides.join("\n")
+    ).toEqual([]);
+  });
+});
+
+/**
+ * A click reuses a preload for the route's `preloadStaleTime`, so a page that
+ * keeps one can mount on a frame that old, which the blocking reload above
+ * does not cover. ADR-0062 allows the window only on a page that seeds no form
+ * from its loader (#762).
+ *
+ * This matches on the prose of each census reason, not on data flow, so it
+ * catches a new row whose reason names such a page, not a seed written
+ * without one.
+ */
+describe("the preload window ADR-0062 allows", () => {
+  it("is kept only by a route whose page no census reason names", () => {
+    const WINDOW = /\bpreloadStaleTime:\s*([\d_]+)/;
+    const ROUTE_PATH = /\bcreateFileRoute\(\s*["']([^"']+)["']/;
+    const named: string[] = [];
+    for (const path of sourceFiles(join(SRC_DIR, "routes"))) {
+      const code = blankComments(readFileSync(path, "utf8"));
+      const window = WINDOW.exec(code)?.[1];
+      const routeId = ROUTE_PATH.exec(code)?.[1];
+      if (
+        window === undefined ||
+        Number(window.replaceAll("_", "")) <= 0 ||
+        routeId === undefined
+      ) {
+        continue;
+      }
+      // `/_public/projects/` is the page at `/projects`: the pathless layout
+      // is no part of the URL a census reason names, nor is the slash.
+      const page = routeId.replace(/^\/_[^/]+/, "").replace(/\/$/, "");
+      const escaped = page.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+      const names = new RegExp(`${escaped}(?![\\w/$])`);
+      for (const [site, { why }] of CENSUS) {
+        if (names.test(why)) {
+          named.push(`${relative(process.cwd(), path)} (${page}): ${site}`);
+        }
+      }
+    }
+    expect(
+      named,
+      "These routes keep a preload (preloadStaleTime above zero), and a\n" +
+        "CENSUS reason says their page seeds from its loader. ADR-0062 allows\n" +
+        "one or the other. Drop the route's preloadStaleTime, or make the seed\n" +
+        "load its own record, as StaffProgramSection does.\n\n" +
+        named.join("\n")
     ).toEqual([]);
   });
 });

@@ -100,6 +100,12 @@ export const searchSchema = z.object({
 
 export const Route = createFileRoute("/_public/projects/")({
   validateSearch: searchSchema,
+  // A hover preload is reused by the click for five minutes instead of
+  // fetched again (#762). Safe here because this page seeds no form from its
+  // loader (ADR-0062). Five minutes is the default `preloadGcTime`, the
+  // longest window that fits it; raise neither without measuring the calls
+  // again.
+  preloadStaleTime: 300_000,
   head: () => ({
     meta: [{ title: pageTitle("Projects") }, NOINDEX],
   }),

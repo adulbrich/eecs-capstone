@@ -3,6 +3,7 @@ import {
   notFound,
   redirect,
   useNavigate,
+  useRouter,
 } from "@tanstack/react-router";
 import { toast } from "sonner";
 import { ProjectForm } from "#/components/project-form";
@@ -36,6 +37,7 @@ export const Route = createFileRoute("/_authed/projects/$projectId/edit")({
 
 function EditProject() {
   const navigate = useNavigate();
+  const router = useRouter();
   const { project } = Route.useLoaderData();
   if (!project) {
     return null;
@@ -68,6 +70,16 @@ function EditProject() {
           }}
           onSaved={() => {
             toast.success("Project saved.");
+            // The project page keeps a hover preload for five minutes
+            // (#762), so a preload from before this save, say from the
+            // card on My Projects, would otherwise be what the navigate
+            // shows. The route id test matters: the pathless `/_public`
+            // layout's match carries `projectId` too.
+            router.clearCache({
+              filter: (match) =>
+                match.routeId === "/_public/projects/$projectId" &&
+                match.params.projectId === projectId,
+            });
             navigate({ to: "/projects/$projectId", params: { projectId } });
           }}
           projectId={projectId}

@@ -1,4 +1,4 @@
-import { Link, useNavigate } from "@tanstack/react-router";
+import { Link, useNavigate, useRouter } from "@tanstack/react-router";
 import { REGEXP_ONLY_DIGITS } from "input-otp";
 import { useEffect, useRef, useState } from "react";
 import { Button } from "#/components/ui/button";
@@ -154,6 +154,7 @@ export function EmailCodeForm({
   onStepChange?: (step: Step) => void;
 }) {
   const navigate = useNavigate();
+  const router = useRouter();
   const [step, setStep] = useState<Step>("address");
   // In the handler rather than an effect on `step`, so the page hides its
   // buttons in the same render the form changes step, not one render later.
@@ -322,6 +323,12 @@ export function EmailCodeForm({
       refuse(signInError, "Sign-in failed.");
       return;
     }
+    // Every cached match was loaded signed out, and `getProject` answers per
+    // viewer. The project pages keep a preload for five minutes (#762), and
+    // this sign-in navigates on the client, so without this staff could land
+    // on a page without their panel. It prunes only cached and preloaded
+    // matches, never this page's own.
+    router.clearCache();
     navigate({ to: redirectTo ?? "/" });
   }
 

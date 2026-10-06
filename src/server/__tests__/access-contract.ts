@@ -300,6 +300,10 @@ export const ACCESS_CONTRACT: Record<string, AccessDeclaration> = {
     level: "staff",
     note: "Returns mentorEmail and the resolved mentor name. Nothing about the mentor is public (#336, #402): no public payload carries a mentor field.",
   },
+  "server/projects-queries.ts:getProjectPrograms": {
+    level: "staff",
+    note: "The staff panel's Programs and teams section reads its own record (#762): the programs, teamsSupported and acceptingApplicants. All three are public on the project page; staff only because the staff panel is the only caller.",
+  },
   "server/projects-queries.ts:listAdminProjects": {
     level: "staff",
     note: "Reads adminProjectListSelect, the staff projection less its six prose columns (#482), so it still carries proposerEmail, mentorEmail and contactEmail. Staff is what keeps the first two out of a public read; the search matches both addresses and the mentor's resolved name, so a public caller could not have them by inference either.",

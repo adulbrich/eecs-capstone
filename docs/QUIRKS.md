@@ -106,6 +106,10 @@ Navigating from `/projects/A` to `/projects/B` re-renders the same component ins
 
 A `useState` initializer never re-runs, so an input seeded from loader data is correct only because `src/router.tsx` sets `defaultStaleReloadMode: "blocking"`. [ADR-0029](./adr/0029-a-revisit-waits-for-its-loader.md) is the decision; the census of seeds is `CENSUS` in `src/test/loader-seed-scan.test.ts`, which fails on an unclassified one. A route opts out on its loader object, `loader: { handler, staleReloadMode: "background" }`, not as a route option.
 
+### A click reuses a hover preload within `preloadStaleTime`, and only then
+
+A match a preload created is judged against `preloadStaleTime`, also when the click then commits it, so within the window hover and click cost one fetch and the click skips the blocking reload. The router default is `0`; `/projects` and `/projects/$projectId` set 5 minutes ([ADR-0062](./adr/0062-a-preload-is-kept-only-where-no-form-seeds-from-the-loader.md)). A preloaded match is garbage-collected after `preloadGcTime`, default 5 minutes, which caps any longer window. Once committed, a revisit follows `staleTime`, which stays `0`. `router.clearCache({ filter })` drops cached and preloaded matches and aborts a preload in flight; filter on `routeId` as well as params, since a pathless layout's match carries its child's params.
+
 ### A redirect thrown from a `queryFn` navigates the tab
 
 `setupRouterSsrQueryIntegration` in `src/router.tsx` leaves `handleRedirects` on, so a TanStack redirect thrown by any query navigates the tab. `requireUser` refuses with `redirect({ to: "/sign-in" })`, so a background refetch after a session ends carries the tab to `/sign-in`, unsaved edits included. A query over a `requireUser` server function catches `isRedirect` and returns an empty result, as `notification-bell.tsx` does.
