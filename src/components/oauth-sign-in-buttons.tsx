@@ -18,8 +18,8 @@ export function OAuthSignInButtons({ redirectTo }: { redirectTo?: string }) {
       <Button
         className="mt-3 w-full"
         onClick={() =>
-          authClient.signIn.oauth2({
-            providerId: "onid",
+          authClient.signIn.social({
+            provider: "onid",
             callbackURL: redirectTo ?? "/",
             errorCallbackURL: errorCallbackURL("onid"),
           })

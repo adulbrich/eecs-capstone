@@ -23,14 +23,14 @@ export function onidProviderConfig(
     // `endpointsFromDiscoveryUrl` for why (#553).
     authorizationUrl: onid.authorizationUrl,
     tokenUrl: onid.tokenUrl,
-    // The one other value discovery supplied that this config still needs
-    // (its userinfo endpoint goes unused, since `getUserInfo` is ours). The
-    // callback compares it with an RFC 9207 `iss` query parameter, but only if
-    // Entra sends one, and this tenant's discovery document does not advertise
-    // that it does. So this is a conditional safeguard, kept so the check
-    // still runs if Entra ever starts sending `iss`. What pins sign-in to the
-    // tenant is the `iss` claim check in `onidUserInfo`.
-    issuer: onid.issuer,
+    // No `issuer`: Better Auth 1.7 removed the option and takes the issuer
+    // only from a discovery document, which this config does not have. What
+    // went with it is the callback's comparison against an RFC 9207 `iss`
+    // query parameter, which only ever ran if Entra sent one, and this
+    // tenant's discovery document does not advertise that it does. The same
+    // goes for 1.7's own id token verification, which also needs discovery
+    // and so does not run here. What pins sign-in to the tenant is the `iss`
+    // claim check in `onidUserInfo`, as it was before (#278).
     clientId: onid.clientId,
     clientSecret: onid.clientSecret,
     // `profile` is not decoration: Entra gates the `oid` claim behind it,
@@ -44,5 +44,12 @@ export function onidProviderConfig(
     scopes: ["openid", "profile", "email"],
     pkce: true,
     getUserInfo,
+    // The `account.accountId` every ONID row already holds, which is the
+    // `oid` that `onidUserInfo` returns as `id`. Better Auth's default reads
+    // `id` too, but only because this config has no discovery document: with
+    // one it switches to `sub`, and every account would fork onto a new row
+    // at its next sign-in. Stated here so adding `discoveryUrl` back cannot
+    // change it.
+    accountSubject: ({ profile }) => profile.id ?? "",
   };
 }

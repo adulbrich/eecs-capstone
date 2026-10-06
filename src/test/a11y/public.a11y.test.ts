@@ -95,7 +95,7 @@ test("@smoke a failed sign-in announces its error", async ({ page }) => {
 // the refusal and the one thing the reader can do about it are announced
 // together. An unknown code lands on the fallback, which is what a new Better
 // Auth error code would produce.
-for (const code of ["user_info_is_missing", "not_a_known_code"]) {
+for (const code of ["unable_to_get_user_info", "not_a_known_code"]) {
   test(`@smoke sign-in page, ONID refusal ${code}`, async ({ page }) => {
     await page.goto(`/sign-in?error=${code}`);
     const alert = page.getByRole("alert");

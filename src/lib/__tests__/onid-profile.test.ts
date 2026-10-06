@@ -107,7 +107,7 @@ describe("onidProfileFromIdToken", () => {
   });
 
   it("returns null when no email and no UPN spelling is present", () => {
-    // Better Auth turns null into a `user_info_is_missing` redirect. The
+    // Better Auth turns null into an `unable_to_get_user_info` redirect. The
     // alternative, inventing an address from `sub`, would create an account
     // nobody can be contacted at and that no password reset can recover.
     const { email, username, ...neither } = full;
@@ -159,7 +159,7 @@ describe("onidProfileFromIdToken", () => {
   });
 
   describe("refusal reasons", () => {
-    // Better Auth collapses every refusal into one `user_info_is_missing`
+    // Better Auth collapses every refusal into one `unable_to_get_user_info`
     // redirect, so the reason exists only in the server log. These assertions
     // are what keep the first live sign-in failure diagnosable rather than a
     // guessing game between six identical-looking outcomes.
@@ -277,8 +277,8 @@ describe("onidProfileFromIdToken", () => {
     });
 
     it("falls back to the local part of the email", () => {
-      // Better Auth rejects a nameless profile with `name_is_missing`, so
-      // there has to be a last resort. Ugly beats unable to sign in, and the
+      // A nameless profile is refused at account creation by
+      // `requireUserName`, so there has to be a last resort. Ugly beats unable to sign in, and the
       // user can edit it on their profile page.
       const { given_name, family_name, ...nameless } = full;
       expect(profileOf(idToken(nameless))?.name).toBe("benny.beaver");

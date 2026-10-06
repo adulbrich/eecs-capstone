@@ -48,11 +48,16 @@ const GLOBAL_MAX = 100;
  * What one address may spend per window on a path where the number protects
  * nothing.
  *
- * `/sign-in/oauth2` (ONID) and `/sign-in/social` (GitHub) mint an OAuth state
- * and redirect, so the password is typed at Microsoft or GitHub. Better Auth's
- * first special rule puts both on 3, which behind a NAT pool address refuses
- * the fourth student since the last lull and protects nothing in exchange. The
- * two code-entry paths take it too, for the reason given beside them below.
+ * `/sign-in/social` mints an OAuth state and redirects, so the password is
+ * typed at Microsoft or GitHub. Better Auth's first special rule puts it on 3,
+ * which behind a NAT pool address refuses the fourth student since the last
+ * lull and protects nothing in exchange. The two code-entry paths take it too,
+ * for the reason given beside them below.
+ *
+ * ONID and GitHub share this one budget. On Better Auth 1.6 ONID had a path of
+ * its own, `/sign-in/oauth2`, and so a budget of its own; 1.7 serves every
+ * provider from `/sign-in/social`, and the bucket is keyed on the path (#278).
+ * GitHub is the small share of that traffic, so the 60 stands.
  *
  * 60 does not make the refusal impossible, because of the accumulation above:
  * a busy pool address at term start reaches it and then goes quiet for up to a
@@ -94,7 +99,6 @@ export const authRateLimit: BetterAuthRateLimitOptions = {
     // limiting it guards nothing and only decides how early a shared campus
     // address stops being able to render a page.
     "/get-session": false,
-    "/sign-in/oauth2": UNCHECKED_RULE,
     "/sign-in/social": UNCHECKED_RULE,
     // The three email-otp paths (#576). They are listed here rather than left
     // to the plugin because `emailOTP()` registers its own rules at 3 per 60

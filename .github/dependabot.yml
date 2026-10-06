@@ -16,14 +16,13 @@ updates:
       interval: weekly
     open-pull-requests-limit: 3
     ignore:
-      # better-auth 1.7 moves the ONID callback path; UIT has to allowlist the
-      # new redirect URI first (#278, docs/QUIRKS.md). Stay on the 1.6 line.
-      - dependency-name: "better-auth"
-        update-types: ["version-update:semver-major", "version-update:semver-minor"]
-      # better-auth pins its core to the same exact version, so a second copy
-      # on another line breaks the build (`getIp` missing, #599).
-      - dependency-name: "@better-auth/core"
-        update-types: ["version-update:semver-major", "version-update:semver-minor"]
+      # better-auth and @better-auth/core are not ignored and must stay that
+      # way as a pair: better-auth pins its core to the same exact version, so
+      # ignoring one strands a second copy on another line and breaks the
+      # build (#599). Both fall in `all-other`, so they arrive in one PR. A
+      # minor can move the ONID callback, which UIT must allowlist first
+      # (#278, docs/QUIRKS.md); onid-sign-in.test.ts fails if it does.
+
       # Biome 2.5.14 types RegExp exec() as never null, so
       # noUnnecessaryConditions flags every match guard (#599).
       - dependency-name: "@biomejs/biome"

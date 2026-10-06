@@ -2,12 +2,11 @@
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-const { oauth2, social } = vi.hoisted(() => ({
-  oauth2: vi.fn(),
-  social: vi.fn(),
-}));
+// Both buttons go through `signIn.social`: since Better Auth 1.7 ONID is a
+// social provider like GitHub (#278).
+const { social } = vi.hoisted(() => ({ social: vi.fn() }));
 vi.mock("#/lib/auth-client", () => ({
-  authClient: { signIn: { oauth2, social } },
+  authClient: { signIn: { social } },
 }));
 
 import { OAuthSignInButtons } from "#/components/oauth-sign-in-buttons";
@@ -36,8 +35,8 @@ describe("OAuthSignInButtons", () => {
   it("sends a refused ONID sign-in back to /sign-in, naming ONID", () => {
     render(<OAuthSignInButtons />);
     fireEvent.click(screen.getByRole("button", { name: "Continue with ONID" }));
-    expect(oauth2).toHaveBeenCalledWith({
-      providerId: "onid",
+    expect(social).toHaveBeenCalledWith({
+      provider: "onid",
       callbackURL: "/",
       errorCallbackURL: "/sign-in?provider=onid",
     });
@@ -60,11 +59,11 @@ describe("the sign-in route's ?redirect= on its way to the buttons", () => {
       fireEvent.click(
         screen.getByRole("button", { name: "Continue with GitHub" })
       );
-      expect(oauth2).toHaveBeenCalledWith(
-        expect.objectContaining({ callbackURL: "/" })
+      expect(social).toHaveBeenCalledWith(
+        expect.objectContaining({ provider: "onid", callbackURL: "/" })
       );
       expect(social).toHaveBeenCalledWith(
-        expect.objectContaining({ callbackURL: "/" })
+        expect.objectContaining({ provider: "github", callbackURL: "/" })
       );
     }
   );
@@ -75,8 +74,11 @@ describe("the sign-in route's ?redirect= on its way to the buttons", () => {
     });
     render(<OAuthSignInButtons redirectTo={redirectTo} />);
     fireEvent.click(screen.getByRole("button", { name: "Continue with ONID" }));
-    expect(oauth2).toHaveBeenCalledWith(
-      expect.objectContaining({ callbackURL: "/projects?page=2" })
+    expect(social).toHaveBeenCalledWith(
+      expect.objectContaining({
+        provider: "onid",
+        callbackURL: "/projects?page=2",
+      })
     );
   });
 });

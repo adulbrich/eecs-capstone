@@ -190,9 +190,9 @@ better-call throws its own `APIError` for a body that fails validation, so `inst
 
 Setting `user.banned` stops new sign-ins, but a signed-in user keeps their session until something next checks it, so `banUserAs` deletes the user's sessions in the same transaction. A past `ban_expires` reads as not banned, and nothing clears the row.
 
-### The ONID callback path is not the GitHub callback path, and the version pin holds it there
+### A minor Better Auth release can move the ONID callback, and Entra must be told first
 
-ONID's callback is `/api/auth/oauth2/callback/onid` on Better Auth 1.6; 1.7 moves it, and Entra matches redirect URIs exactly. So `better-auth` and `@better-auth/core` stay on the 1.6 line with a tilde range, and `.github/dependabot.yml` skips their minor and major updates. The upgrade needs a new URI allowlisted first (#278).
+Better Auth 1.7 moved ONID's callback from `/api/auth/oauth2/callback/onid` to `/api/auth/callback/onid`, and Entra matches redirect URIs exactly, so the upgrade waited on UIT (#278). Hence the tilde on `better-auth` and `@better-auth/core`: a minor arrives only as a reviewed Dependabot PR, never from `npm install`. `onid-sign-in.test.ts` asserts the `redirect_uri` sign-in sends, so a minor that moves it again fails there; get the new URI allowlisted before changing the assertion.
 
 ### `user.name` is trimmed and refused blank in the create hook
 
@@ -324,10 +324,6 @@ register(
     )
 );
 ```
-
-### Vitest 5 and better-auth's optional peer range
-
-`better-auth` 1.6 declares an optional `vitest` peer that excludes 5, and npm refuses the pair with `ERESOLVE` on the next install that re-resolves the edge. The `overrides` entry in `package.json` satisfies it with `$vitest`; drop it with the 1.7 upgrade.
 
 ### A test that spawns a subprocess needs a budget above the subprocess's own
 

@@ -28,16 +28,21 @@ import { APIError } from "better-auth/api";
  * the sign-up endpoint, where a blank name is a caller's mistake worth
  * reporting rather than a name worth inventing.
  *
- * Where the refusal surfaces depends on the caller. Email sign-up rethrows an
- * APIError as a 400, which is what `sign-up.mjs` does with anything
- * `isAPIError`. A first OAuth sign-in does not: `handleOAuthUserInfo` catches
- * it and redirects with the message as an error parameter. Both refuse the
- * account, which is the point; neither reaches a form field.
+ * Where the refusal surfaces depends on the caller. A code sign-in answers it
+ * as a 400. A first OAuth sign-in redirects to the error URL with the `code`
+ * as `?error=`, and only because there is a code: Better Auth 1.7's callback
+ * redirects an APIError that carries one and lets any other escape as a bare
+ * 400 (`better-auth/dist/api/routes/callback.mjs`), which would leave the
+ * person on a JSON page instead of `/sign-in`. Both refuse the account, which
+ * is the point; neither reaches a form field.
  */
 export function requireUserName(value: unknown): string {
   const name = typeof value === "string" ? value.trim() : "";
   if (!name) {
-    throw new APIError("BAD_REQUEST", { message: "Name is required" });
+    throw new APIError("BAD_REQUEST", {
+      code: "NAME_REQUIRED",
+      message: "Name is required",
+    });
   }
   return name;
 }

@@ -143,7 +143,7 @@ Auth's CLI into `src/db/auth-schema.ts` and re-exported from `src/db/schema.ts`)
 
 `src/db/auth-schema.ts` is **hand-maintained**. Do not run `@better-auth/cli
 generate` against it: that package lags the library (the CLI is stuck on 1.4.x
-while we run `better-auth` 1.6.x), and its output silently drops the
+while we run `better-auth` 1.7.x), and its output silently drops the
 timezone-aware timestamps, the session/account/verification indexes, and the
 `role` NOT NULL default that this file carries. Running it would produce a
 destructive migration.

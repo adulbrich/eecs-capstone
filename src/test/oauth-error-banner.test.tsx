@@ -13,8 +13,8 @@ describe("OAuthErrorBanner", () => {
     ["account_not_linked", "onid"],
     ["account_not_linked", "github"],
     ["account_not_linked", undefined],
-    ["email_is_missing", "onid"],
-    ["user_info_is_missing", "onid"],
+    ["unable_to_get_user_info", "onid"],
+    ["unable_to_get_user_info", "github"],
   ] as const)(
     "names the capstone office as a mailto link for %s from %s",
     (code, provider) => {

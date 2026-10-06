@@ -737,11 +737,11 @@ export const auth = betterAuth({
     // ONID_DISCOVERY_URL instead, and docs/ONID-SSO.md, "How the endpoints are
     // resolved", says why (#553).
     //
-    // The callback path is /api/auth/oauth2/callback/onid, which does not match
-    // the /api/auth/callback/github shape beside it. That is the 1.6 generic
-    // OAuth path, and Entra matches redirect URIs exactly against what UIT
-    // allowlisted. better-auth 1.7 converges the two shapes, which is why
-    // package.json pins ~1.6 rather than ^1.6.
+    // The callback path is /api/auth/callback/onid, the shape GitHub's has,
+    // and Entra matches redirect URIs exactly against what UIT allowlisted.
+    // better-auth 1.7 moved it there from /api/auth/oauth2/callback/onid, so a
+    // minor release can move a path Entra has to be told about first. That is
+    // why package.json pins with a tilde rather than a caret (#278).
     genericOAuth({
       config: [
         onidProviderConfig(authConfig.onid, (tokens) =>

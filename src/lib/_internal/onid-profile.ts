@@ -3,12 +3,12 @@
  *
  * This exists because Better Auth's own `getUserInfo` cannot do the job. Its
  * ID-token branch requires BOTH `sub` and `email` to be present
- * (`better-auth/dist/plugins/generic-oauth/routes.mjs`), and falls through to
- * the provider's `userinfo_endpoint` otherwise. For this tenant that endpoint
- * is Microsoft Graph, whose OIDC response carries a fixed claim set and not the
- * tenant-custom `username` claim. So the one case UIT warned us about, a user
- * with no email claim, is exactly the case the default handler routes to the
- * one source that cannot answer it.
+ * (`fetchUserInfo` in `better-auth/dist/plugins/generic-oauth/index.mjs`), and
+ * falls through to the provider's `userinfo_endpoint` otherwise. For this
+ * tenant that endpoint is Microsoft Graph, whose OIDC response carries a
+ * fixed claim set and not the tenant-custom `username` claim. So the one case
+ * UIT warned us about, a user with no email claim, is exactly the case the
+ * default handler routes to the one source that cannot answer it.
  *
  * Reading the ID token and nothing else also takes an outbound call to Graph
  * off the sign-in path.
@@ -17,8 +17,8 @@
  * body of a back-channel POST we make ourselves, over TLS to the tenant's token
  * endpoint on login.microsoftonline.com, authenticated with the client secret.
  * OpenID Connect Core 3.1.3.7 permits skipping validation for a token
- * obtained that way, and Better Auth's default decodes without verifying for
- * the same reason.
+ * obtained that way. Better Auth 1.7 does verify, but only against keys and an
+ * issuer read from a discovery document, and this config has none (#553).
  */
 
 export interface OnidProfile {
@@ -26,6 +26,9 @@ export interface OnidProfile {
   emailVerified: true;
   id: string;
   name: string;
+  // Better Auth 1.7 types a generic provider's profile as an open record and
+  // hands it to `accountSubject`, so this has to admit one to be returned.
+  [key: string]: unknown;
 }
 
 const DISCOVERY_SUFFIX = /\/\.well-known\/openid-configuration\/?$/;
@@ -101,7 +104,7 @@ function decodePayload(idToken: string): Record<string, unknown> | null {
     return parsed as Record<string, unknown>;
   } catch {
     // A malformed token is a null profile, not a thrown error. Better Auth
-    // turns null into a `user_info_is_missing` redirect, which is a sign-in
+    // turns null into an `unable_to_get_user_info` redirect, which is a sign-in
     // the user can retry rather than a 500.
     return null;
   }
@@ -116,9 +119,9 @@ export interface OnidRejection {
  * The mapping, with the reason for a refusal instead of a bare null.
  *
  * Six different conditions reject a token and Better Auth collapses all of them
- * into one `user_info_is_missing` redirect, so without a reason the first real
- * sign-in failure is a guessing game: wrong issuer, no `oid`, or a UPN under a
- * fourth claim name all look identical from the browser. Exported separately
+ * into one `unable_to_get_user_info` redirect, so without a reason the first
+ * real sign-in failure is a guessing game: wrong issuer, no `oid`, or a UPN
+ * under a fourth claim name all look identical from the browser. Exported separately
  * from the logging wrapper so tests can assert which guard fired.
  */
 export function onidProfileOrRejection(
