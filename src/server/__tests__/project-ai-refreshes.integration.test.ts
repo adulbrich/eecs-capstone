@@ -412,12 +412,19 @@ describe("the summary view", () => {
   it("drops a failure older than the summary stored since", async () => {
     // A staff Save and the production sweep write without recording, so an
     // older failure must not sit beside the newer text as if it were current.
+    // The sweep is stamped off the failure, not the clock: both writes can
+    // land in one millisecond, and a tie keeps the attempt.
     const admin = await makeUser("admin");
     const project = await makeProject();
     await refreshSocialSummary(project.id, failingModel);
+    const failed = await readAttempt(project.id, "social_summary");
+    expect(failed).toMatchObject({ outcome: "failed" });
     await db
       .update(projects)
-      .set({ socialSummary: "Swept.", socialSummaryUpdatedAt: new Date() })
+      .set({
+        socialSummary: "Swept.",
+        socialSummaryUpdatedAt: new Date(failed!.attemptedAt.getTime() + 1000),
+      })
       .where(eq(projects.id, project.id));
 
     const view = await getSocialSummaryAs(admin, { projectId: project.id });
