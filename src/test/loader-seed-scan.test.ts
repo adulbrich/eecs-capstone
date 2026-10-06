@@ -1005,7 +1005,9 @@ describe("the preload window ADR-0062 allows", () => {
       const page =
         routeId.replace(/^(?:\/_[^/]+)+/, "").replace(/\/$/, "") || "/";
       const escaped = page.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-      const names = new RegExp(`${escaped}(?![\\w/$])`);
+      // Bounded on both sides: `/projects` is not named by
+      // `/admin/projects` nor by `/projects/$projectId/edit`.
+      const names = new RegExp(`(?<![\\w/$])${escaped}(?![\\w/$])`);
       for (const [site, { why }] of CENSUS) {
         if (names.test(why)) {
           named.push(`${relative(process.cwd(), path)} (${page}): ${site}`);
