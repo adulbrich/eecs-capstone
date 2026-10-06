@@ -42,6 +42,8 @@ import {
 
 afterEach(cleanup);
 
+const ROVER_EXCERPT = "The card's excerpt, which the table never renders.";
+
 const ROWS: ProjectListRow[] = [
   {
     categories: [
@@ -50,7 +52,7 @@ const ROWS: ProjectListRow[] = [
     ],
     contactEmail: "jane@example.com",
     contactName: "Jane Doe",
-    excerpt: "The card's excerpt, which the table never renders.",
+    excerpt: ROVER_EXCERPT,
     id: "p1",
     imageUrl: "projects/p1/a.webp",
     // Two, so the Program cell has a join to get wrong.
@@ -200,8 +202,7 @@ describe("the public project table", () => {
     // Table view is the metadata view: the excerpt arrives with the shared
     // loader for the card and the table leaves it out (#761).
     renderTable([]);
-    const excerpt = ROWS[0].excerpt ?? "";
-    expect(rowFor("Rover Telemetry").queryByText(excerpt)).toBeNull();
+    expect(rowFor("Rover Telemetry").queryByText(ROVER_EXCERPT)).toBeNull();
   });
 
   it("renders the card's badge row in one column, and a dash for none", () => {
