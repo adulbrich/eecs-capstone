@@ -7,6 +7,17 @@ export function readSession() {
   return auth.api.getSession({ headers: req.headers });
 }
 
+/**
+ * What the `getSession` server function sends: the user, not the session row,
+ * which carries the raw token, the IP address and the user agent.
+ * `authClient.useSession()` still receives the row from Better Auth; see the
+ * QUIRKS entry "The raw session token reaches page JavaScript".
+ */
+export async function readClientSession() {
+  const session = await readSession();
+  return session ? { user: session.user } : null;
+}
+
 export async function requireUser() {
   const session = await readSession();
   if (!session?.user) {

@@ -424,6 +424,6 @@ export const ACCESS_CONTRACT: Record<string, AccessDeclaration> = {
   // leaving it out is how the count came to 86 when it was 87.
   "lib/auth-guards.ts:getSession": {
     level: "public",
-    note: "Returns the caller's own session, or null when there is none. Public because asking who you are cannot leak someone else: the answer is derived from the request's own cookies.",
+    note: "Returns the caller's own user, never the session row, or null when there is none. Public because asking who you are cannot leak someone else: the answer is derived from the request's own cookies.",
   },
 };
