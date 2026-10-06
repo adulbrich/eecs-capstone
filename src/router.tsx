@@ -49,6 +49,8 @@ export function getRouter() {
     context,
     scrollRestoration: true,
     defaultPreload: "intent",
+    // Every hover refetches by default. A route keeps a preload only where
+    // its page seeds no form from its loader (ADR-0062).
     defaultPreloadStaleTime: 0,
     /**
      * A revisit waits for its loader instead of painting the previous

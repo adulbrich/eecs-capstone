@@ -24,6 +24,7 @@ import {
   createProjectAs,
   updateProjectProgramsAs,
 } from "#/server/_internal/projects";
+import { getProjectProgramsAs } from "#/server/_internal/projects-queries";
 
 async function makeUser(email: string, role: UserRole) {
   await auth.api.createUser({
@@ -356,5 +357,57 @@ describe("programs", () => {
       .from(programInstructors)
       .where(eq(programInstructors.programId, programId));
     expect(after.length).toBe(0);
+  });
+});
+
+// The staff panel's Programs and teams section reads this on mount instead of
+// taking the page loader's record, so the page can keep a hover preload (#762).
+describe("getProjectProgramsAs", () => {
+  it("returns the programs, teams supported and openings to staff, and Forbidden to anyone else", async () => {
+    const owner = await makeUser(`gpo-${Date.now()}@x.com`, "user");
+    const admin = await makeUser(`gpa-${Date.now()}@x.com`, "admin");
+    const { id: programId } = await createProgramAs(admin, {
+      courseId: `GP-${Date.now()}`,
+      courseName: "Read back",
+      description: null,
+    });
+    const { id } = await createProjectAs(owner, {
+      title: `Programs read ${Date.now()}`,
+      description: null,
+      problemStatement: null,
+      objectives: null,
+      minQualifications: null,
+      prefQualifications: null,
+      url: null,
+      contactEmail: null,
+      contactName: null,
+      imageUrl: "",
+      licenseRestrictions: null,
+      notes: null,
+    });
+
+    expect(await getProjectProgramsAs(admin, { projectId: id })).toEqual({
+      acceptingApplicants: true,
+      programs: [],
+      teamsSupported: 1,
+    });
+
+    await updateProjectProgramsAs(admin, {
+      id,
+      programIds: [programId],
+      acceptingApplicants: false,
+      teamsSupported: 2,
+    });
+    const after = await getProjectProgramsAs(admin, { projectId: id });
+    expect(after.acceptingApplicants).toBe(false);
+    expect(after.teamsSupported).toBe(2);
+    expect(after.programs.map((p) => p.id)).toEqual([programId]);
+
+    await expect(
+      getProjectProgramsAs(owner, { projectId: id })
+    ).rejects.toThrow("Forbidden");
+    await expect(getProjectProgramsAs(null, { projectId: id })).rejects.toThrow(
+      "Forbidden"
+    );
   });
 });

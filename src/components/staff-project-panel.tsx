@@ -2,7 +2,6 @@ import { Link } from "@tanstack/react-router";
 import { useCallback, useEffect, useState } from "react";
 import { errorMessage } from "#/lib/error-message";
 import { STAFF_PANEL_AUDIENCE_HINT } from "#/lib/private-notes";
-import type { ProjectProgram } from "#/lib/project-visibility";
 import {
   canTransition,
   PROJECT_STATUS_DESCRIPTION,
@@ -50,21 +49,9 @@ import { Textarea } from "./ui/textarea";
 const WORKFLOW = PROJECT_STATUSES_IN_DISPLAY_ORDER;
 
 interface Project {
-  /** The Programs and teams section's starting value for its checkbox. */
-  acceptingApplicants: boolean;
   deletedAt: Date | string | null;
   id: string;
-  /**
-   * The Programs and teams section's starting set; the payload already
-   * carries it.
-   */
-  programs: ProjectProgram[];
   status: string;
-  /**
-   * Read only here: the Programs and teams section warns when the set
-   * outgrows it.
-   */
-  teamsSupported: number;
 }
 
 /**
@@ -446,11 +433,8 @@ export function StaffProjectPanel({
         before deciding whose it is (#450).
       */}
       <StaffProgramSection
-        acceptingApplicants={project.acceptingApplicants}
         onChanged={onSectionChanged}
-        programs={project.programs}
         projectId={project.id}
-        teamsSupported={project.teamsSupported}
       />
 
       <StaffProposerSection

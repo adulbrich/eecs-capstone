@@ -38,6 +38,7 @@ import {
   canSeeProject,
   canSeeStatusHistory,
   filterCommentsForViewer,
+  type ProjectProgram,
   projectDetailView,
 } from "#/lib/project-visibility";
 import { assertStaff, isStaff, type Viewer } from "#/lib/viewer";
@@ -652,6 +653,42 @@ export async function getProjectMentorshipAs(
 
 export async function getProjectMentorshipImpl(data: { projectId: string }) {
   return getProjectMentorshipAs(await getViewer(), data);
+}
+
+export interface ProjectPrograms {
+  acceptingApplicants: boolean;
+  programs: ProjectProgram[];
+  teamsSupported: number;
+}
+
+/**
+ * The staff panel's Programs and teams section, read on its own (#762) rather
+ * than seeded from the page's loader, so the project page can keep a hover
+ * preload without a stale preload seeding that form. All three fields are
+ * public on the project page already; staff only because the only caller is
+ * the staff panel, like its sibling reads.
+ */
+export async function getProjectProgramsAs(
+  viewer: Viewer,
+  data: { projectId: string }
+): Promise<ProjectPrograms> {
+  assertStaff(viewer);
+  const [row] = await db
+    .select({
+      acceptingApplicants: projects.acceptingApplicants,
+      programs: projectProgramsList,
+      teamsSupported: projects.teamsSupported,
+    })
+    .from(projects)
+    .where(eq(projects.id, data.projectId));
+  if (!row) {
+    throw new Error("Project not found");
+  }
+  return row;
+}
+
+export async function getProjectProgramsImpl(data: { projectId: string }) {
+  return getProjectProgramsAs(await getViewer(), data);
 }
 
 /**

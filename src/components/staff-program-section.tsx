@@ -1,5 +1,5 @@
-import { useState } from "react";
-import type { ProjectProgram } from "#/lib/project-visibility";
+import { useCallback, useEffect, useState } from "react";
+import { errorMessage } from "#/lib/error-message";
 import {
   clampTeamsSupported,
   TEAMS_SUPPORTED_MAX,
@@ -7,6 +7,7 @@ import {
 } from "#/lib/teams-supported";
 import { useAction } from "#/lib/use-action";
 import { updateProjectPrograms } from "#/server/projects";
+import { getProjectPrograms } from "#/server/projects-queries";
 import { PanelSection } from "./panel";
 import { ProgramMultiSelect } from "./program-multi-select";
 import { Button } from "./ui/button";
@@ -14,6 +15,8 @@ import { Checkbox } from "./ui/checkbox";
 import { FieldError } from "./ui/field";
 import { Input } from "./ui/input";
 import { Label } from "./ui/label";
+
+type Saved = Awaited<ReturnType<typeof getProjectPrograms>>;
 
 /**
  * The staff edit of a project's programs and of whether its team is full, as
@@ -24,44 +27,56 @@ import { Label } from "./ui/label";
  * flag followed it for the same reason: staff run bidding and assignment, so
  * staff are the ones who learn a team filled up.
  *
- * No load of its own, unlike the Mentor and Categories sections: the
- * programs are already on the detail payload every viewer gets, so the
- * draft starts from the saved set rather than from blank. That also means
- * there is no window where a blank draft could be posted over a real value,
- * which is what those two sections disable Save to avoid.
+ * It loads its own record on mount, as the Mentor and Categories sections do,
+ * rather than seeding from the page's loader (#762). The project page keeps a
+ * hover preload for five minutes, and a form seeded from a preload that old
+ * could post pre-edit values over a colleague's save; ADR-0062 has the rule.
+ * Save is disabled until the load lands, so the blank starting draft can never
+ * be posted over a real set.
  *
- * The draft seeds from the saved values once and is never resynced, so the
- * remount is what keeps it honest: the panel is keyed on the project
- * (`<StaffProjectPanel key={project.id}>`), so a navigation between two
- * projects cannot leave A's programs in B's picker. A set another staff
- * member saved while this panel sat open is not picked up, the same as the
- * single picker before it.
+ * The draft is set from each load and is not resynced otherwise. A set another
+ * staff member saved while this panel sat open is not picked up until this
+ * section saves or remounts, the same as the single picker before it.
  *
  * One Save for both fields, because three Save buttons in one section would
  * be worse than the navigation #491 removed. The endpoint decides what
  * actually moved and logs each field separately.
  */
 export function StaffProgramSection({
-  acceptingApplicants,
   onChanged,
-  programs,
   projectId,
-  teamsSupported,
 }: {
-  acceptingApplicants: boolean;
   onChanged: () => Promise<void>;
-  programs: ProjectProgram[];
   projectId: string;
-  teamsSupported: number;
 }) {
-  const [draft, setDraft] = useState(() => programs.map((p) => p.id));
-  const [teams, setTeams] = useState(teamsSupported);
+  const [saved, setSaved] = useState<Saved | null>(null);
+  const [draft, setDraft] = useState<string[]>([]);
+  const [teams, setTeams] = useState(1);
   // Held in the glossary's direction rather than the column's. The column is
   // `accepting_applicants` and CONTEXT.md keeps that name on purpose, but the
   // word staff and students both read is "Team is full", so the checkbox says
   // that and the flip happens once, at the save.
-  const [full, setFull] = useState(() => !acceptingApplicants);
-  const { busy, error, run } = useAction({ fallback: "Save failed" });
+  const [full, setFull] = useState(false);
+  // `setError` comes back out for the load below, which writes its failure
+  // into the same slot, as the Categories section does.
+  const { busy, error, run, setError } = useAction({ fallback: "Save failed" });
+
+  const load = useCallback(async () => {
+    try {
+      const record = await getProjectPrograms({ data: { projectId } });
+      setSaved(record);
+      setDraft(record.programs.map((p) => p.id));
+      setTeams(record.teamsSupported);
+      setFull(!record.acceptingApplicants);
+    } catch (e) {
+      setError(errorMessage(e, "Could not load the programs"));
+    }
+    // `setError` is the hook's own state setter, so it is stable.
+  }, [projectId, setError]);
+
+  useEffect(() => {
+    void load();
+  }, [load]);
 
   function save() {
     return run(async () => {
@@ -73,6 +88,7 @@ export function StaffProgramSection({
           teamsSupported: teams,
         },
       });
+      await load();
       await onChanged();
     });
   }
@@ -142,13 +158,15 @@ export function StaffProgramSection({
             than to overrule them.
           </p>
         </div>
-        <TeamsWarning
-          programCount={programs.length}
-          teamsSupported={teamsSupported}
-        />
+        {saved && (
+          <TeamsWarning
+            programCount={saved.programs.length}
+            teamsSupported={saved.teamsSupported}
+          />
+        )}
         <FieldError message={error} />
         <Button
-          disabled={busy}
+          disabled={busy || saved === null}
           onClick={() => void save()}
           size="sm"
           type="button"
