@@ -149,8 +149,9 @@ describe("searchProjects", () => {
   it("returns exactly the public field set", async () => {
     // Pinned so a private column cannot ride into the anonymous listing with
     // nothing failing. The list is projectDetailView's public fields minus the
-    // three the listing has no use for (notes, isSponsored, deletedAt)
-    // plus `updatedAt` and the correlated categories string. proposerEmail and
+    // three the listing has no use for (notes, isSponsored, deletedAt) and the
+    // six prose fields, plus `updatedAt`, the correlated categories and the
+    // description excerpt, never its source (ADR-0061). proposerEmail and
     // notes must never appear here.
     const admin = await makeAdmin(`k-${Date.now()}@x.com`);
     await publish(admin, "Key set");
@@ -163,14 +164,9 @@ describe("searchProjects", () => {
       "categories",
       "contactEmail",
       "contactName",
-      "description",
+      "excerpt",
       "id",
       "imageUrl",
-      "licenseRestrictions",
-      "minQualifications",
-      "objectives",
-      "prefQualifications",
-      "problemStatement",
       "programs",
       "requiresNdaIp",
       "status",

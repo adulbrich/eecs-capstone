@@ -42,6 +42,8 @@ import {
 
 afterEach(cleanup);
 
+const ROVER_EXCERPT = "The card's excerpt, which the table never renders.";
+
 const ROWS: ProjectListRow[] = [
   {
     categories: [
@@ -50,14 +52,9 @@ const ROWS: ProjectListRow[] = [
     ],
     contactEmail: "jane@example.com",
     contactName: "Jane Doe",
-    description: "A **bold** description that goes on.",
+    excerpt: ROVER_EXCERPT,
     id: "p1",
     imageUrl: "projects/p1/a.webp",
-    licenseRestrictions: "OSU owns it",
-    minQualifications: null,
-    objectives: null,
-    prefQualifications: null,
-    problemStatement: null,
     // Two, so the Program cell has a join to get wrong.
     programs: [
       { id: "pr1", courseId: "CS 461", courseName: "Capstone" },
@@ -78,14 +75,9 @@ const ROWS: ProjectListRow[] = [
     categories: [],
     contactEmail: null,
     contactName: null,
-    description: null,
+    excerpt: null,
     id: "p2",
     imageUrl: null,
-    licenseRestrictions: null,
-    minQualifications: null,
-    objectives: null,
-    prefQualifications: null,
-    problemStatement: null,
     programs: [],
     requiresNdaIp: false,
     // The bare row: no badge of any kind, so the cell shows a dash.
@@ -159,19 +151,10 @@ function badgesCellFor(title: string): HTMLElement {
 }
 
 describe("the public project table", () => {
-  it("shows the seven scannable columns and hides the prose by default", () => {
+  it("shows the seven scannable columns and hides the contact email and URL by default", () => {
     // The literal lists come from the issue's column table, not from the
     // module, so a column added on the wrong side of the line fails here.
-    expect([...DEFAULT_HIDDEN].sort()).toEqual([
-      "contactEmail",
-      "description",
-      "licenseRestrictions",
-      "minQualifications",
-      "objectives",
-      "prefQualifications",
-      "problemStatement",
-      "url",
-    ]);
+    expect([...DEFAULT_HIDDEN].sort()).toEqual(["contactEmail", "url"]);
     renderTable(DEFAULT_HIDDEN);
     expect(
       screen.getAllByRole("columnheader").map((h) => h.textContent?.trim())
@@ -215,14 +198,11 @@ describe("the public project table", () => {
     expect(cellFor("Bare Minimum", "Categories").textContent?.trim()).toBe("-");
   });
 
-  it("clamps prose to a fixed width and strips its markdown", () => {
+  it("renders no prose, not even the excerpt, with every column shown", () => {
+    // Table view is the metadata view: the excerpt arrives with the shared
+    // loader for the card and the table leaves it out (#761).
     renderTable([]);
-    const cell = rowFor("Rover Telemetry").getByText(
-      "A bold description that goes on."
-    );
-    expect(cell.className).toContain("line-clamp-3");
-    expect(cell.className).toContain("max-w-xs");
-    expect(cell.className).toContain("md:whitespace-normal");
+    expect(rowFor("Rover Telemetry").queryByText(ROVER_EXCERPT)).toBeNull();
   });
 
   it("renders the card's badge row in one column, and a dash for none", () => {

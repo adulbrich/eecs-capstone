@@ -212,6 +212,12 @@ a viewer who has a vector and has not chosen an order, so writing interests is w
 turns it on rather than picking it each visit.
 _Avoid_: suggestion, match, personalization
 
+**Description excerpt**:
+The plain-text cut of a project's description that the listing card and similar
+projects show, never the description itself. Wire key `excerpt`; null when the
+description strips to nothing.
+_Avoid_: summary (the listing projection owns that word), snippet
+
 **Similar projects**:
 The published projects accepting applicants that share a program with the one being
 viewed, ordered by how close their text is to it, at most five. The same for every
@@ -251,7 +257,8 @@ social media, written by a model from the title, description and problem stateme
 Public, because it is the page's `og:description`. Staff may overwrite it, which
 stops it regenerating until they hand it back.
 _Avoid_: summary (the listing card's projection already owns that word in this
-codebase), blurb, excerpt, description (a field the proposer writes)
+codebase), blurb, excerpt (that is the description excerpt), description (a field
+the proposer writes)
 
 **Social preview**:
 What a link to a page looks like when a chat app or a social platform expands it:

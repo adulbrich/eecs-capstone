@@ -1,7 +1,6 @@
 import { Link } from "@tanstack/react-router";
 import { projectImageSrc } from "#/lib/project-image";
 import type { ProjectProgram } from "#/lib/project-visibility";
-import { stripMarkdown } from "#/lib/strip-markdown";
 import { BookmarkToggle } from "./bookmark-set";
 import { ImageOrFallback } from "./image-or-fallback";
 import { LocalTime } from "./local-time";
@@ -13,7 +12,8 @@ import { Card } from "./ui/card";
 interface ProjectSummary {
   acceptingApplicants: boolean;
   contactName?: string | null;
-  description: string | null;
+  /** The description as plain text, already cut by the server (#761). */
+  excerpt: string | null;
   id: string;
   imageUrl?: string | null;
   programs: ProjectProgram[];
@@ -113,9 +113,9 @@ export function ProjectCard({ project }: { project: ProjectSummary }) {
             acceptingApplicants={project.acceptingApplicants}
             className="mt-2 self-start"
           />
-          {project.description && (
+          {project.excerpt && (
             <p className="mt-2 line-clamp-3 text-muted-foreground text-sm md:mt-1">
-              {stripMarkdown(project.description)}
+              {project.excerpt}
             </p>
           )}
           <ProjectMeta project={project} />

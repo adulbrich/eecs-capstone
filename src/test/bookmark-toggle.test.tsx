@@ -127,7 +127,7 @@ describe("BookmarkToggle", () => {
     const project: ProjectSummary = {
       id: "p1",
       title: "Rover",
-      description: null,
+      excerpt: null,
       acceptingApplicants: true,
       requiresNdaIp: false,
       status: "published",

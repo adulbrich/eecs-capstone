@@ -241,11 +241,12 @@ describe("getSimilarProjectsAs", () => {
 
     expect(Object.keys(row).sort()).toEqual(["excerpt", "id", "title"]);
     expect(row.id).toBe(candidate);
-    expect(
-      row.excerpt.startsWith("Goal Build a drone that maps the quad. ")
-    ).toBe(true);
-    expect(row.excerpt.length).toBeLessThanOrEqual(160);
-    expect(row.excerpt.endsWith("...")).toBe(true);
-    expect(blank.excerpt).toBe("");
+    const excerpt = row.excerpt ?? "";
+    expect(excerpt.startsWith("Goal Build a drone that maps the quad. ")).toBe(
+      true
+    );
+    expect(excerpt.length).toBeLessThanOrEqual(160);
+    expect(excerpt.endsWith("...")).toBe(true);
+    expect(blank.excerpt).toBeNull();
   });
 });

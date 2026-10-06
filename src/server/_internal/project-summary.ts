@@ -1,5 +1,9 @@
 import { type SQL, sql } from "drizzle-orm";
 import { projects, user } from "#/db/schema";
+import {
+  descriptionExcerpt,
+  LISTING_EXCERPT_LENGTH,
+} from "#/lib/description-excerpt";
 import type { ProjectProgram } from "#/lib/project-visibility";
 
 /**
@@ -142,10 +146,10 @@ export const projectProgramCount = sql<number>`(
 
 /**
  * The mentor, resolved at read time. A correlated subquery rather than a join
- * so the four consumers of `projectSummarySelect` pick it up without each
- * adding a join, same as `categories` in the admin export. Case-insensitive
- * on purpose, and therefore not on the `user.email` index; at capstone scale
- * that costs nothing and it is the same trade `claim-projects.ts` makes.
+ * so the staff projections pick it up without each adding a join, same as
+ * `categories` in the admin export. Case-insensitive on purpose, and
+ * therefore not on the `user.email` index; at capstone scale that costs
+ * nothing and it is the same trade `claim-projects.ts` makes.
  *
  * `LIMIT 1` is belt and braces: `user.email` is unique, but only byte-wise.
  */
@@ -156,26 +160,16 @@ export const mentorNameSql = sql<string | null>`(
 )`;
 
 /**
- * Column projection shared by every query that feeds the project card and
- * the public table: the public listing, "my projects" and "my bookmarks".
- * The programs come from a correlated subquery, so no caller joins anything
- * to use it.
- *
- * What may be in here is decided by `projectDetailView` and pinned by a
- * key-set test; `docs/QUIRKS.md` ("Both domains name the fields their reads
- * return, and a key-set test pins each") is the one place that rule is
- * written out.
+ * The columns every project listing shares, with no prose field in it. The
+ * programs and categories come from correlated subqueries, so no caller
+ * joins anything to use it. Not exported: a listing reads
+ * `projectSummarySelect` and staff read `adminProjectSummarySelect`, and both
+ * build on this so neither has to remove what the other added.
  */
-export const projectSummarySelect = {
+const projectSummaryBaseSelect = {
   id: projects.id,
   title: projects.title,
-  description: projects.description,
-  problemStatement: projects.problemStatement,
-  objectives: projects.objectives,
-  minQualifications: projects.minQualifications,
-  prefQualifications: projects.prefQualifications,
   url: projects.url,
-  licenseRestrictions: projects.licenseRestrictions,
   // Public by design, see projectDetailView: a student needs to know an
   // agreement is involved before applying.
   requiresNdaIp: projects.requiresNdaIp,
@@ -199,15 +193,56 @@ export const projectSummarySelect = {
 };
 
 /**
- * The staff projection: the public one plus proposer identity and the
- * lifecycle dates. Proposer identity is staff information and is what keeps
- * this separate from `projectSummarySelect`. The CSV export reads it whole;
- * the staff table reads `adminProjectListSelect`, which drops its prose.
+ * Column projection shared by every query that feeds the project card and
+ * the public table: the public listing, My Projects, Mentoring on My Projects
+ * and bookmarks. No prose field: the description rides along only as the
+ * excerpt's source, and `withExcerpt` swaps it for the excerpt before a row
+ * leaves the server
+ * ([ADR-0061](../../../docs/adr/0061-the-listing-carries-an-excerpt-not-the-prose.md)).
+ *
+ * Each read is pinned by a key-set test; `docs/QUIRKS.md` ("Both domains name
+ * the fields their reads return, and a key-set test pins each") is the one
+ * place that rule is written out.
+ */
+export const projectSummarySelect = {
+  ...projectSummaryBaseSelect,
+  excerptSource: projects.description,
+};
+
+/**
+ * A listing row with its excerpt source replaced by the excerpt. Generic so a
+ * read that selects more than the projection (bookmarks adds `bookmarkedAt`)
+ * keeps its extra keys.
+ */
+export function withExcerpt<Row extends { excerptSource: string | null }>(
+  row: Row
+): Omit<Row, "excerptSource"> & { excerpt: string | null } {
+  const { excerptSource, ...rest } = row;
+  return {
+    ...rest,
+    excerpt: descriptionExcerpt(excerptSource, LISTING_EXCERPT_LENGTH),
+  };
+}
+
+/**
+ * The staff projection: the shared columns plus the six prose fields in full,
+ * proposer identity and the lifecycle dates. Proposer identity is staff
+ * information and is what keeps this separate from `projectSummarySelect`.
+ * The CSV export reads it whole; the staff table reads
+ * `adminProjectListSelect`, which drops its prose. Built on the base rather
+ * than on `projectSummarySelect`, so the excerpt's source never reaches the
+ * export's row type.
  *
  * Join `user` (on `projects.proposerId`) before using it.
  */
 export const adminProjectSummarySelect = {
-  ...projectSummarySelect,
+  ...projectSummaryBaseSelect,
+  description: projects.description,
+  problemStatement: projects.problemStatement,
+  objectives: projects.objectives,
+  minQualifications: projects.minQualifications,
+  prefQualifications: projects.prefQualifications,
+  licenseRestrictions: projects.licenseRestrictions,
   // Staff only: the mentor address and the name it resolves to, for the
   // staff list, its search and the CSV export. The name left the public
   // projection in #336; the address joined it here in #617, because a

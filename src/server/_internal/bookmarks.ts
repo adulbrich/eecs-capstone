@@ -4,7 +4,7 @@ import { projectBookmarks, projects } from "#/db/schema";
 import { requireUser } from "#/lib/_internal/auth-guards";
 import { canSeeProject } from "#/lib/project-visibility";
 import type { Viewer } from "#/lib/viewer";
-import { projectSummarySelect } from "./project-summary";
+import { projectSummarySelect, withExcerpt } from "./project-summary";
 
 /**
  * `*As` first, `*ForCurrentUser` second, per the workflow conventions in
@@ -122,7 +122,7 @@ export async function listMyBookmarksAs(viewer: BookmarkViewer) {
 
   const visible = rows.filter((row) => canSeeProject(row, viewer));
   return {
-    rows: visible.map(({ deletedAt, proposerId, ...row }) => row),
+    rows: visible.map(({ deletedAt, proposerId, ...row }) => withExcerpt(row)),
     unavailableCount: rows.length - visible.length,
   };
 }

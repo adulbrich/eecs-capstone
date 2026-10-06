@@ -312,6 +312,39 @@ describe("listMentoredProjectsAs", () => {
       (await listMentoredProjectsAs({ email: mentor.email })).map((r) => r.id)
     ).toEqual([live.id]);
   });
+
+  it("returns exactly the listing field set, the excerpt in place of the prose", async () => {
+    // Pinned like the public listing's (#761): a prose field or the
+    // excerpt's source riding along fails here.
+    const admin = await makeUser(`mk-${Date.now()}@x.edu`, "admin");
+    const mentor = await makeUser(`mk-mentor-${Date.now()}@x.edu`, "user");
+    const { id } = await createProjectAs(admin, {
+      ...baseProject(),
+      description: "**Bold** start of a description.",
+    });
+    await updateProjectMentorshipAs(admin, { id, mentorEmail: mentor.email });
+
+    const [row] = await listMentoredProjectsAs({ email: mentor.email });
+
+    expect(Object.keys(row).sort()).toEqual([
+      "acceptingApplicants",
+      "categories",
+      "contactEmail",
+      "contactName",
+      "excerpt",
+      "id",
+      "imageUrl",
+      "programs",
+      "requiresNdaIp",
+      "status",
+      "studentProposed",
+      "teamsSupported",
+      "title",
+      "updatedAt",
+      "url",
+    ]);
+    expect(row.excerpt).toBe("Bold start of a description.");
+  });
 });
 
 describe("getProjectMentorshipAs", () => {

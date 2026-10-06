@@ -26,6 +26,7 @@ import {
 import {
   getProjectAs,
   getProposerForEditAs,
+  listMyProjectsAs,
   listProjectEditLogAs,
 } from "#/server/_internal/projects-queries";
 
@@ -1975,5 +1976,38 @@ describe("updateProjectAs cross-user guard", () => {
       .from(projectEditLog)
       .where(eq(projectEditLog.projectId, id));
     expect(log).toHaveLength(0);
+  });
+});
+
+describe("listMyProjectsAs", () => {
+  it("returns exactly the listing field set, the excerpt in place of the prose", async () => {
+    // Pinned like the public listing's: the card and table read this, so a
+    // prose field or the excerpt's source riding along fails here (#761).
+    const owner = await makeUser(`lm-${Date.now()}@x.com`, "user");
+    await createProjectAs(owner, {
+      ...baseProject(),
+      description: "**Bold** start of a description.",
+    });
+
+    const { rows } = await listMyProjectsAs(owner, { status: "all" });
+
+    expect(Object.keys(rows[0]).sort()).toEqual([
+      "acceptingApplicants",
+      "categories",
+      "contactEmail",
+      "contactName",
+      "excerpt",
+      "id",
+      "imageUrl",
+      "programs",
+      "requiresNdaIp",
+      "status",
+      "studentProposed",
+      "teamsSupported",
+      "title",
+      "updatedAt",
+      "url",
+    ]);
+    expect(rows[0].excerpt).toBe("Bold start of a description.");
   });
 });
