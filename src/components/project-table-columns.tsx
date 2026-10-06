@@ -1,11 +1,6 @@
 import { Link } from "@tanstack/react-router";
-import type { CellContext } from "@tanstack/react-table";
-import {
-  type AdminTableFeatures,
-  defineAdminColumns,
-} from "#/components/admin-data-table";
+import { defineAdminColumns } from "#/components/admin-data-table";
 import { projectImageSrc } from "#/lib/project-image";
-import { stripMarkdown } from "#/lib/strip-markdown";
 import type { SortState } from "#/lib/table-state";
 import type { searchProjects } from "#/server/search";
 import { BookmarkToggle } from "./bookmark-set";
@@ -16,7 +11,7 @@ import { projectSummaryColumns } from "./project-summary-columns";
 
 /**
  * One row of the public listing, as `searchProjects` returns it. Both modes
- * render this shape: the card reads a subset of it, the table all of it.
+ * render this shape: the card reads the excerpt, the table the metadata.
  */
 export type ProjectListRow = Awaited<
   ReturnType<typeof searchProjects>
@@ -35,50 +30,6 @@ export const PROJECT_TABLE_DEFAULT_SORT: SortState = {
   desc: true,
   id: "updatedAt",
 };
-
-/**
- * A prose field in a table cell. The fixed width plus the clamp is what keeps
- * one long description from setting the row height for the whole table.
- */
-function Prose({ text }: { text: string | null }) {
-  if (!text) {
-    return "-";
-  }
-  return (
-    <div className="line-clamp-3 max-w-xs md:whitespace-normal">
-      {stripMarkdown(text)}
-    </div>
-  );
-}
-
-/** The nullable text columns of a row: what a prose cell can be pointed at. */
-type TextField = {
-  [K in keyof ProjectListRow]: ProjectListRow[K] extends string | null
-    ? null extends ProjectListRow[K]
-      ? K
-      : never
-    : never;
-}[keyof ProjectListRow];
-
-/**
- * A hidden-by-default prose column, with the field name as its id. No
- * `accessorFn` and `enableSorting: false`: without an accessor TanStack
- * already refuses to sort, but `useAdminTableState` reads the flag, and the
- * flag is what keeps `?sort=description` out of the sortable set.
- */
-function proseColumn(field: TextField, header: string) {
-  return {
-    cell: ({
-      row,
-    }: CellContext<AdminTableFeatures, ProjectListRow, unknown>) => (
-      <Prose text={row.original[field]} />
-    ),
-    defaultHidden: true,
-    enableSorting: false,
-    header,
-    id: field,
-  };
-}
 
 const shared = projectSummaryColumns<ProjectListRow>();
 
@@ -173,12 +124,6 @@ export const PROJECT_TABLE_COLUMNS = defineAdminColumns<ProjectListRow>()([
     header: "Updated",
     id: "updatedAt",
   },
-  proseColumn("description", "Description"),
-  proseColumn("problemStatement", "Problem statement"),
-  proseColumn("objectives", "Objectives"),
-  proseColumn("minQualifications", "Min qualifications"),
-  proseColumn("prefQualifications", "Pref qualifications"),
-  proseColumn("licenseRestrictions", "License restrictions"),
   {
     accessorFn: (row) => row.url ?? undefined,
     cell: ({ row }) =>

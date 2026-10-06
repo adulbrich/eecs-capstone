@@ -29,6 +29,7 @@ import {
   PROGRAM_FILTER_NONE,
 } from "#/lib/admin-project-filters";
 import { dayRange } from "#/lib/day-range";
+import { descriptionExcerpt } from "#/lib/description-excerpt";
 import {
   canEditProject,
   canSeeProject,
@@ -36,8 +37,6 @@ import {
   filterCommentsForViewer,
   projectDetailView,
 } from "#/lib/project-visibility";
-import { truncateOnWordBoundary } from "#/lib/social-meta";
-import { stripMarkdown } from "#/lib/strip-markdown";
 import { assertStaff, isStaff, type Viewer } from "#/lib/viewer";
 import type { ProjectStatus } from "#/lib/vocabularies";
 import type { AdminProjectsFilter } from "../projects-queries";
@@ -53,6 +52,7 @@ import {
   projectSummarySelect,
   runsInProgram,
   sharesAProgramWith,
+  withExcerpt,
 } from "./project-summary";
 
 /** How many similar projects a project page lists (#614). */
@@ -80,6 +80,17 @@ export async function listMyProjectsImpl(data: { status: StatusFilter }) {
   if (!viewer) {
     return { rows: [], teamCapacity: 0 };
   }
+  return listMyProjectsAs(viewer, data);
+}
+
+/**
+ * Test seam for My Projects: the viewer's own live projects, every status,
+ * newest first, plus their standing team capacity.
+ */
+export async function listMyProjectsAs(
+  viewer: { id: string },
+  data: { status: StatusFilter }
+) {
   const conditions = [
     eq(projects.proposerId, viewer.id),
     isNull(projects.deletedAt),
@@ -109,7 +120,10 @@ export async function listMyProjectsImpl(data: { status: StatusFilter }) {
         )
       ),
   ]);
-  return { rows, teamCapacity: capacity?.teamCapacity ?? 0 };
+  return {
+    rows: rows.map(withExcerpt),
+    teamCapacity: capacity?.teamCapacity ?? 0,
+  };
 }
 
 /**
@@ -123,8 +137,8 @@ export async function listMyProjectsImpl(data: { status: StatusFilter }) {
  * is changed drops out silently. No `mentor_id`: the schema comment on
  * `mentor_email` rejects one on purpose, and the address is the link.
  */
-export function listMentoredProjectsAs(viewer: { email: string }) {
-  return db
+export async function listMentoredProjectsAs(viewer: { email: string }) {
+  const rows = await db
     .select(projectSummarySelect)
     .from(projects)
     .where(
@@ -134,6 +148,7 @@ export function listMentoredProjectsAs(viewer: { email: string }) {
       )
     )
     .orderBy(desc(projects.updatedAt));
+  return rows.map(withExcerpt);
 }
 
 export async function listMentoredProjectsImpl() {
@@ -478,8 +493,8 @@ export async function getSimilarProjectsImpl(data: { projectId: string }) {
  * for every viewer.
  */
 export interface SimilarProject {
-  /** The description as plain text, cut on a word boundary. Empty when there is none. */
-  excerpt: string;
+  /** The description as plain text, cut on a word boundary. Null when there is none. */
+  excerpt: string | null;
   id: string;
   title: string;
 }
@@ -544,8 +559,8 @@ export async function getSimilarProjectsAs(
     (row): SimilarProject => ({
       id: row.id,
       title: row.title,
-      excerpt: truncateOnWordBoundary(
-        stripMarkdown(row.description),
+      excerpt: descriptionExcerpt(
+        row.description,
         SIMILAR_PROJECT_EXCERPT_LENGTH
       ),
     })

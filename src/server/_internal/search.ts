@@ -13,7 +13,11 @@ import { projectCategories, projects, userInterests } from "#/db/schema";
 import { readSession } from "#/lib/_internal/auth-guards";
 import type { SearchProjectsInput } from "../search";
 import { toSqlVector } from "./project-embeddings";
-import { projectSummarySelect, runsInProgram } from "./project-summary";
+import {
+  projectSummarySelect,
+  runsInProgram,
+  withExcerpt,
+} from "./project-summary";
 
 /**
  * Request entry point: resolves the viewer, then delegates. Tests call
@@ -291,7 +295,7 @@ export async function searchProjectsImpl(
     .where(and(...conditions));
 
   return {
-    rows,
+    rows: rows.map(withExcerpt),
     total: count,
     page: data.page,
     pageSize: data.pageSize,

@@ -384,34 +384,21 @@ test("projects table shows its default-hidden columns when toggled on", async ({
 }) => {
   await page.goto("/projects?view=table");
   await waitForHydration(page);
-  const hiddenColumns = [
-    "Description",
-    "Problem statement",
-    "Objectives",
-    "Min qualifications",
-    "Pref qualifications",
-    "License restrictions",
-    "URL",
-  ];
-
+  // URL alone since the prose columns left table view (#761).
   await page.getByRole("button", { name: "Columns" }).click();
-  for (const label of hiddenColumns) {
-    await toggleColumnOn(page, label);
-  }
+  await toggleColumnOn(page, "URL");
   await closeMenu(page);
 
-  for (const label of hiddenColumns) {
-    await expect(
-      page.getByRole("columnheader", { name: label, exact: true })
-    ).toBeVisible();
-    const cell = page.locator(`td[data-label="${label}"]`).first();
-    await expect(cell).toBeVisible();
-    // A dash for an empty field still counts: the point is that the cell
-    // rendered rather than threw, since nothing before this ever ran these
-    // columns' cell functions.
-    const text = (await cell.textContent())?.trim() ?? "";
-    expect(text.length).toBeGreaterThan(0);
-  }
+  await expect(
+    page.getByRole("columnheader", { name: "URL", exact: true })
+  ).toBeVisible();
+  const cell = page.locator('td[data-label="URL"]').first();
+  await expect(cell).toBeVisible();
+  // A dash for an empty field still counts: the point is that the cell
+  // rendered rather than threw, since nothing before this ever ran the
+  // column's cell function.
+  const text = (await cell.textContent())?.trim() ?? "";
+  expect(text.length).toBeGreaterThan(0);
 
   await checkA11y(page);
 });

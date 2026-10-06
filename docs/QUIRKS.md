@@ -675,7 +675,7 @@ It orders "Recently updated", so a writer sets it only when a field in `projectD
 
 ### Both domains name the fields their reads return, and a key-set test pins each
 
-`projectDetailView` names every field of the public `/projects/$id` payload, so a new column is invisible until named; `proposerEmail` is absent, not nulled. `projectSummarySelect` may carry what an anonymous detail read returns, minus `notes`, `isSponsored` and `deletedAt`, plus `updatedAt` and `categories`; the staff selects extend it. Key-set tests in four integration suites fail on a new column: the moment to ask whether it is public.
+`projectDetailView` names every field of the public `/projects/$id` payload, so a new column is invisible until named; `proposerEmail` is absent, not nulled. The listing projection, `projectSummarySelect`, carries no prose field, only the description as the source `withExcerpt` turns into `excerpt` ([ADR-0061](adr/0061-the-listing-carries-an-excerpt-not-the-prose.md)); a read that skips the mapper ships the source and fails its key-set test. The staff selects share its prose-free base, and the CSV's adds the six prose fields back. Key-set tests in the integration suites fail on a new column: the moment to ask whether it is public.
 
 ### The edit diff has no field list; it reads the writer's keys
 

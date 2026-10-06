@@ -41,7 +41,7 @@ afterEach(cleanup);
 const base: ProjectSummary = {
   id: "00000000-0000-0000-0000-000000000001",
   title: "Smart Greenhouse",
-  description: "A long description that should be clamped to three lines.",
+  excerpt: "A long description that should be clamped to three lines.",
   status: "published",
   acceptingApplicants: true,
   requiresNdaIp: false,
@@ -108,6 +108,20 @@ describe("ProjectCard", () => {
       />
     );
     expect(getByText("CS 461; CS 46X · Jane Doe")).toBeTruthy();
+  });
+
+  it("renders the excerpt the server cut, clamped to three lines", () => {
+    const { getByText } = render(<ProjectCard project={base} />);
+    const excerpt = getByText(base.excerpt ?? "");
+    expect(excerpt.tagName).toBe("P");
+    expect(excerpt.className).toContain("line-clamp-3");
+  });
+
+  it("renders no description paragraph when there is no excerpt", () => {
+    const { container } = render(
+      <ProjectCard project={{ ...base, excerpt: null }} />
+    );
+    expect(container.querySelector("p.line-clamp-3")).toBeNull();
   });
 
   it("shows no program line for a project in none", () => {
