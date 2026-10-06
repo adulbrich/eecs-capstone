@@ -315,8 +315,8 @@ async function expectedClaim(
  * rate limiter, so a listed path is a flat 404 rather than a handler that
  * declines.
  *
- * Two groups, and one path in each is the reason the group is here rather than
- * left to its handler.
+ * Two groups and one stray, and one path in each group is the reason the group
+ * is here rather than left to its handler.
  *
  * The password and its verification link (#576). With `emailAndPassword` off
  * the sign-in and sign-up handlers refuse on their own, but `/verify-email` does
@@ -337,8 +337,16 @@ async function expectedClaim(
  * `/verify-email` above, and `/sign-in/email-otp` is the only path that does
  * the revoke, so it is the only one that may verify. The password-reset and
  * email-change paths are surface with no caller.
+ *
+ * And `/account-info`, since Better Auth 1.7 (#278). It hands the account's
+ * stored tokens to the provider's `getUserInfo`, and 1.7 made ONID a social
+ * provider, so a signed-in ONID user calling it reruns `onidUserInfo` on an ID
+ * token from their last sign-in. That mapper releases whatever unverified row
+ * holds the token's address, on the premise that the person has just
+ * authenticated, which a stored token does not show. Nothing here calls it.
  */
 const DISABLED_PATHS = [
+  "/account-info",
   "/sign-in/email",
   "/sign-up/email",
   "/request-password-reset",
@@ -548,8 +556,8 @@ export const auth = betterAuth({
   // still turned into its response by the router's own catch, so this changes
   // nothing a client sees.
   onAPIError: { throw: true },
-  // See DISABLED_PATHS: the retired password paths, and six of the nine
-  // `emailOTP()` mounts, are 404 rather than served.
+  // See DISABLED_PATHS: the retired password paths, six of the nine
+  // `emailOTP()` mounts, and `/account-info` are 404 rather than served.
   disabledPaths: DISABLED_PATHS,
   advanced: {
     // CloudFront terminates TLS at the edge and forwards to the origin over
