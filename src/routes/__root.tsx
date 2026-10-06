@@ -110,11 +110,11 @@ function RootDocument({ children }: { children: React.ReactNode }) {
           {children}
           <Toaster />
           {/*
-            Bottom left, because the bottom right is the project page's
-            similar-projects control (#614). The trigger is hidden whenever
-            Playwright drives the browser: any corner of a 375px sheet holds
-            a control it can sit over, as "Clear all" found when devtools
-            0.15 moved it (#754). The hotkey still opens the panel.
+            Bottom left, so in manual use the trigger stays off the project
+            page's similar-projects control (#614). Hidden whenever an
+            automated browser drives the page: any corner of a 375px sheet
+            holds a control it can sit over, as "Clear all" found when a
+            devtools upgrade moved it (#754). The hotkey still opens the panel.
           */}
           <TanStackDevtools
             config={{
