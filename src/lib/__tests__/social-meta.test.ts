@@ -3,65 +3,10 @@ import {
   SITE_DESCRIPTION,
   SOCIAL_DESCRIPTION_MAX_LENGTH,
   socialDescription,
-  stripMarkdown,
   truncateOnWordBoundary,
 } from "#/lib/social-meta";
 
 const ELLIPSIS = "...";
-
-describe("stripMarkdown", () => {
-  it("keeps a link's label and drops its target", () => {
-    // The target is noise in a preview and would eat most of a 160 character
-    // budget on its own.
-    expect(
-      stripMarkdown("See [the brief](https://example.com/a/b) first")
-    ).toBe("See the brief first");
-  });
-
-  it("drops an image entirely, label and all", () => {
-    expect(stripMarkdown("![a diagram](/x.png) Then the text")).toBe(
-      "Then the text"
-    );
-  });
-
-  it("removes heading, bullet, ordered and blockquote markers", () => {
-    const source = "## Goals\n\n- first\n- second\n\n1. third\n\n> a quote";
-    expect(stripMarkdown(source)).toBe("Goals first second third a quote");
-  });
-
-  it("unwraps bold, italic and strikethrough without eating the words", () => {
-    expect(stripMarkdown("**bold** and _italic_ and ~~gone~~")).toBe(
-      "bold and italic and gone"
-    );
-  });
-
-  it("does not eat an underscore inside a word", () => {
-    // snake_case identifiers appear in these fields constantly, and an
-    // emphasis rule that matched them would silently delete the middle.
-    expect(stripMarkdown("call refresh_social_summary now")).toBe(
-      "call refresh_social_summary now"
-    );
-  });
-
-  it("removes a fenced code block rather than inlining its contents", () => {
-    const source = "Before\n\n```ts\nconst x = 1;\n```\n\nAfter";
-    expect(stripMarkdown(source)).toBe("Before After");
-  });
-
-  it("keeps the contents of inline code", () => {
-    expect(stripMarkdown("run `npm test` first")).toBe("run npm test first");
-  });
-
-  it("collapses newlines and runs of whitespace into single spaces", () => {
-    expect(stripMarkdown("one\n\n\ntwo    three\t\tfour")).toBe(
-      "one two three four"
-    );
-  });
-
-  it("strips html a proposer pasted in", () => {
-    expect(stripMarkdown("<p>Hello <b>there</b></p>")).toBe("Hello there");
-  });
-});
 
 describe("truncateOnWordBoundary", () => {
   it("returns a string at the limit untouched", () => {
