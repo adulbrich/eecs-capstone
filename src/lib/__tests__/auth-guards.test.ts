@@ -12,7 +12,11 @@ vi.mock("@tanstack/react-start/server", () => ({
 }));
 
 import { auth } from "#/lib/auth";
-import { requireRole, requireUser } from "../_internal/auth-guards";
+import {
+  readClientSession,
+  requireRole,
+  requireUser,
+} from "../_internal/auth-guards";
 
 describe("requireUser", () => {
   it("returns the user when a session exists", async () => {
@@ -72,5 +76,28 @@ describe("requireRole", () => {
     await expect(requireRole(["admin"])).rejects.toMatchObject({
       options: { to: "/sign-in" },
     });
+  });
+});
+
+describe("readClientSession", () => {
+  it("returns the user and nothing from the session row", async () => {
+    (
+      auth.api.getSession as unknown as ReturnType<typeof vi.fn>
+    ).mockResolvedValueOnce({
+      user: { id: "u1", email: "a@b.com", role: "user" },
+      session: { id: "s1", token: "raw-token", ipAddress: "10.0.0.1" },
+    });
+
+    expect(await readClientSession()).toEqual({
+      user: { id: "u1", email: "a@b.com", role: "user" },
+    });
+  });
+
+  it("returns null when no session", async () => {
+    (
+      auth.api.getSession as unknown as ReturnType<typeof vi.fn>
+    ).mockResolvedValueOnce(null);
+
+    expect(await readClientSession()).toBeNull();
   });
 });

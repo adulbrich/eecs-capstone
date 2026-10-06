@@ -218,6 +218,10 @@ Validation runs inside the endpoint, after every before-hook, so a before-hook r
 
 A `hooks.before` can answer 200 without running the handler by throwing `APIError("OK", ...)`; the send guard does so to answer `{ success: true }` to a request it refuses, since any other answer enumerates accounts. Only `auth.handler` converts it, and `auth.api.*` rethrows, so test those paths through `auth.handler` with a built `Request`.
 
+### The raw session token reaches page JavaScript; keep `bearer` off or signed
+
+`get-session`, which `authClient.useSession()` calls on every page, `list-sessions` and `sign-in/email-otp` all return the raw session token; Better Auth's schema does not hide it. It authenticates nothing here: the session cookie is signed with the server secret, and the `bearer` plugin, the one thing that takes a raw token as a credential, is off. Never enable `bearer` without `requireSignature`. Stripping `get-session` with `customSession` is not a substitute: the other two still return the token, and it also reshapes the server's `auth.api.getSession`.
+
 ---
 
 ## Drizzle ORM + Postgres
