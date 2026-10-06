@@ -200,7 +200,8 @@ describe("the public project table", () => {
     // Table view is the metadata view: the excerpt arrives with the shared
     // loader for the card and the table leaves it out (#761).
     renderTable([]);
-    expect(rowFor("Rover Telemetry").queryByText(/excerpt/)).toBeNull();
+    const excerpt = ROWS[0].excerpt ?? "";
+    expect(rowFor("Rover Telemetry").queryByText(excerpt)).toBeNull();
   });
 
   it("renders the card's badge row in one column, and a dash for none", () => {

@@ -146,8 +146,8 @@ export const projectProgramCount = sql<number>`(
 
 /**
  * The mentor, resolved at read time. A correlated subquery rather than a join
- * so the four consumers of `projectSummarySelect` pick it up without each
- * adding a join, same as `categories` in the admin export. Case-insensitive
+ * so the staff projections pick it up without each adding a join, same as
+ * `categories` in the admin export. Case-insensitive
  * on purpose, and therefore not on the `user.email` index; at capstone scale
  * that costs nothing and it is the same trade `claim-projects.ts` makes.
  *

@@ -29,7 +29,10 @@ import {
   PROGRAM_FILTER_NONE,
 } from "#/lib/admin-project-filters";
 import { dayRange } from "#/lib/day-range";
-import { descriptionExcerpt } from "#/lib/description-excerpt";
+import {
+  descriptionExcerpt,
+  SIMILAR_PROJECT_EXCERPT_LENGTH,
+} from "#/lib/description-excerpt";
 import {
   canEditProject,
   canSeeProject,
@@ -57,13 +60,6 @@ import {
 
 /** How many similar projects a project page lists (#614). */
 const SIMILAR_PROJECTS_LIMIT = 5;
-
-/**
- * The excerpt's ceiling in characters, ellipsis included. The row clamps to
- * two lines in CSS; this only keeps the payload from carrying a whole
- * description to be hidden.
- */
-const SIMILAR_PROJECT_EXCERPT_LENGTH = 160;
 
 /** The vocabulary plus the sentinel this filter adds for "no filter". */
 type StatusFilter = "all" | ProjectStatus;

@@ -10,6 +10,13 @@ import { stripMarkdown } from "./strip-markdown";
 export const LISTING_EXCERPT_LENGTH = 320;
 
 /**
+ * The similar-projects row's budget (#614), ellipsis included. The row clamps
+ * to two lines in CSS; this only keeps the payload from carrying a whole
+ * description to be hidden.
+ */
+export const SIMILAR_PROJECT_EXCERPT_LENGTH = 160;
+
+/**
  * A project's description as plain text, cut to `max` characters on a word
  * boundary, or `null` when nothing is left to show (#761).
  *

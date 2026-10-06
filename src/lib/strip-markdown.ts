@@ -1,10 +1,10 @@
 /**
  * Reduces markdown source to plain text for clamped summaries (cards, rows).
  *
- * Deliberately regex-based rather than a real parser: this runs once per card
- * on every listing render, and the output is truncated by `line-clamp`
- * anyway. It is not a sanitizer and must never be used to render untrusted
- * markup; use the `Markdown` component for display.
+ * Deliberately regex-based rather than a real parser: this runs on the server
+ * once per row of every listing read (`descriptionExcerpt`), and the output is
+ * cut to an excerpt anyway. It is not a sanitizer and must never be used to
+ * render untrusted markup; use the `Markdown` component for display.
  */
 const CODE_FENCE = /```[\s\S]*?```/g;
 const HORIZONTAL_RULE = /^\s{0,3}([-*_])(\s*\1){2,}\s*$/gm;

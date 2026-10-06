@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   descriptionExcerpt,
   LISTING_EXCERPT_LENGTH,
+  SIMILAR_PROJECT_EXCERPT_LENGTH,
 } from "#/lib/description-excerpt";
 
 /**
@@ -14,8 +15,7 @@ function straddling(budget: number): string {
   return `${lead}[a linked phrase that runs on](https://example.com/a/long/path) and **bold text across the budget** ${"tail ".repeat(40)}`;
 }
 
-/** The listing card's budget and similar projects' (#614). */
-const BUDGETS = [LISTING_EXCERPT_LENGTH, 160];
+const BUDGETS = [LISTING_EXCERPT_LENGTH, SIMILAR_PROJECT_EXCERPT_LENGTH];
 
 describe.each(BUDGETS)("descriptionExcerpt at %i", (max) => {
   it("is null for no description", () => {
