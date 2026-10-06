@@ -423,9 +423,7 @@ describe("the summary view", () => {
       .update(projects)
       .set({
         socialSummary: "Swept.",
-        socialSummaryUpdatedAt: new Date(
-          (failed?.attemptedAt.getTime() ?? 0) + 1000
-        ),
+        socialSummaryUpdatedAt: new Date(failed!.attemptedAt.getTime() + 1000),
       })
       .where(eq(projects.id, project.id));
 
