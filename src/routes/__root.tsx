@@ -111,12 +111,16 @@ function RootDocument({ children }: { children: React.ReactNode }) {
           <Toaster />
           {/*
             Bottom left, because the bottom right is the project page's
-            similar-projects control (#614), and a dev-only trigger over it
-            intercepts the click in the accessibility suite.
+            similar-projects control (#614). The trigger is hidden whenever
+            Playwright drives the browser: any corner of a 375px sheet holds
+            a control it can sit over, as "Clear all" found when devtools
+            0.15 moved it (#754). The hotkey still opens the panel.
           */}
           <TanStackDevtools
             config={{
               position: "bottom-left",
+              triggerHidden:
+                typeof navigator !== "undefined" && navigator.webdriver,
             }}
             plugins={[
               {
