@@ -193,8 +193,28 @@ describe("stripMarkdown", () => {
     );
   });
 
-  it("removes an html comment", () => {
+  it("removes an html comment, even one holding a `>`", () => {
     expect(stripMarkdown("x <!-- hidden --> y")).toBe("x y");
+    expect(stripMarkdown("<!-- TODO: A -> B --> Build a robot")).toBe(
+      "Build a robot"
+    );
+  });
+
+  it("removes namespaced tags pasted from Word", () => {
+    expect(stripMarkdown("<o:p>Pasted</o:p> text")).toBe("Pasted text");
+  });
+
+  it("does not let a stray backtick shield a later paragraph", () => {
+    expect(
+      stripMarkdown("it`s here\n\nsee [docs](https://x.test) and `foo` ok")
+    ).toBe("it`s here see docs and foo ok");
+  });
+
+  it("drops a pasted private-use character rather than reading it as code", () => {
+    const slot = "\uE000";
+    expect(stripMarkdown(`x ${slot}0${slot} then \`real\``)).toBe(
+      "x 0 then real"
+    );
   });
 
   it("keeps an autolink and an email address in angle brackets", () => {

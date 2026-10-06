@@ -7,19 +7,23 @@
  * anyway. It is not a sanitizer and must never be used to render untrusted
  * markup; use the `Markdown` component for display.
  *
- * No failed match may rescan text an earlier failed match already covered
- * (#765). Before that rule, every opener with no closer scanned to the end of
- * the string, so 20,000 characters of `**a ` took 64 ms and four times the
- * length cost about sixteen times the time. Each pattern below that scans for
- * a closer says how it keeps the call linear. Code fences and inline code need
- * nothing: every later opener is also a closer, so a scan ends at the next one.
+ * Every pattern reads each character a bounded number of times, so the call
+ * is linear in its input (#765). Before that rule, every opener with no closer
+ * scanned to the end of the string, so 20,000 characters of `**a ` took 64 ms
+ * and four times the length cost about sixteen times the time. Each pattern
+ * below that scans for a closer says how it stops. Code fences and inline code
+ * need nothing: every later opener is also a closer, so a scan ends at the
+ * next one.
  */
 const CODE_FENCE = /```[\s\S]*?```/g;
-const INLINE_CODE = /`([^`]*)`/g;
+// One line at most, so a backtick typed as an apostrophe cannot pair with one
+// paragraphs later and shield everything between from the patterns below.
+const INLINE_CODE = /`([^`\n]*)`/g;
 // Stands in for an inline code span while the other patterns run, so emphasis
 // and tag removal cannot reach into `__init__` or `<canvas>`. A private-use
-// character, which no proposer types.
-const CODE_SLOT = /(\d+)/g;
+// character, removed from the input first so a pasted one cannot collide.
+const SLOT = "\uE000";
+const CODE_SLOT = new RegExp(`${SLOT}(\\d+)${SLOT}`, "g");
 const HORIZONTAL_RULE = /^\s{0,3}([-*_])(\s*\1){2,}\s*$/gm;
 // A GFM table delimiter row, e.g. `| --- | :--: |`: a line made up only of
 // pipes, colons, hyphens, and whitespace. The lookahead requires at least one
@@ -27,10 +31,10 @@ const HORIZONTAL_RULE = /^\s{0,3}([-*_])(\s*\1){2,}\s*$/gm;
 // or a `- item` bullet line (starts with a list marker, not a pipe).
 const TABLE_SEPARATOR_ROW = /^(?=[^\n]*\|)[\s:|-]+$/gm;
 // A label stops at the next `[` or `]`, and a target at the next `[`, `(` or
-// `)` outside one balanced pair, which is where the next opener starts. So no
-// two failed scans cover the same text. The balanced pairs keep `?q[]=1` and
-// Wikipedia's `Rust_(programming_language)` inside the target. Nested brackets
-// in a label never matched.
+// `)` outside one balanced pair, which is at most a few characters past where
+// the next opener starts. The balanced pairs keep `?q[]=1` and Wikipedia's
+// `Rust_(programming_language)` inside the target. Nested brackets in a label
+// never matched.
 const IMAGE = /!\[[^[\]]*\]\((?:[^()[\]]|\[[^()[\]]*\]|\([^()[\]]*\))*\)/g;
 const LINK = /\[([^[\]]*)\]\((?:[^()[\]]|\[[^()[\]]*\]|\([^()[\]]*\))*\)/g;
 const HEADING_MARKER = /^\s{0,3}#{1,6}\s+/gm;
@@ -49,11 +53,14 @@ const ASTERISK_EMPHASIS = /(\*{1,3}(?!\*)|~~(?!~))(?=\S)([\s\S]{0,499}?\S)\1/g;
 // may not, because `snake_case_names` are ordinary prose in a technical field.
 const UNDERSCORE_EMPHASIS =
   /(^|[^\w])_{1,3}(?!_)(?=\S)([\s\S]{0,499}?\S)_{1,3}(?!\w)/g;
-// An element or a comment. The name must end at whitespace, `/` or `>`, so
-// `a < b`, an autolink `<https://x.test>` and `<me@x.test>` survive. `[^<>]`
-// stops at the next `<`, which keeps an unclosed tag from scanning past the
-// one after it.
-const HTML_TAG = /<(?:\/?[A-Za-z][A-Za-z0-9-]*(?=[\s/>])|!)[^<>]*>/g;
+// A comment with no `<` inside, which is also where its scan stops.
+const HTML_COMMENT = /<!--[^<]*?-->/g;
+// An element, Word's `o:p` included. The name must end at whitespace, `/` or
+// `>`, so `a < b`, an autolink `<https://x.test>` and `<me@x.test>` survive.
+// `[^<>]` stops at the next `<`, which keeps an unclosed tag from scanning past
+// the one after it.
+const HTML_TAG =
+  /<\/?[A-Za-z][A-Za-z0-9-]*(?::[A-Za-z][A-Za-z0-9-]*)?(?=[\s/>])[^<>]*>/g;
 // Remaining table pipes (header and data rows) become spaces so cell text
 // survives as separate words instead of running together.
 const PIPE = /\|/g;
@@ -65,10 +72,11 @@ export function stripMarkdown(input: string | null | undefined): string {
   }
   const code: string[] = [];
   return input
+    .replaceAll(SLOT, "")
     .replace(CODE_FENCE, " ")
     .replace(INLINE_CODE, (_, content: string) => {
       code.push(content);
-      return `${code.length - 1}`;
+      return `${SLOT}${code.length - 1}${SLOT}`;
     })
     .replace(HORIZONTAL_RULE, " ")
     .replace(TABLE_SEPARATOR_ROW, " ")
@@ -80,9 +88,10 @@ export function stripMarkdown(input: string | null | undefined): string {
     .replace(TASK_MARKER, "")
     .replace(ASTERISK_EMPHASIS, "$2")
     .replace(UNDERSCORE_EMPHASIS, "$1$2")
+    .replace(HTML_COMMENT, " ")
     .replace(HTML_TAG, " ")
     .replace(PIPE, " ")
-    .replace(CODE_SLOT, (slot, index: string) => code[Number(index)] ?? slot)
+    .replace(CODE_SLOT, (_, index: string) => code[Number(index)])
     .replace(WHITESPACE, " ")
     .trim();
 }
