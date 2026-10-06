@@ -377,6 +377,10 @@ Locally both use the dev database as `user@example.com`, and the end-to-end swee
 
 Route chunks hydrate after the root layout, so a click on a route's button can land before its handler exists: the click succeeds and nothing happens, and the route's first server calls fire after it. `waitForHydration` in `src/test/shared/playwright.ts` waits for every match, and skips the Solid-rendered TanStack Devtools.
 
+### The devtools trigger is hidden whenever an automated browser drives the page
+
+`__root.tsx` sets `triggerHidden` from `navigator.webdriver`, because a dev-only trigger over a control intercepts the suite's click (#614, #754). It keys on the browser, not an env flag, so a reused local dev server hides it too. Any devtools store update, opening the panel included, writes the merged settings to localStorage, and stored settings beat `config`; so a persistent automated profile (Playwright MCP's) keeps the trigger hidden even when driven by hand, until its Settings tab turns it back on. The suites' contexts are fresh and their captured storage states hold no settings.
+
 ### A Columns menu that scrolls must be focusable itself
 
 A Columns menu tall enough to scroll fails axe's `scrollable-region-focusable` unless its content is tabbable, so `admin-data-table.tsx` passes it `tabIndex={0}`.
