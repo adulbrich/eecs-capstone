@@ -162,22 +162,60 @@ describe("stripMarkdown", () => {
     expect(stripMarkdown(source)).toBe("Goal Owner ship us demo");
   });
 
-  it("keeps the markers of emphasis longer than it recognises", () => {
-    const long = "word ".repeat(120).trim();
-    expect(stripMarkdown(`**${long}**`)).toBe(`**${long}**`);
+  it("removes emphasis up to 500 characters and keeps the markers past it", () => {
+    const limit = "a".repeat(500);
+    expect(stripMarkdown(`**${limit}**`)).toBe(limit);
+    expect(stripMarkdown(`**${limit}a**`)).toBe(`**${limit}a**`);
+  });
+
+  it("keeps a link whose target holds brackets or parentheses", () => {
+    expect(stripMarkdown("see [docs](https://x.test/?q[0]=1) now")).toBe(
+      "see docs now"
+    );
+    expect(stripMarkdown("![x](https://x.test/a[1].png) after")).toBe("after");
+    expect(
+      stripMarkdown(
+        "[Rust](https://en.wikipedia.org/wiki/Rust_(programming_language)) is fast"
+      )
+    ).toBe("Rust is fast");
+    expect(stripMarkdown('[a](https://x.test "a (b) title") b')).toBe("a b");
+  });
+
+  it("leaves the contents of a code span alone", () => {
+    expect(stripMarkdown("use the `<canvas>` element")).toBe(
+      "use the <canvas> element"
+    );
+    expect(stripMarkdown("edit `__init__` in `__init__.py`")).toBe(
+      "edit __init__ in __init__.py"
+    );
+    expect(stripMarkdown("call `fn(*args, **kwargs)` and **bold**")).toBe(
+      "call fn(*args, **kwargs) and bold"
+    );
+  });
+
+  it("removes an html comment", () => {
+    expect(stripMarkdown("x <!-- hidden --> y")).toBe("x y");
+  });
+
+  it("keeps an autolink and an email address in angle brackets", () => {
+    expect(stripMarkdown("see <https://x.test/a> or <me@x.test>")).toBe(
+      "see <https://x.test/a> or <me@x.test>"
+    );
   });
 });
 
 /**
- * Each of these, repeated, is an opener with no closer. Before #765 every one
- * rescanned to the end of the string, and 20,000 characters took 45 to 243 ms
- * on Node 24 on a laptop. Now the slowest, `*a `, takes about 12 ms there,
- * since emphasis still walks its 500-character bound from every opener.
+ * Each of these, repeated, is an opener with no closer. Before #765 most of
+ * them rescanned to the end of the string, and 20,000 characters took 45 to
+ * 243 ms on Node 24 on a laptop. The backtick, fence and `<a ` cases were
+ * already fast in this module and guard against a regression. The slowest now
+ * are the emphasis cases, which still walk the 500-character bound from every
+ * opener.
  *
  * The ceiling is absolute, because a ratio between two lengths is flakier
- * under CI load, and sits above three times that slowest case yet below every
- * timing from before the fix. The best of three runs, not one, so a garbage
- * collection pause cannot fail it.
+ * under CI load, and sits at about three times the slowest case yet below
+ * every timing from before the fix. The best of three runs, not one, so a
+ * garbage collection pause cannot fail it.
  */
 const UNCLOSED_OPENERS = [
   "~~a ",
@@ -187,7 +225,10 @@ const UNCLOSED_OPENERS = [
   "***a ",
   "[a](",
   "[a",
+  "[a](x[b](c)",
   "_a ",
+  "___a ",
+  "~~___a ",
   "<a ",
   "`a ",
   "```a ",
@@ -199,19 +240,22 @@ const CEILING_MS = 40;
 const RUNS = 3;
 
 describe("stripMarkdown on unclosed openers", () => {
-  it.each(UNCLOSED_OPENERS)("strips %j repeated in linear time", (opener) => {
-    const input = opener
-      .repeat(Math.ceil(ADVERSARIAL_LENGTH / opener.length))
-      .slice(0, ADVERSARIAL_LENGTH);
-    // The first call pays for compiling the patterns, which is not the cost
-    // under test.
-    stripMarkdown(input);
-    let best = Number.POSITIVE_INFINITY;
-    for (let run = 0; run < RUNS; run++) {
-      const start = performance.now();
+  it.each(UNCLOSED_OPENERS)(
+    "strips %j repeated within the ceiling",
+    (opener) => {
+      const input = opener
+        .repeat(Math.ceil(ADVERSARIAL_LENGTH / opener.length))
+        .slice(0, ADVERSARIAL_LENGTH);
+      // The first call pays for compiling the patterns, which is not the cost
+      // under test.
       stripMarkdown(input);
-      best = Math.min(best, performance.now() - start);
+      let best = Number.POSITIVE_INFINITY;
+      for (let run = 0; run < RUNS; run++) {
+        const start = performance.now();
+        stripMarkdown(input);
+        best = Math.min(best, performance.now() - start);
+      }
+      expect(best).toBeLessThan(CEILING_MS);
     }
-    expect(best).toBeLessThan(CEILING_MS);
-  });
+  );
 });
