@@ -1,18 +1,20 @@
 /**
  * The text that goes in `og:description` and `twitter:description`.
  *
- * Client-safe and dependency-free apart from the brand, because `head()` runs
- * on both sides of the SSR boundary.
+ * Client-safe and dependency-free apart from the brand and the stripper,
+ * because `head()` runs on both sides of the SSR boundary.
  *
- * Two jobs. `stripMarkdown` exists because `projects.description` and
- * `projects.problemStatement` are Markdown that the detail page renders through
- * the `Markdown` component: pasted raw into a meta tag, a heading's `#` and a
- * link's bracket syntax reach the preview card verbatim. And the fallback chain
- * in `socialDescription` is what actually runs most of the time, since the
- * generated summary is null on every project that has not been published since
- * the column landed, and stays null whenever Bedrock is unavailable.
+ * Two jobs. Every field goes through `stripMarkdown` because
+ * `projects.description` and `projects.problemStatement` are Markdown that the
+ * detail page renders through the `Markdown` component: pasted raw into a meta
+ * tag, a heading's `#` and a link's bracket syntax reach the preview card
+ * verbatim. And the fallback chain in `socialDescription` is what actually runs
+ * most of the time, since the generated summary is null on every project that
+ * has not been published since the column landed, and stays null whenever
+ * Bedrock is unavailable.
  */
 import { brand } from "./brand";
+import { stripMarkdown } from "./strip-markdown";
 
 /**
  * Meta descriptions are cut somewhere near this by every consumer, and the
@@ -60,59 +62,7 @@ export const NOINDEX = { content: "noindex, follow", name: "robots" } as const;
  */
 export const SOCIAL_CARD_ALT = `${brand.institutionName} ${brand.programName}, School of Electrical Engineering and Computer Science`;
 
-// Biome wants regex literals at the top level, and these are hot enough to
-// deserve it anyway: `socialDescription` can run three of them per request.
-const CODE_FENCE = /```[\s\S]*?```/g;
-const IMAGE = /!\[[^\]]*\]\([^)]*\)/g;
-const LINK = /\[([^\]]*)\]\([^)]*\)/g;
-const INLINE_CODE = /`([^`]*)`/g;
-const HEADING = /^\s{0,3}#{1,6}\s+/gm;
-const BLOCKQUOTE = /^\s{0,3}>\s?/gm;
-const BULLET = /^\s{0,3}[-*+]\s+/gm;
-const ORDERED = /^\s{0,3}\d+\.\s+/gm;
-const RULE = /^\s{0,3}(?:-{3,}|\*{3,}|_{3,})\s*$/gm;
-const ASTERISK_EMPHASIS = /(\*{1,3})(\S(?:[\s\S]*?\S)?)\1/g;
-/**
- * Underscore emphasis, guarded on both sides so it cannot fire inside a word.
- * CommonMark makes the same distinction and for the same reason: `*` may
- * emphasise intraword, `_` may not, because `snake_case_names` are ordinary
- * prose in a technical field. Without the guards, "refresh_social_summary"
- * comes out as "refreshsocialsummary" with no sign anything was lost.
- */
-const UNDERSCORE_EMPHASIS =
-  /(?<![A-Za-z0-9_])(_{1,3})(\S(?:[\s\S]*?\S)?)\1(?![A-Za-z0-9_])/g;
-const STRIKETHROUGH = /~~([\s\S]*?)~~/g;
-const HTML_TAG = /<[^>]*>/g;
-const WHITESPACE = /\s+/g;
 const TRAILING_PUNCTUATION = /[\s,;:.!?-]+$/;
-
-/**
- * Markdown to plain prose, for a single line of preview text.
- *
- * Not a parser and not trying to be: it removes the syntax a proposer actually
- * types into these two fields. A construct it does not know survives as its own
- * characters, which is the right failure for a meta tag. A link keeps its label
- * and loses its target, because the target is noise in a preview and would eat
- * most of the budget.
- */
-export function stripMarkdown(text: string): string {
-  return text
-    .replace(CODE_FENCE, " ")
-    .replace(IMAGE, " ")
-    .replace(LINK, "$1")
-    .replace(INLINE_CODE, "$1")
-    .replace(RULE, " ")
-    .replace(HEADING, "")
-    .replace(BLOCKQUOTE, "")
-    .replace(BULLET, "")
-    .replace(ORDERED, "")
-    .replace(STRIKETHROUGH, "$1")
-    .replace(ASTERISK_EMPHASIS, "$2")
-    .replace(UNDERSCORE_EMPHASIS, "$2")
-    .replace(HTML_TAG, " ")
-    .replace(WHITESPACE, " ")
-    .trim();
-}
 
 /** A high surrogate with no low surrogate after it, at the end of a string. */
 const LONE_TRAILING_SURROGATE = /[\uD800-\uDBFF]$/;
