@@ -64,11 +64,13 @@ describe("the retired password paths", () => {
   });
 });
 
-// #278: on Better Auth 1.7 this reruns ONID's `getUserInfo`, address release
-// included, on a stored ID token. See DISABLED_PATHS in `src/lib/auth.ts`.
-it("answers 404 for /account-info", async () => {
-  const response = await auth.handler(
-    new Request(`${BASE}/account-info?providerId=onid`)
-  );
-  expect(response.status).toBe(404);
+describe("the account info path", () => {
+  // #278: on Better Auth 1.7 this reruns ONID's `getUserInfo`, address release
+  // included, on a stored ID token. See DISABLED_PATHS in `src/lib/auth.ts`.
+  it("answers 404 for /account-info", async () => {
+    const response = await auth.handler(
+      new Request(`${BASE}/account-info?providerId=onid`)
+    );
+    expect(response.status).toBe(404);
+  });
 });

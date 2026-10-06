@@ -168,7 +168,7 @@ describe("the ONID account key", () => {
   // Every ONID row in production holds the `oid` as `account.accountId`. A
   // sign-in that keyed on anything else would miss that row and create a
   // second account for the same person (#278).
-  //
+
   // Called directly because the sign-ins below cannot tell the pin from Better
   // Auth's default: without a discovery document the default reads `id` too.
   // With one it reads `sub`, which is the fork this keeps out.
