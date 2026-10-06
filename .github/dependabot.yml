@@ -22,7 +22,6 @@ updates:
       # build (#599). Both fall in `all-other`, so they arrive in one PR. A
       # minor can move the ONID callback, which UIT must allowlist first
       # (#278, docs/QUIRKS.md); onid-sign-in.test.ts fails if it does.
-
       # Biome 2.5.14 types RegExp exec() as never null, so
       # noUnnecessaryConditions flags every match guard (#599).
       - dependency-name: "@biomejs/biome"

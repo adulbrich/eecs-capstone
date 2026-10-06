@@ -35,9 +35,9 @@ import { addressProofRefused } from "#/lib/address-proof";
  * row and one row answered to two people. Since 1.7 it deletes every account
  * on the row (#278), so the code sign-in would instead take the row, and
  * everything on it, away from whoever signed up with that provider. Either
- * way, proving the address is good
- * proof of the address and no proof at all of the other identity, which is
- * why this still refuses rather than leaving it to the helper.
+ * way, proving the address is good proof of the address and no proof at all
+ * of the other identity, which is why this still refuses rather than leaving
+ * it to the helper.
  *
  * ## Why the refusal has to look like a wrong code
  *

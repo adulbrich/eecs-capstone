@@ -52,17 +52,16 @@ const ISSUER_VERSION_SUFFIX = /\/v2\.0$/;
  * The authorize and token endpoints, derived from the discovery URL the same
  * way as the issuer, so that no sign-in fetches the discovery document (#553).
  *
- * Handing `genericOAuth` a `discoveryUrl` instead makes it GET the document
- * twice per sign-in, once in `/sign-in/oauth2` and once in its callback, with
- * no cache, and both handlers overwrite a static URL passed beside it with
- * what the fetch returns. Entra's v2.0
+ * Handing `genericOAuth` a `discoveryUrl` instead made Better Auth 1.6 GET the
+ * document twice per sign-in, once in the sign-in handler and once in its
+ * callback, with no cache (1.7 fetches it once, at startup). Entra's v2.0
  * endpoints are a fixed shape under the tenant, the one Better Auth's own
  * `microsoftEntraId` helper builds from a tenant id: drop the `/v2.0` from the
  * issuer and append `/oauth2/v2.0/authorize` or `/oauth2/v2.0/token`.
  *
  * An unset discovery URL yields empty endpoints rather than a relative path,
- * so `/sign-in/oauth2` refuses with Better Auth's configuration error, which
- * is what it did when discovery had nothing to fetch.
+ * so `/sign-in/social` refuses ONID with Better Auth's configuration error,
+ * which is what it did when discovery had nothing to fetch.
  */
 export function endpointsFromDiscoveryUrl(discoveryUrl: string): {
   authorizationUrl: string;
@@ -121,8 +120,8 @@ export interface OnidRejection {
  * Six different conditions reject a token and Better Auth collapses all of them
  * into one `unable_to_get_user_info` redirect, so without a reason the first
  * real sign-in failure is a guessing game: wrong issuer, no `oid`, or a UPN
- * under a fourth claim name all look identical from the browser. Exported separately
- * from the logging wrapper so tests can assert which guard fired.
+ * under a fourth claim name all look identical from the browser. Exported
+ * separately from the logging wrapper so tests can assert which guard fired.
  */
 export function onidProfileOrRejection(
   idToken: string | null | undefined,

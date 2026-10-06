@@ -238,7 +238,7 @@ describe("onidProfileFromIdToken", () => {
     });
 
     it("maps an unset discovery URL to empty endpoints, not relative paths", () => {
-      // Empty is what makes `/sign-in/oauth2` refuse with a configuration
+      // Empty is what makes `/sign-in/social` refuse with a configuration
       // error; `/oauth2/v2.0/authorize` would be a redirect to nowhere.
       expect(endpointsFromDiscoveryUrl("")).toEqual({
         authorizationUrl: "",
@@ -278,8 +278,8 @@ describe("onidProfileFromIdToken", () => {
 
     it("falls back to the local part of the email", () => {
       // A nameless profile is refused at account creation by
-      // `requireUserName`, so there has to be a last resort. Ugly beats unable to sign in, and the
-      // user can edit it on their profile page.
+      // `requireUserName`, so there has to be a last resort. Ugly beats
+      // unable to sign in, and the user can edit it on their profile page.
       const { given_name, family_name, ...nameless } = full;
       expect(profileOf(idToken(nameless))?.name).toBe("benny.beaver");
     });

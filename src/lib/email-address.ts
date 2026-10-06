@@ -9,7 +9,7 @@
  *
  * `user.email` is NOT one of those columns, and this function must never be
  * the reason someone drops a `lower()` from a comparison against it. Better
- * Auth normalizes that column itself, in 1.7.7, and at two layers: the
+ * Auth normalizes that column itself, in 1.7, and at two layers: the
  * `emailOTP` plugin's `routes.mjs` on every path, `oauth2/link-account.mjs`
  * for every OAuth provider, and the admin plugin's create-user each lowercase
  * before calling, and `db/internal-adapter.mjs` lowercases again inside
