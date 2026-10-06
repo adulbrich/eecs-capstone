@@ -28,24 +28,30 @@ const onid = buildAuthConfig({
   ONID_CLIENT_SECRET: "onid-secret-fake",
 } as NodeJS.ProcessEnv).onid;
 
-/** A stand-in for `onidUserInfo`, which reaches the database. */
+const OID = "8f1c9d0a-2b3e-4c5d-9e6f-7a8b9c0d1e2f";
+
+/**
+ * A stand-in for `onidUserInfo`, which reaches the database. It carries a
+ * `sub` beside the `oid` it returns as `id`, the way an Entra token does, so a
+ * provider that keyed accounts on `sub` would write a different row.
+ */
 const getUserInfo = vi.fn(() =>
   Promise.resolve({
-    id: "8f1c9d0a-2b3e-4c5d-9e6f-7a8b9c0d1e2f",
+    id: OID,
+    sub: "pairwise-sub-that-is-not-the-oid",
     email: "benny.beaver@oregonstate.edu",
     emailVerified: true,
     name: "Benny Beaver",
   })
 );
 
+/** The memory adapter's tables, so a test can read what sign-in wrote. */
+let tables: Record<string, Record<string, unknown>[]>;
+
 function buildAuth() {
+  tables = { user: [], session: [], account: [], verification: [] };
   return betterAuth({
-    database: memoryAdapter({
-      user: [],
-      session: [],
-      account: [],
-      verification: [],
-    }),
+    database: memoryAdapter(tables),
     baseURL: BASE_URL,
     secret: "onid-sign-in-test-secret-that-is-long-enough",
     plugins: [
@@ -87,10 +93,10 @@ afterEach(() => {
 /** POSTs the ONID button's request and returns the response. */
 function signIn(auth: ReturnType<typeof buildAuth>): Promise<Response> {
   return auth.handler(
-    new Request(`${BASE_URL}/api/auth/sign-in/oauth2`, {
+    new Request(`${BASE_URL}/api/auth/sign-in/social`, {
       method: "POST",
       headers: { "content-type": "application/json", origin: BASE_URL },
-      body: JSON.stringify({ providerId: "onid", callbackURL: "/" }),
+      body: JSON.stringify({ provider: "onid", callbackURL: "/" }),
     })
   );
 }
@@ -116,7 +122,7 @@ async function signInAndCallBack(
     .map((line) => line.split(";")[0])
     .join("; ");
   return auth.handler(
-    new Request(`${BASE_URL}/api/auth/oauth2/callback/onid?${query}`, {
+    new Request(`${BASE_URL}/api/auth/callback/onid?${query}`, {
       headers: { cookie },
     })
   );
@@ -134,7 +140,7 @@ describe("ONID sign-in without discovery", () => {
       expect(`${redirect.origin}${redirect.pathname}`).toBe(AUTHORIZE_URL);
       expect(redirect.searchParams.get("client_id")).toBe("onid-id-fake");
       expect(redirect.searchParams.get("redirect_uri")).toBe(
-        `${BASE_URL}/api/auth/oauth2/callback/onid`
+        `${BASE_URL}/api/auth/callback/onid`
       );
     }
 
@@ -156,18 +162,42 @@ describe("ONID sign-in without discovery", () => {
     expect(fetched).toEqual([TOKEN_URL, TOKEN_URL]);
     expect(fetched).not.toContain(DISCOVERY_URL);
   });
+});
 
-  it("refuses the RFC 9207 iss parameter of another tenant if Entra sends one", async () => {
-    // Discovery supplied the expected issuer for this check. Passing it
-    // statically keeps the check running without the fetch, for the day Entra
-    // sends `iss`; today it does not advertise that it will, and the tenant is
-    // pinned by the `iss` claim check in `onidUserInfo`.
-    const callback = await signInAndCallBack(buildAuth(), {
-      iss: "https://login.microsoftonline.com/other-tenant/v2.0",
-    });
+describe("the ONID account key", () => {
+  // Every ONID row in production holds the `oid` as `account.accountId`. A
+  // sign-in that keyed on anything else would miss that row and create a
+  // second account for the same person (#278).
 
-    expect(callback.status).toBe(302);
-    expect(callback.headers.get("location")).toContain("issuer_mismatch");
-    expect(fetched).toEqual([]);
+  // Called directly because the sign-ins below cannot tell the pin from Better
+  // Auth's default: without a discovery document the default reads `id` too.
+  // With one it reads `sub`, which is the fork this keeps out.
+  it("keys the account on the profile's id even when a sub is present", async () => {
+    const { accountSubject } = onidProviderConfig(onid, getUserInfo);
+
+    expect(
+      await accountSubject?.({
+        profile: { ...(await getUserInfo()), emailVerified: true },
+        tokens: {},
+      })
+    ).toBe(OID);
+  });
+
+  it("writes the oid, not the sub, as the account id", async () => {
+    const callback = await signInAndCallBack(buildAuth());
+
+    expect(callback.headers.get("location")).not.toContain("error");
+    expect(tables.account).toEqual([
+      expect.objectContaining({ accountId: OID, providerId: "onid" }),
+    ]);
+  });
+
+  it("signs the same person back in to the same account", async () => {
+    const auth = buildAuth();
+    await signInAndCallBack(auth);
+    await signInAndCallBack(auth);
+
+    expect(tables.user).toHaveLength(1);
+    expect(tables.account).toHaveLength(1);
   });
 });

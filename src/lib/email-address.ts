@@ -9,11 +9,11 @@
  *
  * `user.email` is NOT one of those columns, and this function must never be
  * the reason someone drops a `lower()` from a comparison against it. Better
- * Auth normalizes that column itself, in 1.6.25, and at two layers:
- * `api/routes/sign-up.mjs:165`, `oauth2/link-account.mjs:101` and the admin
- * plugin's `routes.mjs:191` each lowercase before calling, and
- * `db/internal-adapter.mjs` lowercases again inside `createUser` and
- * `createOAuthUser`, so the invariant does not rest on any one caller.
+ * Auth normalizes that column itself, in 1.7, and at two layers: the
+ * `emailOTP` plugin's `routes.mjs` on every path, `oauth2/link-account.mjs`
+ * for every OAuth provider, and the admin plugin's create-user each lowercase
+ * before calling, and `db/internal-adapter.mjs` lowercases again inside
+ * `createUser`, so the invariant does not rest on any one caller.
  * So those folds are defensive rather than load-bearing, and they stay
  * defensive: that is a library's internals, not a contract it publishes, and
  * an upgrade changing it would silently stop linking accounts.

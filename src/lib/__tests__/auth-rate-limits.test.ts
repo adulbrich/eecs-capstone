@@ -1,6 +1,6 @@
 import { betterAuth } from "better-auth";
 import { memoryAdapter } from "better-auth/adapters/memory";
-import { emailOTP, genericOAuth } from "better-auth/plugins";
+import { emailOTP } from "better-auth/plugins";
 import { describe, expect, it, vi } from "vitest";
 import {
   authRateLimit,
@@ -24,12 +24,12 @@ const BASE_URL = "https://auth.test";
 const TRUSTED_PROXY = "10.0.0.0/16";
 
 /**
- * The paths where no credential is checked, so they share one budget: the two
- * OAuth buttons on /sign-in. Better Auth's own default rule covers both at 3,
- * which is the refusal being removed. Not "3 per 10 seconds": see "what a max
- * actually means" below.
+ * The path where no credential is checked: both OAuth buttons on /sign-in,
+ * which since Better Auth 1.7 share it and so share one budget. Better Auth's
+ * own default rule covers it at 3, which is the refusal being removed. Not "3
+ * per 10 seconds": see "what a max actually means" below.
  */
-const UNCHECKED_PATHS = ["/sign-in/oauth2", "/sign-in/social"] as const;
+const UNCHECKED_PATHS = ["/sign-in/social"] as const;
 
 /** Every path the rules name, for the "is this route real" cases below. */
 const RULED_PATHS = [
@@ -56,16 +56,10 @@ function buildAuth() {
     secret: "rate-limit-test-secret-that-is-long-enough",
     rateLimit: { ...authRateLimit, enabled: true },
     advanced: { ipAddress: { trustedProxies: [TRUSTED_PROXY] } },
-    // Mounted so `/sign-in/oauth2` is a real route here, the way it is in
-    // `src/lib/auth.ts`. The empty config means the handler refuses on an
-    // unknown provider before it would fetch anything.
-    plugins: [
-      genericOAuth({ config: [] }),
-      // Mounted for the same reason, so the three `email-otp` rules name real
-      // routes here. `sendVerificationOTP` is never reached: the limiter
-      // answers in `onRequest`, ahead of the handler.
-      emailOTP({ sendVerificationOTP: () => Promise.resolve() }),
-    ],
+    // Mounted so the three `email-otp` rules name real routes here, the way
+    // they do in `src/lib/auth.ts`. `sendVerificationOTP` is never reached:
+    // the limiter answers in `onRequest`, ahead of the handler.
+    plugins: [emailOTP({ sendVerificationOTP: () => Promise.resolve() })],
   });
 }
 
@@ -110,26 +104,14 @@ describe("the budget for paths that check no credential", () => {
       expect(refused.status).toBe(429);
     }
   );
-
-  it("counts each path separately, so ONID does not spend GitHub's budget", async () => {
-    const auth = buildAuth();
-    const address = anAddress();
-
-    for (let spent = 0; spent < UNCHECKED_MAX; spent += 1) {
-      await call(auth, "/sign-in/oauth2", address);
-    }
-
-    const github = await call(auth, "/sign-in/social", address);
-    expect(github.status).not.toBe(429);
-  });
 });
 
 describe("the paths the rules name", () => {
   // The rules are strings, and Better Auth matches them against the paths it
   // mounts. A version that renamed one would leave the rule pointing at
   // nothing and silently restore the 3-per-10-seconds default, which is the
-  // lockout this exists to prevent. The genericOAuth comment in src/lib/auth.ts
-  // records that 1.7 moves OAuth path shapes, which is the bump to re-check.
+  // lockout this exists to prevent. 1.7 did exactly that to `/sign-in/oauth2`,
+  // ONID's own path on 1.6 (#278), so re-check this on every minor bump.
   //
   // The assertion is the exact 400 an empty body earns from a mounted route,
   // not `not 404`: a rule pointing at a path that no longer exists would leave

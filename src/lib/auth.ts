@@ -316,7 +316,7 @@ async function expectedClaim(
  * declines.
  *
  * Two groups, and one path in each is the reason the group is here rather than
- * left to its handler.
+ * left to its handler. Then one path on its own.
  *
  * The password and its verification link (#576). With `emailAndPassword` off
  * the sign-in and sign-up handlers refuse on their own, but `/verify-email` does
@@ -337,8 +337,16 @@ async function expectedClaim(
  * `/verify-email` above, and `/sign-in/email-otp` is the only path that does
  * the revoke, so it is the only one that may verify. The password-reset and
  * email-change paths are surface with no caller.
+ *
+ * And `/account-info` (#278). It hands the account's stored tokens to the
+ * provider's `getUserInfo`, and `genericOAuth` registers ONID as a social
+ * provider (1.6 did too), so a signed-in ONID user calling it reruns
+ * `onidUserInfo` on an ID token from their last sign-in. That mapper releases whatever unverified row
+ * holds the token's address, on the premise that the person has just
+ * authenticated, which a stored token does not show. Nothing here calls it.
  */
 const DISABLED_PATHS = [
+  "/account-info",
   "/sign-in/email",
   "/sign-up/email",
   "/request-password-reset",
@@ -548,8 +556,8 @@ export const auth = betterAuth({
   // still turned into its response by the router's own catch, so this changes
   // nothing a client sees.
   onAPIError: { throw: true },
-  // See DISABLED_PATHS: the retired password paths, and six of the nine
-  // `emailOTP()` mounts, are 404 rather than served.
+  // See DISABLED_PATHS: the retired password paths, six of the nine
+  // `emailOTP()` mounts, and `/account-info` are 404 rather than served.
   disabledPaths: DISABLED_PATHS,
   advanced: {
     // CloudFront terminates TLS at the edge and forwards to the origin over
@@ -737,11 +745,11 @@ export const auth = betterAuth({
     // ONID_DISCOVERY_URL instead, and docs/ONID-SSO.md, "How the endpoints are
     // resolved", says why (#553).
     //
-    // The callback path is /api/auth/oauth2/callback/onid, which does not match
-    // the /api/auth/callback/github shape beside it. That is the 1.6 generic
-    // OAuth path, and Entra matches redirect URIs exactly against what UIT
-    // allowlisted. better-auth 1.7 converges the two shapes, which is why
-    // package.json pins ~1.6 rather than ^1.6.
+    // The callback path is /api/auth/callback/onid, the shape GitHub's has,
+    // and Entra matches redirect URIs exactly against what UIT allowlisted.
+    // better-auth 1.7 moved it there from /api/auth/oauth2/callback/onid, so a
+    // minor release can move a path Entra has to be told about first. That is
+    // why package.json pins with a tilde rather than a caret (#278).
     genericOAuth({
       config: [
         onidProviderConfig(authConfig.onid, (tokens) =>

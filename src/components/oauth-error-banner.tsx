@@ -66,25 +66,16 @@ const ACCOUNT_NOT_LINKED: Record<OAuthProvider | "unknown", ReactNode> = {
 };
 
 /**
- * Copy for the other OAuth failures a user can actually do something about.
- * Both `_is_missing` codes come only from the generic OAuth plugin
- * (`better-auth/dist/plugins/generic-oauth/routes.mjs`), which is ONID here,
- * so they name it whatever the URL says; GitHub's missing address arrives as
- * `email_not_found` and takes the fallback.
+ * Copy for the other OAuth failures that need more than the fallback.
+ *
+ * ONID has no entry of its own. Since Better Auth 1.7 it shares the callback
+ * with GitHub, so a token `onidUserInfo` refuses arrives as
+ * `unable_to_get_user_info`, the code GitHub's failures use too, and the
+ * fallback below already names whichever provider the URL carries. The codes
+ * that were ONID's alone on 1.6, `user_info_is_missing` and
+ * `email_is_missing`, went with the plugin's own callback (#278).
  */
 const OAUTH_ERRORS: Record<string, ReactNode> = {
-  email_is_missing: (
-    <>
-      ONID did not return an email address for your account. Contact the
-      capstone office at <SupportEmailLink /> so we can follow up with UIT.
-    </>
-  ),
-  user_info_is_missing: (
-    <>
-      ONID did not return enough information to sign you in. Try again, and
-      contact the capstone office at <SupportEmailLink /> if it keeps happening.
-    </>
-  ),
   signup_disabled: "This account is not permitted to sign up.",
 };
 

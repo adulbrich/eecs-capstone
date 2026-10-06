@@ -8,11 +8,11 @@ import { addressProofRefused } from "#/lib/address-proof";
  * acts on it (#576).
  *
  * Better Auth's `signInEmailOTP` calls `revokeUnprovenAccountAccess` on any
- * unverified row, then marks it verified, then mints a session. That helper is
- * looser than `releaseUnverifiedAddress`, which ADR-0045 wrote for the ONID
- * path: it refuses neither a banned row nor a row another provider is already
- * linked to. Both gaps are real, and neither is reachable from inside the
- * plugin, so this runs ahead of it.
+ * unverified row, which strips it, marks it verified, and hands it back for a
+ * session. That helper is looser than `releaseUnverifiedAddress`, which
+ * ADR-0045 wrote for the ONID path: it refuses neither a banned row nor a row
+ * another provider is already linked to. Both gaps are real, and neither is
+ * reachable from inside the plugin, so this runs ahead of it.
  *
  * Both refusals are `addressProofRefused` in `src/lib/address-proof.ts`, the
  * rule the ONID release and the admin user page read too (#605).
@@ -28,14 +28,16 @@ import { addressProofRefused } from "#/lib/address-proof";
  * whose `banExpires` has passed and lets the session through, so a code
  * against that row is let through too.
  *
- * **A row with another provider linked.** This one grants something. A social
- * sign-up whose provider reported the address unverified leaves a row with a
- * provider account and `emailVerified` false. `revokeUnprovenAccountAccess`
- * deletes only `credential` accounts, so it deletes nothing here, and the code
- * sign-in then verifies that row and mints a session on it. The provider
- * identity is untouched and can still sign in, so one row now answers to two
- * people. Proving the address is good proof of the address and no proof at all
- * of the other identity.
+ * **A row with another provider linked.** A social sign-up whose provider
+ * reported the address unverified leaves a row with a provider account and
+ * `emailVerified` false. On Better Auth 1.6 the helper deleted only
+ * `credential` accounts, so the code sign-in left the provider identity on the
+ * row and one row answered to two people. Since 1.7 it deletes every account
+ * on the row (#278), so the code sign-in would instead take the row, and
+ * everything on it, away from whoever signed up with that provider. Either
+ * way, proving the address is good proof of the address and no proof at all
+ * of the other identity, which is why this still refuses rather than leaving
+ * it to the helper.
  *
  * ## Why the refusal has to look like a wrong code
  *

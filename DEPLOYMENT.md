@@ -333,12 +333,12 @@ you set it.** It does not auto-renew, UIT do not track expiry dates on their
 side, and nothing in this stack will warn you: sign-in simply starts failing on
 that date. Renewal is a request through the UIT support portal.
 
-The redirect URI, confirmed registered by UIT, is
-`https://capstone.eecs.oregonstate.edu/api/auth/oauth2/callback/onid`. Note the
-`oauth2` segment, which differs from GitHub's `/api/auth/callback/github` in
-section 4.2. That is the Better Auth 1.6 generic-OAuth path, Entra matches
-redirect URIs exactly, and `package.json` pins `~1.6` because 1.7 moves it. See
-`docs/ONID-SSO.md` before upgrading.
+The redirect URI, registered by UIT, is
+`https://capstone.eecs.oregonstate.edu/api/auth/callback/onid`, the same shape
+as GitHub's `/api/auth/callback/github` in section 4.2. Better Auth 1.7 moved it
+there from `/api/auth/oauth2/callback/onid`, which stays registered for a
+rollback. Entra matches redirect URIs exactly, so `package.json` pins Better
+Auth with a tilde. See `docs/ONID-SSO.md` before upgrading to a new minor.
 
 ---
 

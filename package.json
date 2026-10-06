@@ -45,9 +45,6 @@
     "@tailwindcss/typography": {
       "postcss-selector-parser": "^7.1.6"
     },
-    "better-auth": {
-      "vitest": "$vitest"
-    },
     "esbuild": ">=0.28.1",
     "js-yaml": ">=4.3.2 <5",
     "shell-quote": ">=1.9.0",
@@ -63,7 +60,7 @@
     "@aws-sdk/client-s3": "^3.1136.0",
     "@aws-sdk/client-sesv2": "^3.1136.0",
     "@aws-sdk/credential-provider-node": "^3.972.83",
-    "@better-auth/core": "~1.6.33",
+    "@better-auth/core": "~1.7.7",
     "@faker-js/faker": "^10.6.0",
     "@smithy/signature-v4": "^5.7.3",
     "@tailwindcss/vite": "^4.3.3",
@@ -77,7 +74,7 @@
     "@tanstack/react-start": "^1.168.56",
     "@tanstack/react-table": "^9.2.4",
     "@tanstack/router-plugin": "^1.168.37",
-    "better-auth": "~1.6.33",
+    "better-auth": "~1.7.7",
     "bowser": "^2.14.1",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",

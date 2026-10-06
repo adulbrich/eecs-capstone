@@ -29,27 +29,31 @@ buys nothing and costs every new developer a round trip.
 ## Redirect URIs
 
 ```
+https://capstone.eecs.oregonstate.edu/api/auth/callback/onid
+http://localhost:3000/api/auth/callback/onid
+```
+
+These are the ones the app uses, the same shape as GitHub's
+`/api/auth/callback/github`: since Better Auth 1.7, `genericOAuth` registers
+ONID as a social provider and the core callback serves it. UIT added both, and
+on 2026-10-06 Entra accepted them in a `prompt=none` probe (#278).
+
+```
 https://capstone.eecs.oregonstate.edu/api/auth/oauth2/callback/onid
 http://localhost:3000/api/auth/oauth2/callback/onid
 ```
 
-Both are registered and confirmed by UIT, along with a separate development
-client secret for the localhost one.
-
-Note the `oauth2` segment. It does not match GitHub's
-`/api/auth/callback/github` sitting beside it in the same app, and that is not a
-mistake to tidy up: it is where Better Auth 1.6 mounts the generic OAuth
-callback (`signInWithOAuth2` in
-`better-auth/dist/plugins/generic-oauth/routes.mjs`).
+These are the Better Auth 1.6 paths, registered on 2026-08-24 along with a
+separate development client secret for the localhost one. Nothing calls them
+now. They stay registered so a rollback to 1.6 needs no request to UIT; ask
+for their removal once 1.7 has settled.
 
 Entra matches redirect URIs exactly. A URI that is not allowlisted fails at
 sign-in, not at configuration time, which is why `package.json` pins
-`better-auth` to `~1.6.13` rather than `^1.6.13`. Version 1.7 rebuilds
-`genericOAuth` on the social-provider path, moves the callback to
-`/api/auth/callback/:id`, and removes `genericOAuthClient()`. Under a caret
-range, a routine `npm update` would break ONID sign-in with no code change and
-no failing test. **Upgrading to 1.7 requires UIT to allowlist the new URI
-first.**
+`better-auth` with a tilde rather than a caret. A minor release moved this path
+once, and under a caret a routine `npm update` would have broken ONID sign-in
+with no code change and no failing test. **A future minor that moves it again
+needs UIT to allowlist the new URI first.**
 
 ## How the endpoints are resolved
 
@@ -66,18 +70,21 @@ token endpoint      https://login.microsoftonline.com/<tenant>/oauth2/v2.0/token
 ```
 
 `onidProviderConfig` in `src/lib/_internal/onid-provider.ts` hands the two
-endpoints and the issuer to `genericOAuth` as `authorizationUrl`, `tokenUrl`
-and `issuer`, with no `discoveryUrl`. That absence is the point (#553). Given a
-`discoveryUrl`, Better Auth 1.6 GETs the document in the `/sign-in/oauth2`
-handler and again in the callback, uncached, and overwrites any static URL with
-what comes back, so every sign-in cost two round trips to Microsoft before the
-token exchange. The issuer is passed because discovery was also what fed the
-callback's RFC 9207 check on an `iss` query parameter. That check runs only if
-Entra sends the parameter, and this tenant's discovery document does not
-advertise `authorization_response_iss_parameter_supported`, so it is a
-conditional safeguard kept for the day Entra does. The tenant is enforced by
-the `iss` claim pin in `onidUserInfo`, not by this. No userinfo endpoint is
-configured, because `getUserInfo` is ours and reads only the ID token.
+endpoints to `genericOAuth` as `authorizationUrl` and `tokenUrl`, with no
+`discoveryUrl`. That absence was the point of #553: given a `discoveryUrl`,
+Better Auth 1.6 GETs the document in the sign-in handler and again in the
+callback, uncached, so every sign-in cost two round trips to Microsoft before
+the token exchange. Better Auth 1.7 fetches it once, at startup, instead.
+
+Two things in 1.7 depend on discovery, so neither runs here. One is the
+callback's RFC 9207 check on an `iss` query parameter, which on 1.6 this config
+kept by passing `issuer` statically; 1.7 removed that option. The check only
+ever ran if Entra sent the parameter, and this tenant's discovery document does
+not advertise `authorization_response_iss_parameter_supported`. The other is
+1.7's own ID token verification against the tenant's signing keys. The tenant
+is enforced by the `iss` claim pin in `onidUserInfo`, as it was on 1.6. No
+userinfo endpoint is configured, because `getUserInfo` is ours and reads only
+the ID token.
 
 The variable keeps its name and its full discovery URL value, so the tenant
 still lives in one place and a tenant change is still a variable, not a deploy.
@@ -108,7 +115,10 @@ app registration is ever recreated with a new client ID, every existing user
 gets a new `sub` and therefore a second account. `oid` is per user per tenant
 and survives that. `sub` stays as the fallback because Entra gates `oid` behind
 the `profile` scope, which we request but do not control. Do not drop `profile`
-from the scopes for the same reason.
+from the scopes for the same reason. The config also sets `accountSubject` to
+read that `id` explicitly: Better Auth 1.7 keys a generic provider on `sub`
+whenever it has a discovery document, so restoring `discoveryUrl` without it
+would fork every account.
 
 **There is no ONID claim.** UIT: "To my knowledge the ONID is not available via
 OIDC. The next-best record would be the UPN, passed through the username claim."
@@ -203,6 +213,12 @@ this safe rather than the merge the paragraph above refuses; there is no
 password left for anyone to inherit. An ONID identity for somebody else's
 address cannot be obtained, so the university authenticating the person is
 stronger proof than a link we mailed ourselves.
+
+That argument holds only for a token from a sign-in that just happened. Better
+Auth also calls `getUserInfo` from `GET /api/auth/account-info`, with the ID
+token stored at the last sign-in, so that path is in `DISABLED_PATHS` (#278).
+Keep it there, and check any new Better Auth route that calls a provider's
+`getUserInfo` the same way.
 
 Two rows are still refused, and `/sign-in` still renders the banner for them. An
 unverified row that some other provider is already linked to belongs to whoever
