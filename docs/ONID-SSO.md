@@ -214,6 +214,12 @@ password left for anyone to inherit. An ONID identity for somebody else's
 address cannot be obtained, so the university authenticating the person is
 stronger proof than a link we mailed ourselves.
 
+That argument holds only for a token from a sign-in that just happened. Better
+Auth also calls `getUserInfo` from `GET /api/auth/account-info`, with the ID
+token stored at the last sign-in, so that path is in `DISABLED_PATHS` (#278).
+Keep it there, and check any new Better Auth route that calls a provider's
+`getUserInfo` the same way.
+
 Two rows are still refused, and `/sign-in` still renders the banner for them. An
 unverified row that some other provider is already linked to belongs to whoever
 holds that identity, and a row under an active ban would hand the student an
