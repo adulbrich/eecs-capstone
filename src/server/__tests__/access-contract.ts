@@ -217,13 +217,13 @@ export const ACCESS_CONTRACT: Record<string, AccessDeclaration> = {
   "server/notifications.ts:getMyNotifications": { level: "authenticated" },
   "server/notifications.ts:listMyNotifications": {
     level: "public",
-    note: "Stale-tab stub from before #729: returns [] and reads neither the session nor the database. Remove in #774.",
+    note: "Stale-tab stub from before #729: returns { rows: [] }, the old shape, and reads neither the session nor the database. Remove in #774.",
   },
   "server/notifications.ts:markAllRead": { level: "authenticated" },
   "server/notifications.ts:markRead": { level: "authenticated" },
   "server/notifications.ts:unreadCount": {
     level: "public",
-    note: "Stale-tab stub from before #729: returns { count: 0 } and reads neither the session nor the database. Remove in #774.",
+    note: "Stale-tab stub from before #729: returns { count: 0 }, the old shape, and reads neither the session nor the database. Remove in #774.",
   },
 
   "server/profile.ts:updateProfile": {

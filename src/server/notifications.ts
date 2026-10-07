@@ -25,7 +25,7 @@ export const getMyNotifications = createServerFn({ method: "GET" }).handler(
  * They answer an empty bell without reading the session. Remove in #774.
  */
 export const listMyNotifications = createServerFn({ method: "GET" }).handler(
-  () => []
+  () => ({ rows: [] })
 );
 
 export const unreadCount = createServerFn({ method: "GET" }).handler(() => ({
