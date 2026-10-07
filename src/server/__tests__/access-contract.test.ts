@@ -65,6 +65,8 @@ describe("the server function access contract", () => {
       "server/inventory.ts:getInventoryItemDetail",
       "server/inventory.ts:listInventory",
       "server/inventory.ts:listInventoryCategories",
+      "server/notifications.ts:listMyNotifications",
+      "server/notifications.ts:unreadCount",
       "server/programs.ts:listPrograms",
       "server/projects-queries.ts:getProject",
       "server/projects-queries.ts:getSimilarProjects",

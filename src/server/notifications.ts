@@ -17,6 +17,21 @@ export const getMyNotifications = createServerFn({ method: "GET" }).handler(
   }
 );
 
+/**
+ * Stale-tab stubs for the bell before #729, which polled these two every
+ * minute. Tabs opened before that deploy still do, and each poll was a 500
+ * that kept `eecs-capstone-app-5xx` firing. A server function's id is a hash
+ * of this file's path and the export name, so neither may move or be renamed.
+ * They answer an empty bell without reading the session. Remove in #774.
+ */
+export const listMyNotifications = createServerFn({ method: "GET" }).handler(
+  () => ({ rows: [] })
+);
+
+export const unreadCount = createServerFn({ method: "GET" }).handler(() => ({
+  count: 0,
+}));
+
 export const markRead = createServerFn({ method: "POST" })
   .validator((data: unknown) => idSchema.parse(data))
   .handler(async ({ data }) => {
