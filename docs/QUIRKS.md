@@ -46,6 +46,10 @@ const make = (s: Status) => createServerFn({ method: "POST" }).handler(/* ... */
 
 Start's import protection fails the build on any client-chain import of a `*.server.*` path, even one inside a stripped handler. Server-only code goes under `_internal/`: [ADR-0001](./adr/0001-internal-directory-for-server-only-code.md).
 
+### Removing or renaming a server function 500s every tab opened before the deploy
+
+A server function's URL is `/_serverFn/<sha256 of "src/server/x.ts--<export>_createServerFn_handler">`, fixed at build time. A tab opened before the deploy keeps the old bundle until a full reload, so a removed id answers 500 for as long as it stays open, and a polled one trips `eecs-capstone-app-5xx` for days. Before removing or renaming one that a client polls, leave a stub under the old file and export name that answers the old shape without a session, with an issue to remove it. To match an id in the ALB logs to a function, `printf '%s' 'src/server/x.ts--<export>_createServerFn_handler' | shasum -a 256`.
+
 ### An impl imports its input types back from its domain's wrapper, type-only
 
 `import type { XInput } from "../x"`, never the schema value, which would pull `createServerFn` into the impl. [ADR-0001](./adr/0001-internal-directory-for-server-only-code.md) has the rule; `verbatimModuleSyntax` turns a dropped `type` into a tsc error.
