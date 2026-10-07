@@ -1,6 +1,7 @@
 import { Link } from "@tanstack/react-router";
 import { defineAdminColumns } from "#/components/admin-data-table";
 import { projectImageSrc } from "#/lib/project-image";
+import { projectUrlHref } from "#/lib/project-url";
 import type { SortState } from "#/lib/table-state";
 import type { searchProjects } from "#/server/search";
 import { BookmarkToggle } from "./bookmark-set";
@@ -126,19 +127,22 @@ export const PROJECT_TABLE_COLUMNS = defineAdminColumns<ProjectListRow>()([
   },
   {
     accessorFn: (row) => row.url ?? undefined,
-    cell: ({ row }) =>
-      row.original.url ? (
+    cell: ({ row }) => {
+      const href = projectUrlHref(row.original.url);
+      if (!href) {
+        return row.original.url || "-";
+      }
+      return (
         <a
           className="text-brand-dark hover:underline"
-          href={row.original.url}
+          href={href}
           rel="noreferrer"
           target="_blank"
         >
-          {row.original.url}
+          {href}
         </a>
-      ) : (
-        "-"
-      ),
+      );
+    },
     defaultHidden: true,
     enableSorting: false,
     header: "URL",

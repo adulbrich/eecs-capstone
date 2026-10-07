@@ -288,6 +288,13 @@
       "when": 1791230002974,
       "tag": "0040_add_project_ai_refreshes",
       "breakpoints": true
+    },
+    {
+      "idx": 41,
+      "version": "7",
+      "when": 1791417001699,
+      "tag": "0041_add_scheme_to_project_urls",
+      "breakpoints": true
     }
   ]
 }

@@ -16,6 +16,7 @@ import {
   IMPROVABLE_FIELDS,
   type ImprovableField,
 } from "#/lib/project-review-fields";
+import { projectUrlSchema } from "#/lib/project-url";
 import {
   clampTeamsSupported,
   TEAMS_SUPPORTED_MAX,
@@ -33,11 +34,6 @@ import { Input } from "./ui/input";
 import { Label } from "./ui/label";
 import { Textarea } from "./ui/textarea";
 
-const optionalUrl = z.union([
-  z.literal(""),
-  z.string().url("Must be a valid URL").max(500),
-]);
-
 const optionalEmail = z.union([
   z.literal(""),
   z.string().email("Must be a valid email").max(200),
@@ -54,7 +50,7 @@ export const projectFormSchema = z.object({
   objectives: z.string().max(FIELD_MAX_LENGTHS.objectives),
   minQualifications: z.string().max(FIELD_MAX_LENGTHS.minQualifications),
   prefQualifications: z.string().max(FIELD_MAX_LENGTHS.prefQualifications),
-  url: optionalUrl,
+  url: projectUrlSchema,
   contactEmail: optionalEmail,
   contactName: z.string().max(200),
   imageUrl: z.union([z.literal(""), z.string().max(500)]),
@@ -442,7 +438,7 @@ export function ProjectForm({
         )}
       </form.Field>
       <Field
-        description="A link to your organization, or to background reading. Optional."
+        description="Optional. One link, starting with https://. Put any other links in the description."
         form={form}
         label="URL"
         name="url"

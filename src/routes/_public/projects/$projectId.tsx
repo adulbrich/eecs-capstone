@@ -22,12 +22,11 @@ import { isUuid } from "#/lib/is-uuid";
 import { pageTitle } from "#/lib/page-title";
 import { projectImageSrc } from "#/lib/project-image";
 import { FIELD_HEADINGS } from "#/lib/project-review-fields";
+import { projectUrlHref } from "#/lib/project-url";
 import { programLabel } from "#/lib/project-visibility";
 import { absoluteUrl } from "#/lib/site-url";
 import { NOINDEX, socialDescription } from "#/lib/social-meta";
 import { getProject, listProjectComments } from "#/server/projects-queries";
-
-const PROTOCOL_RE = /^https?:\/\//i;
 
 type GetProjectResult = Awaited<ReturnType<typeof getProject>>;
 
@@ -393,19 +392,23 @@ function UrlSection({ url }: { url: string | null }) {
   if (!url) {
     return null;
   }
-  const href = PROTOCOL_RE.test(url) ? url : `https://${url}`;
+  const href = projectUrlHref(url);
   return (
     <section className="mt-8">
       <SectionHeading>URL</SectionHeading>
-      <p className="mt-2">
-        <a
-          className="break-all text-brand-dark underline"
-          href={href}
-          rel="noopener noreferrer"
-          target="_blank"
-        >
-          {url}
-        </a>
+      <p className="mt-2 whitespace-pre-line break-all">
+        {href ? (
+          <a
+            className="text-brand-dark underline"
+            href={href}
+            rel="noopener noreferrer"
+            target="_blank"
+          >
+            {href}
+          </a>
+        ) : (
+          url
+        )}
       </p>
     </section>
   );

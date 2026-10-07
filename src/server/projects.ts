@@ -1,5 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
+import { projectUrlSchema } from "#/lib/project-url";
 import {
   TEAMS_SUPPORTED_MAX,
   TEAMS_SUPPORTED_MIN,
@@ -14,7 +15,7 @@ const projectInputSchema = z.object({
   objectives: z.string().max(5000).nullable().optional(),
   minQualifications: z.string().max(2000).nullable().optional(),
   prefQualifications: z.string().max(2000).nullable().optional(),
-  url: z.string().url().max(500).nullable().optional().or(z.literal("")),
+  url: projectUrlSchema.nullable().optional(),
   contactEmail: z
     .string()
     .email()
