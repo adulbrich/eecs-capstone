@@ -24,8 +24,8 @@ const SCHEME_RE = /^https?:\/\//i;
 // a signal alone: both are legal in one link, as in an archive.org snapshot.
 const SECOND_LINK_RE = /\s|[,;|]https?:\/\//i;
 
-// `new URL` rather than `URL.canParse`, which browsers gained only in late
-// 2023: this runs on the public page at render, where an older one would throw.
+// `new URL` rather than `URL.canParse`, which browsers gained only in 2023:
+// this runs on the public page at render, where an older one would throw.
 function parses(value: string): boolean {
   try {
     return Boolean(new URL(value));
