@@ -1,9 +1,10 @@
 -- Backfill for #776: a project URL that is one bare domain gains `https://`.
 --
--- `projectUrlSchema` in src/lib/project-url.ts requires the scheme from this
--- release on, so an unprefixed value would fail the next time anyone saved
--- its project, on a field they never touched. The legacy import carried 48 of
--- them, such as `www.intel.com`.
+-- `projectUrlSchema` in src/lib/project-url.ts requires the scheme, as `.url()`
+-- did before it, so an unprefixed value blocks every save of its project on a
+-- field nobody touched. 40 of the 242 archived legacy URLs were one, such as
+-- `www.intel.com`; this WHERE, run as a SELECT over that export, matched
+-- exactly those 40, and each result passes the schema.
 --
 -- Only a value shaped like a host, with an optional path, is rewritten. Prose,
 -- several links, `none` and any value already holding a scheme stay as they

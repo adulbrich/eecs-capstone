@@ -7,8 +7,10 @@ import {
 } from "#/lib/project-url";
 
 function messages(value: string): string[] {
-  const r = projectUrlSchema.safeParse(value);
-  return r.success ? [] : r.error.issues.map((i) => i.message);
+  const result = projectUrlSchema.safeParse(value);
+  return result.success
+    ? []
+    : result.error.issues.map((issue) => issue.message);
 }
 
 describe("projectUrlSchema", () => {
@@ -36,6 +38,7 @@ describe("projectUrlSchema", () => {
     "https://a.com\thttps://b.com",
     "https://a.com,https://b.com",
     "https://a.com;http://b.com",
+    "https://a.com|https://b.com",
     "Company site: https://a.com",
   ])("rejects more than one link in %j", (value) => {
     expect(messages(value)).toEqual([PROJECT_URL_MESSAGES.oneLink]);
