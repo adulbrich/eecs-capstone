@@ -95,13 +95,13 @@ const DEFAULT_HIDDEN = PROJECT_TABLE_COLUMNS.filter(
   (column) => column.defaultHidden
 ).map((column) => column.id);
 
-function renderTable(hidden: string[]) {
+function renderTable(hidden: string[], data: ProjectListRow[] = ROWS) {
   return render(
     <BookmarkSetProvider>
       <AdminDataTable
         caption="Projects"
         columns={PROJECT_TABLE_COLUMNS}
-        data={ROWS}
+        data={data}
         defaultSort={PROJECT_TABLE_DEFAULT_SORT}
         emptyMessage="Nothing."
         getRowId={(row) => row.id}
@@ -316,6 +316,18 @@ describe("the public project table", () => {
     const url = row.getByRole("link", { name: "https://example.com/rover" });
     expect(url.getAttribute("href")).toBe("https://example.com/rover");
     expect(url.getAttribute("rel")).toContain("noreferrer");
+  });
+
+  it.each([
+    "https://a.com https://b.com",
+    "www.example.com",
+    "javascript:alert(1)",
+  ])("shows the stored URL %j as text, not a link", (stored) => {
+    // Rows written before #776 can hold any of these. The cell used to put
+    // the value straight into an href.
+    renderTable([], [{ ...ROWS[0], url: stored }]);
+    const row = rowFor("Rover Telemetry");
+    expect(row.getByText(stored).closest("a")).toBeNull();
   });
 
   it("puts the thumbnail, the link and the bookmark toggle in the Title cell", async () => {

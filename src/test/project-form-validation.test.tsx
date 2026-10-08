@@ -84,4 +84,23 @@ describe("ProjectForm validation", () => {
       expect(screen.getByText(/Title is required/)).toBeTruthy()
     );
   });
+
+  it("refuses several links in the URL field and says where they go", async () => {
+    // #776: zod's `.url()` accepted links separated by a space, and the page
+    // rendered them as one broken link.
+    const form = renderForm();
+    const message = /Enter one link. Put any others in the description./;
+
+    expect(screen.queryByText(message)).toBeNull();
+
+    fireEvent.change(screen.getByLabelText("Title"), {
+      target: { value: "A project" },
+    });
+    fireEvent.change(screen.getByLabelText("URL"), {
+      target: { value: "https://a.com https://b.com" },
+    });
+    fireEvent.submit(form);
+
+    await waitFor(() => expect(screen.getByText(message)).toBeTruthy());
+  });
 });
