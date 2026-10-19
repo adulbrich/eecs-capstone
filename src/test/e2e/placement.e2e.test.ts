@@ -209,7 +209,7 @@ test.describe("placement workspace", () => {
     await page.getByRole("tab", { name: /Bids/ }).click();
     await page.getByRole("button", { name: "Per project" }).click();
     await page
-      .getByRole("button", { name: /^Pin Ada Park to Tide Clock/ })
+      .getByRole("button", { name: /^Pin here: Ada Park to Tide Clock/ })
       .click();
     await page.getByRole("tab", { name: /Projects/ }).click();
     await page.getByLabel("Min students per team, Robot Arm").fill("1");
@@ -767,7 +767,7 @@ test.describe("placement workspace", () => {
     for (const [table, header] of Object.entries(headers)) {
       const download = page.waitForEvent("download");
       await sheet
-        .getByRole("button", { name: `Download ${table} as CSV` })
+        .getByRole("button", { name: `Download CSV of ${table}` })
         .click();
       const text = await readFile(await (await download).path(), "utf-8");
       expect(text.replace(/^\uFEFF/, "").split("\r\n")[0]).toBe(header);
@@ -1376,7 +1376,7 @@ test.describe("placement workspace", () => {
     await expect(tide).toContainText("Tides, and");
 
     await tide
-      .getByRole("button", { name: "Pin Ada Park to Tide Clock" })
+      .getByRole("button", { name: "Pin here: Ada Park to Tide Clock" })
       .click();
     await expect(
       tide.getByRole("button", { name: "Unpin Ada Park" })
@@ -1479,7 +1479,7 @@ test.describe("placement workspace", () => {
     // A pin set after the run shows alone, and says when it takes effect.
     await page.getByRole("button", { name: "Per project" }).click();
     await page
-      .getByRole("button", { name: "Pin Ada Park to Robot Arm" })
+      .getByRole("button", { name: "Pin here: Ada Park to Robot Arm" })
       .click();
     const perStudent = page.getByRole("button", { name: "Per student" });
     await perStudent.click();
@@ -1590,7 +1590,7 @@ test.describe("placement workspace", () => {
     await expect(added).toContainText("Moon Base");
     await page.getByRole("tab", { name: /Bids/ }).click();
     await page
-      .getByRole("button", { name: "Remove Kim Lee from placement" })
+      .getByRole("button", { name: "Remove from placement: Kim Lee" })
       .click();
     await expect(
       page.getByText(
@@ -1616,7 +1616,7 @@ test.describe("placement workspace", () => {
     // On the board, Remove sits in the row's More menu and asks first, so
     // it is not read as "remove from this team" (#685).
     await expect(
-      page.getByRole("button", { name: "Remove Ada Park from placement" })
+      page.getByRole("button", { name: "Remove from placement: Ada Park" })
     ).toHaveCount(0);
     const removeFromBoard = async () => {
       await page.getByRole("button", { name: "More for Ada Park" }).click();

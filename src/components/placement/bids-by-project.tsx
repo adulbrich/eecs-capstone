@@ -170,7 +170,7 @@ export function BidsByProject({
               ) : (
                 !r.fixed && (
                   <Button
-                    aria-label={`Pin ${who} to ${r.projectTitle}`}
+                    aria-label={`Pin here: ${who} to ${r.projectTitle}`}
                     onClick={() => pin(r.email, r.projectKey)}
                     size="sm"
                     type="button"

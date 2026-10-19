@@ -643,12 +643,12 @@ test("@smoke admin placement, projects and bids loaded", async ({ page }) => {
 
   await page.getByRole("button", { name: "Per project" }).click();
   await expect(
-    page.getByRole("button", { name: /^Pin .* to / }).first()
+    page.getByRole("button", { name: /^Pin here: .* to / }).first()
   ).toBeVisible();
   await checkA11y(page);
   // Who is pinned to each project, and the Pinned only switch (#688).
   await page
-    .getByRole("button", { name: /^Pin .* to / })
+    .getByRole("button", { name: /^Pin here: .* to / })
     .first()
     .click();
   await expect(page.getByText(/^Pinned: /).first()).toBeVisible();

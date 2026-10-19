@@ -109,7 +109,7 @@ function renderTwoBells() {
 }
 
 function bells() {
-  return screen.getAllByRole("button", { name: "Notifications" });
+  return screen.getAllByRole("button", { name: /^Notifications/ });
 }
 
 async function settledOnMount() {
@@ -247,6 +247,41 @@ describe("NotificationBell, mounted twice", () => {
       }
     });
     expect(onError).not.toHaveBeenCalled();
+  });
+
+  it("names a single-digit count as its badge shows it", async () => {
+    session = { user: { id: "u1" } };
+    renderTwoBells();
+    await settledOnMount();
+    const named = screen.getAllByRole("button", {
+      name: "Notifications, 2 unread",
+    });
+    expect(named).toHaveLength(2);
+    for (const bell of named) {
+      expect(bell.textContent).toBe("2");
+    }
+  });
+
+  it("names the count its badge shows, and none once read", async () => {
+    unread = 12;
+    session = { user: { id: "u1" } };
+    renderTwoBells();
+    await waitFor(() => {
+      for (const bell of bells()) {
+        expect(bell.textContent).toBe("9+");
+      }
+    });
+    expect(
+      screen.getAllByRole("button", { name: "Notifications, 9+ unread" })
+    ).toHaveLength(2);
+
+    unread = 0;
+    fireEvent.click(bells()[0]);
+    await waitFor(() =>
+      expect(
+        screen.getAllByRole("button", { name: "Notifications" })
+      ).toHaveLength(2)
+    );
   });
 
   it("makes no request for a signed-out viewer", async () => {

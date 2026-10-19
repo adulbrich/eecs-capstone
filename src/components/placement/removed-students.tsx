@@ -30,7 +30,7 @@ export function RemoveStudentButton({
 }) {
   return (
     <Button
-      aria-label={`Remove ${name || email} from placement`}
+      aria-label={`Remove from placement: ${name || email}`}
       onClick={() => update((w) => removeStudents(w, [email]))}
       size="sm"
       type="button"

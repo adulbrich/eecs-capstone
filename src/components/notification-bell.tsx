@@ -105,6 +105,7 @@ export function NotificationBell() {
     });
   }, [router, queryClient, userId]);
   const unread = data?.count ?? 0;
+  const badge = unread > 9 ? "9+" : String(unread);
   const rows = data?.rows ?? [];
 
   // One read of this viewer's entry, shared by every mounted bell: after a
@@ -152,7 +153,11 @@ export function NotificationBell() {
     >
       <PopoverTrigger asChild>
         <Button
-          aria-label="Notifications"
+          // The name carries the badge's text, which a screen reader would
+          // otherwise never hear and a voice user could not say.
+          aria-label={
+            unread > 0 ? `Notifications, ${badge} unread` : "Notifications"
+          }
           className="relative"
           size="icon-sm"
           type="button"
@@ -168,7 +173,7 @@ export function NotificationBell() {
           )}
           {unread > 0 && (
             <span className="absolute -top-0.5 -right-0.5 min-w-[1.25rem] rounded-full bg-destructive px-1 text-center text-destructive-foreground text-xs">
-              {unread > 9 ? "9+" : unread}
+              {badge}
             </span>
           )}
         </Button>
