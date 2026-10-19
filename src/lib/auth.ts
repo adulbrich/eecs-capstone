@@ -657,10 +657,24 @@ export const auth = betterAuth({
   },
   user: {
     additionalFields: {
-      affiliation: { type: "string", required: false },
-      linkedin: { type: "string", required: false },
-      wantsToMentor: { type: "boolean", required: false, defaultValue: false },
-      mentorTeamCount: { type: "number", required: false, defaultValue: 1 },
+      // `input: false` on all four profile fields: `POST /update-user` would
+      // otherwise take them from any signed-in user with only a type check,
+      // skipping `profileSchema`'s link rule and its mentor rule. The profile
+      // page writes them through `updateProfile` (#778).
+      affiliation: { type: "string", required: false, input: false },
+      linkedin: { type: "string", required: false, input: false },
+      wantsToMentor: {
+        type: "boolean",
+        required: false,
+        defaultValue: false,
+        input: false,
+      },
+      mentorTeamCount: {
+        type: "number",
+        required: false,
+        defaultValue: 1,
+        input: false,
+      },
       // Server-written only: `input: false` keeps it off every sign-up and
       // update body. Mirrors the column in auth-schema.ts. See #84.
       deletedAt: { type: "date", required: false, input: false },

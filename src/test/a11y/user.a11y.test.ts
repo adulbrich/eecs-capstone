@@ -385,6 +385,22 @@ test("profile page", async ({ page }) => {
   await checkA11y(page);
 });
 
+// Refused on the client: the server's refusal of the same value would arrive
+// as zod's issues JSON (#778). Nothing is saved, so the fixture is untouched.
+test("profile page, refusing a javascript: LinkedIn URL", async ({ page }) => {
+  await page.goto("/profile");
+  await waitForHydration(page);
+  const field = page.getByLabel("LinkedIn URL");
+  await field.fill("javascript:alert(1)");
+  await page.getByRole("button", { name: "Save profile" }).click();
+  await expect(page.locator("#linkedin-error")).toHaveText(
+    "Start the link with https:// or http://."
+  );
+  await expect(field).toHaveAttribute("aria-invalid", "true");
+  await expect(field).toHaveAttribute("aria-describedby", "linkedin-error");
+  await checkA11y(page);
+});
+
 test("new project form", async ({ page }) => {
   await page.goto("/projects/new");
   await checkA11y(page);
