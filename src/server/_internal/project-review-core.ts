@@ -24,7 +24,7 @@ export interface ReviewConfig {
   /**
    * Reasoning tokens are billed and counted as output, and editing seven prose
    * fields needs no deliberation. "none" turns reasoning off entirely on the
-   * GPT-6 models if a deployment wants that.
+   * GPT-6 Luna if a deployment wants that.
    */
   reasoningEffort: string;
 }

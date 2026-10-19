@@ -16,7 +16,7 @@ const DEFAULT_REGION = "us-east-1";
 const SIGNING_SERVICE = "bedrock-mantle";
 
 /**
- * OpenAI's GPT models are served under `/openai/v1` on Mantle rather than the
+ * GPT-5.6 and GPT-6 are served under `/openai/v1` on Mantle rather than the
  * endpoint's default `/v1`, so the path is not interchangeable between models.
  */
 export const RESPONSES_PATH = "/openai/v1/responses";
