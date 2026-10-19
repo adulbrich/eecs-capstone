@@ -115,6 +115,45 @@ describe("profile", () => {
     expect(row.name).toBe(email);
   });
 
+  // `update-user` checks an additional field's type and nothing else, so it
+  // would skip `profileSchema`: its link rule and its mentor rule (#778).
+  // Better Auth refuses only a truthy value for an `input: false` field and
+  // drops a falsy one, which is why these send a value that would be written.
+  it.each([
+    ["linkedin", "javascript:alert(1)"],
+    ["affiliation", "Anywhere"],
+    ["wantsToMentor", true],
+    ["mentorTeamCount", 5],
+  ] as const)("refuses %s through update-user", async (field, value) => {
+    const email = `f-${field}-${Date.now()}@x.com`;
+    const headers = await signedInHeaders(email);
+    await expect(
+      auth.api.updateUser({ body: { [field]: value }, headers })
+    ).rejects.toThrow(`${field} is not allowed to be set`);
+    const [row] = await db.select().from(user).where(eq(user.email, email));
+    expect({
+      affiliation: row.affiliation,
+      linkedin: row.linkedin,
+      mentorTeamCount: row.mentorTeamCount,
+      wantsToMentor: row.wantsToMentor,
+    }).toEqual({
+      affiliation: null,
+      linkedin: null,
+      mentorTeamCount: 1,
+      wantsToMentor: false,
+    });
+  });
+
+  it("stores a LinkedIn URL of spaces as null", async () => {
+    const u = await makeUser(`l-${Date.now()}@x.com`);
+    await updateProfileImpl(
+      u.id,
+      profileSchema.parse({ linkedin: "   ", name: "Ada" })
+    );
+    const [row] = await db.select().from(user).where(eq(user.id, u.id));
+    expect(row.linkedin).toBeNull();
+  });
+
   it("stores a padded account name trimmed", async () => {
     const email = `p-${Date.now()}@x.com`;
     await auth.api.createUser({

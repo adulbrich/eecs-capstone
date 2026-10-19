@@ -166,6 +166,10 @@ Better Auth generates `text` primary keys and we keep the default, so every FK t
 
 `npx @better-auth/cli generate` overwrites `src/db/auth-schema.ts`, and the custom fields come back because they live in `user.additionalFields` in `src/lib/auth.ts`. Change them there; `.claude/hooks/guard-edits.mjs` refuses an edit to the generated file.
 
+### An additional field without `input: false` is writable by any signed-in user
+
+`POST /update-user` passes every additional field through with only a type check, whatever schema the app's own server function applies. So every profile field carries `input: false` and is written through `updateProfile` (#778). The refusal is a 400 for a truthy value only: `false`, `0` and `""` are dropped without a word, so a test must send a value that would have been written. A `defaultValue` still applies on create.
+
 ### Console email transport in dev
 
 `EMAIL_TRANSPORT=console` writes every email the app sends to stderr, which is where a local sign-in code arrives. `EMAIL_TRANSPORT=ses` needs `EMAIL_FROM`, and `getEmailSender()` runs at import in `src/lib/auth.ts`, so a missing one takes down the app, not just mail. All email markup comes from `src/lib/email/templates.ts`, which owns the escaping.

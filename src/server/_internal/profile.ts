@@ -9,7 +9,8 @@ export async function updateProfileImpl(userId: string, data: ProfileInput) {
     .update(user)
     .set({
       affiliation: data.affiliation?.trim() || null,
-      linkedin: data.linkedin ?? null,
+      // The schema trims, so a field of spaces arrives as "".
+      linkedin: data.linkedin || null,
       mentorTeamCount: data.mentorTeamCount,
       name: data.name,
       updatedAt: new Date(),

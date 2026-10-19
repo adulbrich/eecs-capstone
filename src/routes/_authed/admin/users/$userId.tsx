@@ -1,5 +1,6 @@
 import { createFileRoute, Link, useRouter } from "@tanstack/react-router";
 import { BanForm } from "#/components/ban-form";
+import { LinkedinLine } from "#/components/linkedin-line";
 import { LocalTime } from "#/components/local-time";
 import { RoleSelect } from "#/components/role-select";
 import {
@@ -94,17 +95,7 @@ function UserDetail() {
           {user.affiliation}
         </p>
       )}
-      {user.linkedin && (
-        <p className="text-sm">
-          <span className="text-muted-foreground">LinkedIn: </span>
-          <a
-            className="break-all text-brand-dark underline"
-            href={user.linkedin}
-          >
-            {user.linkedin}
-          </a>
-        </p>
-      )}
+      {user.linkedin && <LinkedinLine stored={user.linkedin} />}
       {user.wantsToMentor && (
         <p className="text-sm">
           <span className="text-muted-foreground">Mentor: </span>

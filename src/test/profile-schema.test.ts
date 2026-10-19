@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { profileSchema } from "#/server/profile";
+import { LINKEDIN_URL_MESSAGES, profileSchema } from "#/server/profile";
 
 const base = { name: "Dana Lee", affiliation: "OSU", linkedin: null };
 
@@ -82,5 +82,24 @@ describe("profileSchema mentor rules", () => {
     const r = profileSchema.parse({ name: "Dana Lee" });
     expect(r.wantsToMentor).toBe(false);
     expect(r.mentorTeamCount).toBe(1);
+  });
+});
+
+describe("profileSchema LinkedIn URL", () => {
+  function linkedinMessages(linkedin: string): string[] {
+    const r = profileSchema.safeParse({ ...base, linkedin });
+    return r.success ? [] : r.error.issues.map((issue) => issue.message);
+  }
+
+  it("accepts one https link", () => {
+    expect(linkedinMessages("https://www.linkedin.com/in/x")).toEqual([]);
+  });
+
+  it.each([
+    ["javascript:alert(1)", LINKEDIN_URL_MESSAGES.scheme],
+    ["www.linkedin.com/in/x", LINKEDIN_URL_MESSAGES.scheme],
+    ["https://a.com https://b.com", LINKEDIN_URL_MESSAGES.several],
+  ])("refuses %j", (linkedin, message) => {
+    expect(linkedinMessages(linkedin)).toEqual([message]);
   });
 });

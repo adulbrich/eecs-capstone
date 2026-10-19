@@ -17,7 +17,9 @@ import { useSignOut } from "#/lib/sign-out";
 import { useAction } from "#/lib/use-action";
 import { getAccountDeletionPreview } from "#/server/account";
 import { getMyInterests, saveMyInterests } from "#/server/interests";
-import { updateProfile } from "#/server/profile";
+import { profileSchema, updateProfile } from "#/server/profile";
+
+const LINKEDIN_ERROR_ID = "linkedin-error";
 
 export const Route = createFileRoute("/_authed/profile")({
   head: () => ({ meta: [{ title: pageTitle("Profile") }] }),
@@ -45,6 +47,7 @@ function Profile() {
   // further down the page.
   const profile = useAction({ fallback: "Save failed" });
   const [profileSaved, setProfileSaved] = useState<string | null>(null);
+  const [linkedinError, setLinkedinError] = useState<string | null>(null);
   const signingOut = useSignOut();
   const [interests, setInterests] = useState("");
   const savingInterests = useAction({
@@ -92,16 +95,27 @@ function Profile() {
     e.preventDefault();
     setProfileSaved(null);
     const form = new FormData(e.currentTarget);
+    const data = {
+      name: String(form.get("name") ?? ""),
+      affiliation: String(form.get("affiliation") ?? "") || null,
+      linkedin: String(form.get("linkedin") ?? "") || null,
+      wantsToMentor,
+      mentorTeamCount,
+    };
+    // The server parses with the same schema, but a refusal from there
+    // arrives as zod's issues JSON, not as the rule's message (#778).
+    const parsed = profileSchema.safeParse(data);
+    if (!parsed.success) {
+      const issues = parsed.error.issues;
+      const linkedin = issues.find((issue) => issue.path[0] === "linkedin");
+      setLinkedinError(linkedin?.message ?? null);
+      const other = issues.find((issue) => issue !== linkedin);
+      profile.setError(other?.message ?? null);
+      return;
+    }
+    setLinkedinError(null);
     void profile.run(async () => {
-      await updateProfile({
-        data: {
-          name: String(form.get("name") ?? ""),
-          affiliation: String(form.get("affiliation") ?? "") || null,
-          linkedin: String(form.get("linkedin") ?? "") || null,
-          wantsToMentor,
-          mentorTeamCount,
-        },
-      });
+      await updateProfile({ data });
       // Awaited inside the flight: the header reads the name from loader
       // data, and re-enabling Save over the old one shows a stale name with
       // a live button beside it.
@@ -160,13 +174,19 @@ function Profile() {
         </div>
         <div className="space-y-1.5">
           <Label htmlFor="linkedin">LinkedIn URL</Label>
+          {/* Not `type="url"`: the browser's own refusal would pre-empt the
+              rule's messages, and it lets `javascript:` through anyway. */}
           <Input
+            aria-describedby={linkedinError ? LINKEDIN_ERROR_ID : undefined}
+            aria-invalid={linkedinError ? true : undefined}
             defaultValue={user.linkedin ?? ""}
             id="linkedin"
+            inputMode="url"
             name="linkedin"
+            onChange={() => setLinkedinError(null)}
             placeholder="https://linkedin.com/in/..."
-            type="url"
           />
+          <FieldError id={LINKEDIN_ERROR_ID} message={linkedinError} />
         </div>
         <MentorFields
           count={mentorTeamCount}
