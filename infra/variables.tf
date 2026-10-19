@@ -53,7 +53,7 @@ variable "db_username" {
 }
 
 variable "db_instance_class" {
-  description = "RDS instance class (Graviton/arm64). Sized by connections rather than by CPU, and by season (ADR-0064). Off season, t4g.micro: 1 GiB and 107 usable connections, which hold two tasks at a pool of 40. Term start, t4g.small: 2 GiB and 220, which hold four at 45 (ADR-0034, ADR-0035). RDS CPU stayed under 7.2% through the 2026 term start outside one five-minute spike."
+  description = "RDS instance class (Graviton/arm64). Sized by connections rather than by CPU, and by season (ADR-0064). Off season, t4g.micro: 1 GiB and 107 usable connections, which hold two tasks at a pool of 40. Term start, t4g.small: 2 GiB and 220, which hold four at 45 (ADR-0034, ADR-0035). RDS CPU stayed at or under 7.1% through the 2026 term start outside a load test and one five-minute spike."
   type        = string
   default     = "db.t4g.micro"
 }

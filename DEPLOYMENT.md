@@ -1373,8 +1373,9 @@ that is the alarms reaching a state for the first time.
 replacement (ADR-0043), so the fleet reads one of two, or two of three, for
 several minutes.
 `eecs-capstone-fleet-below-floor` alarms only below what a deploy keeps
-running, so that dip stays silent and a mail from it means tasks are down or
-crash-looping. ADR-0058 records the 12 deploys that settled this and what the
+running, so that dip stays silent and a mail from it means too few tasks pass
+their health check: off season, none at all, so one of two crash-looping is left
+to the 5XX alarms. ADR-0058 records the 12 deploys that settled this and what the
 threshold gives up.
 
 ### Run a migration manually

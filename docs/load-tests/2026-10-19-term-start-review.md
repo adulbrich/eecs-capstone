@@ -18,7 +18,7 @@ before fall 2027.
 
 | Metric | #522 assumed | Observed |
 | --- | --- | --- |
-| ECS `CPUUtilization` | peak 23.9% at one task | 41% busiest task at the 09-25 peak (49 requests per second); target tracking never fired after 09-23 |
+| ECS `CPUUtilization` | peak 23.9% at one task | 41% busiest task at the 09-25 peak (49 requests per second); target tracking never fired after 09-23, since its trigger is three minutes of 50% average and the task count never rose |
 | ECS `MemoryUtilization` | 44.7% of 512 MB | 30.4% of 1024 MB at most (09-27); 10% to 17% since 10-03 |
 | ECS task count | floor 2, ceiling 4 | 3 every day from 09-24; 4 only during the 09-23 k6 run |
 | RDS `DatabaseConnections` | 210 worst case of 220 | 41 at most (09-24, 09-25); 17 to 18 at rest |
@@ -26,6 +26,19 @@ before fall 2027.
 | ALB `TargetResponseTime` p99, busiest minute | 208 ms, 263 requests | 223 ms worst hour; 2,934 requests; no ELB 5XX |
 
 `PoolWaiting` was 0 in every minute from 09-24 to 10-18.
+
+Memory, which #522 did not size but the move back to `db.t4g.micro` turns on:
+
+| Instance | Period | `FreeableMemory` daily minimum | `SwapUsage` daily maximum |
+| --- | --- | --- | --- |
+| `db.t4g.micro` | 09-07 to 09-20, before term, a handful of staff | 131 to 180 MiB | 31 to 39 MiB |
+| `db.t4g.small` | 09-22 to 10-18 | 889 to 1,018 MiB | not read |
+
+The micro row is the risk ADR-0064 accepts: a smaller dataset than today's already
+swapped a little. `eecs-capstone-db-memory` alarms below 64 MiB for ten minutes.
+
+`container_memory` stays at 1024 MB. The 30.4% peak would be 61% of 512 MB, and #527
+named it the change least worth making, with the worst failure if wrong.
 
 ## After the peak
 

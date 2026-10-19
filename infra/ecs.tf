@@ -284,7 +284,8 @@ resource "aws_ecs_service" "app" {
   # stops a task before it starts its replacement, so the fleet dips to
   # half the desired count while that task drains (deregistration_delay
   # above), the new one starts, and two health checks pass: about three
-  # minutes per task, three tasks in sequence. Deploys therefore take
+  # minutes per task, in sequence: two tasks off season, three at term
+  # start. Deploys therefore take
   # longer and should not run during an arrival burst.
   # src/lib/__tests__/db-pool.test.ts reads this number, so the budget
   # cannot drift from it. ADR-0043.

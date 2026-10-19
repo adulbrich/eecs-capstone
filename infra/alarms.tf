@@ -125,7 +125,8 @@ resource "aws_cloudwatch_metric_alarm" "app_5xx" {
 }
 
 # The failure ADR-0034 and ADR-0043 are both about. Off season (ADR-0064) 60 is
-# below the 80 two tasks can hold at a pool of 40, above the 41 the whole
+# below the 80 app connections two tasks can hold at a pool of 40 (90 with
+# the traffic writer's), above the 41 the whole
 # 2026 term start peak reached, and far above the 18 an idle day holds with
 # the warm floor, so this fires while there is still headroom rather than once
 # `acquire` has already started timing out at the instance ceiling of 107. At
@@ -214,8 +215,9 @@ resource "aws_cloudwatch_metric_alarm" "fleet_below_floor" {
 # 2026, before term start and on a smaller dataset, it sat at 131 to 180 MiB
 # freeable with about 32 MiB swapped. Below 64 MiB the next step is heavier
 # swapping and slower queries, so this fires with room left to move back to
-# `db.t4g.small`. `t4g.small` sat near 900 MiB free throughout term, so the
-# alarm stays quiet there.
+# `db.t4g.small`. `t4g.small` never dropped below 889 MiB free through term,
+# so the alarm stays quiet there. docs/load-tests/2026-10-19-term-start-review.md
+# has the numbers.
 #
 # Two five-minute periods so an autovacuum or a backup does not mail.
 resource "aws_cloudwatch_metric_alarm" "db_memory" {
