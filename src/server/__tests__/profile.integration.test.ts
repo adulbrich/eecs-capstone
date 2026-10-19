@@ -125,7 +125,7 @@ describe("profile", () => {
     ["wantsToMentor", true],
     ["mentorTeamCount", 5],
   ] as const)("refuses %s through update-user", async (field, value) => {
-    const email = `f-${field}-${Date.now()}@x.com`;
+    const email = `f-${field.toLowerCase()}-${Date.now()}@x.com`;
     const headers = await signedInHeaders(email);
     await expect(
       auth.api.updateUser({ body: { [field]: value }, headers })
