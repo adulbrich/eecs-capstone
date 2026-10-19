@@ -249,6 +249,15 @@ describe("NotificationBell, mounted twice", () => {
     expect(onError).not.toHaveBeenCalled();
   });
 
+  it("names a single-digit count as its badge shows it", async () => {
+    session = { user: { id: "u1" } };
+    renderTwoBells();
+    await settledOnMount();
+    expect(
+      screen.getAllByRole("button", { name: "Notifications, 2 unread" })
+    ).toHaveLength(2);
+  });
+
   it("names the count its badge shows, and none once read", async () => {
     unread = 12;
     session = { user: { id: "u1" } };

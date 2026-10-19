@@ -168,14 +168,15 @@ refuses, and not a spinner in place of the words: a control whose text vanishes
 is a control a screen reader stops being able to name, and the accessible name
 is what every role query in the test suite matches on.
 
-### An `aria-label` begins with the text on screen
+### An `aria-label` contains the text on screen, unbroken
 
-A control with visible words and an `aria-label` names itself with those words
-first, then the detail: `Remove from placement: Ada Park`, not `Remove Ada Park
-from placement`. A voice user says what they see, and WCAG 2.5.3 requires the
-name to contain it. A badge or count inside the control is visible text too, so
-the bell is `Notifications, 3 unread`. axe's `label-content-name-mismatch` fails
-the a11y suite on either.
+A voice user says what they see, so WCAG 2.5.3 requires a control's name to
+contain its visible words in one run. Put them first, then the detail:
+`Remove from placement: Ada Park`, not `Remove Ada Park from placement`.
+A badge or count inside the control is visible text too, so the bell is
+`Notifications, 3 unread`, and text shown only from `md` counts at the widths
+that show it. The a11y suite fails a control that breaks this, through axe's
+`label-content-name-mismatch`.
 
 ### A link inside running text is underlined at rest
 

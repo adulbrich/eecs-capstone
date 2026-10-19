@@ -347,7 +347,7 @@ function Section({
         <h3 className="font-medium">{title}</h3>
         {empty === null && (
           <Button
-            aria-label={`Download ${title.toLowerCase()} as CSV`}
+            aria-label={`Download CSV of ${title.toLowerCase()}`}
             onClick={() =>
               downloadText(
                 `${filename}-${new Date().toISOString().slice(0, 10)}.csv`,
