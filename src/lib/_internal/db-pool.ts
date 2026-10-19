@@ -6,18 +6,22 @@ import { TRAFFIC_STATEMENT_TIMEOUT_MS } from "./traffic-timing";
  * How many connections the fleet may hold open at once, and where the number
  * comes from. Pure, so the unit test can hold the sum to the ceiling.
  *
- * The binding constraint is the RDS instance, not the task. `db.t4g.small`
- * has 2 GiB, which the RDS formula turns into 225 `max_connections`; Postgres
- * keeps 3 for superusers and RDS 2 more for its own, so 220 are usable. Task
- * memory is not the limit: an idle client measured at 0.11 MB of RSS, so
- * twenty are about 2 MB of the 1024 MB task.
+ * The binding constraint is the RDS instance, not the task, and the instance
+ * changes with the season (ADR-0064). Off season it is `db.t4g.micro`: 1 GiB,
+ * which the RDS formula turns into 112 `max_connections`; Postgres keeps 3 for
+ * superusers and RDS 2 more for its own, so 107 are usable. At term start it
+ * is `db.t4g.small`: 2 GiB, 225, so 220. The unit test holds `rdsUsable` to
+ * `db_instance_class` in `infra/variables.tf`. Task memory is not the limit:
+ * an idle client measured at 0.11 MB of RSS, so twenty are about 2 MB of the
+ * 1024 MB task.
  *
  * `taskCeiling` is the most app tasks the budget allows at once: the
- * autoscaling ceiling of four in `infra/variables.tf`, times the service's
- * `deployment_maximum_percent` in `infra/ecs.tf`. That is 100, so a deploy
- * stops a task before it starts its replacement and the ceiling is four.
- * It used to be eight, because the AWS default of 200 runs old and new side
- * by side, and that doubling is what held the pool at 20 (ADR-0043).
+ * autoscaling ceiling in `infra/variables.tf`, two off season and four at
+ * term start, times the service's `deployment_maximum_percent` in
+ * `infra/ecs.tf`. That is 100, so a deploy stops a task before it starts its
+ * replacement and the ceiling is the autoscaling ceiling itself. It used to be
+ * twice that, because the AWS default of 200 runs old and new side by side,
+ * and that doubling is what held the pool at 20 (ADR-0043).
  * `oneOffScript` is pg's default pool that `scripts/migrate.mjs` and the
  * other one-off scripts open beside the fleet; `migrate()` uses one session
  * of it, so this is a reservation, not a measurement. `trafficPerTask` is
@@ -26,8 +30,8 @@ import { TRAFFIC_STATEMENT_TIMEOUT_MS } from "./traffic-timing";
  * the ADR before changing any of these.
  */
 export const CONNECTION_BUDGET = {
-  rdsUsable: 220,
-  taskCeiling: 4,
+  rdsUsable: 107,
+  taskCeiling: 2,
   oneOffScript: 10,
   trafficPerTask: 5,
 } as const;
@@ -38,12 +42,16 @@ export const CONNECTION_BUDGET = {
  * staff (#521). 20 was the most eight tasks could hold, and the #524 load
  * test pinned three tasks at 59 of 60 during a term start burst while CPU
  * still had room, with session lookups failing on the acquire timeout
- * (#558). With the ceiling at four, 45 fits: (45 + 5) * 4 + 10 = 210 of
- * 220, leaving ten for a second one-off script or a hand-held psql. A cap:
+ * (#558). At term start, with the ceiling at four on `db.t4g.small`, 45
+ * fits: (45 + 5) * 4 + 10 = 210 of 220. Off season, two on `db.t4g.micro`,
+ * 40 fits: (40 + 5) * 2 + 10 = 100 of 107, leaving seven for a second one-off
+ * script or a hand-held psql. Depth beats a third task there: one staff load
+ * of `/admin/analytics` fans out to up to 30 connections on one task, while
+ * the busiest student minute of the 2026 term start took 8 (ADR-0064). A cap:
  * pg-pool opens lazily and closes clients idle for 10 s, so a quiet task
  * holds no more than `POOL_MIN` in production and none elsewhere.
  */
-const POOL_MAX = 45;
+const POOL_MAX = 40;
 
 /**
  * Connections a production task keeps open through a lull (#601, ADR-0052).

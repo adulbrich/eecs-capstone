@@ -100,9 +100,13 @@ resource "aws_lb_listener" "http" {
 resource "aws_ecs_cluster" "main" {
   name = var.project
 
+  # Off: its 38 metrics were about $11 of a $97 month in October 2026, and the
+  # one alarm that read them now reads the load balancer's HealthyHostCount,
+  # which is free (ADR-0058). CPU and memory per service still come from
+  # AWS/ECS without it. Turn it on for a load test that needs per-task numbers.
   setting {
     name  = "containerInsights"
-    value = "enabled"
+    value = "disabled"
   }
 
   tags = { Name = var.project }
@@ -280,7 +284,8 @@ resource "aws_ecs_service" "app" {
   # stops a task before it starts its replacement, so the fleet dips to
   # half the desired count while that task drains (deregistration_delay
   # above), the new one starts, and two health checks pass: about three
-  # minutes per task, three tasks in sequence. Deploys therefore take
+  # minutes per task, in sequence: two tasks off season, three at term
+  # start. Deploys therefore take
   # longer and should not run during an arrival burst.
   # src/lib/__tests__/db-pool.test.ts reads this number, so the budget
   # cannot drift from it. ADR-0043.
@@ -291,7 +296,7 @@ resource "aws_ecs_service" "app" {
   # first apply of the cap above failed with "Availability Zone Rebalancing
   # does not support maximumPercent <= 100". What it did was move tasks back
   # into an availability zone after that zone recovered from an outage; with
-  # two zones and a floor of three tasks the fleet is uneven at rest anyway,
+  # two zones and an odd task count the fleet is uneven at rest anyway,
   # and placement still spreads new tasks across zones at launch. The pool
   # depth the cap buys is worth more than that. ADR-0043.
   availability_zone_rebalancing = "DISABLED"

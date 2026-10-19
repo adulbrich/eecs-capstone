@@ -53,9 +53,9 @@ variable "db_username" {
 }
 
 variable "db_instance_class" {
-  description = "RDS instance class (Graviton/arm64). Sized by connections rather than by CPU: t4g.micro peaked at 6.6% CPU, but its 107 usable connections cannot hold four app tasks at their pool maximum during a deploy. t4g.small has 2 GiB and 220. See ADR-0035."
+  description = "RDS instance class (Graviton/arm64). Sized by connections rather than by CPU, and by season (ADR-0064). Off season, t4g.micro: 1 GiB and 107 usable connections, which hold two tasks at a pool of 40. Term start, t4g.small: 2 GiB and 220, which hold four at 45 (ADR-0034, ADR-0035). RDS CPU stayed at or under 7.1% through the 2026 term start outside a load test and one five-minute spike."
   type        = string
-  default     = "db.t4g.small"
+  default     = "db.t4g.micro"
 }
 
 variable "db_allocated_storage" {
@@ -83,15 +83,15 @@ variable "container_memory" {
 }
 
 variable "app_min_tasks" {
-  description = "Floor for the app service. Three because the fleet has to be big enough before the students arrive: the #524 load test measured two tasks absorbing 26 requests per second against a term start burst of about 42, and measured the scaler arriving minutes after a burst that lasts two. Two rather than one was the original floor, so that a task crash is not an outage while ECS replaces it, and that still holds underneath. See ADR-0040."
+  description = "Floor for the app service. Two off season, so that a task crash or a deploy is not an outage: at one, a deploy at the 50 and 100 percents in ecs.tf has no task to keep while it replaces the only one. Three at term start, because the fleet has to be big enough before the students arrive: the #524 load test measured two tasks absorbing 26 requests per second against a burst of about 42, and the scaler arriving minutes after a burst that lasts two. See ADR-0040 and ADR-0064."
   type        = number
-  default     = 3
+  default     = 2
 }
 
 variable "app_max_tasks" {
-  description = "Ceiling for the app service. Four is what the database connection budget allows: a deploy replaces tasks one at a time (deployment_maximum_percent 100 in ecs.tf), so four is also the most tasks that ever run at once, holding 200 connections, which with the one-off script reservation is 210 of the instance's 220. Raising it means a bigger instance or a smaller pool, not just a bigger number, and `src/lib/__tests__/db-pool.test.ts` reads this default and the deploy percentage and fails if the budget disagrees with either. See ADR-0034 and ADR-0043."
+  description = "Ceiling for the app service, set by the database connection budget: a deploy replaces tasks one at a time (deployment_maximum_percent 100 in ecs.tf), so this is also the most tasks that ever run at once. Two off season, the same as the floor, so the CPU policy never acts: two tasks hold 90 connections at a pool of 40, which with the one-off script reservation is 100 of t4g.micro's 107, and a pool that deep is what a staff analytics load needs, where a third task is what nobody has needed since 2026-09-23. Four at term start, 210 of t4g.small's 220 at a pool of 45. Raising it means a bigger instance or a smaller pool, not just a bigger number, and `src/lib/__tests__/db-pool.test.ts` reads this default and the deploy percentage and fails if the budget disagrees with either. See ADR-0034, ADR-0043 and ADR-0064."
   type        = number
-  default     = 4
+  default     = 2
 }
 
 variable "app_scale_target_cpu" {
