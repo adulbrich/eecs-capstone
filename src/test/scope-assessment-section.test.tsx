@@ -30,7 +30,7 @@ const view: ScopeAssessmentView = {
     threeTerms: "about_right",
     confidence: 0.35,
     rationale: "Two services and a mobile client exceed one term.",
-    model: "openai.gpt-5.6-luna",
+    model: "openai.gpt-6-luna",
   },
   stale: false,
 };

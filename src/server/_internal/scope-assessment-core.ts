@@ -39,7 +39,7 @@ export function buildScopeConfig(
   env: NodeJS.ProcessEnv = process.env
 ): ScopeConfig {
   return {
-    modelId: env.BEDROCK_MODEL_ID ?? "openai.gpt-5.6-luna",
+    modelId: env.BEDROCK_MODEL_ID ?? "openai.gpt-6-luna",
     reasoningEffort: env.BEDROCK_SCOPE_REASONING_EFFORT ?? "high",
   };
 }

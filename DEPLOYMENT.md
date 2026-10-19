@@ -192,7 +192,9 @@ AI project review is the other Bedrock caller, and it does not share this path:
 it calls the `bedrock-mantle` endpoint, which authorizes
 `bedrock-mantle:CreateInference` rather than `bedrock:InvokeModel`, and which is
 offered in fewer regions. Both statements are on the task role in
-`infra/iam.tf`.
+`infra/iam.tf`. GPT-6 Luna, the default review model, is on Mantle only in
+us-east-1, so `bedrock_region` defaults there while the app runs in us-west-2;
+both Bedrock callers cross regions.
 
 1. The migration creates the `vector` extension. RDS PostgreSQL 18 ships
    pgvector 0.8.1, and the master user has the privileges to create it.

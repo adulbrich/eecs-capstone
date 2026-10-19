@@ -165,15 +165,15 @@ variable "deploy_branch" {
 }
 
 variable "bedrock_region" {
-  description = "Region hosting the Bedrock model (kept independent of var.region)."
+  description = "Region hosting the Bedrock model (kept independent of var.region). GPT-6 Luna on bedrock-mantle is offered only in us-east-1."
   type        = string
-  default     = "us-west-2"
+  default     = "us-east-1"
 }
 
 variable "bedrock_model_id" {
   description = "Bedrock model ID for AI project review, as named on the bedrock-mantle endpoint (no us./global. prefix)."
   type        = string
-  default     = "openai.gpt-5.6-luna"
+  default     = "openai.gpt-6-luna"
 }
 
 variable "bedrock_reasoning_effort" {
