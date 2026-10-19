@@ -1,4 +1,4 @@
-# Alarms on the six numbers that have gone bad in production, or would have
+# Alarms on the seven numbers that have gone bad in production, or would have
 # been the first sign that something had. CloudWatch has recorded every one of
 # them since the account was built and told nobody: before this file the only
 # alarms on the account were the two Application Auto Scaling creates for its
@@ -14,7 +14,7 @@
 # named for produced, which is the most that can be said before the first time
 # one fires. Retune them in place; nothing else reads these numbers.
 
-# One topic for all six. Splitting by severity would be premature: there is
+# One topic for all seven. Splitting by severity would be premature: there is
 # one recipient and every alarm below means somebody should look.
 resource "aws_sns_topic" "alarms" {
   name = "${var.project}-alarms"
@@ -42,8 +42,8 @@ resource "aws_sns_topic_subscription" "alarm_email" {
 # Every alarm below notifies on the way in and on the way out, so a recovery is
 # mailed too. Without the second one the only signal is the opening mail, and an
 # alarm that has quietly gone back to OK reads exactly like one nobody has
-# fixed. Named once rather than twelve times so that "both ways, one topic" is a
-# single fact rather than six copies to keep in step.
+# fixed. Named once rather than fourteen times so that "both ways, one topic" is a
+# single fact rather than seven copies to keep in step.
 locals {
   alarm_notifications = [aws_sns_topic.alarms.arn]
 }
@@ -124,24 +124,26 @@ resource "aws_cloudwatch_metric_alarm" "app_5xx" {
   tags = { Name = "${var.project}-app-5xx" }
 }
 
-# The failure ADR-0034 and ADR-0043 are both about. 100 is below the 135 three
-# tasks can hold now that the pool is 45 (#570), and far above the 7 an idle
-# day reaches, so this fires while there is still headroom rather than once
-# `acquire` has already started timing out at the instance ceiling of 220.
+# The failure ADR-0034 and ADR-0043 are both about. Off season (ADR-0064) 60 is
+# below the 80 two tasks can hold at a pool of 40, above the 41 the whole
+# 2026 term start peak reached, and far above the 18 an idle day holds with
+# the warm floor, so this fires while there is still headroom rather than once
+# `acquire` has already started timing out at the instance ceiling of 107. At
+# term start it was 100, against 135 for three tasks at 45 and a ceiling of 220.
 #
 # Maximum rather than Average, because the pool pins for seconds at a time and
 # a one-minute average of a burst reads as nothing. Two consecutive minutes so
 # a single migration or a one-off script does not mail anybody.
 resource "aws_cloudwatch_metric_alarm" "db_connections" {
   alarm_name        = "${var.project}-db-connections"
-  alarm_description = "RDS held more than 100 connections for two minutes running, which is the pool approaching the instance ceiling."
+  alarm_description = "RDS held more than 60 connections for two minutes running, which is the pool approaching the instance ceiling."
 
   namespace   = "AWS/RDS"
   metric_name = "DatabaseConnections"
   statistic   = "Maximum"
 
   comparison_operator = "GreaterThanThreshold"
-  threshold           = 100
+  threshold           = 60
   period              = 60
   evaluation_periods  = 2
   datapoints_to_alarm = 2
@@ -166,29 +168,30 @@ locals {
   )
 }
 
-# The fleet below what a deploy keeps running. Container Insights is already
-# enabled on the cluster (`ecs.tf`), which is what publishes this.
+# The fleet below what a deploy keeps serving, counted as targets passing the
+# load balancer's health check. This read Container Insights' RunningTaskCount
+# until Container Insights was turned off to save its metric charge
+# (ADR-0064); HealthyHostCount is free and also counts a task that runs but
+# fails its health check, which RunningTaskCount could not see.
 #
-# `treat_missing_data = "breaching"` because a service at zero tasks publishes
-# nothing at all, and that is the outage this alarm exists for. Under the
-# default it would go to INSUFFICIENT_DATA and stay silent through exactly the
-# case it is named for.
+# `treat_missing_data = "breaching"` because a target group with nothing
+# registered may publish nothing at all, and that is the outage this alarm
+# exists for. Under the default it would go to INSUFFICIENT_DATA and stay
+# silent through exactly the case it is named for.
 #
-# Below the deploy's healthy minimum, not below the floor (ADR-0058): two of
-# three, or two of four. At the floor this mailed on 12 of 12 deploys and on
-# nothing else, and no sample count separates that dip from a real one, so the
-# threshold is the dip itself, read from the service so the two move together.
-# Two of three tasks exiting as they start reads one and fires; two that hang
-# stay RUNNING through their failed health checks and may not, which ADR-0058
-# records. What this gives up is the fleet short of its desired count by what a
-# deploy stops, which ECS replacement and the deployment circuit breaker answer
-# and the 5XX alarms still see.
+# Below the deploy's healthy minimum, not below the floor (ADR-0058): one of
+# two, two of three or four. At the floor this mailed on 12 of 12 deploys and
+# on nothing else, and no sample count separates that dip from a real one, so
+# the threshold is the dip itself, read from the service so the two move
+# together. What this gives up is the fleet short of its desired count by what
+# a deploy stops, which ECS replacement and the deployment circuit breaker
+# answer and the 5XX alarms still see.
 resource "aws_cloudwatch_metric_alarm" "fleet_below_floor" {
   alarm_name        = "${var.project}-fleet-below-floor"
-  alarm_description = "The app service ran fewer than ${local.fleet_alarm_threshold} tasks for three minutes running. A rolling deploy keeps at least that many, so this is an outage or a crash loop."
+  alarm_description = "Fewer than ${local.fleet_alarm_threshold} app tasks passed the load balancer health check for three minutes running. A rolling deploy keeps at least that many, so this is an outage or a crash loop."
 
-  namespace   = "ECS/ContainerInsights"
-  metric_name = "RunningTaskCount"
+  namespace   = "AWS/ApplicationELB"
+  metric_name = "HealthyHostCount"
   statistic   = "Minimum"
 
   comparison_operator = "LessThanThreshold"
@@ -198,15 +201,43 @@ resource "aws_cloudwatch_metric_alarm" "fleet_below_floor" {
   datapoints_to_alarm = 3
   treat_missing_data  = "breaching"
 
-  dimensions = {
-    ClusterName = aws_ecs_cluster.main.name
-    ServiceName = aws_ecs_service.app.name
-  }
+  dimensions = { LoadBalancer = aws_lb.app.arn_suffix, TargetGroup = aws_lb_target_group.app.arn_suffix }
 
   alarm_actions = local.alarm_notifications
   ok_actions    = local.alarm_notifications
 
   tags = { Name = "${var.project}-fleet-below-floor" }
+}
+
+# The database running short of memory, which is the risk ADR-0064 accepts by
+# running `db.t4g.micro` off season. That class has 1 GiB, and in September
+# 2026, before term start and on a smaller dataset, it sat at 131 to 180 MiB
+# freeable with about 32 MiB swapped. Below 64 MiB the next step is heavier
+# swapping and slower queries, so this fires with room left to move back to
+# `db.t4g.small`. `t4g.small` sat near 900 MiB free throughout term, so the
+# alarm stays quiet there.
+#
+# Two five-minute periods so an autovacuum or a backup does not mail.
+resource "aws_cloudwatch_metric_alarm" "db_memory" {
+  alarm_name        = "${var.project}-db-memory"
+  alarm_description = "RDS freeable memory stayed below 64 MiB for ten minutes, which is the instance class too small for the working set."
+
+  namespace   = "AWS/RDS"
+  metric_name = "FreeableMemory"
+  statistic   = "Minimum"
+
+  comparison_operator = "LessThanThreshold"
+  threshold           = 64 * 1024 * 1024
+  period              = 300
+  evaluation_periods  = 2
+  datapoints_to_alarm = 2
+
+  dimensions = { DBInstanceIdentifier = aws_db_instance.main.identifier }
+
+  alarm_actions = local.alarm_notifications
+  ok_actions    = local.alarm_notifications
+
+  tags = { Name = "${var.project}-db-memory" }
 }
 
 # A request queued for a database connection. The app samples pg-pool's
@@ -221,7 +252,7 @@ resource "aws_cloudwatch_metric_alarm" "fleet_below_floor" {
 # sign the pool ran out during the #524 load test, which ADR-0042's redaction
 # made hard to spot. `db_connections` above sees the instance; this sees the
 # queue in front of it, which fills before the instance does whenever one task
-# holds all 45 of its own connections.
+# holds every connection in its own pool.
 #
 # A queue seen in two consecutive calendar minutes. Each line holds one minute
 # of one-second samples, stamped with that minute, so a burst that queues

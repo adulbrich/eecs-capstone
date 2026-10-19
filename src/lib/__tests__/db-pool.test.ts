@@ -102,6 +102,25 @@ describe("poolConfig", () => {
     );
   });
 
+  it("reads the usable connections from the instance class Terraform sets", () => {
+    // The class changes with the season (ADR-0064), and nothing else
+    // connects it to `rdsUsable`: moving to `db.t4g.small` without raising
+    // the budget wastes the instance, and moving to `db.t4g.micro` without
+    // lowering it overruns one. `max_connections` from the RDS formula, less
+    // 3 for superusers and 2 for RDS. A class missing here fails until its
+    // number is worked out and added.
+    const usable: Record<string, number> = {
+      "db.t4g.micro": 107,
+      "db.t4g.small": 220,
+    };
+    const instanceClass = terraformArgument(
+      "infra/variables.tf",
+      'variable "db_instance_class" {',
+      "default"
+    );
+    expect(usable[instanceClass ?? ""]).toBe(CONNECTION_BUDGET.rdsUsable);
+  });
+
   it("keeps the whole fleet inside what the RDS instance can hold", () => {
     // The ceiling this rests on: every app task at its pool maximum plus the
     // traffic writer's reservation, with a one-off script's pool open beside

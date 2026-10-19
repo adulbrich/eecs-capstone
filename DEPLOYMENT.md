@@ -1331,14 +1331,15 @@ aws --profile aws-capstone1 cloudwatch set-alarm-state --region us-west-2 \
 data on its next period and overwrites whatever was set here, so nothing needs
 undoing.
 
-Six alarms exist, all on the one topic:
+Seven alarms exist, all on the one topic:
 
 | Alarm | Fires when |
 | --- | --- |
 | `eecs-capstone-alb-5xx` | The load balancer returned more than 5 5XX in five minutes |
 | `eecs-capstone-app-5xx` | The app returned more than 5 5XX in five minutes |
-| `eecs-capstone-db-connections` | RDS held more than 100 connections for two minutes running |
-| `eecs-capstone-fleet-below-floor` | The service ran fewer tasks than a deploy keeps running (two, today) for three minutes running |
+| `eecs-capstone-db-connections` | RDS held more than 60 connections for two minutes running (100 at term start, ADR-0064) |
+| `eecs-capstone-fleet-below-floor` | Fewer targets passed the load balancer health check than a deploy keeps serving (one off season, two at term start) for three minutes running |
+| `eecs-capstone-db-memory` | RDS freeable memory stayed below 64 MiB for ten minutes |
 | `eecs-capstone-db-pool-waiting` | A request queued for a database connection in each of two consecutive minutes |
 | `eecs-capstone-ai-write-failures` | Automatic AI writes (project embedding, social summary, interest embedding) failed at least twice in three hours |
 
@@ -1364,12 +1365,13 @@ of their interests.
 **Expect some mail that is not an incident.**
 
 Each alarm sends on its first transition into OK, and on the first apply all
-six start in INSUFFICIENT_DATA, so confirming the subscription is likely to be
-followed by up to six "OK" messages within a few minutes. Nothing is wrong;
+seven start in INSUFFICIENT_DATA, so confirming the subscription is likely to be
+followed by up to seven "OK" messages within a few minutes. Nothing is wrong;
 that is the alarms reaching a state for the first time.
 
 **A deploy does not mail.** A rolling deploy stops a task before starting its
-replacement (ADR-0043), so the fleet reads two of three for several minutes.
+replacement (ADR-0043), so the fleet reads one of two, or two of three, for
+several minutes.
 `eecs-capstone-fleet-below-floor` alarms only below what a deploy keeps
 running, so that dip stays silent and a mail from it means tasks are down or
 crash-looping. ADR-0058 records the 12 deploys that settled this and what the
@@ -1640,19 +1642,25 @@ management) are for high-volume senders and should be skipped.
 
 ## 10. Cost
 
-Rough monthly cost at capstone scale in us-west-2:
+Rough monthly cost in us-west-2, by season
+([ADR-0064](./docs/adr/0064-the-fleet-is-sized-per-season.md)). The term start
+column is October 2026's bill less Container Insights, which is now off.
 
-| Item | ~$/mo |
-|------|------|
-| Internal ALB | 17 |
-| Fargate (0.25 vCPU / 1 GB, 2 tasks) | 17 |
-| RDS db.t4g.small + 20 GB | 26 |
-| CloudFront + S3 + ECR + Secrets Manager | 1 to 5 |
-| **Total** | **~61 to 65** |
+| Item | Off season ~$/mo | Term start ~$/mo |
+|------|------|------|
+| Internal ALB | 17 | 17 |
+| Fargate (0.25 vCPU / 1 GB) | 17 (2 tasks) | 26 (3 tasks) |
+| Public IPv4, one per task | 7 | 11 |
+| RDS + 20 GB gp3 | 14 (db.t4g.micro) | 26 (db.t4g.small) |
+| CloudWatch custom metrics and alarms | 2 | 2 |
+| CloudFront + S3 + ECR + Secrets Manager + GuardDuty | 3 to 7 | 3 to 7 |
+| **Total** | **~60 to 64** | **~85 to 89** |
 
-The Fargate line is the floor, not the ceiling: the service autoscales to four
-tasks on CPU, and each extra task is about $8.51 a month for the hours it
-actually runs. See [ADR-0035](./docs/adr/0035-scale-the-service-and-let-it-pick-the-instance.md)
+Off season the floor and the ceiling are both two tasks. At term start the
+Fargate line is the floor of three, and the service autoscales on CPU to four;
+each extra task is about
+$8.51 a month plus $3.65 for its address, for the hours it actually runs. See
+[ADR-0035](./docs/adr/0035-scale-the-service-and-let-it-pick-the-instance.md)
 for why the instance class is sized by connections rather than by load.
 
 Changing the instance class restarts the burstable instance and resets its
