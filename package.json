@@ -103,7 +103,7 @@
     "zod": "^4.6.5"
   },
   "devDependencies": {
-    "@axe-core/playwright": "^4.13.0",
+    "@axe-core/playwright": "^4.14.0",
     "@biomejs/biome": "2.5.15",
     "@playwright/test": "^1.63.0",
     "@tailwindcss/typography": "^0.5.20",

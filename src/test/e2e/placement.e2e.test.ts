@@ -1590,7 +1590,7 @@ test.describe("placement workspace", () => {
     await expect(added).toContainText("Moon Base");
     await page.getByRole("tab", { name: /Bids/ }).click();
     await page
-      .getByRole("button", { name: "Remove Kim Lee from placement" })
+      .getByRole("button", { name: "Remove from placement: Kim Lee" })
       .click();
     await expect(
       page.getByText(
@@ -1616,7 +1616,7 @@ test.describe("placement workspace", () => {
     // On the board, Remove sits in the row's More menu and asks first, so
     // it is not read as "remove from this team" (#685).
     await expect(
-      page.getByRole("button", { name: "Remove Ada Park from placement" })
+      page.getByRole("button", { name: "Remove from placement: Ada Park" })
     ).toHaveCount(0);
     const removeFromBoard = async () => {
       await page.getByRole("button", { name: "More for Ada Park" }).click();
