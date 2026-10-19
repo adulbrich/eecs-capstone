@@ -24,7 +24,7 @@ export interface ReviewConfig {
   /**
    * Reasoning tokens are billed and counted as output, and editing seven prose
    * fields needs no deliberation. "none" turns reasoning off entirely on the
-   * GPT-5.6 models if a deployment wants that.
+   * GPT-6 models if a deployment wants that.
    */
   reasoningEffort: string;
 }
@@ -38,7 +38,7 @@ export function buildReviewConfig(
   env: NodeJS.ProcessEnv = process.env
 ): ReviewConfig {
   return {
-    modelId: env.BEDROCK_MODEL_ID ?? "openai.gpt-5.6-luna",
+    modelId: env.BEDROCK_MODEL_ID ?? "openai.gpt-6-luna",
     reasoningEffort: env.BEDROCK_REASONING_EFFORT ?? "medium",
   };
 }

@@ -341,9 +341,9 @@ describe("reviewToolSpec", () => {
 });
 
 describe("buildReviewConfig", () => {
-  it("defaults to the Mantle GPT-5.6 id at medium reasoning", () => {
+  it("defaults to the Mantle GPT-6 Luna id at medium reasoning", () => {
     expect(buildReviewConfig({} as NodeJS.ProcessEnv)).toEqual({
-      modelId: "openai.gpt-5.6-luna",
+      modelId: "openai.gpt-6-luna",
       reasoningEffort: "medium",
     });
   });

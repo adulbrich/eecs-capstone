@@ -757,7 +757,7 @@ A hash detects change, not intent, so both writers test `social_summary_is_manua
 
 ### Model ids are not portable between the two endpoints
 
-Mantle takes the bare id (`openai.gpt-5.6-luna`) under `/openai/v1`; `bedrock-runtime` needs an inference profile (`us.` or `global.`). Each endpoint rejects the other's form; `BEDROCK_MODEL_ID` holds the Mantle form.
+Mantle takes the bare id (`openai.gpt-6-luna`) under `/openai/v1`; `bedrock-runtime` needs an inference profile (`us.` or `global.`). Each endpoint rejects the other's form; `BEDROCK_MODEL_ID` holds the Mantle form. Mantle availability is per model, not per endpoint: GPT-6 Luna is us-east-1 only, though GPT-5.6 Luna also ran in us-west-2, so a model change can force a `BEDROCK_REGION` change.
 
 ### Reasoning models reject sampling parameters and spend the output budget
 

@@ -236,7 +236,8 @@ as a build arg, so that one is nobody's to set by hand either.
 
 The project form can request per-field improvement suggestions, backed by AWS
 Bedrock. Set `BEDROCK_MODEL_ID` (and the relevant AWS credentials) to configure
-the model; the default is OpenAI GPT-5.6 Luna.
+the model; the default is OpenAI GPT-6 Luna, which Mantle offers only in
+us-east-1.
 
 The call goes to the OpenAI-compatible Responses API on the `bedrock-mantle`
 endpoint, signed with SigV4 from the ambient AWS credentials, so no separate

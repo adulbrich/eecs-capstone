@@ -43,7 +43,7 @@ export function buildSocialSummaryConfig(
   env: NodeJS.ProcessEnv = process.env
 ): SocialSummaryConfig {
   return {
-    modelId: env.BEDROCK_MODEL_ID ?? "openai.gpt-5.6-luna",
+    modelId: env.BEDROCK_MODEL_ID ?? "openai.gpt-6-luna",
     reasoningEffort: env.BEDROCK_SOCIAL_SUMMARY_REASONING_EFFORT ?? "medium",
   };
 }
