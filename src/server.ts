@@ -11,6 +11,7 @@ import {
   createStartHandler,
   defaultStreamHandler,
   defineHandlerCallback,
+  setResponseStatus,
 } from "@tanstack/react-start/server";
 import { createServerEntry } from "@tanstack/react-start/server-entry";
 import {
@@ -22,28 +23,15 @@ import {
 // task's first request, the load balancer's health check (ADR-0052).
 import "#/db";
 
-type Rendered = Awaited<ReturnType<typeof defaultStreamHandler>>;
-
-/**
- * The same render with another status. The body stream is handed over
- * rather than copied, and a streamed result keeps its own `dispose`, which
- * cancels that same stream if the client goes away.
- */
-function withStatus(rendered: Rendered, status: number): Rendered {
-  const restatus = (response: Response) =>
-    new Response(response.body, { status, headers: response.headers });
-  return rendered instanceof Response
-    ? restatus(rendered)
-    : { ...rendered, response: restatus(rendered.response) };
-}
-
-const handler = defineHandlerCallback(async (ctx) => {
+const handler = defineHandlerCallback((ctx) => {
   const { matches } = ctx.router.state;
   for (const line of renderFailureLines(matches)) {
     console.error(line);
   }
-  const rendered = await defaultStreamHandler(ctx);
-  return refusedByRole(matches) ? withStatus(rendered, 403) : rendered;
+  if (refusedByRole(matches)) {
+    setResponseStatus(403);
+  }
+  return defaultStreamHandler(ctx);
 });
 
 export default createServerEntry({ fetch: createStartHandler(handler) });
