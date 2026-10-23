@@ -243,7 +243,7 @@ describe("nvmrc-node", () => {
     const pinned = readFileSync("Dockerfile", "utf8").match(
       /^ARG NODE_VERSION=(\S+)$/m
     );
-    expect(pinned?.[1]).toBe(wanted);
+    expect(pinned?.[1], "Dockerfile ARG NODE_VERSION").toBe(wanted);
   });
 });
 
