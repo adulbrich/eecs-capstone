@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   formatPickupWindow,
   pickupContactSentence,
-  pickupWindowFields,
+  pickupWindowInput,
   resolvePickupTerms,
   resolvePickupWindow,
 } from "#/lib/pickup-window";
@@ -58,12 +58,28 @@ describe("resolvePickupWindow", () => {
     );
   });
 
+  it("refuses a day that is not on the calendar instead of rolling it over", () => {
+    expect(() => window("2027-02-31", null, null)).toThrow(
+      "Pick a pickup day that is on the calendar."
+    );
+  });
+
+  it("refuses a day more than a year out, year 9999 included", () => {
+    expect(window("2027-10-28", null, null).pickupBy).not.toBeNull();
+    expect(() => window("2027-10-29", null, null)).toThrow(
+      "Pick a pickup day within the next year."
+    );
+    expect(() => window("9999-12-31", null, null)).toThrow(
+      "Pick a pickup day within the next year."
+    );
+  });
+
   it("refuses one time without the other", () => {
     expect(() => window("2026-10-30", "14:00", null)).toThrow(
-      "Give both pickup times, or neither."
+      "Give both a From and a To, or neither."
     );
     expect(() => window("2026-10-30", null, "16:00")).toThrow(
-      "Give both pickup times, or neither."
+      "Give both a From and a To, or neither."
     );
   });
 
@@ -130,10 +146,10 @@ describe("formatPickupWindow", () => {
   });
 });
 
-describe("pickupWindowFields", () => {
+describe("pickupWindowInput", () => {
   it("round-trips a window through the inputs", () => {
     const { pickupFrom, pickupBy } = window("2026-10-30", "14:00", "16:30");
-    expect(pickupWindowFields(pickupFrom, pickupBy)).toEqual({
+    expect(pickupWindowInput(pickupFrom, pickupBy)).toEqual({
       pickupDay: "2026-10-30",
       pickupFromTime: "14:00",
       pickupToTime: "16:30",
@@ -141,7 +157,7 @@ describe("pickupWindowFields", () => {
   });
 
   it("gives a deadline with no start back as its Pacific day alone", () => {
-    expect(pickupWindowFields(null, "2026-10-31T06:59:59.999Z")).toEqual({
+    expect(pickupWindowInput(null, "2026-10-31T06:59:59.999Z")).toEqual({
       pickupDay: "2026-10-30",
       pickupFromTime: null,
       pickupToTime: null,
@@ -149,7 +165,7 @@ describe("pickupWindowFields", () => {
   });
 
   it("gives nothing back for no deadline", () => {
-    expect(pickupWindowFields(null, null)).toEqual({
+    expect(pickupWindowInput(null, null)).toEqual({
       pickupDay: null,
       pickupFromTime: null,
       pickupToTime: null,

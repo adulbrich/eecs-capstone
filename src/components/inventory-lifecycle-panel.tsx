@@ -10,7 +10,7 @@ import {
   needsDueAt,
   needsHolder,
 } from "#/lib/inventory-workflow";
-import { formatPickupWindow, pickupWindowFields } from "#/lib/pickup-window";
+import { formatPickupWindow } from "#/lib/pickup-window";
 import { useAction } from "#/lib/use-action";
 import { INVENTORY_ITEM_STATUSES, type ItemStatus } from "#/lib/vocabularies";
 import {
@@ -27,6 +27,7 @@ import {
   EMPTY_PICKUP,
   PickupFields,
   type PickupFormValue,
+  pickupFormValue,
   pickupPayload,
 } from "./pickup-fields";
 import { EMAIL_SKIP_HINT, SendEmailCheckbox } from "./send-email-checkbox";
@@ -472,14 +473,7 @@ export function InventoryLifecyclePanel({
     // The terms already on the hold when there are some, read back in the
     // office's zone; otherwise a blank window and the item's location copied
     // in, which staff see under its hint and usually replace.
-    const stored = pickupWindowFields(item.pickupFrom, item.pickupBy);
-    setPickup({
-      day: stored.pickupDay ?? "",
-      from: stored.pickupFromTime ?? "",
-      to: stored.pickupToTime ?? "",
-      place: item.pickupPlace ?? item.location ?? "",
-      note: item.pickupNote ?? "",
-    });
+    setPickup(pickupFormValue(item, item.location ?? null));
     setDlgComment("");
     // The skip is a decision about one hold; checked again on every open.
     setDlgSendEmail(true);

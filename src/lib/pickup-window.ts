@@ -11,10 +11,16 @@
  * midnight, which in Corvallis is the evening before (#805); composing the
  * instant here, from the strings, is what keeps the 28th the 28th.
  */
-import { dayEnd, localInstant, OFFICE_TIME_ZONE } from "./day-range";
+import {
+  dayEnd,
+  localDay,
+  localInstant,
+  OFFICE_TIME_ZONE,
+  shiftDay,
+} from "./day-range";
 
 /** What staff type: a `YYYY-MM-DD` day and two `HH:MM` times, all optional. */
-export interface PickupWindowFields {
+export interface PickupWindowInput {
   pickupDay: string | null;
   pickupFromTime: string | null;
   pickupToTime: string | null;
@@ -40,7 +46,7 @@ export interface PickupWindow {
  * gives: the boundary is the rule.
  */
 export function resolvePickupWindow(
-  fields: PickupWindowFields,
+  fields: PickupWindowInput,
   now: number = Date.now()
 ): PickupWindow {
   const day = fields.pickupDay?.trim() || null;
@@ -52,8 +58,19 @@ export function resolvePickupWindow(
     }
     return { pickupFrom: null, pickupBy: null };
   }
+  // The wire shape lets "2026-02-31" through, and the arithmetic below would
+  // quietly read it as March 3. A day that does not survive a round trip
+  // through the calendar is not one.
+  if (shiftDay(day, 0) !== day) {
+    throw new Error("Pick a pickup day that is on the calendar.");
+  }
+  // A year out is already no arrangement anyone keeps, and the calendar
+  // arithmetic stops at year 9999 with a message staff should never read.
+  if (day > lastPickupDay(now)) {
+    throw new Error("Pick a pickup day within the next year.");
+  }
   if (Boolean(from) !== Boolean(to)) {
-    throw new Error("Give both pickup times, or neither.");
+    throw new Error("Give both a From and a To, or neither.");
   }
   const pickupFrom = from ? localInstant(day, from) : null;
   const pickupBy = to ? localInstant(day, to) : dayEnd(day);
@@ -67,7 +84,7 @@ export function resolvePickupWindow(
 }
 
 /** Everything staff type about a pickup: the window, where, and a note. */
-export interface PickupFields extends PickupWindowFields {
+export interface PickupInput extends PickupWindowInput {
   pickupNote: string | null;
   pickupPlace: string | null;
 }
@@ -83,7 +100,7 @@ export interface PickupTerms extends PickupWindow {
  * a field staff cleared stores nothing rather than whitespace.
  */
 export function resolvePickupTerms(
-  fields: PickupFields,
+  fields: PickupInput,
   now: number = Date.now()
 ): PickupTerms {
   return {
@@ -95,23 +112,28 @@ export function resolvePickupTerms(
 
 /** A day picked today, as the office reads it, for a date input's `min`. */
 export function officeToday(now: number = Date.now()): string {
-  return dayOf(new Date(now));
+  return localDay(new Date(now));
+}
+
+/** The furthest pickup day staff may pick, for a date input's `max`. */
+export function lastPickupDay(now: number = Date.now()): string {
+  return shiftDay(officeToday(now), 365);
 }
 
 /**
  * The fields that would reproduce a stored window, for a dialog reopened on
- * an item that already has one. A deadline that is not a day's end and has no
- * start (the seven-day default) comes back as its day alone.
+ * an item that already has one. A deadline with no start (a day alone, or the
+ * seven-day default) comes back as its day alone.
  */
-export function pickupWindowFields(
+export function pickupWindowInput(
   pickupFrom: Date | string | null | undefined,
   pickupBy: Date | string | null | undefined
-): PickupWindowFields {
+): PickupWindowInput {
   if (!pickupBy) {
     return { pickupDay: null, pickupFromTime: null, pickupToTime: null };
   }
   const by = new Date(pickupBy);
-  const day = dayOf(by);
+  const day = localDay(by);
   if (!pickupFrom) {
     return { pickupDay: day, pickupFromTime: null, pickupToTime: null };
   }
@@ -147,6 +169,21 @@ export function formatPickupWindow(
 }
 
 /**
+ * What to do and when, as one phrase: "Pick up on" a window, "Pick up by" a
+ * deadline. One place, so the email and `/my/items` say it the same way.
+ */
+export function pickupPhrase(
+  pickupFrom: Date | string | null | undefined,
+  pickupBy: Date | string | null | undefined
+): string | null {
+  const when = formatPickupWindow(pickupFrom, pickupBy);
+  if (!when) {
+    return null;
+  }
+  return pickupFrom ? `Pick up on ${when}` : `Pick up by ${when}`;
+}
+
+/**
  * The one sentence that tells a requester what to do when the window does not
  * suit them. Null without an inbox, so a deployment with none says nothing
  * rather than "email null".
@@ -178,13 +215,6 @@ const CLOCK_FORMAT = new Intl.DateTimeFormat("en-US", {
   timeZone: OFFICE_TIME_ZONE,
 });
 
-const DAY_FORMAT = new Intl.DateTimeFormat("en-US", {
-  day: "2-digit",
-  month: "2-digit",
-  timeZone: OFFICE_TIME_ZONE,
-  year: "numeric",
-});
-
 function partsOf(format: Intl.DateTimeFormat, d: Date) {
   return Object.fromEntries(
     format.formatToParts(d).map((p) => [p.type, p.value])
@@ -201,10 +231,4 @@ function timeOf(d: Date): string {
 function clockOf(d: Date): string {
   const p = partsOf(CLOCK_FORMAT, d);
   return `${p.hour}:${p.minute}`;
-}
-
-/** "2026-10-28", the value an `<input type="date">` takes. */
-function dayOf(d: Date): string {
-  const p = partsOf(DAY_FORMAT, d);
-  return `${p.year}-${p.month}-${p.day}`;
 }

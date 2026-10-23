@@ -17,7 +17,8 @@ export const OFFICE_TIME_ZONE = "America/Los_Angeles";
 
 const DAY_MS = 86_400_000;
 const DAY = /^(\d{4})-(\d{2})-(\d{2})$/;
-const TIME = /^([01]\d|2[0-3]):([0-5]\d)$/;
+/** A 24-hour `HH:MM`, the value an `<input type="time">` sends. */
+export const TIME_PATTERN = /^([01]\d|2[0-3]):([0-5]\d)$/;
 
 const partsFormatter = new Map<string, Intl.DateTimeFormat>();
 
@@ -82,8 +83,9 @@ export function dayStart(day: string, timeZone = OFFICE_TIME_ZONE): Date {
 
 /**
  * The instant a wall clock in `timeZone` reads `time` (`HH:MM`, 24-hour) on
- * `day`. A time the spring change skips lands an hour later, as the clock on
- * the wall would.
+ * `day`. A time the spring change skips (2:00 to 2:59 on that Sunday) has no
+ * instant and lands an hour earlier, on the old offset; nothing the office
+ * schedules falls there.
  */
 export function localInstant(
   day: string,
@@ -106,7 +108,7 @@ export function dayEnd(day: string, timeZone = OFFICE_TIME_ZONE): Date {
 }
 
 function parseTime(time: string): [number, number] {
-  const m = TIME.exec(time);
+  const m = TIME_PATTERN.exec(time);
   if (!m) {
     throw new Error(`not an HH:MM time: ${time}`);
   }

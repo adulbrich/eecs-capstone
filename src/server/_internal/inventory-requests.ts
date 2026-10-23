@@ -8,7 +8,7 @@ import {
 import { requireUser } from "#/lib/_internal/auth-guards";
 import type { InventoryNotice } from "#/lib/inventory-notifications";
 import {
-  type PickupFields,
+  type PickupInput,
   type PickupTerms,
   resolvePickupTerms,
 } from "#/lib/pickup-window";
@@ -282,13 +282,13 @@ export async function cancelRequestItemAs(
  * caller who may not approve learns that rather than what is wrong with the
  * window; the `*As` call checks again, which costs nothing.
  */
-function typedTerms(viewer: Viewer, fields: PickupFields): PickupTerms {
+function typedTerms(viewer: Viewer, fields: PickupInput): PickupTerms {
   assertStaff(viewer);
   return resolvePickupTerms(fields);
 }
 
 export async function approveRequestItemForCurrentUser(
-  data: { requestItemId: string; sendEmail: boolean } & PickupFields
+  data: { requestItemId: string; sendEmail: boolean } & PickupInput
 ) {
   const viewer = await requireUser();
   const { sendEmail, requestItemId, ...fields } = data;
@@ -300,7 +300,7 @@ export async function approveRequestItemForCurrentUser(
 }
 
 export async function approveRequestLinesForCurrentUser(
-  data: { requestItemIds: string[]; sendEmail: boolean } & PickupFields
+  data: { requestItemIds: string[]; sendEmail: boolean } & PickupInput
 ) {
   const viewer = await requireUser();
   const { sendEmail, requestItemIds, ...fields } = data;

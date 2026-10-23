@@ -38,7 +38,7 @@ import {
   MY_ITEMS_FILTERS,
   type MyItemsFilter,
 } from "#/lib/my-items-filter";
-import { formatPickupWindow } from "#/lib/pickup-window";
+import { formatPickupWindow, pickupPhrase } from "#/lib/pickup-window";
 import type { SortState } from "#/lib/table-state";
 import { useAction } from "#/lib/use-action";
 import { useAdminTable } from "#/lib/use-admin-table";
@@ -232,11 +232,7 @@ function DeadlineCell({ row }: { row: Row }) {
       </>
     );
   }
-  const when = formatPickupWindow(pair.pickupFrom, pair.pickupBy);
-  if (when) {
-    return <>{pair.pickupFrom ? `Pick up ${when}` : `Pick up by ${when}`}</>;
-  }
-  return <>-</>;
+  return <>{pickupPhrase(pair.pickupFrom, pair.pickupBy) ?? "-"}</>;
 }
 
 /** An open row whose item is reserved and not yet collected. */

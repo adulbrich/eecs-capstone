@@ -19,7 +19,11 @@
 
 import { overdueFlags } from "./inventory-deadlines";
 import type { NotificationRow } from "./notification-row";
-import { formatPickupWindow, pickupContactSentence } from "./pickup-window";
+import {
+  formatPickupWindow,
+  pickupContactSentence,
+  pickupPhrase,
+} from "./pickup-window";
 import type { ItemStatus, NotificationType } from "./vocabularies";
 
 /**
@@ -256,14 +260,12 @@ function reservedMessage(
   input: TransitionNotice,
   staffInbox: string | null
 ): string {
-  const when = formatPickupWindow(input.pickupFrom, input.pickupBy);
+  const when = pickupPhrase(input.pickupFrom, input.pickupBy);
   const place = input.pickupPlace?.trim();
   const note = input.pickupNote?.trim();
   const paragraphs = [`Your request for ${name} was approved.`];
   if (when) {
-    paragraphs.push(
-      input.pickupFrom ? `Pick up on ${when}.` : `Pick up by ${when}.`
-    );
+    paragraphs.push(`${when}.`);
   }
   if (place) {
     paragraphs.push(`Where to pick up: ${place}`);

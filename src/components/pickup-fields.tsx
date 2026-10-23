@@ -1,4 +1,8 @@
-import { officeToday } from "#/lib/pickup-window";
+import {
+  lastPickupDay,
+  officeToday,
+  pickupWindowInput,
+} from "#/lib/pickup-window";
 import { Input } from "./ui/input";
 import { Label } from "./ui/label";
 import { Textarea } from "./ui/textarea";
@@ -19,6 +23,30 @@ export const EMPTY_PICKUP: PickupFormValue = {
   place: "",
   to: "",
 };
+
+/**
+ * The form a dialog opens with: the terms already on a hold, read back in the
+ * office's zone, or blank with `fallbackPlace` copied in. The inverse of
+ * `pickupPayload`.
+ */
+export function pickupFormValue(
+  stored: {
+    pickupBy?: Date | string | null;
+    pickupFrom?: Date | string | null;
+    pickupNote?: string | null;
+    pickupPlace?: string | null;
+  },
+  fallbackPlace: string | null
+): PickupFormValue {
+  const typed = pickupWindowInput(stored.pickupFrom, stored.pickupBy);
+  return {
+    day: typed.pickupDay ?? "",
+    from: typed.pickupFromTime ?? "",
+    to: typed.pickupToTime ?? "",
+    place: stored.pickupPlace ?? fallbackPlace ?? "",
+    note: stored.pickupNote ?? "",
+  };
+}
 
 /**
  * The fields as the server takes them (`PICKUP_FIELDS`). Sent as typed: the
@@ -72,6 +100,7 @@ export function PickupFields({
         <Input
           disabled={disabled}
           id={`${idPrefix}-day`}
+          max={lastPickupDay()}
           min={officeToday()}
           onChange={field("day")}
           type="date"

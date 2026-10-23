@@ -1,7 +1,6 @@
 import { z } from "zod";
-
-const DAY = /^\d{4}-\d{2}-\d{2}$/;
-const TIME = /^([01]\d|2[0-3]):[0-5]\d$/;
+import { TIME_PATTERN } from "#/lib/day-range";
+import { DAY_PATTERN } from "#/lib/report-range";
 
 /**
  * The pickup terms staff send with an approval or a reserve (#799), spread
@@ -15,16 +14,21 @@ const TIME = /^([01]\d|2[0-3]):[0-5]\d$/;
  * `src/lib/pickup-window.ts`, where the unit test can reach them.
  */
 export const PICKUP_FIELDS = {
-  pickupDay: z.string().regex(DAY).or(z.literal("")).nullable().default(null),
+  pickupDay: z
+    .string()
+    .regex(DAY_PATTERN)
+    .or(z.literal(""))
+    .nullable()
+    .default(null),
   pickupFromTime: z
     .string()
-    .regex(TIME)
+    .regex(TIME_PATTERN)
     .or(z.literal(""))
     .nullable()
     .default(null),
   pickupToTime: z
     .string()
-    .regex(TIME)
+    .regex(TIME_PATTERN)
     .or(z.literal(""))
     .nullable()
     .default(null),
