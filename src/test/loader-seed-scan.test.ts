@@ -146,17 +146,10 @@ const CENSUS = new Map<string, { class: SeedClass; why: string }>([
     },
   ],
   [
-    "src/components/admin-request-actions.tsx: useState(EMPTY_PICKUP)",
+    "src/components/approve-dialog.tsx: useState(EMPTY_PICKUP)",
     {
       class: "D",
-      why: "blank pickup terms, a module constant; the item's location is copied in by openApprove each time the popover opens, not at mount",
-    },
-  ],
-  [
-    "src/components/approve-all-dialog.tsx: useState(EMPTY_PICKUP)",
-    {
-      class: "D",
-      why: "blank pickup terms, a module constant; Approve all copies nothing in (ADR-0065)",
+      why: "blank pickup terms, a module constant; a line's dialog copies the item's location in when it opens on a blank form, not at mount, and a request's copies nothing (ADR-0065)",
     },
   ],
   [

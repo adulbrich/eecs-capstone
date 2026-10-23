@@ -18,7 +18,7 @@ import {
   defineAdminColumns,
 } from "#/components/admin-data-table";
 import { AdminRequestActions } from "#/components/admin-request-actions";
-import { ApproveAllDialog } from "#/components/approve-all-dialog";
+import { ApproveDialog } from "#/components/approve-dialog";
 import {
   CustomLineActions,
   StartSourcingAllButton,
@@ -168,23 +168,31 @@ const KIND: Record<Row["kind"], KindConfig> = {
   item: {
     badge: null,
     groupAction: (rows, onDone) => (
-      <ApproveAllDialog
-        lines={rows.map((row) => ({
-          id: row.line.id,
-          itemName: subjectOf(row),
-          status: row.line.status,
-        }))}
+      <ApproveDialog
         onDone={onDone}
         // One requester per request: the rows are one group's.
-        requesterEmail={rows[0]?.requester.email ?? null}
+        requester={{
+          email: rows[0]?.requester.email ?? null,
+          name: rows[0]?.requester.name ?? null,
+        }}
+        scope={{
+          kind: "request",
+          lines: rows.map((row) => ({
+            id: row.line.id,
+            itemName: subjectOf(row),
+            status: row.line.status,
+          })),
+        }}
       />
     ),
     rowActions: (row, onDone) => (
       <AdminRequestActions
         itemLocation={row.kind === "item" ? row.item.location : null}
+        itemName={subjectOf(row)}
         lineId={row.line.id}
         onDone={onDone}
         requesterEmail={row.requester.email}
+        requesterName={row.requester.name}
         status={row.line.status}
       />
     ),
@@ -557,9 +565,11 @@ function sheetActions(
     return row.line.status === "pending" ? (
       <AdminRequestActions
         itemLocation={row.item.location}
+        itemName={row.item.name}
         lineId={row.line.id}
         onDone={done}
         requesterEmail={row.requester.email}
+        requesterName={row.requester.name}
         status={row.line.status}
       />
     ) : undefined;

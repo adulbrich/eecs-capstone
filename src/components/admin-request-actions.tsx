@@ -1,12 +1,7 @@
 import { useState } from "react";
 import { useAction } from "#/lib/use-action";
-import { approveRequestItem, rejectRequestItem } from "#/server/inventory";
-import {
-  EMPTY_PICKUP,
-  PickupFields,
-  type PickupFormValue,
-  pickupPayload,
-} from "./pickup-fields";
+import { rejectRequestItem } from "#/server/inventory";
+import { ApproveDialog } from "./approve-dialog";
 import { EMAIL_SKIP_HINT, SendEmailCheckbox } from "./send-email-checkbox";
 import { Button } from "./ui/button";
 import { FieldError } from "./ui/field";
@@ -17,10 +12,12 @@ import { Textarea } from "./ui/textarea";
 interface Props {
   /**
    * The item's storage location, copied into "Where to pick up" when the
-   * approve popover opens. One item, so one location; staff see the copy and
-   * usually replace it with the office. The batch dialog never does this.
+   * approve dialog opens. One item, so one location; staff see the copy and
+   * usually replace it with the office. A whole request's dialog never does.
    */
   itemLocation: string | null;
+  /** Names the line in the approve dialog's title. */
+  itemName: string;
   lineId: string;
   /**
    * Called after a decision lands, so the caller can refetch. The router is
@@ -30,31 +27,35 @@ interface Props {
   onDone: () => Promise<void>;
   /** Who is emailed by either decision; named on the skip (#387). */
   requesterEmail: string;
+  /** Names the request in the approve dialog's title; the address stands in. */
+  requesterName: string | null;
   status: string;
 }
 
 /**
- * Approve / reject for one request line, sized for a table cell. The queue
- * used to render these forms inline in a card, which a cell has no room for,
- * so each decision opens in a popover instead. Both decisions email the
- * requester and write their bell row; the popover carries the skip.
+ * Approve / reject for one request line, sized for a table cell. Approve
+ * opens the same dialog as a whole request's Approve all, because its pickup
+ * terms are a form rather than a confirmation (#799); reject stays a popover
+ * with its one reason. Both decisions email the requester and write their
+ * bell row, and each surface carries the skip.
  */
 export function AdminRequestActions({
   itemLocation,
+  itemName,
   lineId,
   onDone,
   requesterEmail,
+  requesterName,
   status,
 }: Props) {
-  const [open, setOpen] = useState<null | "approve" | "reject">(null);
-  const [pickup, setPickup] = useState<PickupFormValue>(EMPTY_PICKUP);
+  const [open, setOpen] = useState(false);
   const [reason, setReason] = useState("");
   const [sendEmail, setSendEmail] = useState(true);
-  // The two decisions fail differently and share one error slot, so the
-  // fallback comes per call rather than per hook. A second activation in the
-  // same tick would decide the line twice; `use-action.ts` says why the
-  // hook's ref is what stops it (#443).
-  const { busy, error, run, setError } = useAction();
+  // A second activation in the same tick would decide the line twice;
+  // `use-action.ts` says why the hook's ref is what stops it (#443).
+  const { busy, error, run, setError } = useAction({
+    fallback: "Reject failed",
+  });
 
   // Approving or rejecting is a one-way door, so a decided line offers
   // nothing rather than a disabled control.
@@ -62,11 +63,10 @@ export function AdminRequestActions({
     return <span className="text-muted-foreground">-</span>;
   }
 
-  // One cleanup for both popovers, run by every control that closes one.
   // The skip is a decision about one click, so it is checked again next time.
   /** Closes and resets. Called by Cancel, by `dismiss` and by the success path. */
   function close() {
-    setOpen(null);
+    setOpen(false);
     setError(null);
     setSendEmail(true);
   }
@@ -95,31 +95,6 @@ export function AdminRequestActions({
     close();
   }
 
-  /**
-   * Opens the approve popover with the place copied from the item. Filled on
-   * open rather than at mount, so a location edited while the row sat on
-   * screen is the one copied, and a cancelled attempt leaves nothing behind.
-   */
-  function openApprove() {
-    setPickup({ ...EMPTY_PICKUP, place: itemLocation ?? "" });
-    setOpen("approve");
-  }
-
-  function onApprove() {
-    return run(async () => {
-      await approveRequestItem({
-        data: {
-          requestItemId: lineId,
-          ...pickupPayload(pickup),
-          sendEmail,
-        },
-      });
-      setPickup(EMPTY_PICKUP);
-      await onDone();
-      close();
-    }, "Approve failed");
-  }
-
   function onReject() {
     if (!reason.trim()) {
       setError("Reason required");
@@ -132,68 +107,28 @@ export function AdminRequestActions({
       setReason("");
       await onDone();
       close();
-    }, "Reject failed");
+    });
   }
 
   return (
     <div className="flex gap-2">
-      <Popover
-        onOpenChange={(next) => (next ? openApprove() : dismiss())}
-        open={open === "approve"}
-      >
-        <PopoverTrigger asChild>
-          <Button disabled={busy} size="sm" type="button">
-            Approve
-          </Button>
-        </PopoverTrigger>
-        {/* Five fields outgrow a phone's screen below a table row, so the
-            popover scrolls inside the space Radix measured rather than
-            pushing Confirm past the fold. */}
-        <PopoverContent className="max-h-(--radix-popover-content-available-height) w-80 space-y-2 overflow-y-auto">
-          <PickupFields
-            disabled={busy}
-            idPrefix={`pickup-${lineId}`}
-            onChange={setPickup}
-            placeHint={
-              itemLocation
-                ? "Copied from the item's location. The requester sees what is here."
-                : "The requester sees what is here."
-            }
-            value={pickup}
-          />
-          <SendEmailCheckbox
-            address={requesterEmail}
-            checked={sendEmail}
-            disabled={busy}
-            hint={EMAIL_SKIP_HINT.withBell}
-            onCheckedChange={setSendEmail}
-          />
-          <FieldError message={error} />
-          <div className="flex gap-2">
-            <Button
-              disabled={busy}
-              onClick={() => void onApprove()}
-              size="sm"
-              type="button"
-            >
-              {busy ? "Saving..." : "Confirm approve"}
-            </Button>
-            <Button
-              disabled={busy}
-              onClick={close}
-              size="sm"
-              type="button"
-              variant="outline"
-            >
-              Cancel
-            </Button>
-          </div>
-        </PopoverContent>
-      </Popover>
+      {/* Held off while a rejection writes, so the row never offers a second
+          decision over itself (#426). The reverse needs no prop: the dialog
+          is modal. */}
+      <ApproveDialog
+        disabled={busy}
+        onDone={onDone}
+        requester={{ email: requesterEmail, name: requesterName }}
+        scope={{
+          kind: "line",
+          itemLocation,
+          line: { id: lineId, itemName, status },
+        }}
+      />
 
       <Popover
-        onOpenChange={(next) => (next ? setOpen("reject") : dismiss())}
-        open={open === "reject"}
+        onOpenChange={(next) => (next ? setOpen(true) : dismiss())}
+        open={open}
       >
         <PopoverTrigger asChild>
           <Button disabled={busy} size="sm" type="button" variant="outline">

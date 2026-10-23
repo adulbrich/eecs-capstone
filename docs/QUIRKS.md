@@ -522,7 +522,7 @@ The query cache outlives the session that filled it, and a session can end witho
 
 ### A Cancel button that sets `open` itself skips the dialog's `onOpenChange`
 
-Radix fires `onOpenChange` only for closes it initiates (Escape, the overlay, `DialogClose`), not when the component sets a controlled `open` itself. When a dialog has close-time cleanup, every control that closes it calls the same function; `approve-all-dialog.test.tsx` and `custom-line-actions.test.tsx` check reopen-after-Cancel.
+Radix fires `onOpenChange` only for closes it initiates (Escape, the overlay, `DialogClose`), not when the component sets a controlled `open` itself. When a dialog has close-time cleanup, every control that closes it calls the same function; `approve-dialog.test.tsx` and `custom-line-actions.test.tsx` check reopen-after-Cancel.
 
 ### Path-by-path convention summary
 
