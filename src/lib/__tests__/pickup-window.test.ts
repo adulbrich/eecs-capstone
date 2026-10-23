@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
   formatPickupWindow,
+  lastPickupDay,
   pickupContactSentence,
+  pickupPhrase,
   pickupWindowInput,
   resolvePickupTerms,
   resolvePickupWindow,
@@ -170,6 +172,27 @@ describe("pickupWindowInput", () => {
       pickupFromTime: null,
       pickupToTime: null,
     });
+  });
+});
+
+describe("lastPickupDay", () => {
+  it("counts the year from the Pacific day, not the UTC one", () => {
+    // 03:00Z on the 29th is 8 pm on the 28th in Corvallis.
+    expect(lastPickupDay(Date.parse("2026-10-29T03:00:00.000Z"))).toBe(
+      "2027-10-28"
+    );
+  });
+});
+
+describe("pickupPhrase", () => {
+  it("says on for a window and by for a day", () => {
+    expect(
+      pickupPhrase("2026-10-30T21:00:00.000Z", "2026-10-30T23:00:00.000Z")
+    ).toBe("Pick up on Oct 30, 2026, 2:00 PM to 4:00 PM");
+    expect(pickupPhrase(null, "2026-10-31T06:59:59.999Z")).toBe(
+      "Pick up by Oct 30, 2026"
+    );
+    expect(pickupPhrase(null, null)).toBeNull();
   });
 });
 
