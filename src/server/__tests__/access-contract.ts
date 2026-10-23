@@ -188,7 +188,7 @@ export const ACCESS_CONTRACT: Record<string, AccessDeclaration> = {
   "server/inventory.ts:submitCart": { level: "authenticated" },
   "server/inventory.ts:transitionInventoryItem": {
     level: "staff",
-    note: "transitionInventoryItemForCurrentUser calls assertStaff before composing the pickup window, and transitionItem checks again through assertAuthorized (src/lib/inventory-workflow.ts). The schema deliberately omits `authority` so a signed-in user cannot supply one. See the transitionSchema docblock.",
+    note: "transitionInventoryItemAs calls assertStaff before composing the pickup window, and transitionItem checks again through assertAuthorized (src/lib/inventory-workflow.ts). The schema deliberately omits `authority` so a signed-in user cannot supply one. See the transitionSchema docblock.",
   },
   "server/inventory.ts:updateInventoryItem": { level: "staff" },
 

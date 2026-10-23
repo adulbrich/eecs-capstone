@@ -538,6 +538,34 @@ describe("InventoryLifecyclePanel: the pickup terms on a reserve (#799)", () => 
     );
   });
 
+  it("reads back what the holder was told, and nothing it was not", () => {
+    render(
+      <InventoryLifecyclePanel
+        hasRequestHistory={false}
+        history={[]}
+        item={{
+          id: "item-1",
+          name: "Oscilloscope",
+          status: "reserved",
+          currentHolderId: null,
+          currentHolderEmail: "walkin@x.edu",
+          currentHolderLabel: null,
+          currentRequestItemId: null,
+          location: "Cabinet A, Bin 1",
+          pickupFrom: "2026-10-30T21:00:00.000Z",
+          pickupBy: "2026-10-30T23:00:00.000Z",
+          pickupPlace: "KEC 1148",
+          pickupNote: null,
+        }}
+      />
+    );
+    expect(screen.getByText("Oct 30, 2026, 2:00 PM to 4:00 PM")).toBeTruthy();
+    expect(screen.getByText("KEC 1148")).toBeTruthy();
+    expect(screen.queryByText("Pickup note")).toBeNull();
+    // The storage location is the private panel's, not a pickup term.
+    expect(screen.queryByText("Cabinet A, Bin 1")).toBeNull();
+  });
+
   it("sends no pickup terms on a checkout", async () => {
     renderPanel({ status: "available" });
     fireEvent.click(screen.getByRole("button", { name: "Check out" }));

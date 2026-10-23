@@ -10,7 +10,7 @@ import {
   needsDueAt,
   needsHolder,
 } from "#/lib/inventory-workflow";
-import { pickupWindowFields } from "#/lib/pickup-window";
+import { formatPickupWindow, pickupWindowFields } from "#/lib/pickup-window";
 import { useAction } from "#/lib/use-action";
 import { INVENTORY_ITEM_STATUSES, type ItemStatus } from "#/lib/vocabularies";
 import {
@@ -350,6 +350,37 @@ function StatusHistorySection({ history }: { history: HistoryRow[] }) {
   );
 }
 
+/**
+ * What the holder was told about collecting the item, as rows of the Status
+ * list. A staff reserve has no request line, so this is the one place staff
+ * can read it back (#799). Nothing renders for a term that was not given.
+ */
+function PickupTermsRows({ item }: { item: Props["item"] }) {
+  const when = formatPickupWindow(item.pickupFrom, item.pickupBy);
+  return (
+    <>
+      {when && (
+        <>
+          <dt className="text-muted-foreground">Pick up</dt>
+          <dd className="col-span-2">{when}</dd>
+        </>
+      )}
+      {item.pickupPlace && (
+        <>
+          <dt className="text-muted-foreground">Where to pick up</dt>
+          <dd className="col-span-2">{item.pickupPlace}</dd>
+        </>
+      )}
+      {item.pickupNote && (
+        <>
+          <dt className="text-muted-foreground">Pickup note</dt>
+          <dd className="col-span-2 whitespace-pre-wrap">{item.pickupNote}</dd>
+        </>
+      )}
+    </>
+  );
+}
+
 export function InventoryLifecyclePanel({
   item,
   history,
@@ -590,6 +621,7 @@ export function InventoryLifecyclePanel({
           </dd>
           <dt className="text-muted-foreground">Holder</dt>
           <dd className="col-span-2">{holderDisplay ?? "-"}</dd>
+          <PickupTermsRows item={item} />
         </dl>
 
         <div className="mt-4 flex flex-wrap items-end gap-3">

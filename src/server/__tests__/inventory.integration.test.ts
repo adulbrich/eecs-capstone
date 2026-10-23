@@ -2157,6 +2157,37 @@ describe("staff-assigned holds in my items", () => {
     }
   });
 
+  it("carries the pickup terms staff gave a hold, and not the location", async () => {
+    const stamp = Date.now();
+    const admin = await makeUser(`h-terms-admin-${stamp}@x.com`, "admin");
+    const holder = await makeUser(`h-terms-holder-${stamp}@x.com`, "user");
+    const item = await makeItem({ name: "Scope", location: "Cabinet A" });
+    const pickupFrom = new Date("2026-10-30T21:00:00.000Z");
+    const pickupBy = new Date("2026-10-30T23:00:00.000Z");
+
+    await transitionItem(admin, {
+      itemId: item.id,
+      nextStatus: "reserved",
+      holderId: holder.id,
+      pickupFrom,
+      pickupBy,
+      pickupPlace: "KEC 1148",
+      pickupNote: "Bring your student ID.",
+    });
+
+    const [only] = activeOf(await listMyItemsAs(holder));
+    expect(only?.kind).toBe("hold");
+    if (only?.kind === "hold") {
+      expect(only.item.pickupFrom?.toISOString()).toBe(
+        pickupFrom.toISOString()
+      );
+      expect(only.item.pickupBy?.toISOString()).toBe(pickupBy.toISOString());
+      expect(only.item.pickupPlace).toBe("KEC 1148");
+      expect(only.item.pickupNote).toBe("Bring your student ID.");
+      expect(JSON.stringify(only)).not.toContain("Cabinet A");
+    }
+  });
+
   it("does not leak another user's hold", async () => {
     const stamp = Date.now();
     const admin = await makeUser(`h2-admin-${stamp}@x.com`, "admin");
