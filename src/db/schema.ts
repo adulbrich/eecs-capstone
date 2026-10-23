@@ -521,6 +521,15 @@ export const inventoryItems = pgTable(
     // item that was never carted), so the current hold's dates live here
     // rather than only on inventory_request_items.
     currentPickupBy: timestamp("current_pickup_by", { withTimezone: true }),
+    // The rest of the pickup arrangement, beside its deadline and for the
+    // same reason: a staff reserve has no line to keep them on. The start of
+    // the window, where to collect, and a note for the holder. The place is a
+    // copy staff chose, never a read of `location`, which stays staff only.
+    currentPickupFrom: timestamp("current_pickup_from", {
+      withTimezone: true,
+    }),
+    currentPickupPlace: text("current_pickup_place"),
+    currentPickupNote: text("current_pickup_note"),
     currentDueAt: timestamp("current_due_at", { withTimezone: true }),
     currentRequestItemId: uuid("current_request_item_id"),
 
@@ -598,7 +607,13 @@ export const inventoryRequestItems = pgTable(
     reviewedAt: timestamp("reviewed_at", { withTimezone: true }),
     reviewComment: text("review_comment"),
 
+    // The pickup window ends at `pickup_by`; `pickup_from` is its start when
+    // staff gave times. Place and note are what staff told the requester on
+    // approval, kept after the item moves on.
+    pickupFrom: timestamp("pickup_from", { withTimezone: true }),
     pickupBy: timestamp("pickup_by", { withTimezone: true }),
+    pickupPlace: text("pickup_place"),
+    pickupNote: text("pickup_note"),
     dueAt: timestamp("due_at", { withTimezone: true }),
 
     closedAt: timestamp("closed_at", { withTimezone: true }),

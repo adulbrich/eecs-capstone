@@ -206,10 +206,22 @@ describe("assertTransitionAllowed: invariants per status", () => {
   it("refuses a deadline on a release", () => {
     expect(() =>
       assertTransitionAllowed(ADMIN, input({ pickupBy: LATER }))
-    ).toThrow(/pickupBy \/ dueAt not allowed on transition to available/);
+    ).toThrow(/Pickup and due terms not allowed on transition to available/);
     expect(() =>
       assertTransitionAllowed(ADMIN, input({ dueAt: LATER }))
-    ).toThrow(/pickupBy \/ dueAt not allowed on transition to available/);
+    ).toThrow(/Pickup and due terms not allowed on transition to available/);
+  });
+
+  it("refuses the rest of the pickup arrangement on a release", () => {
+    for (const terms of [
+      { pickupFrom: LATER },
+      { pickupPlace: "KEC 1148" },
+      { pickupNote: "Bring your ID." },
+    ]) {
+      expect(() => assertTransitionAllowed(ADMIN, input(terms))).toThrow(
+        /Pickup and due terms not allowed on transition to available/
+      );
+    }
   });
 
   it("requires a line and a person, and no label, on requested", () => {
@@ -410,7 +422,7 @@ describe("the form predicates agree with the rules", () => {
     for (const nextStatus of PANEL_STATUSES.filter((s) => !needsHolder(s))) {
       expect(needsDueAt(nextStatus)).toBe(false);
       expect(refusal({ dueAt: LATER, nextStatus })).toMatch(
-        /pickupBy \/ dueAt not allowed/
+        /Pickup and due terms not allowed/
       );
     }
   });

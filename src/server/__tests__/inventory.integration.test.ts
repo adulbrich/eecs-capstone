@@ -1694,6 +1694,82 @@ describe("approveRequestLinesAs", () => {
     ).toHaveLength(2);
   });
 
+  it("writes one window, place and note to every line and every item", async () => {
+    const stamp = Date.now();
+    const admin = await makeUser(`terms-admin-${stamp}@x.com`, "admin");
+    const student = await makeUser(`terms-student-${stamp}@x.com`, "user");
+    const items = [
+      await makeItem({ location: "Cabinet A, Bin 1" }),
+      await makeItem({ location: "Parts Drawer 4" }),
+    ];
+    const lines = await submitBatch(student, items);
+    const pickupFrom = new Date("2026-10-30T21:00:00.000Z");
+    const pickupBy = new Date("2026-10-30T23:00:00.000Z");
+
+    await approveRequestLinesAs(admin, {
+      requestItemIds: lines.map((line) => line.id),
+      pickupFrom,
+      pickupBy,
+      pickupPlace: "KEC 1148",
+      pickupNote: "Bring your student ID.",
+    });
+
+    for (const line of lines) {
+      const after = await lineStatus(line.id);
+      expect(after.pickupFrom?.toISOString()).toBe(pickupFrom.toISOString());
+      expect(after.pickupBy?.toISOString()).toBe(pickupBy.toISOString());
+      expect(after.pickupPlace).toBe("KEC 1148");
+      expect(after.pickupNote).toBe("Bring your student ID.");
+    }
+    for (const item of items) {
+      const [after] = await db
+        .select()
+        .from(inventoryItems)
+        .where(eq(inventoryItems.id, item.id));
+      expect(after.currentPickupFrom?.toISOString()).toBe(
+        pickupFrom.toISOString()
+      );
+      // The place staff typed, never the storage location beside it.
+      expect(after.currentPickupPlace).toBe("KEC 1148");
+      expect(after.currentPickupNote).toBe("Bring your student ID.");
+    }
+  });
+
+  it("clears the item's pickup terms on checkout and leaves the line's", async () => {
+    const stamp = Date.now();
+    const admin = await makeUser(`clear-admin-${stamp}@x.com`, "admin");
+    const student = await makeUser(`clear-student-${stamp}@x.com`, "user");
+    const item = await makeItem();
+    const [line] = await submitBatch(student, [item]);
+    await approveRequestLinesAs(admin, {
+      requestItemIds: [line.id],
+      pickupFrom: new Date("2026-10-30T21:00:00.000Z"),
+      pickupBy: new Date("2026-10-30T23:00:00.000Z"),
+      pickupPlace: "KEC 1148",
+      pickupNote: "Bring your student ID.",
+    });
+
+    await transitionItem(admin, {
+      itemId: item.id,
+      nextStatus: "checked_out",
+      requestItemId: line.id,
+      holderId: student.id,
+      dueAt: new Date(Date.now() + 7 * 86_400_000),
+    });
+
+    const [afterItem] = await db
+      .select()
+      .from(inventoryItems)
+      .where(eq(inventoryItems.id, item.id));
+    expect(afterItem.currentPickupBy).toBeNull();
+    expect(afterItem.currentPickupFrom).toBeNull();
+    expect(afterItem.currentPickupPlace).toBeNull();
+    expect(afterItem.currentPickupNote).toBeNull();
+    const afterLine = await lineStatus(line.id);
+    expect(afterLine.pickupPlace).toBe("KEC 1148");
+    expect(afterLine.pickupNote).toBe("Bring your student ID.");
+  });
+
   it("leaves a decided line alone when the caller passes only the pending ones", async () => {
     const stamp = Date.now();
     const admin = await makeUser(`part-admin-${stamp}@x.com`, "admin");
@@ -2339,6 +2415,9 @@ describe("my items payload names every field it returns", () => {
         "id",
         "name",
         "pickupBy",
+        "pickupFrom",
+        "pickupNote",
+        "pickupPlace",
         "status",
         "updatedAt",
       ]);
@@ -2366,6 +2445,9 @@ describe("my items payload names every field it returns", () => {
         "dueAt",
         "id",
         "pickupBy",
+        "pickupFrom",
+        "pickupNote",
+        "pickupPlace",
         "reviewedAt",
         "status",
       ]);
@@ -3820,6 +3902,36 @@ describe("inventory emails", () => {
     expect(send.mock.calls[0]?.[1].subject).toContain("Reserved:");
     expect(send.mock.calls[0]?.[1].text).toContain(
       "https://app/my/items?filter=open"
+    );
+
+    send.mockClear();
+    process.env.EMAIL_STAFF_INBOX = "capstone@oregonstate.edu";
+    const windowItem = await makeItem();
+    const { line: windowLine } = await makeRequestLine(
+      student.id,
+      windowItem.id
+    );
+    await approveRequestItemAs(
+      admin,
+      {
+        requestItemId: windowLine.id,
+        pickupFrom: new Date("2026-10-30T21:00:00.000Z"),
+        pickupBy: new Date("2026-10-30T23:00:00.000Z"),
+        pickupPlace: "KEC 1148",
+        pickupNote: "Bring your student ID.",
+      },
+      { send }
+    );
+    const windowMail = send.mock.calls[0]?.[1];
+    expect(windowMail.subject).toContain("Pick up by Oct 30, 2026.");
+    // One paragraph each, so the HTML keeps them apart.
+    expect(windowMail.html).toContain(
+      "<p>Pick up on Oct 30, 2026, 2:00 PM to 4:00 PM.</p>"
+    );
+    expect(windowMail.html).toContain("<p>Where to pick up: KEC 1148</p>");
+    expect(windowMail.html).toContain("<p>Bring your student ID.</p>");
+    expect(windowMail.text).toContain(
+      "If this time doesn't work, email capstone@oregonstate.edu."
     );
 
     send.mockClear();

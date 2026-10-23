@@ -366,6 +366,12 @@ Each project carries:
   step. Nothing is public and nothing on a submitted line is editable.
 - [x] Rejection requires a reason that is shown to the user; rejected/returned
   items go back to `available`.
+- [x] Approving or reserving takes an optional pickup window (a day, and a From
+  and To on it, in Corvallis time), a pickup place and a pickup note (#799).
+  The requester reads them in the approval email and on `/my/items`, with the
+  staff inbox to write to if the time does not work. A one-item dialog copies
+  the item's location into the place for staff to replace; Approve all starts
+  blank and never names a storage location (ADR-0065).
 - [x] Staff change item status and assign holders; items auto-assign to the
   requesting user on reserve, with manual override on checkout.
 - [x] Staff-assigned holds need no request line: an item that was never carted
@@ -374,7 +380,7 @@ Each project carries:
   matches an account resolves to it (and so notifies the holder) the same way
   a project's proposer email resolves to a proposer; an address with no
   account still records the typed name and program instead. The hold's
-  pickup-by and due-at live on the item, so they survive whether or not a
+  pickup terms and due-at live on the item, so they survive whether or not a
   request line exists.
 - [x] One item can involve two people: the student who requested it and the
   teammate who collected it. The request stays attributed to its requester,
@@ -422,7 +428,9 @@ catalogue that decided the matrix below; #288 shipped it.
   no linked account or when the proposer is the actor. Internal comments notify
   nobody.
 - [x] Inventory events to the requester or holder: request approved (with the
-  pickup-by date), rejected, checked out (with the due date), returned, closed
+  pickup window, pickup place and pickup note staff gave, and the staff inbox
+  to write to if the time does not work), rejected, checked out (with the due
+  date), returned, closed
   by staff; on a custom line, sourcing started, sourcing note edited, rejected,
   fulfilled. Cart submission, custom request submission and self-cancel write
   no row; the admin overview tile is the staff signal in the app, and the staff
@@ -487,7 +495,7 @@ catalogue that decided the matrix below; #288 shipped it.
   | Staff inbox | Custom request submitted | tile | yes |
   | Staff inbox | Comment from the proposer | no | yes |
   | Staff inbox | New account | no | no |
-  | Holder | Request approved, pick up by date | yes | yes |
+  | Holder | Request approved, pickup window, place and note | yes | yes |
   | Requester | Request rejected | yes | yes |
   | Holder | Checked out, due date | yes | yes |
   | Holder | Returned, closed by staff | yes | no |

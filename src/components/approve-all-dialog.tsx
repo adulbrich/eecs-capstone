@@ -1,6 +1,12 @@
 import { useState } from "react";
 import { useAction } from "#/lib/use-action";
 import { approveRequestLines } from "#/server/inventory";
+import {
+  EMPTY_PICKUP,
+  PickupFields,
+  type PickupFormValue,
+  pickupPayload,
+} from "./pickup-fields";
 import { EMAIL_SKIP_HINT, SendEmailCheckbox } from "./send-email-checkbox";
 import { Button } from "./ui/button";
 import {
@@ -13,8 +19,6 @@ import {
   DialogTrigger,
 } from "./ui/dialog";
 import { FieldError } from "./ui/field";
-import { Input } from "./ui/input";
-import { Label } from "./ui/label";
 
 export interface ApproveAllLine {
   id: string;
@@ -24,7 +28,8 @@ export interface ApproveAllLine {
 
 /**
  * One decision over a whole request: every line still pending takes the one
- * pickup date, or none does. Sits on the group header of the request queue.
+ * set of pickup terms, or none does. Sits on the group header of the request
+ * queue.
  *
  * The dialog lists what it is about to approve, and sends exactly those ids:
  * a line decided between the render and the click fails the batch on the
@@ -43,7 +48,7 @@ export function ApproveAllDialog({
   requesterEmail: string | null;
 }) {
   const [open, setOpen] = useState(false);
-  const [pickupBy, setPickupBy] = useState("");
+  const [pickup, setPickup] = useState<PickupFormValue>(EMPTY_PICKUP);
   const [sendEmail, setSendEmail] = useState(true);
   // A second activation in the same tick would approve the whole batch
   // twice; `use-action.ts` says why the hook's ref is what stops it (#443).
@@ -61,11 +66,11 @@ export function ApproveAllDialog({
       await approveRequestLines({
         data: {
           requestItemIds: pending.map((line) => line.id),
-          pickupBy: pickupBy ? new Date(pickupBy) : null,
+          ...pickupPayload(pickup),
           sendEmail,
         },
       });
-      setPickupBy("");
+      setPickup(EMPTY_PICKUP);
       await onDone();
       setOpen(false);
     });
@@ -111,7 +116,7 @@ export function ApproveAllDialog({
           </DialogTitle>
           <DialogDescription>
             Every pending line in this request is reserved to the requester with
-            the same pickup deadline.
+            the same pickup window, place and note.
           </DialogDescription>
         </DialogHeader>
         <ul className="list-disc space-y-0.5 pl-5 text-sm">
@@ -119,15 +124,16 @@ export function ApproveAllDialog({
             <li key={line.id}>{line.itemName}</li>
           ))}
         </ul>
-        <div className="space-y-1.5">
-          <Label htmlFor="approve-all-pickup">Pickup by (optional)</Label>
-          <Input
-            id="approve-all-pickup"
-            onChange={(e) => setPickupBy(e.target.value)}
-            type="date"
-            value={pickupBy}
-          />
-        </div>
+        {/* No place is copied in and no location is listed: the items can
+            sit in different places, none of which is where the requester
+            goes, and a storage location is staff only (#799). */}
+        <PickupFields
+          disabled={busy}
+          idPrefix="approve-all-pickup"
+          onChange={setPickup}
+          placeHint="Left blank, the requester is told no place. They see what is here."
+          value={pickup}
+        />
         <SendEmailCheckbox
           address={requesterEmail}
           checked={sendEmail}

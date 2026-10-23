@@ -127,7 +127,14 @@ export interface TransitionInput {
   itemId: string;
   lineDecision?: RequestLineDecision | null;
   nextStatus: ItemStatus;
+  /** The end of the pickup window: the pickup deadline. */
   pickupBy?: Date | null;
+  /** The start of the pickup window, when staff gave times. */
+  pickupFrom?: Date | null;
+  /** What staff tell the holder to read beside the window. */
+  pickupNote?: string | null;
+  /** Where to collect, as staff typed it; never read from the item. */
+  pickupPlace?: string | null;
   requestItemId?: string | null;
   /**
    * Suppresses the notification this transition would otherwise write. One
@@ -272,6 +279,9 @@ function validateStatusInvariants(input: TransitionInput) {
     holderProgram,
     requestItemId,
     pickupBy,
+    pickupFrom,
+    pickupPlace,
+    pickupNote,
     dueAt,
   } = input;
 
@@ -291,9 +301,10 @@ function validateStatusInvariants(input: TransitionInput) {
           `Cannot set holder or request on transition to ${nextStatus}`
         );
       }
-      if (pickupBy || dueAt) {
+      // A release ends the hold, so it carries none of the hold's terms.
+      if (pickupBy || pickupFrom || pickupPlace || pickupNote || dueAt) {
         throw new Error(
-          `pickupBy / dueAt not allowed on transition to ${nextStatus}`
+          `Pickup and due terms not allowed on transition to ${nextStatus}`
         );
       }
       return;

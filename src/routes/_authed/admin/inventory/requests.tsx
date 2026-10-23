@@ -51,6 +51,7 @@ import { requireStaff } from "#/lib/access-denied";
 import { isOpenCustomLine } from "#/lib/inventory-custom-workflow";
 import { lineTimeline } from "#/lib/inventory-timeline";
 import { pageTitle } from "#/lib/page-title";
+import { formatPickupWindow } from "#/lib/pickup-window";
 import { searchParamQuerySchema } from "#/lib/search-query";
 import type { SortState } from "#/lib/table-state";
 import { useAdminTable } from "#/lib/use-admin-table";
@@ -180,6 +181,7 @@ const KIND: Record<Row["kind"], KindConfig> = {
     ),
     rowActions: (row, onDone) => (
       <AdminRequestActions
+        itemLocation={row.kind === "item" ? row.item.location : null}
         lineId={row.line.id}
         onDone={onDone}
         requesterEmail={row.requester.email}
@@ -554,6 +556,7 @@ function sheetActions(
   if (row.kind === "item") {
     return row.line.status === "pending" ? (
       <AdminRequestActions
+        itemLocation={row.item.location}
         lineId={row.line.id}
         onDone={done}
         requesterEmail={row.requester.email}
@@ -611,7 +614,14 @@ function itemFields(row: ItemRow): LineSheetField[] {
       ),
     },
     { label: "Status", value: statusLabel(row.line.status) },
-    { label: "Pickup by", value: dateOr(row.line.pickupBy) },
+    // The terms the requester was given, in the office's zone, whatever the
+    // reader's: the window is a time to be in Corvallis.
+    {
+      label: "Pick up",
+      value: formatPickupWindow(row.line.pickupFrom, row.line.pickupBy) ?? "-",
+    },
+    { label: "Where to pick up", value: textOr(row.line.pickupPlace) },
+    { label: "Pickup note", value: textOr(row.line.pickupNote) },
     { label: "Due", value: dateOr(row.line.dueAt) },
     {
       label: "Collected by",

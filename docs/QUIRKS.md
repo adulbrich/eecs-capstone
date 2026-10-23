@@ -673,6 +673,10 @@ An envelope holds item lines or custom lines, so a join to `inventory_request_it
 
 `approveRequestLinesAs` sorts the ids and approves all in one transaction, each line then its item, so overlapping batches wait instead of deadlocking. One line no longer pending fails the batch, since the ids are what staff confirmed.
 
+### Pickup terms are strings on the wire and instants in `*As`
+
+`PICKUP_FIELDS` takes the day and times as `YYYY-MM-DD` and `HH:MM` strings; never `z.coerce.date()` for a day, which reads it as UTC midnight, the evening before in Corvallis (#805). The `*ForCurrentUser` wrappers compose them with `resolvePickupTerms` (`src/lib/pickup-window.ts`), which refuses a window that has ended. The `*As` functions take instants, so the seed and the integration suite can still build overdue fixtures with past dates. Render a window with `formatPickupWindow`, which pins the office zone and needs no `LocalTime`. Approve all never prefills the pickup place (ADR-0065).
+
 ### submitCart is lock-first
 
 `submitCartAs` locks each cart item and re-checks `available` before inserting the envelope, so an all-race submit leaves no orphan request; losers return in `skipped`.

@@ -38,6 +38,7 @@ import {
   MY_ITEMS_FILTERS,
   type MyItemsFilter,
 } from "#/lib/my-items-filter";
+import { formatPickupWindow } from "#/lib/pickup-window";
 import type { SortState } from "#/lib/table-state";
 import { useAction } from "#/lib/use-action";
 import { useAdminTable } from "#/lib/use-admin-table";
@@ -48,6 +49,7 @@ import type {
 } from "#/lib/vocabularies";
 import {
   cancelRequestItem,
+  getPickupContact,
   listMyItems,
   removeFromCart,
   submitCart,
@@ -67,8 +69,15 @@ export const searchSchema = z.object({
 export const Route = createFileRoute("/_authed/my/items")({
   validateSearch: searchSchema,
   // No loaderDeps: the filter is applied in the browser over the viewer's
-  // own rows, which are few, so changing it never refetches.
-  loader: () => listMyItems(),
+  // own rows, which are few, so changing it never refetches. The inbox rides
+  // along for the line under a pickup window (#799).
+  loader: async () => {
+    const [rows, contact] = await Promise.all([
+      listMyItems(),
+      getPickupContact(),
+    ]);
+    return { rows, staffInbox: contact.staffInbox };
+  },
   component: MyItems,
 });
 
@@ -223,14 +232,20 @@ function DeadlineCell({ row }: { row: Row }) {
       </>
     );
   }
-  if (pair.pickupBy) {
-    return (
-      <>
-        Pick up by <LocalTime dateOnly value={pair.pickupBy} />
-      </>
-    );
+  const when = formatPickupWindow(pair.pickupFrom, pair.pickupBy);
+  if (when) {
+    return <>{pair.pickupFrom ? `Pick up ${when}` : `Pick up by ${when}`}</>;
   }
   return <>-</>;
+}
+
+/** An open row whose item is reserved and not yet collected. */
+function awaitsPickup(row: Row): boolean {
+  if (!(isDeadlineEntry(row) && isOpenRow(row))) {
+    return false;
+  }
+  const pair = row.kind === "hold" ? row.item : row.line;
+  return Boolean(pair.pickupBy && !pair.dueAt);
 }
 
 function StateCell({ row }: { row: Row }) {
@@ -418,7 +433,7 @@ const NO_MATCH: Record<MyItemsFilter, string> = {
 };
 
 function MyItems() {
-  const data = Route.useLoaderData();
+  const { rows: data, staffInbox } = Route.useLoaderData();
   const { filter } = Route.useSearch();
   const navigate = useNavigate({ from: "/my/items" });
   const router = useRouter();
@@ -590,7 +605,7 @@ function MyItems() {
           ) : undefined
         }
         events={openRow ? timelineOf(openRow) : []}
-        fields={openRow ? fieldsOf(openRow) : []}
+        fields={openRow ? fieldsOf(openRow, staffInbox) : []}
         onOpenChange={(open) => {
           if (!open) {
             setOpenId(null);
@@ -629,7 +644,7 @@ function timelineOf(row: Row) {
   return [];
 }
 
-function fieldsOf(row: Row): LineSheetField[] {
+function fieldsOf(row: Row, staffInbox: string | null): LineSheetField[] {
   if (row.kind === "cart") {
     return [];
   }
@@ -673,10 +688,41 @@ function fieldsOf(row: Row): LineSheetField[] {
           lineLabel(row.line.status)
         ),
     },
+    // In the office's zone, as the approval email put it: the window is a
+    // time to be in Corvallis, wherever the reader is.
     {
-      label: "Pickup by",
-      value: pair.pickupBy ? <LocalTime dateOnly value={pair.pickupBy} /> : "-",
+      label: "Pick up",
+      value: formatPickupWindow(pair.pickupFrom, pair.pickupBy) ?? "-",
     },
+    { label: "Where to pick up", value: pair.pickupPlace ?? "-" },
+    {
+      label: "Pickup note",
+      value: pair.pickupNote ? (
+        <span className="whitespace-pre-wrap">{pair.pickupNote}</span>
+      ) : (
+        "-"
+      ),
+    },
+    // Only while the item waits to be collected; after that the window is
+    // history and there is nothing left to rearrange.
+    ...(staffInbox && awaitsPickup(row)
+      ? [
+          {
+            label: "Time doesn't work?",
+            value: (
+              <>
+                Email{" "}
+                <a
+                  className="break-all text-brand-dark underline"
+                  href={`mailto:${staffInbox}`}
+                >
+                  {staffInbox}
+                </a>
+              </>
+            ),
+          },
+        ]
+      : []),
     {
       label: "Due",
       value: pair.dueAt ? <LocalTime dateOnly value={pair.dueAt} /> : "-",

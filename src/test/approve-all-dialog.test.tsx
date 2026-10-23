@@ -170,8 +170,11 @@ describe("ApproveAllDialog", () => {
       />
     );
     openDialog();
-    fireEvent.change(screen.getByLabelText("Pickup by (optional)"), {
+    fireEvent.change(screen.getByLabelText("Pickup day (optional)"), {
       target: { value: "2026-10-01" },
+    });
+    fireEvent.change(screen.getByLabelText("Where to pick up (optional)"), {
+      target: { value: "KEC 1148" },
     });
     fireEvent.click(
       screen.getByRole("button", { name: "Confirm approve all" })
@@ -181,7 +184,11 @@ describe("ApproveAllDialog", () => {
     expect(approveRequestLines).toHaveBeenCalledWith({
       data: {
         requestItemIds: ["b", "a"],
-        pickupBy: new Date("2026-10-01"),
+        pickupDay: "2026-10-01",
+        pickupFromTime: "",
+        pickupToTime: "",
+        pickupPlace: "KEC 1148",
+        pickupNote: "",
         sendEmail: true,
       },
     });
@@ -294,7 +301,40 @@ describe("ApproveAllDialog", () => {
     );
     await waitFor(() => expect(onDone).toHaveBeenCalledTimes(1));
     expect(approveRequestLines).toHaveBeenCalledWith({
-      data: { requestItemIds: ["b", "a"], pickupBy: null, sendEmail: false },
+      data: {
+        requestItemIds: ["b", "a"],
+        pickupDay: "",
+        pickupFromTime: "",
+        pickupToTime: "",
+        pickupPlace: "",
+        pickupNote: "",
+        sendEmail: false,
+      },
     });
+  });
+
+  /**
+   * The items in one request can sit in different places, and none of them
+   * is where the requester goes: staff decided the batch copies nothing in
+   * and names no storage location anywhere in the dialog (#799).
+   */
+  it("starts the place blank and never names where an item is stored", () => {
+    render(
+      <ApproveAllDialog
+        lines={lines}
+        onDone={vi.fn()}
+        requesterEmail="student@x.edu"
+      />
+    );
+    openDialog();
+    expect(
+      (screen.getByLabelText("Where to pick up (optional)") as HTMLInputElement)
+        .value
+    ).toBe("");
+    expect(
+      screen.getByText(
+        "Left blank, the requester is told no place. They see what is here."
+      )
+    ).toBeTruthy();
   });
 });

@@ -10,6 +10,7 @@ import {
   needsDueAt,
   needsHolder,
 } from "#/lib/inventory-workflow";
+import { pickupWindowFields } from "#/lib/pickup-window";
 import { useAction } from "#/lib/use-action";
 import { INVENTORY_ITEM_STATUSES, type ItemStatus } from "#/lib/vocabularies";
 import {
@@ -22,6 +23,12 @@ import { HolderField } from "./holder-field";
 import { InventoryStatusBadge } from "./inventory-status-badge";
 import { LocalTime } from "./local-time";
 import { PanelSection } from "./panel";
+import {
+  EMPTY_PICKUP,
+  PickupFields,
+  type PickupFormValue,
+  pickupPayload,
+} from "./pickup-fields";
 import { EMAIL_SKIP_HINT, SendEmailCheckbox } from "./send-email-checkbox";
 import {
   AlertDialog,
@@ -93,7 +100,12 @@ interface Props {
     currentHolderLabel: string | null;
     currentHolderProgram?: string | null;
     currentRequestItemId: string | null;
+    /** Staff only. Copied into "Where to pick up" when nothing is set yet. */
+    location?: string | null;
     pickupBy?: Date | string | null;
+    pickupFrom?: Date | string | null;
+    pickupNote?: string | null;
+    pickupPlace?: string | null;
     dueAt?: Date | string | null;
   };
 }
@@ -366,7 +378,7 @@ export function InventoryLifecyclePanel({
   // the requester's details under the teammate's name.
   const holderDetailsAddress = useRef("");
   const [dueDate, setDueDate] = useState("");
-  const [pickupDate, setPickupDate] = useState("");
+  const [pickup, setPickup] = useState<PickupFormValue>(EMPTY_PICKUP);
   const [dlgComment, setDlgComment] = useState("");
   const [dlgSendEmail, setDlgSendEmail] = useState(true);
 
@@ -386,7 +398,7 @@ export function InventoryLifecyclePanel({
     holderLabel?: string | null;
     holderName?: string | null;
     holderProgram?: string | null;
-    pickupBy?: Date | null;
+    pickup?: PickupFormValue;
     dueAt?: Date | null;
     comment?: string | null;
   }) {
@@ -401,7 +413,7 @@ export function InventoryLifecyclePanel({
           holderLabel: input.holderLabel ?? null,
           holderName: input.holderName ?? null,
           holderProgram: input.holderProgram ?? null,
-          pickupBy: input.pickupBy ?? null,
+          ...pickupPayload(input.pickup ?? EMPTY_PICKUP),
           dueAt: input.dueAt ?? null,
           comment: input.comment ?? null,
         },
@@ -426,7 +438,17 @@ export function InventoryLifecyclePanel({
     // HolderField's own lookup recomputes this from the prefilled address; it
     // just should not carry the previous dialog's result into a new one.
     setDueDate(toDateInput(item.dueAt));
-    setPickupDate(toDateInput(item.pickupBy));
+    // The terms already on the hold when there are some, read back in the
+    // office's zone; otherwise a blank window and the item's location copied
+    // in, which staff see under its hint and usually replace.
+    const stored = pickupWindowFields(item.pickupFrom, item.pickupBy);
+    setPickup({
+      day: stored.pickupDay ?? "",
+      from: stored.pickupFromTime ?? "",
+      to: stored.pickupToTime ?? "",
+      place: item.pickupPlace ?? item.location ?? "",
+      note: item.pickupNote ?? "",
+    });
     setDlgComment("");
     // The skip is a decision about one hold; checked again on every open.
     setDlgSendEmail(true);
@@ -495,10 +517,7 @@ export function InventoryLifecyclePanel({
       // error; the item's own columns carry the hold.
       requestItemId: holderRequired ? item.currentRequestItemId : null,
       ...holder,
-      pickupBy:
-        dlgTargetStatus === "reserved" && pickupDate
-          ? new Date(pickupDate)
-          : null,
+      pickup: dlgTargetStatus === "reserved" ? pickup : EMPTY_PICKUP,
       dueAt:
         dlgTargetStatus === "checked_out" && dueDate ? new Date(dueDate) : null,
       comment: dlgComment || null,
@@ -694,26 +713,40 @@ export function InventoryLifecyclePanel({
               </div>
             )}
             {dlgTargetStatus === "reserved" && (
-              <div>
-                <Label htmlFor="pickup-date">Pickup by</Label>
-                <Input
-                  className="mt-1"
-                  id="pickup-date"
-                  onChange={(e) => setPickupDate(e.target.value)}
-                  type="date"
-                  value={pickupDate}
-                />
-              </div>
+              <PickupFields
+                audience="holder"
+                disabled={busy}
+                idPrefix="reserve-pickup"
+                onChange={setPickup}
+                placeHint={
+                  !item.pickupPlace && item.location
+                    ? "Copied from the item's location. The holder sees what is here."
+                    : "The holder sees what is here."
+                }
+                value={pickup}
+              />
             )}
             <div>
               <Label htmlFor="comment">Comment (optional)</Label>
               <Textarea
+                aria-describedby={
+                  dlgTargetStatus === "reserved" ? "comment-hint" : undefined
+                }
                 className="mt-1"
                 id="comment"
                 onChange={(e) => setDlgComment(e.target.value)}
                 rows={2}
                 value={dlgComment}
               />
+              {/* Two text boxes on a reserve; this one says which is sent. */}
+              {dlgTargetStatus === "reserved" && (
+                <p
+                  className="mt-1 text-muted-foreground text-xs"
+                  id="comment-hint"
+                >
+                  Kept in the status history for staff. Not sent to the holder.
+                </p>
+              )}
             </div>
             {/*
               The address typed above, or none for a label hold, which emails

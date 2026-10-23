@@ -26,9 +26,10 @@ afterEach(() => {
   vi.clearAllMocks();
 });
 
-function renderPending() {
+function renderPending(itemLocation: string | null = "Cabinet A, Bin 1") {
   render(
     <AdminRequestActions
+      itemLocation={itemLocation}
       lineId="line-1"
       onDone={() => Promise.resolve()}
       requesterEmail="student@x.edu"
@@ -61,11 +62,11 @@ describe("AdminRequestActions", () => {
     fireEvent.keyDown(document.activeElement ?? document.body, {
       key: "Escape",
     });
-    expect(screen.getByLabelText("Pickup by (optional)")).toBeTruthy();
+    expect(screen.getByLabelText("Pickup day (optional)")).toBeTruthy();
 
     write.resolve();
     await waitFor(() =>
-      expect(screen.queryByLabelText("Pickup by (optional)")).toBeNull()
+      expect(screen.queryByLabelText("Pickup day (optional)")).toBeNull()
     );
     // No focus assertion here. Two were tried and neither went red with the
     // guard reverted, so they asserted nothing. The mechanism is not pinned
@@ -161,7 +162,7 @@ describe("AdminRequestActions", () => {
 
     write.resolve();
     await waitFor(() =>
-      expect(screen.queryByLabelText("Pickup by (optional)")).toBeNull()
+      expect(screen.queryByLabelText("Pickup day (optional)")).toBeNull()
     );
   });
 
@@ -177,6 +178,7 @@ describe("AdminRequestActions", () => {
     // second decision on a line that already has one.
     render(
       <AdminRequestActions
+        itemLocation={null}
         lineId="line-1"
         onDone={() => Promise.resolve()}
         requesterEmail="student@x.edu"
@@ -191,14 +193,75 @@ describe("AdminRequestActions", () => {
   it("closes the approve popover on Cancel without deciding", async () => {
     renderPending();
     fireEvent.click(screen.getByRole("button", { name: "Approve" }));
-    fireEvent.change(screen.getByLabelText("Pickup by (optional)"), {
+    fireEvent.change(screen.getByLabelText("Pickup day (optional)"), {
       target: { value: "2026-10-01" },
     });
     fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
     await waitFor(() =>
-      expect(screen.queryByLabelText("Pickup by (optional)")).toBeNull()
+      expect(screen.queryByLabelText("Pickup day (optional)")).toBeNull()
     );
     expect(approveRequestItem).not.toHaveBeenCalled();
+  });
+
+  /**
+   * One item, so its location is copied in for staff to keep or replace, and
+   * the hint says so; what staff typed is sent as typed, for the server to
+   * compose in the office's zone (#799).
+   */
+  it("copies the item's location into the place and sends what staff typed", async () => {
+    vi.mocked(approveRequestItem).mockResolvedValue({ ok: true });
+    renderPending();
+
+    fireEvent.click(screen.getByRole("button", { name: "Approve" }));
+    const place = screen.getByLabelText("Where to pick up (optional)");
+    expect((place as HTMLInputElement).value).toBe("Cabinet A, Bin 1");
+    expect(
+      screen.getByText(
+        "Copied from the item's location. The requester sees what is here."
+      )
+    ).toBeTruthy();
+
+    fireEvent.change(place, { target: { value: "KEC 1148" } });
+    fireEvent.change(screen.getByLabelText("Pickup day (optional)"), {
+      target: { value: "2026-10-30" },
+    });
+    fireEvent.change(screen.getByLabelText("From"), {
+      target: { value: "14:00" },
+    });
+    fireEvent.change(screen.getByLabelText("To"), {
+      target: { value: "16:00" },
+    });
+    fireEvent.change(
+      screen.getByLabelText("Note for the requester (optional)"),
+      {
+        target: { value: "Bring your ID." },
+      }
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Confirm approve" }));
+
+    await waitFor(() =>
+      expect(approveRequestItem).toHaveBeenCalledWith({
+        data: {
+          requestItemId: "line-1",
+          pickupDay: "2026-10-30",
+          pickupFromTime: "14:00",
+          pickupToTime: "16:00",
+          pickupPlace: "KEC 1148",
+          pickupNote: "Bring your ID.",
+          sendEmail: true,
+        },
+      })
+    );
+  });
+
+  it("starts the place blank for an item with no location", () => {
+    renderPending(null);
+    fireEvent.click(screen.getByRole("button", { name: "Approve" }));
+    expect(
+      (screen.getByLabelText("Where to pick up (optional)") as HTMLInputElement)
+        .value
+    ).toBe("");
+    expect(screen.getByText("The requester sees what is here.")).toBeTruthy();
   });
 
   it("closes the reject popover on Cancel without deciding", async () => {
@@ -233,7 +296,15 @@ describe("AdminRequestActions", () => {
     fireEvent.click(screen.getByRole("button", { name: "Confirm approve" }));
     await waitFor(() =>
       expect(approveRequestItem).toHaveBeenCalledWith({
-        data: { requestItemId: "line-1", pickupBy: null, sendEmail: false },
+        data: {
+          requestItemId: "line-1",
+          pickupDay: "",
+          pickupFromTime: "",
+          pickupToTime: "",
+          pickupPlace: "Cabinet A, Bin 1",
+          pickupNote: "",
+          sendEmail: false,
+        },
       })
     );
     // The popover closes once the decision lands; opening the next one

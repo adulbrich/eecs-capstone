@@ -122,6 +122,9 @@ export interface InventoryItemRow {
   currentHolderLabel: string | null;
   currentHolderProgram: string | null;
   currentPickupBy: Date | null;
+  currentPickupFrom: Date | null;
+  currentPickupNote: string | null;
+  currentPickupPlace: string | null;
   currentRequestItemId: string | null;
   description: string | null;
   id: string;
@@ -164,6 +167,9 @@ export type InventoryItemStaff = InventoryItemPublic & {
   location: string | null;
   notes: string | null;
   pickupBy: Date | null;
+  pickupFrom: Date | null;
+  pickupNote: string | null;
+  pickupPlace: string | null;
   serial: string | null;
   updatedAt: Date;
 };
@@ -188,6 +194,9 @@ export interface HoldItemView {
   id: string;
   name: string;
   pickupBy: Date | null;
+  pickupFrom: Date | null;
+  pickupNote: string | null;
+  pickupPlace: string | null;
   status: ItemStatus;
   updatedAt: Date;
 }
@@ -202,6 +211,9 @@ export interface RequestLineRow {
   id: string;
   itemId: string;
   pickupBy: Date | null;
+  pickupFrom: Date | null;
+  pickupNote: string | null;
+  pickupPlace: string | null;
   requestId: string;
   reviewComment: string | null;
   reviewedAt: Date | null;
@@ -217,6 +229,9 @@ export interface MyRequestLineView {
   dueAt: Date | null;
   id: string;
   pickupBy: Date | null;
+  pickupFrom: Date | null;
+  pickupNote: string | null;
+  pickupPlace: string | null;
   reviewedAt: Date | null;
   status: string;
 }
@@ -300,8 +315,11 @@ export function staffItemView(
 ): InventoryItemStaff {
   return {
     ...publicItemView(row, categories),
-    // Staff keep the pickup deadline the public view leaves out.
+    // Staff keep the pickup terms the public view leaves out.
     pickupBy: row.currentPickupBy,
+    pickupFrom: row.currentPickupFrom,
+    pickupPlace: row.currentPickupPlace,
+    pickupNote: row.currentPickupNote,
     createdAt: row.createdAt,
     serial: row.serial,
     label: row.label,
@@ -321,7 +339,8 @@ export function staffItemView(
  * What someone holding an item may see about it on their own page.
  *
  * `updatedAt` is here because it is the tie-break in `compareByDeadline`, not
- * because the page renders it.
+ * because the page renders it. The pickup terms are what staff told this
+ * holder; `location` is not among them and never is.
  */
 export function holdItemView(row: HoldItemRow): HoldItemView {
   return {
@@ -329,6 +348,9 @@ export function holdItemView(row: HoldItemRow): HoldItemView {
     name: row.name,
     status: row.status,
     pickupBy: row.currentPickupBy,
+    pickupFrom: row.currentPickupFrom,
+    pickupPlace: row.currentPickupPlace,
+    pickupNote: row.currentPickupNote,
     dueAt: row.currentDueAt,
     updatedAt: row.updatedAt,
   };
@@ -349,6 +371,9 @@ export function myRequestLineView(row: RequestLineRow): MyRequestLineView {
     id: row.id,
     status: row.status,
     pickupBy: row.pickupBy,
+    pickupFrom: row.pickupFrom,
+    pickupPlace: row.pickupPlace,
+    pickupNote: row.pickupNote,
     dueAt: row.dueAt,
     createdAt: row.createdAt,
     reviewedAt: row.reviewedAt,

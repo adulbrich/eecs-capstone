@@ -1,9 +1,11 @@
 import { describe, expect, it } from "vitest";
 import {
+  dayEnd,
   dayRange,
   dayStart,
   daysInclusive,
   localDay,
+  localInstant,
   shiftDay,
 } from "#/lib/day-range";
 
@@ -51,6 +53,46 @@ describe("dayStart", () => {
 
   it("refuses anything that is not a day", () => {
     expect(() => dayStart("2026-7-4")).toThrow(/not a YYYY-MM-DD day/);
+  });
+});
+
+describe("localInstant", () => {
+  it("reads a summer afternoon as Pacific Daylight Time", () => {
+    expect(localInstant("2026-10-28", "14:00").toISOString()).toBe(
+      "2026-10-28T21:00:00.000Z"
+    );
+  });
+
+  it("reads the afternoon after each change on the new offset", () => {
+    // Midnight on both change days is still the old offset; the afternoon
+    // is already the new one, which a guess taken at midnight gets wrong.
+    expect(localInstant("2026-03-08", "15:30").toISOString()).toBe(
+      "2026-03-08T22:30:00.000Z"
+    );
+    expect(localInstant("2026-11-01", "15:30").toISOString()).toBe(
+      "2026-11-01T23:30:00.000Z"
+    );
+  });
+
+  it("refuses anything that is not a 24-hour HH:MM time", () => {
+    expect(() => localInstant("2026-10-28", "2:00")).toThrow(
+      /not an HH:MM time/
+    );
+    expect(() => localInstant("2026-10-28", "24:00")).toThrow(
+      /not an HH:MM time/
+    );
+  });
+});
+
+describe("dayEnd", () => {
+  it("is the last millisecond of the Pacific day, still that day", () => {
+    const end = dayEnd("2026-10-28");
+    expect(end.toISOString()).toBe("2026-10-29T06:59:59.999Z");
+    expect(localDay(end)).toBe("2026-10-28");
+  });
+
+  it("follows the long autumn day", () => {
+    expect(dayEnd("2026-11-01").toISOString()).toBe("2026-11-02T07:59:59.999Z");
   });
 });
 

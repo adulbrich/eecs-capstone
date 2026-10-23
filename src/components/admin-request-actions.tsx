@@ -1,15 +1,26 @@
 import { useState } from "react";
 import { useAction } from "#/lib/use-action";
 import { approveRequestItem, rejectRequestItem } from "#/server/inventory";
+import {
+  EMPTY_PICKUP,
+  PickupFields,
+  type PickupFormValue,
+  pickupPayload,
+} from "./pickup-fields";
 import { EMAIL_SKIP_HINT, SendEmailCheckbox } from "./send-email-checkbox";
 import { Button } from "./ui/button";
 import { FieldError } from "./ui/field";
-import { Input } from "./ui/input";
 import { Label } from "./ui/label";
 import { Popover, PopoverContent, PopoverTrigger } from "./ui/popover";
 import { Textarea } from "./ui/textarea";
 
 interface Props {
+  /**
+   * The item's storage location, copied into "Where to pick up" when the
+   * approve popover opens. One item, so one location; staff see the copy and
+   * usually replace it with the office. The batch dialog never does this.
+   */
+  itemLocation: string | null;
   lineId: string;
   /**
    * Called after a decision lands, so the caller can refetch. The router is
@@ -29,13 +40,14 @@ interface Props {
  * requester and write their bell row; the popover carries the skip.
  */
 export function AdminRequestActions({
+  itemLocation,
   lineId,
   onDone,
   requesterEmail,
   status,
 }: Props) {
   const [open, setOpen] = useState<null | "approve" | "reject">(null);
-  const [pickupBy, setPickupBy] = useState("");
+  const [pickup, setPickup] = useState<PickupFormValue>(EMPTY_PICKUP);
   const [reason, setReason] = useState("");
   const [sendEmail, setSendEmail] = useState(true);
   // The two decisions fail differently and share one error slot, so the
@@ -83,16 +95,26 @@ export function AdminRequestActions({
     close();
   }
 
+  /**
+   * Opens the approve popover with the place copied from the item. Filled on
+   * open rather than at mount, so a location edited while the row sat on
+   * screen is the one copied, and a cancelled attempt leaves nothing behind.
+   */
+  function openApprove() {
+    setPickup({ ...EMPTY_PICKUP, place: itemLocation ?? "" });
+    setOpen("approve");
+  }
+
   function onApprove() {
     return run(async () => {
       await approveRequestItem({
         data: {
           requestItemId: lineId,
-          pickupBy: pickupBy ? new Date(pickupBy) : null,
+          ...pickupPayload(pickup),
           sendEmail,
         },
       });
-      setPickupBy("");
+      setPickup(EMPTY_PICKUP);
       await onDone();
       close();
     }, "Approve failed");
@@ -116,7 +138,7 @@ export function AdminRequestActions({
   return (
     <div className="flex gap-2">
       <Popover
-        onOpenChange={(next) => (next ? setOpen("approve") : dismiss())}
+        onOpenChange={(next) => (next ? openApprove() : dismiss())}
         open={open === "approve"}
       >
         <PopoverTrigger asChild>
@@ -124,13 +146,20 @@ export function AdminRequestActions({
             Approve
           </Button>
         </PopoverTrigger>
-        <PopoverContent className="w-64 space-y-2">
-          <Label htmlFor={`pickup-${lineId}`}>Pickup by (optional)</Label>
-          <Input
-            id={`pickup-${lineId}`}
-            onChange={(e) => setPickupBy(e.target.value)}
-            type="date"
-            value={pickupBy}
+        {/* Five fields outgrow a phone's screen below a table row, so the
+            popover scrolls inside the space Radix measured rather than
+            pushing Confirm past the fold. */}
+        <PopoverContent className="max-h-(--radix-popover-content-available-height) w-80 space-y-2 overflow-y-auto">
+          <PickupFields
+            disabled={busy}
+            idPrefix={`pickup-${lineId}`}
+            onChange={setPickup}
+            placeHint={
+              itemLocation
+                ? "Copied from the item's location. The requester sees what is here."
+                : "The requester sees what is here."
+            }
+            value={pickup}
           />
           <SendEmailCheckbox
             address={requesterEmail}

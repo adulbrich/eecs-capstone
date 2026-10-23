@@ -19,6 +19,7 @@
 
 import { overdueFlags } from "./inventory-deadlines";
 import type { NotificationRow } from "./notification-row";
+import { formatPickupWindow, pickupContactSentence } from "./pickup-window";
 import type { ItemStatus, NotificationType } from "./vocabularies";
 
 /**
@@ -91,6 +92,9 @@ export interface TransitionNotice {
   dueAt?: Date | null;
   nextStatus: ItemStatus;
   pickupBy?: Date | null;
+  pickupFrom?: Date | null;
+  pickupNote?: string | null;
+  pickupPlace?: string | null;
   requestItemId?: string | null;
   /** See `TransitionInput.silent`: the fulfill path speaks for itself. */
   silent?: boolean | null;
@@ -124,13 +128,16 @@ function formatDate(d: Date | null | undefined): string {
  * At most one notice: no branch here has ever produced two. Multi-row lives in
  * `overdueNotifications` below. `holder` is the hold the transition assigns,
  * as an account, an address, or neither; a release reads the previous holder
- * off the item instead.
+ * off the item instead. `staffInbox` is where a reservation tells its holder
+ * to write when the pickup time does not suit; the caller reads it from the
+ * server's config so this module stays pure.
  */
 export function notificationFor(
   prev: TransitionSubject,
   input: TransitionNotice,
   holder: NoticeRecipient | null,
-  closed: ClosedLineOutcome | null
+  closed: ClosedLineOutcome | null,
+  staffInbox: string | null = null
 ): InventoryNotice | null {
   // Before everything, including the denial: the one caller that sets this
   // is fulfilling a custom line, which never closes a request line and
@@ -187,14 +194,16 @@ export function notificationFor(
 
   switch (input.nextStatus) {
     case "reserved": {
-      const title = input.pickupBy
-        ? `Reserved: ${prev.name}. Pick up by ${formatDate(input.pickupBy)}.`
-        : `Reserved: ${prev.name}.`;
+      // The day in the office's zone, not the server's: a window ending at
+      // 7 pm in Corvallis is already tomorrow in UTC.
+      const day = formatPickupWindow(null, input.pickupBy);
       return {
         recipient,
         type: "inventory_request_approved",
-        title,
-        message: `Your request for ${prev.name} was approved.`,
+        title: day
+          ? `Reserved: ${prev.name}. Pick up by ${day}.`
+          : `Reserved: ${prev.name}.`,
+        message: reservedMessage(prev.name, input, staffInbox),
         link: "/my/items?filter=open",
       };
     }
@@ -234,6 +243,39 @@ export function notificationFor(
     default:
       return null;
   }
+}
+
+/**
+ * A reservation's body, one paragraph per thing the holder acts on: the
+ * window, where to go, the note verbatim, and who to write to when the time
+ * does not suit. The bell shows only the title, so this reaches the holder by
+ * email; `/my/items` shows the same terms from the stored columns.
+ */
+function reservedMessage(
+  name: string,
+  input: TransitionNotice,
+  staffInbox: string | null
+): string {
+  const when = formatPickupWindow(input.pickupFrom, input.pickupBy);
+  const place = input.pickupPlace?.trim();
+  const note = input.pickupNote?.trim();
+  const paragraphs = [`Your request for ${name} was approved.`];
+  if (when) {
+    paragraphs.push(
+      input.pickupFrom ? `Pick up on ${when}.` : `Pick up by ${when}.`
+    );
+  }
+  if (place) {
+    paragraphs.push(`Where to pick up: ${place}`);
+  }
+  if (note) {
+    paragraphs.push(note);
+  }
+  const contact = when ? pickupContactSentence(staffInbox) : null;
+  if (contact) {
+    paragraphs.push(contact);
+  }
+  return paragraphs.join("\n\n");
 }
 
 /** The person the item was held for, as the item row remembers them. */
