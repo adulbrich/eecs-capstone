@@ -6,6 +6,18 @@ updates:
     schedule:
       interval: weekly
 
+  # The Node image in the Dockerfile, whose FROM tags are literal because
+  # Dependabot skips a tag built from an ARG. Nothing bumps .nvmrc, which CI
+  # reads, so check-scripts.test.ts fails on this PR until .nvmrc is bumped to
+  # match on its branch. The major tracks .nvmrc, as @types/node does below.
+  - package-ecosystem: docker
+    directory: "/"
+    schedule:
+      interval: weekly
+    ignore:
+      - dependency-name: "node"
+        update-types: ["version-update:semver-major"]
+
   # npm, grouped. Every PR goes through the review loop in AGENTS.md, so a few
   # larger bumps cost less than many small ones. TanStack moves together and
   # is what docs/QUIRKS.md most often records a change against, so it gets its

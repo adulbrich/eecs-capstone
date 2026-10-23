@@ -1,13 +1,13 @@
 # syntax=docker/dockerfile:1
 
-# Pinned to the project's Node version (.nvmrc), which CI reads;
-# src/test/check-scripts.test.ts fails when the two differ. bookworm-slim is
-# glibc-based, which matches sharp's prebuilt linux binaries (avoids
-# Alpine/musl issues).
-ARG NODE_VERSION=24.22.1
+# The Node version is written into both FROM lines, not an ARG, because
+# Dependabot skips a FROM tag built from a variable. It bumps these tags but
+# not .nvmrc, which CI reads, so src/test/check-scripts.test.ts fails until
+# .nvmrc matches. bookworm-slim is glibc-based, which matches sharp's prebuilt
+# linux binaries (avoids Alpine/musl issues).
 
 # ---- build stage: install all deps and produce .output/ ----
-FROM node:${NODE_VERSION}-bookworm-slim AS build
+FROM node:24.22.1-bookworm-slim AS build
 WORKDIR /app
 
 COPY package.json package-lock.json ./
@@ -28,7 +28,7 @@ RUN npm run build
 RUN node scripts/check-asset-manifest.mjs
 
 # ---- runtime stage: production deps + built server + migrations ----
-FROM node:${NODE_VERSION}-bookworm-slim AS runtime
+FROM node:24.22.1-bookworm-slim AS runtime
 WORKDIR /app
 ENV NODE_ENV=production
 ENV PORT=3000

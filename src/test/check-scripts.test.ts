@@ -236,14 +236,19 @@ describe("nvmrc-node", () => {
   });
 
   // CI reads `.nvmrc` through `node-version-file`, and the production image
-  // reads the Dockerfile's default because deploy.yml passes no NODE_VERSION.
-  // A bump to one alone would test on one Node and ship another.
-  it("pins the Dockerfile to the .nvmrc version", () => {
+  // reads the Dockerfile's two FROM tags. Dependabot bumps the tags but not
+  // `.nvmrc`, so its pull request fails here until `.nvmrc` follows.
+  it("pins the Dockerfile's node images to the .nvmrc version", () => {
     const wanted = readFileSync(".nvmrc", "utf8").trim().replace(/^v/, "");
-    const pinned = readFileSync("Dockerfile", "utf8").match(
-      /^ARG NODE_VERSION=(\S+)$/m
-    );
-    expect(pinned?.[1], "Dockerfile ARG NODE_VERSION").toBe(wanted);
+    const tags = [
+      ...readFileSync("Dockerfile", "utf8").matchAll(
+        /^FROM node:(\S+?)-bookworm-slim\b/gm
+      ),
+    ].map((match) => match[1]);
+    expect(tags, "Dockerfile FROM node tags: bump .nvmrc to match").toEqual([
+      wanted,
+      wanted,
+    ]);
   });
 });
 
