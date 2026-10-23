@@ -23,15 +23,19 @@ import {
 // task's first request, the load balancer's health check (ADR-0052).
 import "#/db";
 
-const handler = defineHandlerCallback((ctx) => {
+const handler = defineHandlerCallback(async (ctx) => {
   const { matches } = ctx.router.state;
   for (const line of renderFailureLines(matches)) {
     console.error(line);
   }
+  const rendered = await defaultStreamHandler(ctx);
+  // Start applies this to the response returned here, streamed or not. Set
+  // after the render, because Start's error response keeps a 4xx set before
+  // a throw, and a refused page whose render throws should still answer 500.
   if (refusedByRole(matches)) {
     setResponseStatus(403);
   }
-  return defaultStreamHandler(ctx);
+  return rendered;
 });
 
 export default createServerEntry({ fetch: createStartHandler(handler) });
