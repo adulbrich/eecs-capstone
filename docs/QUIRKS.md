@@ -56,7 +56,7 @@ A server function's URL is `/_serverFn/<sha256 of "src/server/x.ts--<export>_cre
 
 ### `.validator(...)`, not `.inputValidator(...)`
 
-The method is `.validator`. `.inputValidator` is a deprecated alias the Start compiler warns about at every call site, and the plans under `docs/superpowers/plans/` still use it.
+The method is `.validator`. `.inputValidator` no longer exists, so a call is a type error. The plans under `docs/superpowers/plans/` still use it; do not copy it from there.
 
 ### Code that must run at boot goes in a Nitro plugin, not `src/server.ts`
 

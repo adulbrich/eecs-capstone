@@ -58,7 +58,7 @@ export function renderFailureLines(
  * Whether this render is the access-denied page (#606), for `src/server.ts`
  * to answer 403 rather than the 500 router-core picks for any thrown value.
  * router-core has no status of its own for it: a server render answers 200,
- * 404 or 500, and `setResponseStatus` does not reach a rendered page.
+ * 404 or 500.
  */
 export function refusedByRole(matches: readonly RenderedMatch[]): boolean {
   return matches.some(
