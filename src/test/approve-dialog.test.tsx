@@ -399,6 +399,31 @@ describe("ApproveDialog over one line", () => {
     expect(screen.getByText("The requester sees what is here.")).toBeTruthy();
   });
 
+  it("copies the location as it is now when the form was left untouched", async () => {
+    const line = { id: "line-1", itemName: "Oscilloscope", status: "pending" };
+    const { rerender } = render(
+      <ApproveDialog
+        onDone={() => Promise.resolve()}
+        requester={requester}
+        scope={{ kind: "line", itemLocation: "Cabinet A, Bin 1", line }}
+      />
+    );
+    openDialog("Approve");
+    fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+
+    // The row re-rendered after someone moved the item.
+    rerender(
+      <ApproveDialog
+        onDone={() => Promise.resolve()}
+        requester={requester}
+        scope={{ kind: "line", itemLocation: "Cabinet B, Bin 4", line }}
+      />
+    );
+    openDialog("Approve");
+    expect(place().value).toBe("Cabinet B, Bin 4");
+  });
+
   it("keeps what staff typed across a Cancel instead of copying the location back", async () => {
     renderLine();
     openDialog("Approve");

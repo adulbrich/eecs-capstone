@@ -63,6 +63,9 @@ export function ApproveDialog({
 }) {
   const [open, setOpen] = useState(false);
   const [pickup, setPickup] = useState<PickupFormValue>(EMPTY_PICKUP);
+  // Whether staff typed in the form since it was last sent. Until they do, a
+  // line's dialog copies the item's location in afresh on every open.
+  const [edited, setEdited] = useState(false);
   const [sendEmail, setSendEmail] = useState(true);
   // A second activation in the same tick would approve twice; `use-action.ts`
   // says why the hook's ref is what stops it (#443).
@@ -94,9 +97,15 @@ export function ApproveDialog({
         });
       }
       setPickup(EMPTY_PICKUP);
+      setEdited(false);
       await onDone();
       setOpen(false);
     });
+  }
+
+  function onPickupChange(next: PickupFormValue) {
+    setEdited(true);
+    setPickup(next);
   }
 
   // One close path for Escape, the overlay, the close X and Cancel alike, and
@@ -113,9 +122,11 @@ export function ApproveDialog({
     if (!next && busy) {
       return;
     }
-    // A fresh form takes the item's location; one staff typed into and then
-    // cancelled keeps what they typed, so a reopen discards nothing.
-    if (next && scope.kind === "line" && pickup === EMPTY_PICKUP) {
+    // An untouched form takes the item's location as it is now, so a location
+    // edited while the row sat on screen is the one copied; one staff typed
+    // into and then cancelled keeps what they typed, so a reopen discards
+    // nothing.
+    if (next && scope.kind === "line" && !edited) {
       setPickup({ ...EMPTY_PICKUP, place: scope.itemLocation ?? "" });
     }
     setOpen(next);
@@ -141,7 +152,11 @@ export function ApproveDialog({
           {single ? "Approve" : "Approve all"}
         </Button>
       </DialogTrigger>
-      <DialogContent>
+      {/* Seven controls outgrow a phone in landscape or with the keyboard
+          up, and the dialog is fixed to the viewport's centre with the page
+          behind it locked, so it scrolls inside itself instead of clipping
+          Confirm out of reach. */}
+      <DialogContent className="max-h-[calc(100dvh-2rem)] overflow-y-auto">
         <DialogHeader>
           {/* A request has no name of its own, so the requester names it. */}
           <DialogTitle>
@@ -165,7 +180,7 @@ export function ApproveDialog({
         <PickupFields
           disabled={busy}
           idPrefix={single ? `approve-${scope.line.id}` : "approve-all-pickup"}
-          onChange={setPickup}
+          onChange={onPickupChange}
           placeHint={placeHint}
           value={pickup}
         />

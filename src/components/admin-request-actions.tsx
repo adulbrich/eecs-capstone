@@ -12,8 +12,9 @@ import { Textarea } from "./ui/textarea";
 interface Props {
   /**
    * The item's storage location, copied into "Where to pick up" when the
-   * approve dialog opens. One item, so one location; staff see the copy and
-   * usually replace it with the office. A whole request's dialog never does.
+   * approve dialog opens on a form staff have not typed in. One item, so one
+   * location; staff see the copy and usually replace it with the office. A
+   * whole request's dialog never does.
    */
   itemLocation: string | null;
   /** Names the line in the approve dialog's title. */

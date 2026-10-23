@@ -703,7 +703,9 @@ export function InventoryLifecyclePanel({
       </PanelSection>
 
       <Dialog onOpenChange={changeDlgOpen} open={dlgOpen}>
-        <DialogContent>
+        {/* A reserve carries the holder, the pickup terms and a comment,
+            which outgrow a short viewport; scroll inside rather than clip. */}
+        <DialogContent className="max-h-[calc(100dvh-2rem)] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>
               {dlgTargetStatus === "checked_out"
