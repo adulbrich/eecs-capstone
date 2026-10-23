@@ -29,9 +29,9 @@ const handler = defineHandlerCallback(async (ctx) => {
     console.error(line);
   }
   const rendered = await defaultStreamHandler(ctx);
-  // Start applies this to the response returned here, streamed or not. Set
-  // after the render, because Start's error response keeps a 4xx set before
-  // a throw, and a refused page whose render throws should still answer 500.
+  // Start applies a `setResponseStatus` status to the response returned here,
+  // streamed or not. Set it only after the render succeeds: if the render
+  // throws, Start answers with any 4xx already set, and a crash should be 500.
   if (refusedByRole(matches)) {
     setResponseStatus(403);
   }
