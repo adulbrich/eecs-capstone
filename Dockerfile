@@ -1,8 +1,10 @@
 # syntax=docker/dockerfile:1
 
-# Pinned to the project's Node version (.nvmrc). bookworm-slim is glibc-based,
-# which matches sharp's prebuilt linux binaries (avoids Alpine/musl issues).
-ARG NODE_VERSION=24.16.0
+# Pinned to the project's Node version (.nvmrc), which CI reads;
+# src/test/check-scripts.test.ts fails when the two differ. bookworm-slim is
+# glibc-based, which matches sharp's prebuilt linux binaries (avoids
+# Alpine/musl issues).
+ARG NODE_VERSION=24.22.1
 
 # ---- build stage: install all deps and produce .output/ ----
 FROM node:${NODE_VERSION}-bookworm-slim AS build

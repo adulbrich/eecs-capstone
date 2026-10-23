@@ -234,6 +234,17 @@ describe("nvmrc-node", () => {
       rmSync(dir, { recursive: true, force: true });
     }
   });
+
+  // CI reads `.nvmrc` through `node-version-file`, and the production image
+  // reads the Dockerfile's default because deploy.yml passes no NODE_VERSION.
+  // A bump to one alone would test on one Node and ship another.
+  it("pins the Dockerfile to the .nvmrc version", () => {
+    const wanted = readFileSync(".nvmrc", "utf8").trim().replace(/^v/, "");
+    const pinned = readFileSync("Dockerfile", "utf8").match(
+      /^ARG NODE_VERSION=(\S+)$/m
+    );
+    expect(pinned?.[1], "Dockerfile ARG NODE_VERSION").toBe(wanted);
+  });
 });
 
 describe("check-prose", () => {
