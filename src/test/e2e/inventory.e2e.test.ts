@@ -60,9 +60,14 @@ test.describe("@smoke inventory lifecycle", () => {
       const row = rowFor(staff, itemName);
       await row.getByRole("button", { name: "Approve" }).click();
       await staff.getByRole("button", { name: "Confirm approve" }).click();
+      // The approve dialog is modal, so while it is open the table behind it
+      // is aria-hidden and a role query finds no row at all: the row check
+      // below would pass mid-write, and the navigation after it would abandon
+      // the approval. The dialog stays open on a refusal and closes only once
+      // the approval landed and the queue refetched, so wait for that first.
+      await expect(staff.getByRole("dialog")).toHaveCount(0);
       // The page lists pending requests, so an approved line leaving the table
-      // is the page saying the transition landed. A closed popover is not:
-      // it closes on failure too.
+      // is the page saying the transition landed.
       await expect(row).toHaveCount(0);
 
       await staff.goto(`/inventory/${itemId}`);
