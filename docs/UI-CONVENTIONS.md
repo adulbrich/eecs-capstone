@@ -451,8 +451,7 @@ and the buttons stay on screen. A `<form>` between the content and the body take
 `overflow-*` or `max-h-*` on a content takes the scrolling back, as `CommandDialog`
 does on purpose for cmdk's own list. A body's children never shrink, and an empty
 body is hidden. `dialog-body-scan.test.ts` fails a file with more footers than
-bodies. `dvh` follows the browser's toolbars, not the
-on-screen keyboard.
+bodies. `dvh` follows the browser's toolbars, not the on-screen keyboard.
 
 ---
 
