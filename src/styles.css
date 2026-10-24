@@ -5,6 +5,8 @@
 @import "react-image-crop/dist/ReactCrop.css";
 
 @custom-variant dark (@media (prefers-color-scheme: dark));
+/* A phone in landscape: dialogs give up their vertical margin (UI-CONVENTIONS). */
+@custom-variant short (@media (max-height: 32rem));
 
 :root {
   /* Brand defaults, which must match brand.ts values exactly.

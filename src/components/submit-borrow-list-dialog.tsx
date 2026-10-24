@@ -3,6 +3,7 @@ import { useAction } from "#/lib/use-action";
 import { Button } from "./ui/button";
 import {
   Dialog,
+  DialogBody,
   DialogContent,
   DialogDescription,
   DialogFooter,
@@ -69,17 +70,19 @@ export function SubmitBorrowListDialog({
             Staff approve each line and tell you when to pick it up.
           </DialogDescription>
         </DialogHeader>
-        <div className="space-y-1.5">
-          <Label htmlFor="borrow-list-note">Note for staff (optional)</Label>
-          <Textarea
-            id="borrow-list-note"
-            onChange={(e) => setNote(e.target.value)}
-            placeholder="When you need it, or which project it is for"
-            rows={2}
-            value={note}
-          />
-          <FieldError message={error} />
-        </div>
+        <DialogBody>
+          <div className="space-y-1.5">
+            <Label htmlFor="borrow-list-note">Note for staff (optional)</Label>
+            <Textarea
+              id="borrow-list-note"
+              onChange={(e) => setNote(e.target.value)}
+              placeholder="When you need it, or which project it is for"
+              rows={2}
+              value={note}
+            />
+            <FieldError message={error} />
+          </div>
+        </DialogBody>
         <DialogFooter>
           <Button
             disabled={busy}

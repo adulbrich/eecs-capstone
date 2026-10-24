@@ -29,6 +29,7 @@ import {
 import { Button } from "#/components/ui/button";
 import {
   Dialog,
+  DialogBody,
   DialogContent,
   DialogDescription,
   DialogFooter,
@@ -270,51 +271,56 @@ function CategoriesAdmin() {
                   : "Add a category for inventory items."}
               </DialogDescription>
             </DialogHeader>
-            <form className="flex flex-col gap-4" onSubmit={onCreate}>
-              {/*
+            <form
+              className="flex min-h-0 flex-1 flex-col gap-4"
+              onSubmit={onCreate}
+            >
+              <DialogBody>
+                {/*
                 Type above Name on the project tab: the type is the group and
                 the name is the category, and a first-time reader who meets
                 Name first files the group under the category (#374).
               */}
-              {tab === "project" && (
+                {tab === "project" && (
+                  <div className="flex flex-col gap-2">
+                    <Label htmlFor="cat-type">Type</Label>
+                    <p
+                      className="text-muted-foreground text-xs"
+                      id="cat-type-description"
+                    >
+                      {CATEGORY_FIELD_DESCRIPTION.type}
+                    </p>
+                    <CategoryTypeCombobox
+                      describedBy="cat-type-description"
+                      id="cat-type"
+                      onChange={setType}
+                      types={types}
+                      value={type}
+                    />
+                  </div>
+                )}
                 <div className="flex flex-col gap-2">
-                  <Label htmlFor="cat-type">Type</Label>
-                  <p
-                    className="text-muted-foreground text-xs"
-                    id="cat-type-description"
-                  >
-                    {CATEGORY_FIELD_DESCRIPTION.type}
-                  </p>
-                  <CategoryTypeCombobox
-                    describedBy="cat-type-description"
-                    id="cat-type"
-                    onChange={setType}
-                    types={types}
-                    value={type}
+                  <Label htmlFor="cat-name">Name</Label>
+                  {tab === "project" && (
+                    <p
+                      className="text-muted-foreground text-xs"
+                      id="cat-name-description"
+                    >
+                      {CATEGORY_FIELD_DESCRIPTION.name}
+                    </p>
+                  )}
+                  <Input
+                    aria-describedby={
+                      tab === "project" ? "cat-name-description" : undefined
+                    }
+                    id="cat-name"
+                    onChange={(e) => setName(e.target.value)}
+                    required
+                    value={name}
                   />
                 </div>
-              )}
-              <div className="flex flex-col gap-2">
-                <Label htmlFor="cat-name">Name</Label>
-                {tab === "project" && (
-                  <p
-                    className="text-muted-foreground text-xs"
-                    id="cat-name-description"
-                  >
-                    {CATEGORY_FIELD_DESCRIPTION.name}
-                  </p>
-                )}
-                <Input
-                  aria-describedby={
-                    tab === "project" ? "cat-name-description" : undefined
-                  }
-                  id="cat-name"
-                  onChange={(e) => setName(e.target.value)}
-                  required
-                  value={name}
-                />
-              </div>
-              <FieldError message={error} />
+                <FieldError message={error} />
+              </DialogBody>
               <DialogFooter>
                 <Button
                   disabled={
