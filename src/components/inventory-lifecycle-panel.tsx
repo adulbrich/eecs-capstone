@@ -33,6 +33,7 @@ import {
 import { EMAIL_SKIP_HINT, SendEmailCheckbox } from "./send-email-checkbox";
 import {
   AlertDialog,
+  AlertDialogBody,
   AlertDialogCancel,
   AlertDialogContent,
   AlertDialogDescription,
@@ -43,6 +44,7 @@ import {
 import { Button } from "./ui/button";
 import {
   Dialog,
+  DialogBody,
   DialogContent,
   DialogDescription,
   DialogFooter,
@@ -703,9 +705,7 @@ export function InventoryLifecyclePanel({
       </PanelSection>
 
       <Dialog onOpenChange={changeDlgOpen} open={dlgOpen}>
-        {/* A reserve carries the holder, the pickup terms and a comment,
-            which outgrow a short viewport; scroll inside rather than clip. */}
-        <DialogContent className="max-h-[calc(100dvh-2rem)] overflow-y-auto">
+        <DialogContent>
           <DialogHeader>
             <DialogTitle>
               {dlgTargetStatus === "checked_out"
@@ -717,7 +717,7 @@ export function InventoryLifecyclePanel({
               team by label. No prior request is needed.
             </DialogDescription>
           </DialogHeader>
-          <div className="space-y-3">
+          <DialogBody className="gap-3">
             <HolderField
               email={assignEmail}
               label={assignLabel}
@@ -788,7 +788,7 @@ export function InventoryLifecyclePanel({
               onCheckedChange={setDlgSendEmail}
             />
             <FieldError message={error} />
-          </div>
+          </DialogBody>
           <DialogFooter>
             <Button
               disabled={busy}
@@ -827,7 +827,7 @@ export function InventoryLifecyclePanel({
               confirm.
             </AlertDialogDescription>
           </AlertDialogHeader>
-          <div className="space-y-3">
+          <AlertDialogBody className="gap-3">
             <p className="text-sm">
               Item name: <span className="font-mono">{item.name}</span>
             </p>
@@ -839,7 +839,7 @@ export function InventoryLifecyclePanel({
               value={delConfirm}
             />
             <FieldError message={error} />
-          </div>
+          </AlertDialogBody>
           <AlertDialogFooter>
             <AlertDialogCancel disabled={busy}>Cancel</AlertDialogCancel>
             <Button

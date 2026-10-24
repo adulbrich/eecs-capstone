@@ -36,6 +36,7 @@ import { StaffProposerSection } from "./staff-proposer-section";
 import { Button } from "./ui/button";
 import {
   Dialog,
+  DialogBody,
   DialogContent,
   DialogDescription,
   DialogFooter,
@@ -374,36 +375,38 @@ export function StaffProjectPanel({
             </DialogTitle>
             <DialogDescription>{dialogDescription(pending)}</DialogDescription>
           </DialogHeader>
-          <div className="space-y-1.5">
-            <Label htmlFor="staff-comment">
-              {needsComment
-                ? "What needs to change? (required)"
-                : "Comment (optional)"}
-            </Label>
-            <Textarea
-              id="staff-comment"
-              onChange={(e) => setComment(e.target.value)}
-              placeholder={
-                needsComment
-                  ? "Describe what the proposer needs to change"
-                  : "Explain the action"
-              }
-              rows={3}
-              value={comment}
-            />
-            <p className="text-muted-foreground text-xs">
-              The project proposer can see this comment.
-            </p>
-          </div>
-          {proposerEmailed && (
-            <SendEmailCheckbox
-              address={proposerAddress}
-              checked={sendEmail}
-              hint={EMAIL_SKIP_HINT.withBell}
-              onCheckedChange={setSendEmail}
-            />
-          )}
-          <FieldError message={error} />
+          <DialogBody>
+            <div className="space-y-1.5">
+              <Label htmlFor="staff-comment">
+                {needsComment
+                  ? "What needs to change? (required)"
+                  : "Comment (optional)"}
+              </Label>
+              <Textarea
+                id="staff-comment"
+                onChange={(e) => setComment(e.target.value)}
+                placeholder={
+                  needsComment
+                    ? "Describe what the proposer needs to change"
+                    : "Explain the action"
+                }
+                rows={3}
+                value={comment}
+              />
+              <p className="text-muted-foreground text-xs">
+                The project proposer can see this comment.
+              </p>
+            </div>
+            {proposerEmailed && (
+              <SendEmailCheckbox
+                address={proposerAddress}
+                checked={sendEmail}
+                hint={EMAIL_SKIP_HINT.withBell}
+                onCheckedChange={setSendEmail}
+              />
+            )}
+            <FieldError message={error} />
+          </DialogBody>
           <DialogFooter>
             <Button
               disabled={busy}

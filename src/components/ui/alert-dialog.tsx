@@ -42,7 +42,7 @@ function AlertDialogContent({
       <AlertDialogOverlay />
       <AlertDialogPrimitive.Content
         className={cn(
-          "data-[state=open]:fade-in-0 data-[state=closed]:fade-out-0 data-[state=open]:zoom-in-95 data-[state=closed]:zoom-out-95 fixed top-[50%] left-[50%] z-50 grid w-full max-w-[calc(100%-2rem)] translate-x-[-50%] translate-y-[-50%] gap-4 rounded-lg border border-border bg-card p-6 shadow-lg duration-200 data-[state=closed]:animate-out data-[state=open]:animate-in sm:max-w-lg",
+          "data-[state=open]:fade-in-0 data-[state=closed]:fade-out-0 data-[state=open]:zoom-in-95 data-[state=closed]:zoom-out-95 fixed top-[50%] left-[50%] z-50 flex max-h-[calc(100dvh-2rem)] short:max-h-dvh w-full max-w-[calc(100%-2rem)] translate-x-[-50%] translate-y-[-50%] flex-col gap-4 overflow-y-auto rounded-lg border border-border bg-card p-6 shadow-lg duration-200 data-[state=closed]:animate-out data-[state=open]:animate-in sm:max-w-lg",
           className
         )}
         data-slot="alert-dialog-content"
@@ -58,8 +58,25 @@ function AlertDialogHeader({
 }: React.ComponentProps<"div">) {
   return (
     <div
-      className={cn("flex flex-col gap-2 text-center sm:text-left", className)}
+      className={cn(
+        "flex shrink-0 flex-col gap-2 text-center sm:text-left",
+        className
+      )}
       data-slot="alert-dialog-header"
+      {...props}
+    />
+  );
+}
+
+/** The alert dialog's `DialogBody`: scrolls between a pinned header and footer. */
+function AlertDialogBody({ className, ...props }: React.ComponentProps<"div">) {
+  return (
+    <div
+      className={cn(
+        "-mx-6 flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto px-6 py-1 empty:hidden",
+        className
+      )}
+      data-slot="alert-dialog-body"
       {...props}
     />
   );
@@ -72,7 +89,7 @@ function AlertDialogFooter({
   return (
     <div
       className={cn(
-        "flex flex-col-reverse gap-2 sm:flex-row sm:justify-end",
+        "flex shrink-0 flex-col-reverse gap-2 sm:flex-row sm:justify-end",
         className
       )}
       data-slot="alert-dialog-footer"
@@ -136,6 +153,7 @@ function AlertDialogCancel({
 export {
   AlertDialog,
   AlertDialogAction,
+  AlertDialogBody,
   AlertDialogCancel,
   AlertDialogContent,
   AlertDialogDescription,
