@@ -49,7 +49,7 @@ export function AdminRequestActions({
   requesterName,
   status,
 }: Props) {
-  const [open, setOpen] = useState(false);
+  const [rejectOpen, setRejectOpen] = useState(false);
   const [reason, setReason] = useState("");
   const [sendEmail, setSendEmail] = useState(true);
   // A second activation in the same tick would decide the line twice;
@@ -67,7 +67,7 @@ export function AdminRequestActions({
   // The skip is a decision about one click, so it is checked again next time.
   /** Closes and resets. Called by Cancel, by `dismiss` and by the success path. */
   function close() {
-    setOpen(false);
+    setRejectOpen(false);
     setError(null);
     setSendEmail(true);
   }
@@ -128,8 +128,8 @@ export function AdminRequestActions({
       />
 
       <Popover
-        onOpenChange={(next) => (next ? setOpen(true) : dismiss())}
-        open={open}
+        onOpenChange={(next) => (next ? setRejectOpen(true) : dismiss())}
+        open={rejectOpen}
       >
         <PopoverTrigger asChild>
           <Button disabled={busy} size="sm" type="button" variant="outline">

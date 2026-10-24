@@ -438,6 +438,15 @@ numbers. `Input`, `SelectTrigger` (at `data-size=default`), `Button size="defaul
 and `ViewToggle` are already `h-9`. Set `h-9` explicitly on any new control that
 sits inline beside them.
 
+### A tall dialog scrolls inside itself
+
+`DialogContent` is fixed to the middle of the viewport with the page behind it
+locked, so a form taller than the screen clips its own buttons out of reach on a
+phone in landscape. A dialog holding a form gives its `DialogContent`
+`max-h-[calc(100dvh-2rem)] overflow-y-auto`, as `approve-dialog.tsx` and the
+reserve dialog in `inventory-lifecycle-panel.tsx` do. `dvh` follows the browser's
+toolbars, not the on-screen keyboard.
+
 ---
 
 ## Site header

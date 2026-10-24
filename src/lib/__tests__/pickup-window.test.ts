@@ -46,6 +46,13 @@ describe("resolvePickupWindow", () => {
     expect(pickupBy?.toISOString()).toBe("2026-11-02T00:00:00.000Z");
   });
 
+  it("puts each end of a window across the autumn change on its own offset", () => {
+    // 00:30 is still daylight time (UTC-7); 03:00 is standard time (UTC-8).
+    const { pickupFrom, pickupBy } = window("2026-11-01", "00:30", "03:00");
+    expect(pickupFrom?.toISOString()).toBe("2026-11-01T07:30:00.000Z");
+    expect(pickupBy?.toISOString()).toBe("2026-11-01T11:00:00.000Z");
+  });
+
   it("accepts today, and a window already open but not yet over", () => {
     expect(window("2026-10-28", null, null).pickupBy).not.toBeNull();
     expect(window("2026-10-28", "11:00", "13:00").pickupBy).not.toBeNull();

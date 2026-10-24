@@ -124,8 +124,9 @@ export function ApproveDialog({
     }
     // An untouched form takes the item's location as it is now, so a location
     // edited while the row sat on screen is the one copied; one staff typed
-    // into and then cancelled keeps what they typed, so a reopen discards
-    // nothing.
+    // into and then cancelled keeps what they typed while this dialog stays
+    // mounted. The table row and the line sheet each hold their own draft, and
+    // closing the sheet drops its one.
     if (next && scope.kind === "line" && !edited) {
       setPickup({ ...EMPTY_PICKUP, place: scope.itemLocation ?? "" });
     }
@@ -140,9 +141,12 @@ export function ApproveDialog({
   let placeHint =
     "Left blank, the requester is told no place. They see what is here.";
   if (single) {
-    placeHint = scope.itemLocation
-      ? "Copied from the item's location. The requester sees what is here."
-      : "The requester sees what is here.";
+    // Says "copied" only while the field still holds the copy, not after
+    // staff type over it.
+    placeHint =
+      scope.itemLocation && pickup.place === scope.itemLocation
+        ? "Copied from the item's location. The requester sees what is here."
+        : "The requester sees what is here.";
   }
 
   return (
@@ -152,10 +156,10 @@ export function ApproveDialog({
           {single ? "Approve" : "Approve all"}
         </Button>
       </DialogTrigger>
-      {/* Seven controls outgrow a phone in landscape or with the keyboard
-          up, and the dialog is fixed to the viewport's centre with the page
-          behind it locked, so it scrolls inside itself instead of clipping
-          Confirm out of reach. */}
+      {/* Seven controls outgrow a phone in landscape, and the dialog is
+          fixed to the viewport's centre with the page behind it locked, so
+          it scrolls inside itself instead of clipping Confirm out of reach.
+          `dvh` follows the browser's toolbars, not the on-screen keyboard. */}
       <DialogContent className="max-h-[calc(100dvh-2rem)] overflow-y-auto">
         <DialogHeader>
           {/* A request has no name of its own, so the requester names it. */}

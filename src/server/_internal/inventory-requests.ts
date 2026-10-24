@@ -278,9 +278,10 @@ export async function cancelRequestItemAs(
 // The skip rides in `EmailOptions`, beside the test seam, so the `*As`
 // inputs stay the row fields (#387).
 /**
- * What staff typed, as the terms `*As` writes. Staff is checked first, so a
- * caller who may not approve learns that rather than what is wrong with the
- * window; the `*As` call checks again, which costs nothing.
+ * What staff typed, as the terms `*As` writes. Staff is checked before the
+ * window is composed, so a caller who may not approve learns that rather than
+ * what is wrong with the window; the `*As` call checks again, which costs
+ * nothing. The schema's format checks on each field still run before either.
  */
 function typedTerms(viewer: Viewer, fields: PickupInput): PickupTerms {
   assertStaff(viewer);

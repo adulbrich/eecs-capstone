@@ -436,8 +436,9 @@ async function closeRequestItemOnRelease(
  *
  * Staff is checked before the window is read, for the order
  * `assertTransitionAllowed` keeps: a caller who may not transition anything
- * learns that, not what is wrong with their window. Nothing else reaches this
- * endpoint, because `authority` is not in its schema.
+ * learns that, not what is wrong with their window; only the schema's format
+ * checks on each field run earlier. Nothing else reaches this endpoint,
+ * because `authority` is not in its schema.
  */
 export async function transitionInventoryItemAs(
   viewer: Viewer,

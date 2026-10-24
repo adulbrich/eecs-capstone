@@ -133,7 +133,7 @@ function formatDate(d: Date | null | undefined): string {
  * `overdueNotifications` below. `holder` is the hold the transition assigns,
  * as an account, an address, or neither; a release reads the previous holder
  * off the item instead. `staffInbox` is where a reservation tells its holder
- * to write when the pickup time does not suit; the caller reads it from the
+ * to write when the pickup window does not suit; the caller reads it from the
  * server's config so this module stays pure.
  */
 export function notificationFor(

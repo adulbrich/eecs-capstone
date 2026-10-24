@@ -138,7 +138,7 @@ export function projectApprovedEmail(input: {
   };
 }
 
-const BLANK_LINE = /\n\s*\n/;
+const BLANK_LINE = /\s*\n\s*\n\s*/;
 
 /**
  * A bell row, mailed. The inventory notices already say the one thing the
@@ -155,7 +155,7 @@ export function notificationEmail(input: {
 }): RenderedEmail {
   return {
     subject: input.title,
-    ...layout(input.message.split(BLANK_LINE), {
+    ...layout(input.message.trim().split(BLANK_LINE), {
       label: "Open in the capstone app",
       url: input.url,
     }),

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   escapeHtml,
+  notificationEmail,
   projectApprovedEmail,
   projectChangesRequestedEmail,
   projectSubmittedEmail,
@@ -149,5 +150,19 @@ describe("projectChangesRequestedEmail", () => {
     expect(email.subject).toBe("Changes requested: Robot arm");
     expect(email.text).toContain("Add measurable objectives.");
     expect(email.text).toContain("https://app/projects/p1");
+  });
+});
+
+describe("notificationEmail", () => {
+  it("makes each blank-line block a paragraph, CRLF and edge blanks included", () => {
+    const email = notificationEmail({
+      message: "Reserved.\r\n\r\nPick up by Friday.\n\n",
+      title: "Reserved: Oscilloscope",
+      url: "https://app/my/items",
+    });
+    expect(email.html).toContain("<p>Reserved.</p><p>Pick up by Friday.</p>");
+    expect(email.html).not.toContain("<p></p>");
+    expect(email.text).toContain("Reserved.\n\nPick up by Friday.\n\n");
+    expect(email.text).not.toContain("\r");
   });
 });

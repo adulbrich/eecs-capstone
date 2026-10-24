@@ -435,6 +435,18 @@ describe("ApproveDialog over one line", () => {
     expect(place().value).toBe("KEC 1148");
   });
 
+  it("stops calling the place a copy once staff type over it", () => {
+    renderLine();
+    openDialog("Approve");
+    fireEvent.change(place(), { target: { value: "KEC 1148" } });
+    expect(
+      screen.queryByText(
+        "Copied from the item's location. The requester sees what is here."
+      )
+    ).toBeNull();
+    expect(screen.getByText("The requester sees what is here.")).toBeTruthy();
+  });
+
   /**
    * Two activations inside one tick, which is the case `disabled` cannot
    * cover: the prop only stops the second click once React has re-rendered,
