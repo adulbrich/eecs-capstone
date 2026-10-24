@@ -30,10 +30,15 @@ describe("dialog bodies", () => {
       }
       const source = readFileSync(file, "utf8");
       for (const { body, footer } of PAIRS) {
-        // `<AlertDialogFooter` does not contain `<DialogFooter`, since the `<`
-        // sits before `Alert`, so the two pairs are checked apart.
-        if (source.includes(footer) && !source.includes(body)) {
-          offenders.push(`${file}: renders ${footer}> without ${body}>`);
+        // Counted, not just found, so a file with two dialogs cannot pass on
+        // one body. `<AlertDialogFooter` does not contain `<DialogFooter`,
+        // since the `<` sits before `Alert`, so the two pairs count apart.
+        const footers = source.split(footer).length - 1;
+        const bodies = source.split(body).length - 1;
+        if (footers > bodies) {
+          offenders.push(
+            `${file}: ${footers} ${footer}> but ${bodies} ${body}>`
+          );
         }
       }
     }

@@ -449,8 +449,9 @@ and the buttons stay on screen. A `<form>` between the content and the body take
 `flex min-h-0 flex-1 flex-col gap-4`, or the body cannot shrink. Below a height of
 32rem (the `short:` variant) the cap is the full `100dvh`. A `className` setting
 `overflow-*` or `max-h-*` on a content takes the scrolling back, as `CommandDialog`
-does on purpose for cmdk's own list. `dialog-body-scan.test.ts` fails a file that
-renders a footer without a body. `dvh` follows the browser's toolbars, not the
+does on purpose for cmdk's own list. A body's children never shrink, and an empty
+body is hidden. `dialog-body-scan.test.ts` fails a file with more footers than
+bodies. `dvh` follows the browser's toolbars, not the
 on-screen keyboard.
 
 ---

@@ -68,12 +68,16 @@ function AlertDialogHeader({
   );
 }
 
-/** The alert dialog's `DialogBody`: scrolls between a pinned header and footer. */
+/**
+ * Everything between the header and the footer, scrolling on its own so the
+ * title and buttons stay on screen. The same classes as `DialogBody`, whose
+ * comment gives the reason for each.
+ */
 function AlertDialogBody({ className, ...props }: React.ComponentProps<"div">) {
   return (
     <div
       className={cn(
-        "-mx-6 flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto px-6 py-1 empty:hidden",
+        "-mx-6 -my-1 flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto px-6 py-1 *:shrink-0 empty:hidden",
         className
       )}
       data-slot="alert-dialog-body"

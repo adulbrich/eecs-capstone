@@ -94,15 +94,18 @@ function DialogHeader({ className, ...props }: React.ComponentProps<"div">) {
 /**
  * Everything between the header and the footer. It scrolls on its own, so a
  * form taller than the viewport keeps its title, close button and footer on
- * screen. The negative margin lets focus rings draw in the content's padding
- * instead of being clipped at the scroll edge. An empty body is hidden, so a
- * dialog that only sometimes has content between the two adds no gap.
+ * screen. The padding gives focus rings room inside the scroll edge, and the
+ * matching negative margins keep the dialog's spacing as it was. Children never
+ * shrink: a flex item with its own overflow (a textarea, a cmdk list) would
+ * otherwise be squashed and clip instead of making the body scroll. An empty
+ * body is hidden, so a dialog that only sometimes has content between the two
+ * adds no gap.
  */
 function DialogBody({ className, ...props }: React.ComponentProps<"div">) {
   return (
     <div
       className={cn(
-        "-mx-6 flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto px-6 py-1 empty:hidden",
+        "-mx-6 -my-1 flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto px-6 py-1 *:shrink-0 empty:hidden",
         className
       )}
       data-slot="dialog-body"

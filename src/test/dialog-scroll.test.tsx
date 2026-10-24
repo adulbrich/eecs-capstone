@@ -37,7 +37,14 @@ const CONTENT = [
   "short:max-h-dvh",
   "overflow-y-auto",
 ];
-const BODY = ["min-h-0", "flex-1", "gap-4", "overflow-y-auto", "empty:hidden"];
+const BODY = [
+  "min-h-0",
+  "flex-1",
+  "gap-4",
+  "overflow-y-auto",
+  "empty:hidden",
+  "*:shrink-0",
+];
 const PINNED = ["shrink-0"];
 
 function classesOf(slot: string): string[] {
