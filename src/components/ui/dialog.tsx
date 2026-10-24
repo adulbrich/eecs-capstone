@@ -2,6 +2,7 @@ import { XIcon } from "lucide-react";
 import { Dialog as DialogPrimitive } from "radix-ui";
 import type * as React from "react";
 import { Button } from "#/components/ui/button.tsx";
+import { useOverflows } from "#/lib/use-overflows.ts";
 import { cn } from "#/lib/utils.ts";
 
 function Dialog({
@@ -99,16 +100,23 @@ function DialogHeader({ className, ...props }: React.ComponentProps<"div">) {
  * shrink: a flex item with its own overflow (a textarea, a cmdk list) would
  * otherwise be squashed and clip instead of making the body scroll. An empty
  * body is hidden, so a dialog that only sometimes has content between the two
- * adds no gap.
+ * adds no gap. A body that scrolls draws a line above the footer, so the cut
+ * off content reads as more to scroll to; one that fits draws none.
  */
-function DialogBody({ className, ...props }: React.ComponentProps<"div">) {
+function DialogBody({
+  className,
+  ...props
+}: Omit<React.ComponentProps<"div">, "ref">) {
+  const [ref, overflows] = useOverflows<HTMLDivElement>();
   return (
     <div
       className={cn(
-        "-mx-6 -my-1 flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto px-6 py-1 *:shrink-0 empty:hidden",
+        "-mx-6 -my-1 flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto px-6 py-1 *:shrink-0 empty:hidden data-overflows:border-b",
         className
       )}
+      data-overflows={overflows || undefined}
       data-slot="dialog-body"
+      ref={ref}
       {...props}
     />
   );

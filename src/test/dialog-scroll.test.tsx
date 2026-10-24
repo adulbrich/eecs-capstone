@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
-import { cleanup, render, screen } from "@testing-library/react";
-import { afterEach, describe, expect, it } from "vitest";
+import { act, cleanup, render, screen } from "@testing-library/react";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   AlertDialog,
   AlertDialogBody,
@@ -45,6 +45,7 @@ const BODY = [
   "overflow-y-auto",
   "empty:hidden",
   "*:shrink-0",
+  "data-overflows:border-b",
 ];
 const PINNED = ["shrink-0"];
 
@@ -119,5 +120,103 @@ describe("CommandDialog", () => {
     const classes = classesOf("dialog-content");
     expect(classes).toContain("overflow-hidden");
     expect(classes).not.toContain("overflow-y-auto");
+  });
+});
+
+describe("a dialog body's separator", () => {
+  // jsdom has no layout, so the heights are faked and the observer callback is
+  // fired by hand, as a resize in a browser would.
+  let scrollHeight = 100;
+  const fire: (() => void)[] = [];
+  const originals = {
+    clientHeight: Object.getOwnPropertyDescriptor(
+      HTMLElement.prototype,
+      "clientHeight"
+    ),
+    scrollHeight: Object.getOwnPropertyDescriptor(
+      HTMLElement.prototype,
+      "scrollHeight"
+    ),
+  };
+
+  beforeEach(() => {
+    scrollHeight = 100;
+    fire.length = 0;
+    vi.stubGlobal(
+      "ResizeObserver",
+      class {
+        constructor(callback: () => void) {
+          fire.push(callback);
+        }
+        observe() {
+          // no-op
+        }
+        unobserve() {
+          // no-op
+        }
+        disconnect() {
+          // no-op
+        }
+      }
+    );
+    Object.defineProperty(HTMLElement.prototype, "clientHeight", {
+      configurable: true,
+      get: () => 100,
+    });
+    Object.defineProperty(HTMLElement.prototype, "scrollHeight", {
+      configurable: true,
+      get: () => scrollHeight,
+    });
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    for (const [key, descriptor] of Object.entries(originals)) {
+      if (descriptor) {
+        Object.defineProperty(HTMLElement.prototype, key, descriptor);
+      }
+    }
+  });
+
+  function resize(height: number) {
+    scrollHeight = height;
+    act(() => {
+      for (const callback of fire) {
+        callback();
+      }
+    });
+  }
+
+  it.each([
+    [
+      "dialog-body",
+      () => (
+        <Dialog open>
+          <DialogContent>
+            <DialogTitle>Title</DialogTitle>
+            <DialogBody>Fields</DialogBody>
+          </DialogContent>
+        </Dialog>
+      ),
+    ],
+    [
+      "alert-dialog-body",
+      () => (
+        <AlertDialog open>
+          <AlertDialogContent>
+            <AlertDialogTitle>Title</AlertDialogTitle>
+            <AlertDialogBody>Fields</AlertDialogBody>
+          </AlertDialogContent>
+        </AlertDialog>
+      ),
+    ],
+  ])("%s shows only while its content overflows", (slot, ui) => {
+    render(ui());
+    const body = document.querySelector(`[data-slot="${slot}"]`);
+    expect(body?.hasAttribute("data-overflows")).toBe(false);
+    resize(300);
+    expect(body?.hasAttribute("data-overflows")).toBe(true);
+    resize(100);
+    expect(body?.hasAttribute("data-overflows")).toBe(false);
   });
 });

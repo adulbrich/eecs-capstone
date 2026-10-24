@@ -1,6 +1,7 @@
 import { AlertDialog as AlertDialogPrimitive } from "radix-ui";
 import type * as React from "react";
 import { buttonVariants } from "#/components/ui/button.tsx";
+import { useOverflows } from "#/lib/use-overflows.ts";
 import { cn } from "#/lib/utils.ts";
 
 function AlertDialog({
@@ -73,14 +74,20 @@ function AlertDialogHeader({
  * title and buttons stay on screen. The same classes as `DialogBody`, whose
  * comment gives the reason for each.
  */
-function AlertDialogBody({ className, ...props }: React.ComponentProps<"div">) {
+function AlertDialogBody({
+  className,
+  ...props
+}: Omit<React.ComponentProps<"div">, "ref">) {
+  const [ref, overflows] = useOverflows<HTMLDivElement>();
   return (
     <div
       className={cn(
-        "-mx-6 -my-1 flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto px-6 py-1 *:shrink-0 empty:hidden",
+        "-mx-6 -my-1 flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto px-6 py-1 *:shrink-0 empty:hidden data-overflows:border-b",
         className
       )}
+      data-overflows={overflows || undefined}
       data-slot="alert-dialog-body"
+      ref={ref}
       {...props}
     />
   );
