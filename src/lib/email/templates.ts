@@ -138,8 +138,8 @@ export function projectApprovedEmail(input: {
   };
 }
 
-// Takes a CRLF blank line whole, counts a line of only spaces (a no-break space
-// included) as blank, and leaves the next paragraph's indent alone.
+// Takes a CRLF blank line whole, counts a line of only whitespace (a no-break
+// space included) as blank, and leaves the next paragraph's indent alone.
 const BLANK_LINE = /\r?\n(?:[^\S\r\n]*\r?\n)+/;
 
 /**
