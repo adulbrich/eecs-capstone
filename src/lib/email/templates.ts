@@ -138,7 +138,8 @@ export function projectApprovedEmail(input: {
   };
 }
 
-const BLANK_LINE = /\s*\n\s*\n\s*/;
+// Takes a CRLF blank line whole, and leaves the next paragraph's indent alone.
+const BLANK_LINE = /\r?\n(?:[ \t]*\r?\n)+/;
 
 /**
  * A bell row, mailed. The inventory notices already say the one thing the

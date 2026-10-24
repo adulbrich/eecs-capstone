@@ -442,10 +442,10 @@ sits inline beside them.
 
 `DialogContent` is fixed to the middle of the viewport with the page behind it
 locked, so a form taller than the screen clips its own buttons out of reach on a
-phone in landscape. A dialog holding a form gives its `DialogContent`
-`max-h-[calc(100dvh-2rem)] overflow-y-auto`, as `approve-dialog.tsx` and the
-reserve dialog in `inventory-lifecycle-panel.tsx` do. `dvh` follows the browser's
-toolbars, not the on-screen keyboard.
+phone in landscape. A dialog whose form can outgrow that gives its
+`DialogContent` `max-h-[calc(100dvh-2rem)] overflow-y-auto`, as `approve-dialog.tsx`
+and the status dialog in `inventory-lifecycle-panel.tsx` do. `dvh` follows the
+browser's toolbars, not the on-screen keyboard.
 
 ---
 

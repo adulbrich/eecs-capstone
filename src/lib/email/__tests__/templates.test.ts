@@ -154,7 +154,7 @@ describe("projectChangesRequestedEmail", () => {
 });
 
 describe("notificationEmail", () => {
-  it("makes each blank-line block a paragraph, CRLF and edge blanks included", () => {
+  it("makes each blank-line block a paragraph, CRLF blank lines and edge blanks included", () => {
     const email = notificationEmail({
       message: "Reserved.\r\n\r\nPick up by Friday.\n\n",
       title: "Reserved: Oscilloscope",
@@ -164,5 +164,14 @@ describe("notificationEmail", () => {
     expect(email.html).not.toContain("<p></p>");
     expect(email.text).toContain("Reserved.\n\nPick up by Friday.\n\n");
     expect(email.text).not.toContain("\r");
+  });
+
+  it("keeps the indent a paragraph starts with in the text part", () => {
+    const email = notificationEmail({
+      message: "Items:\n\n  - a\n  - b",
+      title: "Reserved: Oscilloscope",
+      url: "https://app/my/items",
+    });
+    expect(email.text).toContain("Items:\n\n  - a\n  - b\n\n");
   });
 });
