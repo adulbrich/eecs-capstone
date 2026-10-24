@@ -166,7 +166,16 @@ describe("notificationEmail", () => {
     expect(email.text).not.toContain("\r");
   });
 
-  it("keeps the indent a paragraph starts with in the text part", () => {
+  it("counts a line of spaces, tabs or a no-break space as blank, and a run of blank lines as one break", () => {
+    const email = notificationEmail({
+      message: "Reserved.\n \t \n\n\nPick up by Friday.",
+      title: "Reserved: Oscilloscope",
+      url: "https://app/my/items",
+    });
+    expect(email.html).toContain("<p>Reserved.</p><p>Pick up by Friday.</p>");
+  });
+
+  it("keeps the indent of a paragraph that follows a blank line", () => {
     const email = notificationEmail({
       message: "Items:\n\n  - a\n  - b",
       title: "Reserved: Oscilloscope",

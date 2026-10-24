@@ -444,7 +444,7 @@ sits inline beside them.
 locked, so a form taller than the screen clips its own buttons out of reach on a
 phone in landscape. A dialog whose form can outgrow that gives its
 `DialogContent` `max-h-[calc(100dvh-2rem)] overflow-y-auto`, as `approve-dialog.tsx`
-and the status dialog in `inventory-lifecycle-panel.tsx` do. `dvh` follows the
+and the checkout and reserve dialog in `inventory-lifecycle-panel.tsx` do. `dvh` follows the
 browser's toolbars, not the on-screen keyboard.
 
 ---
