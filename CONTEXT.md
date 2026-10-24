@@ -483,10 +483,28 @@ _Avoid_: pickup person, teammate (as a term), holder (when the distinction from 
 requester matters)
 
 **Pickup deadline**:
-When a reserved item must be collected by. Set by staff on approval, kept on the
-item for the current hold and on the line for the request. Informational: nothing
-happens when it passes except that the item becomes overdue.
+When a reserved item must be collected by: the end of the pickup window, or seven
+days out when staff gave none. Set by staff on approval, kept on the item for the
+current hold and on the line for the request. Informational: nothing happens when
+it passes except that the item becomes overdue.
 _Avoid_: pickup date, expiry, reservation deadline
+
+**Pickup window**:
+The day, and optionally a From and To time on it, when a reserved item can be
+collected, read in Corvallis time. A day without times runs to the end of that
+day. Set by staff on approval or reserve, kept where the pickup deadline is.
+_Avoid_: pickup slot, pickup time, appointment
+
+**Pickup place**:
+Where the requester collects a reserved item, as staff typed it: usually the
+instructor's office. Never the item's location, which is where it is stored and
+stays staff only; a one-item dialog copies the location in for staff to replace.
+_Avoid_: location (the item's staff-only field), pickup location
+
+**Pickup note**:
+What staff tell the requester about collecting an item, sent with the approval and
+shown on `/my/items`.
+_Avoid_: review comment (staff only), approval note
 
 **Due date**:
 When a checked-out item must be returned by. Same shape as the pickup deadline, on

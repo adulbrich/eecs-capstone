@@ -522,7 +522,7 @@ The query cache outlives the session that filled it, and a session can end witho
 
 ### A Cancel button that sets `open` itself skips the dialog's `onOpenChange`
 
-Radix fires `onOpenChange` only for closes it initiates (Escape, the overlay, `DialogClose`), not when the component sets a controlled `open` itself. When a dialog has close-time cleanup, every control that closes it calls the same function; `approve-all-dialog.test.tsx` and `custom-line-actions.test.tsx` check reopen-after-Cancel.
+Radix fires `onOpenChange` only for closes it initiates (Escape, the overlay, `DialogClose`), not when the component sets a controlled `open` itself. When a dialog has close-time cleanup, every control that closes it calls the same function; `approve-dialog.test.tsx` and `custom-line-actions.test.tsx` check reopen-after-Cancel.
 
 ### Path-by-path convention summary
 
@@ -672,6 +672,10 @@ An envelope holds item lines or custom lines, so a join to `inventory_request_it
 ### Batch approve iterates lines in ascending id order
 
 `approveRequestLinesAs` sorts the ids and approves all in one transaction, each line then its item, so overlapping batches wait instead of deadlocking. One line no longer pending fails the batch, since the ids are what staff confirmed.
+
+### Pickup terms are strings on the wire and instants in the approve `*As`
+
+`PICKUP_FIELDS` takes the day and times as `YYYY-MM-DD` and `HH:MM` strings; never `z.coerce.date()` for a day, which reads it as UTC midnight, the evening before in Corvallis (#805). `resolvePickupTerms` (`src/lib/pickup-window.ts`) composes them and refuses a window that has ended. The approve wrappers call it, so `approveRequestItemAs` and `approveRequestLinesAs` take instants and the seed can still build overdue fixtures with past dates. `transitionInventoryItemAs` takes the strings and calls it itself; seed and tests reach `transitionItem` directly. Render a window with `pickupPhrase` or `formatPickupWindow`, which pin the office zone and need no `LocalTime`. Approve all never prefills the pickup place (ADR-0065).
 
 ### submitCart is lock-first
 

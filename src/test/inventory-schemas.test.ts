@@ -2,11 +2,6 @@ import { describe, expect, it } from "vitest";
 import { z } from "zod";
 import { itemPayloadSchema, transitionSchema } from "#/server/inventory";
 
-const approveSchema = z.object({
-  requestItemId: z.string().uuid(),
-  pickupBy: z.coerce.date().nullable().default(null),
-});
-
 const rejectSchema = z.object({
   requestItemId: z.string().uuid(),
   reviewComment: z.string().min(1).max(2000),
@@ -18,9 +13,10 @@ describe("transitionSchema is the staff gate", () => {
     nextStatus: "retired" as const,
   };
 
-  // transitionInventoryItem calls only requireUser(), so assertStaff inside
-  // transitionItem is the whole gate, and `authority` is the only way past
-  // it. If this test ever fails, any signed-in user can retire any item.
+  // `authority` is the only way past the assertStaff inside transitionItem.
+  // The endpoint's wrapper asserts staff too, for the order of refusals; if
+  // this test ever fails, that one check is all that stands between any
+  // signed-in user and retiring any item.
   it("strips an authority a client tries to post", () => {
     const parsed = transitionSchema.parse({
       ...valid,
@@ -55,7 +51,12 @@ describe("transitionSchema is the staff gate", () => {
       "holderProgram",
       "itemId",
       "nextStatus",
-      "pickupBy",
+      // The pickup terms as typed (#799); composed on the server.
+      "pickupDay",
+      "pickupFromTime",
+      "pickupNote",
+      "pickupPlace",
+      "pickupToTime",
       "requestItemId",
       // The email-only skip (#387); `silent` is still not on the wire.
       "sendEmail",
@@ -83,12 +84,32 @@ describe("inventory schemas", () => {
     expect(parsed.categoryIds).toEqual(categoryIds);
   });
 
-  it("approveSchema coerces ISO date string", () => {
-    const parsed = approveSchema.parse({
-      requestItemId: "00000000-0000-0000-0000-000000000000",
-      pickupBy: "2026-06-01T00:00:00Z",
+  // A coerced Date read "2026-10-28" as UTC midnight, the evening before in
+  // Corvallis (#805). The strings go to `resolvePickupTerms` as typed.
+  it("keeps the pickup day and times as the strings staff typed", () => {
+    const parsed = transitionSchema.parse({
+      itemId: "11111111-1111-4111-8111-111111111111",
+      nextStatus: "reserved",
+      pickupDay: "2026-10-28",
+      pickupFromTime: "14:00",
+      pickupToTime: "",
     });
-    expect(parsed.pickupBy).toBeInstanceOf(Date);
+    expect(parsed.pickupDay).toBe("2026-10-28");
+    expect(parsed.pickupFromTime).toBe("14:00");
+    expect(parsed.pickupToTime).toBe("");
+  });
+
+  it("refuses a pickup day or time in any other shape", () => {
+    const base = {
+      itemId: "11111111-1111-4111-8111-111111111111",
+      nextStatus: "reserved",
+    };
+    expect(() =>
+      transitionSchema.parse({ ...base, pickupDay: "2026-10-28T00:00:00Z" })
+    ).toThrow();
+    expect(() =>
+      transitionSchema.parse({ ...base, pickupFromTime: "2pm" })
+    ).toThrow();
   });
 
   it("rejectSchema requires reviewComment", () => {

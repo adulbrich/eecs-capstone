@@ -20,6 +20,7 @@ import {
   userInterests,
 } from "../src/db/schema";
 import { auth } from "../src/lib/auth";
+import { localDay, localInstant } from "../src/lib/day-range";
 import type { UserRole } from "../src/lib/vocabularies";
 import {
   addToCartAs,
@@ -1075,12 +1076,17 @@ async function seedInventoryFlows(
   const arduino = await itemBySerial("ARD-UNOR4W-0014");
   await request(sam, arduino, "For the embedded systems capstone demo.");
 
-  // 5. An approved request: line approved, item reserved, pickup ahead.
+  // 5. An approved request: line approved, item reserved, pickup ahead, with
+  //    the window, place and note staff give on approval (#799).
   const coral = await itemBySerial("CORAL-USB-0009");
   const coralLine = await request(sam, coral, "Edge inference benchmarking.");
+  const coralDay = localDay(daysFromNow(5));
   await approveRequestItemAs(staff, {
     requestItemId: coralLine,
-    pickupBy: daysFromNow(5),
+    pickupFrom: localInstant(coralDay, "14:00"),
+    pickupBy: localInstant(coralDay, "16:00"),
+    pickupPlace: "KEC 1148, the instructor office",
+    pickupNote: "Bring your student ID.",
   });
 
   // 6. Requester is not the holder. Sam asked, Jordan collected, so both see

@@ -138,10 +138,17 @@ export function projectApprovedEmail(input: {
   };
 }
 
+// Takes a CRLF blank line whole, counts a line of only whitespace (a no-break
+// space included) as blank, and leaves the next paragraph's indent alone.
+const BLANK_LINE = /\r?\n(?:[^\S\r\n]*\r?\n)+/;
+
 /**
  * A bell row, mailed. The inventory notices already say the one thing the
  * recipient must do (pick up by a date, return by a date, ask again), so the
  * email carries the same words rather than a second copy that would drift.
+ * A blank line in the message starts a new paragraph, which is how a
+ * reservation keeps its window, place and note apart; a lone line break stays
+ * inside its paragraph, as HTML would collapse it anyway.
  */
 export function notificationEmail(input: {
   message: string;
@@ -150,7 +157,7 @@ export function notificationEmail(input: {
 }): RenderedEmail {
   return {
     subject: input.title,
-    ...layout([input.message], {
+    ...layout(input.message.trim().split(BLANK_LINE), {
       label: "Open in the capstone app",
       url: input.url,
     }),

@@ -146,6 +146,20 @@ const CENSUS = new Map<string, { class: SeedClass; why: string }>([
     },
   ],
   [
+    "src/components/approve-dialog.tsx: useState(EMPTY_PICKUP)",
+    {
+      class: "D",
+      why: "blank pickup terms, a module constant; a line's dialog copies the item's location in when it opens on a blank form, not at mount, and a request's copies nothing (ADR-0065)",
+    },
+  ],
+  [
+    "src/components/inventory-lifecycle-panel.tsx: useState(EMPTY_PICKUP)",
+    {
+      class: "D",
+      why: "blank pickup terms, a module constant; openDialogFor reads the item's stored terms or location each time the dialog opens",
+    },
+  ],
+  [
     "src/components/placement/add-project-dialog.tsx: useState(EMPTY)",
     {
       class: "D",

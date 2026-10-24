@@ -17,6 +17,8 @@ export const OFFICE_TIME_ZONE = "America/Los_Angeles";
 
 const DAY_MS = 86_400_000;
 const DAY = /^(\d{4})-(\d{2})-(\d{2})$/;
+/** A 24-hour `HH:MM`, the value an `<input type="time">` sends. */
+export const TIME_PATTERN = /^([01]\d|2[0-3]):([0-5]\d)$/;
 
 const partsFormatter = new Map<string, Intl.DateTimeFormat>();
 
@@ -76,13 +78,41 @@ export function localDay(instant: Date, timeZone = OFFICE_TIME_ZONE): string {
 
 /** Midnight at the start of `day` in `timeZone`, as an instant. */
 export function dayStart(day: string, timeZone = OFFICE_TIME_ZONE): Date {
+  return localInstant(day, "00:00", timeZone);
+}
+
+/**
+ * The instant a wall clock in `timeZone` reads `time` (`HH:MM`, 24-hour) on
+ * `day`. A time the spring change skips (2:00 to 2:59 on that Sunday) has no
+ * instant and lands an hour earlier, on the old offset; nothing the office
+ * schedules falls there.
+ */
+export function localInstant(
+  day: string,
+  time: string,
+  timeZone = OFFICE_TIME_ZONE
+): Date {
   const [y, m, d] = parseDay(day);
-  const guess = Date.UTC(y, m - 1, d);
+  const [hour, minute] = parseTime(time);
+  const guess = Date.UTC(y, m - 1, d, hour, minute);
   const first = guess - offsetAt(guess, timeZone);
   // A guess made the wrong side of a DST change is off by the change; one
   // more look at the offset where the first answer landed corrects it.
   const second = guess - offsetAt(first, timeZone);
   return new Date(second);
+}
+
+/** The last millisecond of `day` in `timeZone`: still that day, wherever read. */
+export function dayEnd(day: string, timeZone = OFFICE_TIME_ZONE): Date {
+  return new Date(dayStart(shiftDay(day, 1), timeZone).getTime() - 1);
+}
+
+function parseTime(time: string): [number, number] {
+  const m = TIME_PATTERN.exec(time);
+  if (!m) {
+    throw new Error(`not an HH:MM time: ${time}`);
+  }
+  return [Number(m[1]), Number(m[2])];
 }
 
 /** `day` moved by `delta` calendar days, DST-free arithmetic on the date. */

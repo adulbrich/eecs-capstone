@@ -295,6 +295,13 @@
       "when": 1791417001699,
       "tag": "0041_add_scheme_to_project_urls",
       "breakpoints": true
+    },
+    {
+      "idx": 42,
+      "version": "7",
+      "when": 1792790138161,
+      "tag": "0042_pickup_window_place_note",
+      "breakpoints": true
     }
   ]
 }

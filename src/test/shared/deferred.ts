@@ -3,7 +3,7 @@
  * write is still in flight rather than only after it settles.
  *
  * Four test files grew the same six lines before this: `export-csv-button`,
- * `admin-request-actions`, `approve-all-dialog` and `custom-line-actions`.
+ * `admin-request-actions`, `approve-dialog` and `custom-line-actions`.
  * Nothing about it is specific to any of them, and a helper copied four times
  * is one that gets fixed in three places.
  *

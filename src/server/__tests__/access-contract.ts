@@ -149,6 +149,10 @@ export const ACCESS_CONTRACT: Record<string, AccessDeclaration> = {
   },
   "server/inventory.ts:createInventoryItem": { level: "staff" },
   "server/inventory.ts:getCart": { level: "authenticated" },
+  "server/inventory.ts:getPickupContact": {
+    level: "authenticated",
+    note: "EMAIL_STAFF_INBOX only, the address every approval email already names to its recipient. Signed-in because the one page that shows it is.",
+  },
   "server/inventory.ts:getInventoryItem": {
     level: "public",
     note: PUBLIC_ITEM_VIEW_NOTE,
@@ -184,7 +188,7 @@ export const ACCESS_CONTRACT: Record<string, AccessDeclaration> = {
   "server/inventory.ts:submitCart": { level: "authenticated" },
   "server/inventory.ts:transitionInventoryItem": {
     level: "staff",
-    note: "The handler carries only requireUser(). The staff gate is the assertStaff in assertAuthorized (src/lib/inventory-workflow.ts), reached through transitionItem and assertTransitionAllowed, and the schema deliberately omits `authority` so a signed-in user cannot supply one. See the transitionSchema docblock.",
+    note: "transitionInventoryItemAs calls assertStaff before composing the pickup window, and transitionItem checks again through assertAuthorized (src/lib/inventory-workflow.ts). The schema deliberately omits `authority` so a signed-in user cannot supply one. See the transitionSchema docblock.",
   },
   "server/inventory.ts:updateInventoryItem": { level: "staff" },
 

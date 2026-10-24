@@ -9,6 +9,8 @@ import {
   notifications,
   user,
 } from "#/db/schema";
+import { requireUser } from "#/lib/_internal/auth-guards";
+import { buildNotificationConfig } from "#/lib/email/config";
 import { type Hold, holdFromInput, holdToColumns } from "#/lib/hold";
 import {
   type InventoryNotice,
@@ -24,7 +26,10 @@ import {
   type TransitionActor,
   type TransitionInput,
 } from "#/lib/inventory-workflow";
+import { resolvePickupTerms } from "#/lib/pickup-window";
+import { assertStaff, type Viewer } from "#/lib/viewer";
 import type { ItemStatus } from "#/lib/vocabularies";
+import type { TransitionInventoryItemInput } from "../inventory";
 import type { EmailOptions } from "./email-dispatch";
 import { notifyInventoryByEmail } from "./inventory-emails";
 
@@ -235,9 +240,13 @@ async function transitionItemInTx(
     .set({
       status: input.nextStatus,
       ...holderColumns,
-      // Writing the hold's dates here on every transition means releasing an
-      // item clears them for free, with no separate reset path.
+      // Writing the hold's terms here on every transition means releasing an
+      // item clears them for free, with no separate reset path. A checkout
+      // clears the pickup terms the same way: they were about collecting it.
       currentPickupBy: input.pickupBy ?? null,
+      currentPickupFrom: input.pickupFrom ?? null,
+      currentPickupPlace: input.pickupPlace ?? null,
+      currentPickupNote: input.pickupNote ?? null,
       currentDueAt: input.dueAt ?? null,
       currentRequestItemId: input.requestItemId ?? null,
       updatedAt: new Date(),
@@ -295,7 +304,13 @@ async function transitionItemInTx(
     );
   }
 
-  const notice = notificationFor(current, input, holdRecipient(hold), closed);
+  const notice = notificationFor(
+    current,
+    input,
+    holdRecipient(hold),
+    closed,
+    buildNotificationConfig().staffInbox
+  );
   const row = toNotificationRow(notice);
   if (row) {
     await tx.insert(notifications).values(row);
@@ -312,7 +327,10 @@ async function syncRequestItem(tx: Tx, input: TransitionInput) {
         .update(inventoryRequestItems)
         .set({
           status: "approved",
+          pickupFrom: input.pickupFrom ?? null,
           pickupBy: input.pickupBy ?? null,
+          pickupPlace: input.pickupPlace ?? null,
+          pickupNote: input.pickupNote ?? null,
           updatedAt: new Date(),
         })
         .where(eq(inventoryRequestItems.id, id));
@@ -409,4 +427,49 @@ async function closeRequestItemOnRelease(
     })
     .where(eq(inventoryRequestItems.id, requestItemId));
   return { outcome: lineStatus, requesterEmail, requesterId };
+}
+
+/**
+ * The staff panel's write. The pickup window arrives as the strings staff
+ * typed and is composed in the office's zone here, so `transitionItem` and
+ * every rule after it see instants.
+ *
+ * Staff is checked before the window is read, for the order
+ * `assertTransitionAllowed` keeps: a caller who may not transition anything
+ * learns that, not what is wrong with their window; only the schema's format
+ * checks on each field run earlier. Nothing else reaches this endpoint,
+ * because `authority` is not in its schema.
+ */
+export async function transitionInventoryItemAs(
+  viewer: Viewer,
+  data: Omit<TransitionInventoryItemInput, "sendEmail">,
+  opts?: EmailOptions
+) {
+  assertStaff(viewer);
+  const {
+    pickupDay,
+    pickupFromTime,
+    pickupToTime,
+    pickupPlace,
+    pickupNote,
+    ...input
+  } = data;
+  const terms = resolvePickupTerms({
+    pickupDay,
+    pickupFromTime,
+    pickupToTime,
+    pickupPlace,
+    pickupNote,
+  });
+  await transitionItem(viewer, { ...input, ...terms }, undefined, opts);
+  return { ok: true as const };
+}
+
+// The skip rides in `EmailOptions`, as on the approve paths (#387).
+export async function transitionInventoryItemForCurrentUser(
+  data: TransitionInventoryItemInput
+) {
+  const viewer = await requireUser();
+  const { sendEmail, ...fields } = data;
+  return transitionInventoryItemAs(viewer, fields, { sendEmail });
 }

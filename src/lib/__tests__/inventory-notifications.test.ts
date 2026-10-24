@@ -90,6 +90,78 @@ describe("notificationFor", () => {
     expect(without?.title).not.toContain("Pick up by");
   });
 
+  it("names the Pacific day in the title, not the server's", () => {
+    // 2 am UTC on the 29th is 7 pm on the 28th in Corvallis.
+    const notice = notificationFor(
+      item,
+      { nextStatus: "reserved", pickupBy: new Date("2026-10-29T02:00:00Z") },
+      { accountId: "u-holder", email: null },
+      null
+    );
+    expect(notice?.title).toBe(
+      "Reserved: Oculus Quest 3. Pick up by Oct 28, 2026."
+    );
+  });
+
+  it("gives the window, place, note and inbox one paragraph each", () => {
+    const notice = notificationFor(
+      item,
+      {
+        nextStatus: "reserved",
+        pickupFrom: new Date("2026-10-28T21:00:00Z"),
+        pickupBy: new Date("2026-10-28T23:00:00Z"),
+        pickupPlace: "  KEC 1148, the instructor office  ",
+        pickupNote: "Bring your student ID.",
+      },
+      { accountId: "u-holder", email: null },
+      null,
+      "capstone@oregonstate.edu"
+    );
+    expect(notice?.message).toBe(
+      [
+        "Your request for Oculus Quest 3 was approved.",
+        "Pick up on Oct 28, 2026, 2:00 PM to 4:00 PM.",
+        "Where to pick up: KEC 1148, the instructor office",
+        "Bring your student ID.",
+        "If this time doesn't work, email capstone@oregonstate.edu.",
+      ].join("\n\n")
+    );
+  });
+
+  it("says pick up by for a deadline alone, and asks for no reply without one", () => {
+    const byDay = notificationFor(
+      item,
+      { nextStatus: "reserved", pickupBy: new Date("2026-10-29T06:59:59Z") },
+      { accountId: "u-holder", email: null },
+      null,
+      "capstone@oregonstate.edu"
+    );
+    expect(byDay?.message).toContain("Pick up by Oct 28, 2026.");
+    expect(byDay?.message).toContain("If this time doesn't work");
+
+    const noDeadline = notificationFor(
+      item,
+      { nextStatus: "reserved", pickupPlace: "KEC 1148" },
+      { accountId: "u-holder", email: null },
+      null,
+      "capstone@oregonstate.edu"
+    );
+    expect(noDeadline?.message).toBe(
+      "Your request for Oculus Quest 3 was approved.\n\nWhere to pick up: KEC 1148"
+    );
+  });
+
+  it("leaves the inbox line out when no inbox is configured", () => {
+    const notice = notificationFor(
+      item,
+      { nextStatus: "reserved", pickupBy: new Date("2026-10-29T06:59:59Z") },
+      { accountId: "u-holder", email: null },
+      null,
+      null
+    );
+    expect(notice?.message).not.toContain("If this time");
+  });
+
   it("announces a checkout with its due date, year included", () => {
     // The year is load-bearing: an item due "Sep 1" with no year reads as this
     // year, and the whole point of the notice is that a deadline has meaning.

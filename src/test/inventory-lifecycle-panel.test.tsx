@@ -472,3 +472,120 @@ describe("InventoryLifecyclePanel: the checkout dialog", () => {
     expect(router.invalidate).not.toHaveBeenCalled();
   });
 });
+
+describe("InventoryLifecyclePanel: the pickup terms on a reserve (#799)", () => {
+  function renderRequested(location: string | null) {
+    return render(
+      <InventoryLifecyclePanel
+        hasRequestHistory
+        history={[]}
+        item={{
+          id: "item-1",
+          name: "Oscilloscope",
+          status: "requested",
+          currentHolderId: "u-1",
+          currentHolderEmail: "student@x.edu",
+          currentHolderLabel: null,
+          currentRequestItemId: "line-1",
+          location,
+        }}
+      />
+    );
+  }
+
+  it("copies the location in, says which text box is sent, and sends the terms as typed", async () => {
+    renderRequested("Cabinet A, Bin 1");
+    fireEvent.click(screen.getByRole("button", { name: "Approve / reserve" }));
+    const dialog = await screen.findByRole("dialog");
+
+    const place = within(dialog).getByLabelText("Where to pick up (optional)");
+    expect((place as HTMLInputElement).value).toBe("Cabinet A, Bin 1");
+    expect(
+      within(dialog).getByText(
+        "Copied from the item's location. The holder sees what is here."
+      )
+    ).toBeTruthy();
+    expect(
+      within(dialog).getByText(
+        "Kept in the status history for staff. Not sent to the holder."
+      )
+    ).toBeTruthy();
+
+    fireEvent.change(place, { target: { value: "KEC 1148" } });
+    fireEvent.change(within(dialog).getByLabelText("Pickup day (optional)"), {
+      target: { value: "2026-10-30" },
+    });
+    fireEvent.change(within(dialog).getByLabelText("From"), {
+      target: { value: "14:00" },
+    });
+    fireEvent.change(within(dialog).getByLabelText("To"), {
+      target: { value: "16:00" },
+    });
+    fireEvent.click(within(dialog).getByRole("button", { name: "Confirm" }));
+
+    await waitFor(() =>
+      expect(server.transitionInventoryItem).toHaveBeenCalledWith({
+        data: expect.objectContaining({
+          nextStatus: "reserved",
+          requestItemId: "line-1",
+          pickupDay: "2026-10-30",
+          pickupFromTime: "14:00",
+          pickupToTime: "16:00",
+          pickupPlace: "KEC 1148",
+          pickupNote: "",
+        }),
+      })
+    );
+  });
+
+  it("reads back what the holder was told, and nothing it was not", () => {
+    render(
+      <InventoryLifecyclePanel
+        hasRequestHistory={false}
+        history={[]}
+        item={{
+          id: "item-1",
+          name: "Oscilloscope",
+          status: "reserved",
+          currentHolderId: null,
+          currentHolderEmail: "walkin@x.edu",
+          currentHolderLabel: null,
+          currentRequestItemId: null,
+          location: "Cabinet A, Bin 1",
+          pickupFrom: "2026-10-30T21:00:00.000Z",
+          pickupBy: "2026-10-30T23:00:00.000Z",
+          pickupPlace: "KEC 1148",
+          pickupNote: null,
+        }}
+      />
+    );
+    expect(screen.getByText("Oct 30, 2026, 2:00 PM to 4:00 PM")).toBeTruthy();
+    expect(screen.getByText("KEC 1148")).toBeTruthy();
+    expect(screen.queryByText("Pickup note")).toBeNull();
+    // The storage location is the private panel's, not a pickup term.
+    expect(screen.queryByText("Cabinet A, Bin 1")).toBeNull();
+  });
+
+  it("sends no pickup terms on a checkout", async () => {
+    renderPanel({ status: "available" });
+    fireEvent.click(screen.getByRole("button", { name: "Check out" }));
+    const dialog = await screen.findByRole("dialog");
+    expect(within(dialog).queryByLabelText("Pickup day (optional)")).toBeNull();
+    fireEvent.change(within(dialog).getByLabelText("Email"), {
+      target: { value: "holder@x.edu" },
+    });
+    fireEvent.change(within(dialog).getByLabelText("Due date"), {
+      target: { value: "2026-10-01" },
+    });
+    fireEvent.click(within(dialog).getByRole("button", { name: "Confirm" }));
+    await waitFor(() =>
+      expect(server.transitionInventoryItem).toHaveBeenCalledWith({
+        data: expect.objectContaining({
+          nextStatus: "checked_out",
+          pickupDay: "",
+          pickupPlace: "",
+        }),
+      })
+    );
+  });
+});

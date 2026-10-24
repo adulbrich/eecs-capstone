@@ -18,7 +18,7 @@ import {
   defineAdminColumns,
 } from "#/components/admin-data-table";
 import { AdminRequestActions } from "#/components/admin-request-actions";
-import { ApproveAllDialog } from "#/components/approve-all-dialog";
+import { ApproveDialog } from "#/components/approve-dialog";
 import {
   CustomLineActions,
   StartSourcingAllButton,
@@ -51,6 +51,7 @@ import { requireStaff } from "#/lib/access-denied";
 import { isOpenCustomLine } from "#/lib/inventory-custom-workflow";
 import { lineTimeline } from "#/lib/inventory-timeline";
 import { pageTitle } from "#/lib/page-title";
+import { formatPickupWindow } from "#/lib/pickup-window";
 import { searchParamQuerySchema } from "#/lib/search-query";
 import type { SortState } from "#/lib/table-state";
 import { useAdminTable } from "#/lib/use-admin-table";
@@ -167,22 +168,31 @@ const KIND: Record<Row["kind"], KindConfig> = {
   item: {
     badge: null,
     groupAction: (rows, onDone) => (
-      <ApproveAllDialog
-        lines={rows.map((row) => ({
-          id: row.line.id,
-          itemName: subjectOf(row),
-          status: row.line.status,
-        }))}
+      <ApproveDialog
         onDone={onDone}
         // One requester per request: the rows are one group's.
-        requesterEmail={rows[0]?.requester.email ?? null}
+        requester={{
+          email: rows[0]?.requester.email ?? null,
+          name: rows[0]?.requester.name ?? null,
+        }}
+        scope={{
+          kind: "request",
+          lines: rows.map((row) => ({
+            id: row.line.id,
+            itemName: subjectOf(row),
+            status: row.line.status,
+          })),
+        }}
       />
     ),
     rowActions: (row, onDone) => (
       <AdminRequestActions
+        itemLocation={row.kind === "item" ? row.item.location : null}
+        itemName={subjectOf(row)}
         lineId={row.line.id}
         onDone={onDone}
         requesterEmail={row.requester.email}
+        requesterName={row.requester.name}
         status={row.line.status}
       />
     ),
@@ -554,9 +564,12 @@ function sheetActions(
   if (row.kind === "item") {
     return row.line.status === "pending" ? (
       <AdminRequestActions
+        itemLocation={row.item.location}
+        itemName={row.item.name}
         lineId={row.line.id}
         onDone={done}
         requesterEmail={row.requester.email}
+        requesterName={row.requester.name}
         status={row.line.status}
       />
     ) : undefined;
@@ -611,7 +624,14 @@ function itemFields(row: ItemRow): LineSheetField[] {
       ),
     },
     { label: "Status", value: statusLabel(row.line.status) },
-    { label: "Pickup by", value: dateOr(row.line.pickupBy) },
+    // The terms the requester was given, in the office's zone, whatever the
+    // reader's: the window is a time to be in Corvallis.
+    {
+      label: "Pick up",
+      value: formatPickupWindow(row.line.pickupFrom, row.line.pickupBy) ?? "-",
+    },
+    { label: "Where to pick up", value: textOr(row.line.pickupPlace) },
+    { label: "Pickup note", value: textOr(row.line.pickupNote) },
     { label: "Due", value: dateOr(row.line.dueAt) },
     {
       label: "Collected by",

@@ -7,6 +7,11 @@ import {
 } from "#/db/schema";
 import { requireUser } from "#/lib/_internal/auth-guards";
 import type { InventoryNotice } from "#/lib/inventory-notifications";
+import {
+  type PickupInput,
+  type PickupTerms,
+  resolvePickupTerms,
+} from "#/lib/pickup-window";
 import { assertStaff, type Viewer } from "#/lib/viewer";
 import type { EmailOptions } from "./email-dispatch";
 import { notifyInventoryByEmail } from "./inventory-emails";
@@ -32,7 +37,7 @@ async function approveLineInTx(
   tx: Tx,
   viewer: NonNullable<Viewer>,
   requestItemId: string,
-  pickupBy: Date
+  terms: PickupTerms
 ): Promise<InventoryNotice | null> {
   const { transitionItem } = await import("./inventory-transitions");
   // Lock the line before reading and updating it so a concurrent cancel
@@ -82,21 +87,40 @@ async function approveLineInTx(
       nextStatus: "reserved",
       requestItemId: line.id,
       holderId: line.requesterId,
-      pickupBy,
+      ...terms,
     },
     tx
   );
 }
 
+/**
+ * The terms an approval writes, as row fields. Instants, not what staff
+ * typed: the wrappers below compose those (`resolvePickupTerms`), and the
+ * seed and the integration suite pass past dates here to build overdue
+ * fixtures, which the typed path refuses. With no deadline the fallback is
+ * `defaultPickupBy`, as before #799.
+ */
+type ApprovalTerms = Partial<PickupTerms>;
+
+function withDefaultDeadline(terms: ApprovalTerms): PickupTerms {
+  return {
+    pickupFrom: terms.pickupFrom ?? null,
+    pickupBy: terms.pickupBy ?? defaultPickupBy(),
+    pickupPlace: terms.pickupPlace ?? null,
+    pickupNote: terms.pickupNote ?? null,
+  };
+}
+
 export async function approveRequestItemAs(
   viewer: Viewer,
-  data: { requestItemId: string; pickupBy: Date | null },
+  data: { requestItemId: string } & ApprovalTerms,
   opts?: EmailOptions
 ) {
   assertStaff(viewer);
-  const pickupBy = data.pickupBy ?? defaultPickupBy();
+  const { requestItemId, ...given } = data;
+  const terms = withDefaultDeadline(given);
   const notice = await db.transaction((tx) =>
-    approveLineInTx(tx, viewer, data.requestItemId, pickupBy)
+    approveLineInTx(tx, viewer, requestItemId, terms)
   );
   // After the commit, never inside it: a failed email must not undo an
   // approval, and a slow one must not hold the item's lock.
@@ -105,7 +129,7 @@ export async function approveRequestItemAs(
 }
 
 /**
- * Approves every named line with one pickup date, or none of them.
+ * Approves every named line with one set of pickup terms, or none of them.
  *
  * The ids are the lines the dialog listed, which is what staff confirmed. A
  * line that has since left `pending` fails the whole batch and names its
@@ -118,21 +142,22 @@ export async function approveRequestItemAs(
  */
 export async function approveRequestLinesAs(
   viewer: Viewer,
-  data: { requestItemIds: string[]; pickupBy: Date | null },
+  data: { requestItemIds: string[] } & ApprovalTerms,
   opts?: EmailOptions
 ) {
   assertStaff(viewer);
-  const ids = [...new Set(data.requestItemIds)].sort();
+  const { requestItemIds, ...given } = data;
+  const ids = [...new Set(requestItemIds)].sort();
   if (ids.length === 0) {
     throw new Error("No lines to approve");
   }
-  // One date for the batch: a fallback computed per line would drift by
-  // milliseconds across the group.
-  const pickupBy = data.pickupBy ?? defaultPickupBy();
+  // One set of terms for the batch: a fallback date computed per line would
+  // drift by milliseconds across the group.
+  const terms = withDefaultDeadline(given);
   const notices = await db.transaction(async (tx) => {
     const collected: (InventoryNotice | null)[] = [];
     for (const id of ids) {
-      collected.push(await approveLineInTx(tx, viewer, id, pickupBy));
+      collected.push(await approveLineInTx(tx, viewer, id, terms));
     }
     return collected;
   });
@@ -252,24 +277,39 @@ export async function cancelRequestItemAs(
 
 // The skip rides in `EmailOptions`, beside the test seam, so the `*As`
 // inputs stay the row fields (#387).
-export async function approveRequestItemForCurrentUser(data: {
-  requestItemId: string;
-  pickupBy: Date | null;
-  sendEmail: boolean;
-}) {
-  const viewer = await requireUser();
-  const { sendEmail, ...fields } = data;
-  return approveRequestItemAs(viewer, fields, { sendEmail });
+/**
+ * What staff typed, as the terms `*As` writes. Staff is checked before the
+ * window is composed, so a caller who may not approve learns that rather than
+ * what is wrong with the window; the `*As` call checks again, which costs
+ * nothing. The schema's format checks on each field still run before either.
+ */
+function typedTerms(viewer: Viewer, fields: PickupInput): PickupTerms {
+  assertStaff(viewer);
+  return resolvePickupTerms(fields);
 }
 
-export async function approveRequestLinesForCurrentUser(data: {
-  requestItemIds: string[];
-  pickupBy: Date | null;
-  sendEmail: boolean;
-}) {
+export async function approveRequestItemForCurrentUser(
+  data: { requestItemId: string; sendEmail: boolean } & PickupInput
+) {
   const viewer = await requireUser();
-  const { sendEmail, ...fields } = data;
-  return approveRequestLinesAs(viewer, fields, { sendEmail });
+  const { sendEmail, requestItemId, ...fields } = data;
+  return approveRequestItemAs(
+    viewer,
+    { requestItemId, ...typedTerms(viewer, fields) },
+    { sendEmail }
+  );
+}
+
+export async function approveRequestLinesForCurrentUser(
+  data: { requestItemIds: string[]; sendEmail: boolean } & PickupInput
+) {
+  const viewer = await requireUser();
+  const { sendEmail, requestItemIds, ...fields } = data;
+  return approveRequestLinesAs(
+    viewer,
+    { requestItemIds, ...typedTerms(viewer, fields) },
+    { sendEmail }
+  );
 }
 
 export async function rejectRequestItemForCurrentUser(data: {

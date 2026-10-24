@@ -25,7 +25,7 @@ const { banUser, setUserRole, unbanUser } = vi.hoisted(() => ({
 vi.mock("#/server/users", () => ({ banUser, setUserRole, unbanUser }));
 
 // Radix Select and Dialog read a few DOM APIs jsdom omits. Same stub set as
-// approve-all-dialog.test.tsx.
+// approve-dialog.test.tsx.
 beforeAll(() => {
   Element.prototype.scrollIntoView = vi.fn();
   Element.prototype.hasPointerCapture = vi.fn();

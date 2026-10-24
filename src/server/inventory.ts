@@ -8,6 +8,7 @@ import {
   INVENTORY_ITEM_STATUSES,
   INVENTORY_REQUEST_ITEM_STATUSES,
 } from "#/lib/vocabularies";
+import { PICKUP_FIELDS } from "./pickup-fields";
 import { SEND_EMAIL_FIELD } from "./send-email-field";
 
 function expectFormData(data: unknown): FormData {
@@ -218,7 +219,7 @@ export const submitCart = createServerFn({ method: "POST" })
 
 const approveSchema = z.object({
   requestItemId: z.string().uuid(),
-  pickupBy: z.coerce.date().nullable().default(null),
+  ...PICKUP_FIELDS,
   ...SEND_EMAIL_FIELD,
 });
 
@@ -233,7 +234,7 @@ export const approveRequestItem = createServerFn({ method: "POST" })
 
 const approveLinesSchema = z.object({
   requestItemIds: z.array(z.string().uuid()).min(1).max(100),
-  pickupBy: z.coerce.date().nullable().default(null),
+  ...PICKUP_FIELDS,
   ...SEND_EMAIL_FIELD,
 });
 
@@ -274,6 +275,20 @@ export const cancelRequestItem = createServerFn({ method: "POST" })
     );
     return cancelRequestItemForCurrentUser(data);
   });
+
+/**
+ * The staff inbox `/my/items` names under a pickup window, for a requester
+ * whose time does not work (#799). The same address the approval email names,
+ * read on the server because it is configuration.
+ */
+export const getPickupContact = createServerFn({ method: "GET" }).handler(
+  async () => {
+    const { requireUser } = await import("#/lib/_internal/auth-guards");
+    const { buildNotificationConfig } = await import("#/lib/email/config");
+    await requireUser();
+    return { staffInbox: buildNotificationConfig().staffInbox };
+  }
+);
 
 export const listMyItems = createServerFn({ method: "GET" }).handler(
   async () => {
@@ -321,12 +336,12 @@ export const listInventoryRequests = createServerFn({ method: "GET" })
 
 /**
  * Exported so `src/test/inventory-schemas.test.ts` can prove it strips
- * `authority`. That is not a style preference: `transitionInventoryItem`
- * carries only `requireUser()`, so `assertStaff` inside `transitionItem` is
- * the entire staff gate for this endpoint, and `authority` is the only way
- * past it. Adding `.passthrough()` or `.catchall()` here, or declaring the
- * field, would let any signed-in user retire any item. The test is what makes
- * that fail loudly instead of silently.
+ * `authority`. That is not a style preference: `authority` is the only way
+ * past the `assertStaff` inside `transitionItem`. The endpoint's wrapper also
+ * asserts staff before it reads the pickup window, but that check exists for
+ * the order of refusals, not as the gate; adding `.passthrough()` or
+ * `.catchall()` here, or declaring the field, must still fail loudly, and the
+ * test is what makes it.
  */
 export const transitionSchema = z.object({
   itemId: z.string().uuid(),
@@ -342,7 +357,9 @@ export const transitionSchema = z.object({
   holderLabel: z.string().max(200).nullable().default(null),
   holderName: z.string().max(200).nullable().default(null),
   holderProgram: z.string().max(200).nullable().default(null),
-  pickupBy: z.coerce.date().nullable().default(null),
+  // The pickup window as strings, never a coerced date; composed in the
+  // office's zone before it reaches transitionItem.
+  ...PICKUP_FIELDS,
   dueAt: z.coerce.date().nullable().default(null),
   comment: z.string().max(2000).nullable().default(null),
   // The email-only skip (#387), never `silent`: that one suppresses the bell
@@ -350,15 +367,13 @@ export const transitionSchema = z.object({
   ...SEND_EMAIL_FIELD,
 });
 
+export type TransitionInventoryItemInput = z.infer<typeof transitionSchema>;
+
 export const transitionInventoryItem = createServerFn({ method: "POST" })
   .validator((d: unknown) => transitionSchema.parse(d))
   .handler(async ({ data }) => {
-    const { requireUser } = await import("#/lib/_internal/auth-guards");
-    const { transitionItem } = await import(
+    const { transitionInventoryItemForCurrentUser } = await import(
       "./_internal/inventory-transitions"
     );
-    const viewer = await requireUser();
-    const { sendEmail, ...input } = data;
-    await transitionItem(viewer, input, undefined, { sendEmail });
-    return { ok: true as const };
+    return transitionInventoryItemForCurrentUser(data);
   });
