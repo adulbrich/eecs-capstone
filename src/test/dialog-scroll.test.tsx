@@ -125,19 +125,10 @@ describe("CommandDialog", () => {
 
 describe("a dialog body's separator", () => {
   // jsdom has no layout, so the heights are faked and the observer callback is
-  // fired by hand, as a resize in a browser would.
+  // fired by hand, as a resize in a browser would. The shared
+  // `installResizeObserver` stub keeps no callback to fire.
   let scrollHeight = 100;
   const fire: (() => void)[] = [];
-  const originals = {
-    clientHeight: Object.getOwnPropertyDescriptor(
-      HTMLElement.prototype,
-      "clientHeight"
-    ),
-    scrollHeight: Object.getOwnPropertyDescriptor(
-      HTMLElement.prototype,
-      "scrollHeight"
-    ),
-  };
 
   beforeEach(() => {
     scrollHeight = 100;
@@ -171,11 +162,10 @@ describe("a dialog body's separator", () => {
 
   afterEach(() => {
     vi.unstubAllGlobals();
-    for (const [key, descriptor] of Object.entries(originals)) {
-      if (descriptor) {
-        Object.defineProperty(HTMLElement.prototype, key, descriptor);
-      }
-    }
+    // jsdom defines both on Element.prototype, so deleting the fakes restores
+    // them.
+    Reflect.deleteProperty(HTMLElement.prototype, "clientHeight");
+    Reflect.deleteProperty(HTMLElement.prototype, "scrollHeight");
   });
 
   function resize(height: number) {
