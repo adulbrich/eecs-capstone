@@ -24,6 +24,7 @@ import {
 import { Button } from "#/components/ui/button";
 import {
   Dialog,
+  DialogBody,
   DialogContent,
   DialogDescription,
   DialogFooter,
@@ -241,43 +242,48 @@ function ProgramsAdmin() {
                 Add a course program that projects can be associated with.
               </DialogDescription>
             </DialogHeader>
-            <form className="flex flex-col gap-4" onSubmit={onCreate}>
-              <div className="flex flex-col gap-2">
-                <Label htmlFor="prog-course-id">Course ID</Label>
-                <Input
-                  aria-describedby="prog-course-id-description"
-                  id="prog-course-id"
-                  onChange={(e) => setCourseId(e.target.value)}
-                  placeholder="e.g., CS 461"
-                  required
-                  value={courseId}
-                />
-                <p
-                  className="text-muted-foreground text-xs"
-                  id="prog-course-id-description"
-                >
-                  {PROGRAM_COURSE_ID_HINT}
-                </p>
-              </div>
-              <div className="flex flex-col gap-2">
-                <Label htmlFor="prog-course-name">Course name</Label>
-                <Input
-                  id="prog-course-name"
-                  onChange={(e) => setCourseName(e.target.value)}
-                  required
-                  value={courseName}
-                />
-              </div>
-              <div className="flex flex-col gap-2">
-                <Label htmlFor="prog-description">Description</Label>
-                <Input
-                  id="prog-description"
-                  onChange={(e) => setDescription(e.target.value)}
-                  placeholder="Optional"
-                  value={description}
-                />
-              </div>
-              <FieldError message={error} />
+            <form
+              className="flex min-h-0 flex-1 flex-col gap-4"
+              onSubmit={onCreate}
+            >
+              <DialogBody>
+                <div className="flex flex-col gap-2">
+                  <Label htmlFor="prog-course-id">Course ID</Label>
+                  <Input
+                    aria-describedby="prog-course-id-description"
+                    id="prog-course-id"
+                    onChange={(e) => setCourseId(e.target.value)}
+                    placeholder="e.g., CS 461"
+                    required
+                    value={courseId}
+                  />
+                  <p
+                    className="text-muted-foreground text-xs"
+                    id="prog-course-id-description"
+                  >
+                    {PROGRAM_COURSE_ID_HINT}
+                  </p>
+                </div>
+                <div className="flex flex-col gap-2">
+                  <Label htmlFor="prog-course-name">Course name</Label>
+                  <Input
+                    id="prog-course-name"
+                    onChange={(e) => setCourseName(e.target.value)}
+                    required
+                    value={courseName}
+                  />
+                </div>
+                <div className="flex flex-col gap-2">
+                  <Label htmlFor="prog-description">Description</Label>
+                  <Input
+                    id="prog-description"
+                    onChange={(e) => setDescription(e.target.value)}
+                    placeholder="Optional"
+                    value={description}
+                  />
+                </div>
+                <FieldError message={error} />
+              </DialogBody>
               <DialogFooter>
                 <Button
                   disabled={busy || !(courseId && courseName)}

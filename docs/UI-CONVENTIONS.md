@@ -440,13 +440,20 @@ sits inline beside them.
 
 ### A tall dialog scrolls inside itself
 
-`DialogContent` is fixed to the middle of the viewport with the page behind it
-locked, so a form taller than the screen clips its own buttons out of reach on a
-phone in landscape. A dialog whose form can outgrow that gives its
-`DialogContent` `max-h-[calc(100dvh-2rem)] overflow-y-auto`, as
-`approve-dialog.tsx` and the checkout and reserve dialog in
-`inventory-lifecycle-panel.tsx` do. `dvh` follows the browser's toolbars, not the
-on-screen keyboard.
+A dialog is fixed to the middle of the viewport with the page behind it locked, so
+on a phone in landscape a form taller than the screen would clip its own buttons.
+`DialogContent` and `AlertDialogContent` carry the cap themselves, a flex column of
+at most `100dvh-2rem`, and anything between a header and a footer goes in
+`DialogBody` or `AlertDialogBody`. Only the body scrolls: the title, the close X
+and the buttons stay on screen. A `<form>` between the content and the body takes
+`flex min-h-0 flex-1 flex-col gap-4`, or the body cannot shrink. Below a height of
+32rem (the `short:` variant) the cap is the full `100dvh`. A `className` setting
+`overflow-*` or `max-h-*` on a content takes the scrolling back, as `CommandDialog`
+does on purpose for cmdk's own list. A body's children never shrink, and an empty
+body is hidden. A body that overflows draws a line above the footer, so the cut
+reads as more to scroll; one that fits draws none, and the line means nothing if
+every dialog has it. `dialog-body-scan.test.ts` fails a file with more footers than
+bodies. `dvh` follows the browser's toolbars, not the on-screen keyboard.
 
 ---
 

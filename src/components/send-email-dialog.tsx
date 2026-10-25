@@ -3,6 +3,7 @@ import { SendEmailCheckbox } from "./send-email-checkbox";
 import { Button } from "./ui/button";
 import {
   Dialog,
+  DialogBody,
   DialogContent,
   DialogDescription,
   DialogFooter,
@@ -69,14 +70,16 @@ function Body({
         <DialogTitle>{title}</DialogTitle>
         <DialogDescription>{description}</DialogDescription>
       </DialogHeader>
-      <SendEmailCheckbox
-        address={address}
-        checked={sendEmail}
-        disabled={busy}
-        hint={hint}
-        onCheckedChange={setSendEmail}
-      />
-      <FieldError message={error} />
+      <DialogBody>
+        <SendEmailCheckbox
+          address={address}
+          checked={sendEmail}
+          disabled={busy}
+          hint={hint}
+          onCheckedChange={setSendEmail}
+        />
+        <FieldError message={error} />
+      </DialogBody>
       <DialogFooter>
         <Button
           disabled={busy}

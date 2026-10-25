@@ -9,6 +9,7 @@ export type { DeletionPreview } from "#/server/account";
 
 import {
   AlertDialog,
+  AlertDialogBody,
   AlertDialogCancel,
   AlertDialogContent,
   AlertDialogDescription,
@@ -101,56 +102,58 @@ export function DeleteAccountDialog({
             and interests.
           </AlertDialogDescription>
         </AlertDialogHeader>
-        {preview && (blocked ? <Blocked preview={preview} /> : null)}
-        {preview && !blocked && (
-          <div className="space-y-3 text-sm">
-            <ul className="list-disc space-y-1 pl-5">
-              <li>
-                Your projects stay published and stay readable at their existing
-                URLs.
-              </li>
-              <li>Your name on them becomes "Deleted user".</li>
-              <li>
-                Contact details you typed into a project stay in that project.
-              </li>
-              <li>
-                Records of inventory you borrowed stay, because they are
-                departmental property records.
-              </li>
-              {preview.programs.length > 0 && (
+        <AlertDialogBody>
+          {preview && (blocked ? <Blocked preview={preview} /> : null)}
+          {preview && !blocked && (
+            <div className="space-y-3 text-sm">
+              <ul className="list-disc space-y-1 pl-5">
                 <li>
-                  You will be removed from these programs:{" "}
-                  {preview.programs
-                    .map((p) => `${p.courseId} ${p.courseName}`)
-                    .join(", ")}
-                  .
+                  Your projects stay published and stay readable at their
+                  existing URLs.
                 </li>
-              )}
-              <li>
-                This cannot be undone.{" "}
-                <strong>
-                  If you sign up again we cannot link your old projects back to
-                  your new account.
-                </strong>
-              </li>
-            </ul>
-            <div className="space-y-1.5">
-              <Label htmlFor="confirm-email">
-                Type your email address to confirm
-              </Label>
-              <Input
-                aria-label="Confirm email"
-                autoComplete="off"
-                id="confirm-email"
-                onChange={(e) => setTyped(e.target.value)}
-                placeholder={preview.email}
-                type="email"
-                value={typed}
-              />
+                <li>Your name on them becomes "Deleted user".</li>
+                <li>
+                  Contact details you typed into a project stay in that project.
+                </li>
+                <li>
+                  Records of inventory you borrowed stay, because they are
+                  departmental property records.
+                </li>
+                {preview.programs.length > 0 && (
+                  <li>
+                    You will be removed from these programs:{" "}
+                    {preview.programs
+                      .map((p) => `${p.courseId} ${p.courseName}`)
+                      .join(", ")}
+                    .
+                  </li>
+                )}
+                <li>
+                  This cannot be undone.{" "}
+                  <strong>
+                    If you sign up again we cannot link your old projects back
+                    to your new account.
+                  </strong>
+                </li>
+              </ul>
+              <div className="space-y-1.5">
+                <Label htmlFor="confirm-email">
+                  Type your email address to confirm
+                </Label>
+                <Input
+                  aria-label="Confirm email"
+                  autoComplete="off"
+                  id="confirm-email"
+                  onChange={(e) => setTyped(e.target.value)}
+                  placeholder={preview.email}
+                  type="email"
+                  value={typed}
+                />
+              </div>
+              <FieldError message={error} />
             </div>
-            <FieldError message={error} />
-          </div>
-        )}
+          )}
+        </AlertDialogBody>
         <AlertDialogFooter>
           <AlertDialogCancel disabled={pending}>Cancel</AlertDialogCancel>
           {!blocked && (

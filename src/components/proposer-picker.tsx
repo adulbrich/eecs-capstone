@@ -19,6 +19,7 @@ import { SearchQueryNote, searchQueryNote } from "./search-hint";
 import { Button } from "./ui/button";
 import {
   Dialog,
+  DialogBody,
   DialogContent,
   DialogDescription,
   DialogFooter,
@@ -192,12 +193,14 @@ export function ProposerPicker({
               {`This project belongs to ${accountName ?? value}. Choosing someone else moves it to them: it leaves the current proposer's list and they stop receiving updates about it.`}
             </DialogDescription>
           </DialogHeader>
-          <AccountSearch
-            onPick={(email) => {
-              onChange(email);
-              setReassignOpen(false);
-            }}
-          />
+          <DialogBody>
+            <AccountSearch
+              onPick={(email) => {
+                onChange(email);
+                setReassignOpen(false);
+              }}
+            />
+          </DialogBody>
           <DialogFooter className="sm:justify-between">
             <Button
               onClick={() => {

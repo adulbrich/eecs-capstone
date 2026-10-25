@@ -11,6 +11,7 @@ import { EMAIL_SKIP_HINT, SendEmailCheckbox } from "./send-email-checkbox";
 import { Button } from "./ui/button";
 import {
   Dialog,
+  DialogBody,
   DialogContent,
   DialogDescription,
   DialogFooter,
@@ -156,11 +157,7 @@ export function ApproveDialog({
           {single ? "Approve" : "Approve all"}
         </Button>
       </DialogTrigger>
-      {/* Seven controls outgrow a phone in landscape, and the dialog is
-          fixed to the viewport's centre with the page behind it locked, so
-          it scrolls inside itself instead of clipping Confirm out of reach.
-          `dvh` follows the browser's toolbars, not the on-screen keyboard. */}
-      <DialogContent className="max-h-[calc(100dvh-2rem)] overflow-y-auto">
+      <DialogContent>
         <DialogHeader>
           {/* A request has no name of its own, so the requester names it. */}
           <DialogTitle>
@@ -174,28 +171,32 @@ export function ApproveDialog({
               : "Every pending line below is reserved to the requester with the same pickup window, place and note."}
           </DialogDescription>
         </DialogHeader>
-        {!single && (
-          <ul className="list-disc space-y-0.5 pl-5 text-sm">
-            {pending.map((line) => (
-              <li key={line.id}>{line.itemName}</li>
-            ))}
-          </ul>
-        )}
-        <PickupFields
-          disabled={busy}
-          idPrefix={single ? `approve-${scope.line.id}` : "approve-all-pickup"}
-          onChange={onPickupChange}
-          placeHint={placeHint}
-          value={pickup}
-        />
-        <SendEmailCheckbox
-          address={requester.email}
-          checked={sendEmail}
-          disabled={busy}
-          hint={EMAIL_SKIP_HINT.withBell}
-          onCheckedChange={setSendEmail}
-        />
-        <FieldError message={error} />
+        <DialogBody>
+          {!single && (
+            <ul className="list-disc space-y-0.5 pl-5 text-sm">
+              {pending.map((line) => (
+                <li key={line.id}>{line.itemName}</li>
+              ))}
+            </ul>
+          )}
+          <PickupFields
+            disabled={busy}
+            idPrefix={
+              single ? `approve-${scope.line.id}` : "approve-all-pickup"
+            }
+            onChange={onPickupChange}
+            placeHint={placeHint}
+            value={pickup}
+          />
+          <SendEmailCheckbox
+            address={requester.email}
+            checked={sendEmail}
+            disabled={busy}
+            hint={EMAIL_SKIP_HINT.withBell}
+            onCheckedChange={setSendEmail}
+          />
+          <FieldError message={error} />
+        </DialogBody>
         <DialogFooter>
           <Button
             disabled={busy}

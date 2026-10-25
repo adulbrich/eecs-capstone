@@ -5,6 +5,7 @@ import { Button } from "#/components/ui/button";
 import { Checkbox } from "#/components/ui/checkbox";
 import {
   Dialog,
+  DialogBody,
   DialogContent,
   DialogDescription,
   DialogFooter,
@@ -170,7 +171,7 @@ export function AddProjectDialog({
       </DialogTrigger>
       <DialogContent>
         <form
-          className="flex flex-col gap-4"
+          className="flex min-h-0 flex-1 flex-col gap-4"
           noValidate
           onSubmit={(event) => {
             event.preventDefault();
@@ -184,38 +185,40 @@ export function AddProjectDialog({
               defaults on the Parameters tab. Bids name it by this title.
             </DialogDescription>
           </DialogHeader>
-          {field("title", "Title", { required: true })}
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-            {field("maxTeams", "Max teams", {
-              inputMode: "numeric",
-              placeholder: String(parameters.maxTeams),
-            })}
-            {field("minStudents", "Min students", {
-              inputMode: "numeric",
-              placeholder: String(parameters.minStudents),
-            })}
-            {field("maxStudents", "Max students", {
-              inputMode: "numeric",
-              placeholder: String(parameters.maxStudents),
-            })}
-          </div>
-          <div className="flex items-center gap-2">
-            <Checkbox
-              checked={draft.studentProposed}
-              id={`${id}-studentProposed`}
-              onCheckedChange={(checked) =>
-                set("studentProposed")(checked === true)
-              }
-            />
-            <Label htmlFor={`${id}-studentProposed`}>Student proposed</Label>
-          </div>
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-            {field("proposerName", "Proposer name")}
-            {field("proposerEmail", "Proposer email", { type: "email" })}
-            {field("mentorName", "Mentor name")}
-            {field("mentorEmail", "Mentor email", { type: "email" })}
-          </div>
-          <FieldError message={error} />
+          <DialogBody>
+            {field("title", "Title", { required: true })}
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+              {field("maxTeams", "Max teams", {
+                inputMode: "numeric",
+                placeholder: String(parameters.maxTeams),
+              })}
+              {field("minStudents", "Min students", {
+                inputMode: "numeric",
+                placeholder: String(parameters.minStudents),
+              })}
+              {field("maxStudents", "Max students", {
+                inputMode: "numeric",
+                placeholder: String(parameters.maxStudents),
+              })}
+            </div>
+            <div className="flex items-center gap-2">
+              <Checkbox
+                checked={draft.studentProposed}
+                id={`${id}-studentProposed`}
+                onCheckedChange={(checked) =>
+                  set("studentProposed")(checked === true)
+                }
+              />
+              <Label htmlFor={`${id}-studentProposed`}>Student proposed</Label>
+            </div>
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              {field("proposerName", "Proposer name")}
+              {field("proposerEmail", "Proposer email", { type: "email" })}
+              {field("mentorName", "Mentor name")}
+              {field("mentorEmail", "Mentor email", { type: "email" })}
+            </div>
+            <FieldError message={error} />
+          </DialogBody>
           <DialogFooter>
             <Button
               onClick={() => onOpenChange(false)}

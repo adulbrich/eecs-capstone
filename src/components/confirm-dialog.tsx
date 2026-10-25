@@ -2,6 +2,7 @@ import type * as React from "react";
 import { useState } from "react";
 import {
   AlertDialog,
+  AlertDialogBody,
   AlertDialogCancel,
   AlertDialogContent,
   AlertDialogDescription,
@@ -86,8 +87,10 @@ export function ConfirmDialog({
           <AlertDialogTitle>{title}</AlertDialogTitle>
           <AlertDialogDescription>{description}</AlertDialogDescription>
         </AlertDialogHeader>
-        {body}
-        <FieldError message={error} />
+        <AlertDialogBody>
+          {body}
+          <FieldError message={error} />
+        </AlertDialogBody>
         <AlertDialogFooter>
           <AlertDialogCancel disabled={busy}>Cancel</AlertDialogCancel>
           {/*
