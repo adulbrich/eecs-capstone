@@ -44,7 +44,8 @@ describe("transitionSchema is the staff gate", () => {
   it("keeps exactly the fields it declares", () => {
     expect(Object.keys(transitionSchema.parse(valid)).sort()).toEqual([
       "comment",
-      "dueAt",
+      // The due date as the day picked (#805); composed on the server.
+      "dueDay",
       "holderEmail",
       "holderLabel",
       "holderName",

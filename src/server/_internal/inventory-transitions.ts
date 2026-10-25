@@ -12,6 +12,7 @@ import {
 import { requireUser } from "#/lib/_internal/auth-guards";
 import { buildNotificationConfig } from "#/lib/email/config";
 import { type Hold, holdFromInput, holdToColumns } from "#/lib/hold";
+import { dueAtForDay } from "#/lib/inventory-deadlines";
 import {
   type InventoryNotice,
   type NoticeRecipient,
@@ -452,6 +453,7 @@ export async function transitionInventoryItemAs(
     pickupToTime,
     pickupPlace,
     pickupNote,
+    dueDay,
     ...input
   } = data;
   const terms = resolvePickupTerms({
@@ -461,7 +463,12 @@ export async function transitionInventoryItemAs(
     pickupPlace,
     pickupNote,
   });
-  await transitionItem(viewer, { ...input, ...terms }, undefined, opts);
+  await transitionItem(
+    viewer,
+    { ...input, ...terms, dueAt: dueAtForDay(dueDay) },
+    undefined,
+    opts
+  );
   return { ok: true as const };
 }
 

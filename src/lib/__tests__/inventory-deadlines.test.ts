@@ -5,6 +5,7 @@ import {
   type DeadlineEntry,
   deadlineOf,
   deadlinePairOf,
+  dueAtForDay,
   isOverdue,
   needsAttention,
   overdueFlags,
@@ -14,6 +15,49 @@ import {
 const NOW = new Date("2026-08-11T12:00:00Z").getTime();
 const BEFORE = new Date(NOW - 1000);
 const AFTER = new Date(NOW + 1000);
+
+describe("dueAtForDay", () => {
+  it("is the end of the day in Corvallis, not UTC midnight (#805)", () => {
+    const due = dueAtForDay("2026-10-25");
+    expect(due?.toISOString()).toBe("2026-10-26T06:59:59.999Z");
+    const checkedOut = { status: "checked_out", pickupBy: null, dueAt: due };
+    // 11 pm Pacific on the 25th, then just past midnight into the 26th.
+    const elevenPm = new Date("2026-10-26T06:00:00Z").getTime();
+    const midnight = new Date("2026-10-26T07:00:00Z").getTime();
+    expect(overdueFlags(checkedOut, elevenPm).checkoutOverdue).toBe(false);
+    expect(overdueFlags(checkedOut, midnight).checkoutOverdue).toBe(true);
+  });
+
+  it("keeps the picked day across both DST changes", () => {
+    // Fall back on 2026-11-01: the day before ends on PDT, the day itself
+    // on PST, an hour later in UTC.
+    expect(dueAtForDay("2026-10-31")?.toISOString()).toBe(
+      "2026-11-01T06:59:59.999Z"
+    );
+    expect(dueAtForDay("2026-11-01")?.toISOString()).toBe(
+      "2026-11-02T07:59:59.999Z"
+    );
+    // Spring forward on 2026-03-08: the reverse.
+    expect(dueAtForDay("2026-03-07")?.toISOString()).toBe(
+      "2026-03-08T07:59:59.999Z"
+    );
+    expect(dueAtForDay("2026-03-08")?.toISOString()).toBe(
+      "2026-03-09T06:59:59.999Z"
+    );
+  });
+
+  it("reads blank as no due date", () => {
+    expect(dueAtForDay(null)).toBeNull();
+    expect(dueAtForDay("")).toBeNull();
+    expect(dueAtForDay("  ")).toBeNull();
+  });
+
+  it("refuses a day that is not on the calendar", () => {
+    expect(() => dueAtForDay("2026-02-31")).toThrow(
+      "Pick a due date that is on the calendar."
+    );
+  });
+});
 
 describe("overdueFlags", () => {
   it("flags a reserved item once its pickup window has passed", () => {

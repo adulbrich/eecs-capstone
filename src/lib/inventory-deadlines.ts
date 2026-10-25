@@ -13,6 +13,27 @@
  * Deadlines are informational columns and overdue is derived at query time,
  * which is why this is a rule rather than a stored flag.
  */
+import { dayEnd, shiftDay } from "./day-range";
+
+/**
+ * The deadline a due date picked as a day stands for: the last millisecond
+ * of that day in the office's zone. Reading "2026-10-25" as UTC midnight made
+ * the item overdue at 5 pm on the 24th and showed the 24th on the page while
+ * the email said the 25th (#805). Blank means no due date; the workflow
+ * decides whether the transition may go without one.
+ */
+export function dueAtForDay(day: string | null | undefined): Date | null {
+  const picked = day?.trim() || null;
+  if (!picked) {
+    return null;
+  }
+  // The wire shape lets "2026-02-31" through, and the arithmetic would read
+  // it as March 3; `resolvePickupWindow` refuses it the same way.
+  if (shiftDay(picked, 0) !== picked) {
+    throw new Error("Pick a due date that is on the calendar.");
+  }
+  return dayEnd(picked);
+}
 
 /**
  * The three fields the overdue rule reads.

@@ -18,6 +18,7 @@ import {
   type InventoryNotice,
   toNotificationRow,
 } from "#/lib/inventory-notifications";
+import { resolvePickupWindow } from "#/lib/pickup-window";
 import type { Viewer } from "#/lib/viewer";
 import type { EmailOptions } from "./email-dispatch";
 import {
@@ -270,7 +271,7 @@ export async function fulfillCustomLineAs(
     customLineId: string;
     itemIds: string[];
     outcomeNote: string | null;
-    pickupBy: Date | null;
+    pickupDay: string | null;
     reserve: boolean;
   },
   opts?: EmailOptions
@@ -310,7 +311,16 @@ export async function fulfillCustomLineAs(
         items.map((item) => ({ customLineId: line.id, itemId: item.id }))
       );
 
-    const pickupBy = data.reserve ? (data.pickupBy ?? defaultPickupBy()) : null;
+    // A day alone is the whole of that day in the office's zone, refused if
+    // it is off the calendar or already over, as on the approve paths (#805).
+    // Resolved after the transition check, so a refusal never outranks it.
+    const pickupBy = data.reserve
+      ? (resolvePickupWindow({
+          pickupDay: data.pickupDay,
+          pickupFromTime: null,
+          pickupToTime: null,
+        }).pickupBy ?? defaultPickupBy())
+      : null;
     if (pickupBy) {
       for (const item of items) {
         await transitionItem(
@@ -451,7 +461,7 @@ export async function fulfillCustomLineForCurrentUser(data: {
   customLineId: string;
   itemIds: string[];
   outcomeNote: string | null;
-  pickupBy: Date | null;
+  pickupDay: string | null;
   reserve: boolean;
   sendEmail: boolean;
 }) {

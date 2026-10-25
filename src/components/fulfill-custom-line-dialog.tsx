@@ -147,7 +147,8 @@ export function FulfillCustomLineDialog({
           customLineId: line.id,
           itemIds: chosen.map((item) => item.id),
           outcomeNote: note.trim() ? note : null,
-          pickupBy: reserve && pickupBy ? new Date(pickupBy) : null,
+          // The day as picked; the server reads it in the office's zone.
+          pickupDay: reserve && pickupBy ? pickupBy : null,
           reserve,
           sendEmail,
         },

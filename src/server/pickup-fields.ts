@@ -3,6 +3,18 @@ import { TIME_PATTERN } from "#/lib/day-range";
 import { DAY_PATTERN } from "#/lib/report-range";
 
 /**
+ * A calendar day as a date input sends it, `YYYY-MM-DD`, for the server to
+ * read in the office's zone. Blank ("") and null both mean unset. The due
+ * date takes the same shape for the same reason (#805).
+ */
+export const OFFICE_DAY = z
+  .string()
+  .regex(DAY_PATTERN)
+  .or(z.literal(""))
+  .nullable()
+  .default(null);
+
+/**
  * The pickup terms staff send with an approval or a reserve (#799), spread
  * into the wire schema beside `SEND_EMAIL_FIELD`.
  *
@@ -14,12 +26,7 @@ import { DAY_PATTERN } from "#/lib/report-range";
  * `src/lib/pickup-window.ts`, where the unit test can reach them.
  */
 export const PICKUP_FIELDS = {
-  pickupDay: z
-    .string()
-    .regex(DAY_PATTERN)
-    .or(z.literal(""))
-    .nullable()
-    .default(null),
+  pickupDay: OFFICE_DAY,
   pickupFromTime: z
     .string()
     .regex(TIME_PATTERN)
