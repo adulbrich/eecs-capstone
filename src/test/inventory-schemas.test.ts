@@ -1,7 +1,11 @@
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
-import { itemPayloadSchema, transitionSchema } from "#/server/inventory";
-import { refuseStaleDayField } from "#/server/pickup-fields";
+import {
+  itemPayloadSchema,
+  parseTransitionInput,
+  transitionSchema,
+} from "#/server/inventory";
+import { parseFulfillCustomLineInput } from "#/server/inventory-custom";
 
 const rejectSchema = z.object({
   requestItemId: z.string().uuid(),
@@ -124,21 +128,48 @@ describe("inventory schemas", () => {
   });
 });
 
-describe("refuseStaleDayField", () => {
-  // A tab loaded before #805 sends the picked day under the old name, which
-  // the schema would drop silently.
-  it("refuses a payload that still carries the old day field", () => {
+describe("a tab loaded before #805", () => {
+  // It sends the picked day under the old name, which the schema would drop
+  // silently: a Fulfil would reserve with the seven-day default instead.
+  const STALE = "This page is out of date. Reload it and pick the day again.";
+  const ITEM = "11111111-1111-4111-8111-111111111111";
+  const LINE = "22222222-2222-4222-8222-222222222222";
+
+  it("is refused when it sends a picked day", () => {
     expect(() =>
-      refuseStaleDayField({ pickupBy: "2026-10-25T00:00:00.000Z" }, "pickupBy")
-    ).toThrow("This page is out of date. Reload it and pick the day again.");
+      parseTransitionInput({
+        itemId: ITEM,
+        nextStatus: "checked_out",
+        holderLabel: "Lab 204",
+        dueAt: "2026-10-25T00:00:00.000Z",
+      })
+    ).toThrow(STALE);
     expect(() =>
-      refuseStaleDayField({ dueAt: "2026-10-25T00:00:00.000Z" }, "dueAt")
-    ).toThrow("This page is out of date.");
+      parseFulfillCustomLineInput({
+        customLineId: LINE,
+        itemIds: [ITEM],
+        pickupBy: "2026-10-25T00:00:00.000Z",
+      })
+    ).toThrow(STALE);
   });
 
-  it("passes a current payload through untouched", () => {
-    const current = { dueDay: "2026-10-25" };
-    expect(refuseStaleDayField(current, "dueAt")).toBe(current);
-    expect(refuseStaleDayField(null, "dueAt")).toBeNull();
+  it("goes through when it picked no day, which means the same today", () => {
+    // Old clients sent the key as null on every other transition, and on a
+    // Fulfil with reserve unticked or no day.
+    expect(
+      parseTransitionInput({
+        itemId: ITEM,
+        nextStatus: "available",
+        dueAt: null,
+      }).dueDay
+    ).toBeNull();
+    expect(
+      parseFulfillCustomLineInput({
+        customLineId: LINE,
+        itemIds: [ITEM],
+        pickupBy: null,
+        reserve: false,
+      }).pickupDay
+    ).toBeNull();
   });
 });

@@ -93,6 +93,17 @@ export function localDay(instant: Date, timeZone = OFFICE_TIME_ZONE): string {
   return `${parts.year}-${parts.month}-${parts.day}`;
 }
 
+/**
+ * The furthest day staff may set a deadline on, a pickup day or a due date:
+ * a year past the office's today, for a date input's `max` and the server's
+ * refusal alike. A year out is already no arrangement anyone keeps, and the
+ * calendar arithmetic here stops at year 9999 with a message staff should
+ * never read.
+ */
+export function lastDeadlineDay(now: number = Date.now()): string {
+  return shiftDay(localDay(new Date(now)), 365);
+}
+
 /** Midnight at the start of `day` in `timeZone`, as an instant. */
 export function dayStart(day: string, timeZone = OFFICE_TIME_ZONE): Date {
   return localInstant(day, "00:00", timeZone);

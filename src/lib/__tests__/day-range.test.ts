@@ -4,6 +4,8 @@ import {
   dayRange,
   dayStart,
   daysInclusive,
+  formatOfficeDay,
+  lastDeadlineDay,
   localDay,
   localInstant,
   shiftDay,
@@ -131,6 +133,22 @@ describe("calendar arithmetic", () => {
     expect(daysInclusive("2026-06-30", "2026-06-30")).toBe(1);
     expect(daysInclusive("2026-06-01", "2026-06-30")).toBe(30);
     expect(daysInclusive("2026-03-01", "2026-03-31")).toBe(31);
+  });
+});
+
+describe("lastDeadlineDay", () => {
+  it("counts the year from the Pacific day, not the UTC one", () => {
+    // 03:00Z on the 29th is 8 pm on the 28th in Corvallis.
+    expect(lastDeadlineDay(Date.parse("2026-10-29T03:00:00.000Z"))).toBe(
+      "2027-10-28"
+    );
+  });
+});
+
+describe("formatOfficeDay", () => {
+  it("names the Pacific day, which is the next day in UTC by evening", () => {
+    // The end of the 25th in Corvallis; already the 26th in UTC.
+    expect(formatOfficeDay("2026-10-26T06:59:59.999Z")).toBe("Oct 25, 2026");
   });
 });
 

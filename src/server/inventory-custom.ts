@@ -89,23 +89,26 @@ export const rejectCustomLine = createServerFn({ method: "POST" })
     return rejectCustomLineForCurrentUser(data);
   });
 
+const fulfillCustomLineSchema = z.object({
+  customLineId: lineId,
+  itemIds: z.array(z.string().uuid()).min(1).max(50),
+  outcomeNote: z.string().max(2000).nullable().default(null),
+  // The day alone, read in the office's zone like the approve paths' pickup
+  // day (#805); the window and place are #806.
+  pickupDay: OFFICE_DAY_FIELD,
+  // Ticked by default: the thing arrived for someone, and that someone is on
+  // the line.
+  reserve: z.boolean().default(true),
+  ...SEND_EMAIL_FIELD,
+});
+
+/** The endpoint's validator, exported so the stale-tab refusal is tested. */
+export function parseFulfillCustomLineInput(d: unknown) {
+  return fulfillCustomLineSchema.parse(refuseStaleDayField(d, "pickupBy"));
+}
+
 export const fulfillCustomLine = createServerFn({ method: "POST" })
-  .validator((d: unknown) =>
-    z
-      .object({
-        customLineId: lineId,
-        itemIds: z.array(z.string().uuid()).min(1).max(50),
-        outcomeNote: z.string().max(2000).nullable().default(null),
-        // The day alone, read in the office's zone like the approve paths'
-        // pickup day (#805); the window and place are #806.
-        pickupDay: OFFICE_DAY_FIELD,
-        // Ticked by default: the thing arrived for someone, and that someone
-        // is on the line.
-        reserve: z.boolean().default(true),
-        ...SEND_EMAIL_FIELD,
-      })
-      .parse(refuseStaleDayField(d, "pickupBy"))
-  )
+  .validator(parseFulfillCustomLineInput)
   .handler(async ({ data }) => {
     const { fulfillCustomLineForCurrentUser } = await import(
       "./_internal/inventory-custom"

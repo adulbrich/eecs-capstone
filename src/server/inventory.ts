@@ -375,10 +375,13 @@ export const transitionSchema = z.object({
 
 export type TransitionInventoryItemInput = z.infer<typeof transitionSchema>;
 
+/** The endpoint's validator, exported so the stale-tab refusal is tested. */
+export function parseTransitionInput(d: unknown): TransitionInventoryItemInput {
+  return transitionSchema.parse(refuseStaleDayField(d, "dueAt"));
+}
+
 export const transitionInventoryItem = createServerFn({ method: "POST" })
-  .validator((d: unknown) =>
-    transitionSchema.parse(refuseStaleDayField(d, "dueAt"))
-  )
+  .validator(parseTransitionInput)
   .handler(async ({ data }) => {
     const { transitionInventoryItemForCurrentUser } = await import(
       "./_internal/inventory-transitions"

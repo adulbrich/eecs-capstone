@@ -14,6 +14,7 @@
 import {
   dayEnd,
   formatOfficeDay,
+  lastDeadlineDay,
   localDay,
   localInstant,
   OFFICE_TIME_ZONE,
@@ -67,7 +68,7 @@ export function resolvePickupWindow(
   }
   // A year out is already no arrangement anyone keeps, and the calendar
   // arithmetic stops at year 9999 with a message staff should never read.
-  if (day > lastPickupDay(now)) {
+  if (day > lastDeadlineDay(now)) {
     throw new Error("Pick a pickup day within the next year.");
   }
   if (Boolean(from) !== Boolean(to)) {
@@ -114,11 +115,6 @@ export function resolvePickupTerms(
 /** A day picked today, as the office reads it, for a date input's `min`. */
 export function officeToday(now: number = Date.now()): string {
   return localDay(new Date(now));
-}
-
-/** The furthest pickup day staff may pick, for a date input's `max`. */
-export function lastPickupDay(now: number = Date.now()): string {
-  return shiftDay(officeToday(now), 365);
 }
 
 /**

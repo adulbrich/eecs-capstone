@@ -11,7 +11,7 @@ const DUE = new Date("2026-03-02T07:59:59.999Z");
 describe("ExpectedBack", () => {
   it("says when a checked-out item is expected back", () => {
     render(<ExpectedBack dueAt={DUE} status="checked_out" />);
-    // The office's day on the first render, server or browser (#805).
+    // The office's day on the first render, with no effect to wait for (#805).
     expect(
       screen.getByText(/Expected back on/).textContent?.replace(/\s+/g, " ")
     ).toBe("Expected back on Mar 1, 2026.");

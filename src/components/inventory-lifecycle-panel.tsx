@@ -1,12 +1,11 @@
 import { useRouter } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
-import { localDay } from "#/lib/day-range";
+import { lastDeadlineDay, localDay } from "#/lib/day-range";
 import {
   formatHoldDetailed,
   formatHoldShort,
   holdFromStoredRow,
 } from "#/lib/hold";
-import { lastDueDay } from "#/lib/inventory-deadlines";
 import {
   HARD_DELETE_HISTORY_REFUSAL,
   needsDueAt,
@@ -740,7 +739,7 @@ export function InventoryLifecyclePanel({
                 <Input
                   className="mt-1"
                   id="due-date"
-                  max={lastDueDay()}
+                  max={lastDeadlineDay()}
                   onChange={(e) => setDueDate(e.target.value)}
                   type="date"
                   value={dueDate}

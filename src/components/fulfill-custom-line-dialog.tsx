@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
-import { lastPickupDay, officeToday } from "#/lib/pickup-window";
+import { lastDeadlineDay } from "#/lib/day-range";
+import { officeToday } from "#/lib/pickup-window";
 import { useAction } from "#/lib/use-action";
 import { listAdminInventory } from "#/server/inventory";
 import { fulfillCustomLine } from "#/server/inventory-custom";
@@ -264,7 +265,7 @@ export function FulfillCustomLineDialog({
               {/* The bounds the server refuses outside of, as in PickupFields. */}
               <Input
                 id={`fulfil-pickup-${line.id}`}
-                max={lastPickupDay()}
+                max={lastDeadlineDay()}
                 min={officeToday()}
                 onChange={(e) => setPickupDay(e.target.value)}
                 type="date"

@@ -13,7 +13,7 @@
  * Deadlines are informational columns and overdue is derived at query time,
  * which is why this is a rule rather than a stored flag.
  */
-import { dayEnd, localDay, shiftDay } from "./day-range";
+import { dayEnd, lastDeadlineDay, shiftDay } from "./day-range";
 
 /**
  * The deadline a due date picked as a day stands for: the last millisecond
@@ -38,15 +38,10 @@ export function dueAtForDay(
   }
   // The same year as the pickup day, and for the same reason: the calendar
   // arithmetic stops at year 9999 with a message staff should never read.
-  if (picked > lastDueDay(now)) {
+  if (picked > lastDeadlineDay(now)) {
     throw new Error("Pick a due date within the next year.");
   }
   return dayEnd(picked);
-}
-
-/** The furthest due date staff may pick, for a date input's `max`. */
-export function lastDueDay(now: number = Date.now()): string {
-  return shiftDay(localDay(new Date(now)), 365);
 }
 
 /**

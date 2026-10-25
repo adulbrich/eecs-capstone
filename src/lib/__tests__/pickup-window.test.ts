@@ -1,7 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
   formatPickupWindow,
-  lastPickupDay,
   pickupContactSentence,
   pickupPhrase,
   pickupWindowInput,
@@ -179,15 +178,6 @@ describe("pickupWindowInput", () => {
       pickupFromTime: null,
       pickupToTime: null,
     });
-  });
-});
-
-describe("lastPickupDay", () => {
-  it("counts the year from the Pacific day, not the UTC one", () => {
-    // 03:00Z on the 29th is 8 pm on the 28th in Corvallis.
-    expect(lastPickupDay(Date.parse("2026-10-29T03:00:00.000Z"))).toBe(
-      "2027-10-28"
-    );
   });
 });
 

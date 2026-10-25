@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { lastDeadlineDay } from "../day-range";
 import {
   attentionSummary,
   compareByDeadline,
@@ -7,7 +8,6 @@ import {
   deadlinePairOf,
   dueAtForDay,
   isOverdue,
-  lastDueDay,
   needsAttention,
   overdueFlags,
 } from "../inventory-deadlines";
@@ -62,7 +62,7 @@ describe("dueAtForDay", () => {
   it("takes a past day, and refuses one more than a year out", () => {
     // NOW is the morning of 2026-08-11 in Corvallis.
     expect(dueAtForDay("2026-08-01", NOW)).not.toBeNull();
-    expect(lastDueDay(NOW)).toBe("2027-08-11");
+    expect(lastDeadlineDay(NOW)).toBe("2027-08-11");
     expect(dueAtForDay("2027-08-11", NOW)).not.toBeNull();
     expect(() => dueAtForDay("2027-08-12", NOW)).toThrow(
       "Pick a due date within the next year."
