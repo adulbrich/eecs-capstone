@@ -13,6 +13,7 @@
  */
 import {
   dayEnd,
+  formatOfficeDay,
   localDay,
   localInstant,
   OFFICE_TIME_ZONE,
@@ -161,7 +162,7 @@ export function formatPickupWindow(
     return null;
   }
   const by = new Date(pickupBy);
-  const date = DATE_FORMAT.format(by);
+  const date = formatOfficeDay(by);
   if (!pickupFrom) {
     return date;
   }
@@ -193,13 +194,6 @@ export function pickupContactSentence(
 ): string | null {
   return staffInbox ? `If this time doesn't work, email ${staffInbox}.` : null;
 }
-
-const DATE_FORMAT = new Intl.DateTimeFormat("en-US", {
-  day: "numeric",
-  month: "short",
-  timeZone: OFFICE_TIME_ZONE,
-  year: "numeric",
-});
 
 const TIME_FORMAT = new Intl.DateTimeFormat("en-US", {
   hour: "numeric",

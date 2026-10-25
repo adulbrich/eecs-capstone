@@ -25,7 +25,7 @@ import {
 } from "#/components/custom-line-actions";
 import { InventoryStatusBadge } from "#/components/inventory-status-badge";
 import { LineSheet, type LineSheetField } from "#/components/line-sheet";
-import { LocalTime } from "#/components/local-time";
+import { LocalTime, OfficeDate } from "#/components/local-time";
 import { SearchQueryNote, searchQueryNote } from "#/components/search-hint";
 import { Badge } from "#/components/ui/badge";
 import {
@@ -605,7 +605,7 @@ function sheetActions(
 }
 
 function dateOr(value: Date | null): ReactNode {
-  return value ? <LocalTime dateOnly value={value} /> : "-";
+  return value ? <OfficeDate value={value} /> : "-";
 }
 
 function textOr(value: string | null): ReactNode {

@@ -7,6 +7,7 @@ import {
   deadlinePairOf,
   dueAtForDay,
   isOverdue,
+  lastDueDay,
   needsAttention,
   overdueFlags,
 } from "../inventory-deadlines";
@@ -55,6 +56,20 @@ describe("dueAtForDay", () => {
   it("refuses a day that is not on the calendar", () => {
     expect(() => dueAtForDay("2026-02-31")).toThrow(
       "Pick a due date that is on the calendar."
+    );
+  });
+
+  it("takes a past day, and refuses one more than a year out", () => {
+    // NOW is the morning of 2026-08-11 in Corvallis.
+    expect(dueAtForDay("2026-08-01", NOW)).not.toBeNull();
+    expect(lastDueDay(NOW)).toBe("2027-08-11");
+    expect(dueAtForDay("2027-08-11", NOW)).not.toBeNull();
+    expect(() => dueAtForDay("2027-08-12", NOW)).toThrow(
+      "Pick a due date within the next year."
+    );
+    // Before the cap, the calendar arithmetic threw its own message here.
+    expect(() => dueAtForDay("9999-12-31", NOW)).toThrow(
+      "Pick a due date within the next year."
     );
   });
 });

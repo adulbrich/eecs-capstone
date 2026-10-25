@@ -1,6 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
-import { PICKUP_FIELDS } from "./pickup-fields";
+import { OFFICE_DAY_FIELD, refuseStaleDayField } from "./pickup-fields";
 import { SEND_EMAIL_FIELD } from "./send-email-field";
 
 /**
@@ -98,13 +98,13 @@ export const fulfillCustomLine = createServerFn({ method: "POST" })
         outcomeNote: z.string().max(2000).nullable().default(null),
         // The day alone, read in the office's zone like the approve paths'
         // pickup day (#805); the window and place are #806.
-        pickupDay: PICKUP_FIELDS.pickupDay,
+        pickupDay: OFFICE_DAY_FIELD,
         // Ticked by default: the thing arrived for someone, and that someone
         // is on the line.
         reserve: z.boolean().default(true),
         ...SEND_EMAIL_FIELD,
       })
-      .parse(d)
+      .parse(refuseStaleDayField(d, "pickupBy"))
   )
   .handler(async ({ data }) => {
     const { fulfillCustomLineForCurrentUser } = await import(

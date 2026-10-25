@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
 import { itemPayloadSchema, transitionSchema } from "#/server/inventory";
+import { refuseStaleDayField } from "#/server/pickup-fields";
 
 const rejectSchema = z.object({
   requestItemId: z.string().uuid(),
@@ -120,5 +121,24 @@ describe("inventory schemas", () => {
         reviewComment: "",
       })
     ).toThrow();
+  });
+});
+
+describe("refuseStaleDayField", () => {
+  // A tab loaded before #805 sends the picked day under the old name, which
+  // the schema would drop silently.
+  it("refuses a payload that still carries the old day field", () => {
+    expect(() =>
+      refuseStaleDayField({ pickupBy: "2026-10-25T00:00:00.000Z" }, "pickupBy")
+    ).toThrow("This page is out of date. Reload it and pick the day again.");
+    expect(() =>
+      refuseStaleDayField({ dueAt: "2026-10-25T00:00:00.000Z" }, "dueAt")
+    ).toThrow("This page is out of date.");
+  });
+
+  it("passes a current payload through untouched", () => {
+    const current = { dueDay: "2026-10-25" };
+    expect(refuseStaleDayField(current, "dueAt")).toBe(current);
+    expect(refuseStaleDayField(null, "dueAt")).toBeNull();
   });
 });

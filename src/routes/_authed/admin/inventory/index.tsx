@@ -18,7 +18,7 @@ import { FilterSwitch } from "#/components/filter-switch";
 import { INVENTORY_STATUS_OPTIONS } from "#/components/inventory-filters";
 import { InventoryStatusBadge } from "#/components/inventory-status-badge";
 import { ListingLayout } from "#/components/listing-layout";
-import { LocalTime } from "#/components/local-time";
+import { LocalTime, OfficeDate } from "#/components/local-time";
 import { OverdueBadge } from "#/components/overdue-badge";
 import { SearchHint } from "#/components/search-hint";
 import {
@@ -317,11 +317,7 @@ export const COLUMNS = defineAdminColumns<Row>()([
   {
     accessorFn: (row) => row.dueAt ?? undefined,
     cell: ({ row }) =>
-      row.original.dueAt ? (
-        <LocalTime dateOnly value={row.original.dueAt} />
-      ) : (
-        "-"
-      ),
+      row.original.dueAt ? <OfficeDate value={row.original.dueAt} /> : "-",
     header: "Due",
     id: "dueAt",
     // Values arrive as Date instances (or ISO strings); the locale-compare

@@ -1970,7 +1970,7 @@ describe("staff-assigned holds without a request line", () => {
     expect(after.currentDueAt?.getTime()).toBe(dueAt.getTime());
   });
 
-  it("stores a due day from the item page as the end of that day in Corvallis", async () => {
+  it("stores a due date picked on the item page as the end of that day in Corvallis", async () => {
     const admin = await makeUser(`wi-due-${Date.now()}@x.com`, "admin");
     const item = await makeItem();
     // The wire shape the lifecycle dialog sends: the day, never a Date (#805).

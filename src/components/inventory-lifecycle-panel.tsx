@@ -6,6 +6,7 @@ import {
   formatHoldShort,
   holdFromStoredRow,
 } from "#/lib/hold";
+import { lastDueDay } from "#/lib/inventory-deadlines";
 import {
   HARD_DELETE_HISTORY_REFUSAL,
   needsDueAt,
@@ -739,6 +740,7 @@ export function InventoryLifecyclePanel({
                 <Input
                   className="mt-1"
                   id="due-date"
+                  max={lastDueDay()}
                   onChange={(e) => setDueDate(e.target.value)}
                   type="date"
                   value={dueDate}

@@ -69,8 +69,8 @@ test.describe("inventory overdue derivation", () => {
       await expect(entry.getByText("Overdue", { exact: true })).toBeVisible();
 
       // The date itself, off the `datetime` attribute rather than the rendered
-      // text: LocalTime switches to the reader's locale in an effect, so the
-      // visible string depends on the machine running the test and the ISO
+      // text: the fixture's due date is not the end of a day, so the day
+      // OfficeDate shows depends on the hour the test runs, and the ISO
       // attribute does not.
       await expect(entry.locator("time")).toHaveAttribute(
         "datetime",

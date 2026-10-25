@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { formatOfficeDay } from "#/lib/day-range";
 
 /**
  * Renders a timestamp without tripping hydration.
@@ -22,6 +23,24 @@ function utcText(iso: string, dateOnly: boolean): string {
   return dateOnly
     ? iso.slice(0, 10)
     : `${iso.slice(0, 10)} ${iso.slice(11, 16)} UTC`;
+}
+
+/**
+ * A deadline staff picked as a day, such as a due date, rendered as that day
+ * in the office's zone. The server and the browser format it alike, so it
+ * needs no effect, and the reader's zone does not move it: the end of the
+ * 25th in Corvallis is the 26th in UTC and in New York (#805).
+ */
+export function OfficeDate({
+  value,
+}: {
+  value: Date | string | null | undefined;
+}) {
+  const iso = value === null || value === undefined ? null : isoOf(value);
+  if (!iso) {
+    return null;
+  }
+  return <time dateTime={iso}>{formatOfficeDay(iso)}</time>;
 }
 
 export function LocalTime({

@@ -13,7 +13,7 @@ import {
 } from "#/components/admin-data-table";
 import { InventoryStatusBadge } from "#/components/inventory-status-badge";
 import { LineSheet, type LineSheetField } from "#/components/line-sheet";
-import { LocalTime } from "#/components/local-time";
+import { LocalTime, OfficeDate } from "#/components/local-time";
 import { NeedsAttention } from "#/components/my-items-attention";
 import { OverdueBadge } from "#/components/overdue-badge";
 import { SubmitBorrowListDialog } from "#/components/submit-borrow-list-dialog";
@@ -228,7 +228,7 @@ function DeadlineCell({ row }: { row: Row }) {
   if (pair.dueAt) {
     return (
       <>
-        Due <LocalTime dateOnly value={pair.dueAt} />
+        Due <OfficeDate value={pair.dueAt} />
       </>
     );
   }
@@ -721,7 +721,7 @@ function fieldsOf(row: Row, staffInbox: string | null): LineSheetField[] {
       : []),
     {
       label: "Due",
-      value: pair.dueAt ? <LocalTime dateOnly value={pair.dueAt} /> : "-",
+      value: pair.dueAt ? <OfficeDate value={pair.dueAt} /> : "-",
     },
     ...(row.kind === "request"
       ? [
