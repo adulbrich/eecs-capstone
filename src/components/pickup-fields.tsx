@@ -1,8 +1,5 @@
-import {
-  lastPickupDay,
-  officeToday,
-  pickupWindowInput,
-} from "#/lib/pickup-window";
+import { lastDeadlineDay } from "#/lib/day-range";
+import { officeToday, pickupWindowInput } from "#/lib/pickup-window";
 import { Input } from "./ui/input";
 import { Label } from "./ui/label";
 import { Textarea } from "./ui/textarea";
@@ -100,7 +97,7 @@ export function PickupFields({
         <Input
           disabled={disabled}
           id={`${idPrefix}-day`}
-          max={lastPickupDay()}
+          max={lastDeadlineDay()}
           min={officeToday()}
           onChange={field("day")}
           type="date"

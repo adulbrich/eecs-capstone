@@ -673,9 +673,9 @@ An envelope holds item lines or custom lines, so a join to `inventory_request_it
 
 `approveRequestLinesAs` sorts the ids and approves all in one transaction, each line then its item, so overlapping batches wait instead of deadlocking. One line no longer pending fails the batch, since the ids are what staff confirmed.
 
-### Pickup terms are strings on the wire and instants in the approve `*As`
+### Pickup terms and due dates are strings on the wire and instants in the approve `*As`
 
-`PICKUP_FIELDS` takes the day and times as `YYYY-MM-DD` and `HH:MM` strings; never `z.coerce.date()` for a day, which reads it as UTC midnight, the evening before in Corvallis (#805). `resolvePickupTerms` (`src/lib/pickup-window.ts`) composes them and refuses a window that has ended. The approve wrappers call it, so `approveRequestItemAs` and `approveRequestLinesAs` take instants and the seed can still build overdue fixtures with past dates. `transitionInventoryItemAs` takes the strings and calls it itself; seed and tests reach `transitionItem` directly. Render a window with `pickupPhrase` or `formatPickupWindow`, which pin the office zone and need no `LocalTime`. Approve all never prefills the pickup place (ADR-0065).
+`PICKUP_FIELDS` takes the day and times as `YYYY-MM-DD` and `HH:MM` strings; never `z.coerce.date()` for a day, which reads it as UTC midnight, the evening before in Corvallis (#805). `resolvePickupTerms` (`src/lib/pickup-window.ts`) composes them and refuses a window that has ended. The approve wrappers call it, so `approveRequestItemAs` and `approveRequestLinesAs` take instants and the seed can still build overdue fixtures with past dates. `transitionInventoryItemAs` takes the strings and calls it itself, with `dueDay` through `dueAtForDay`; so does `fulfillCustomLineAs` with `pickupDay`. Seed and tests reach `transitionItem` directly. Render a window with `pickupPhrase` or `formatPickupWindow` and a due date with `OfficeDate`, which pin the office zone; `LocalTime dateOnly` shows the end of a Pacific day as the next day. Approve all never prefills the pickup place (ADR-0065).
 
 ### submitCart is lock-first
 

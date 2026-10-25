@@ -66,6 +66,23 @@ function parseDay(day: string): [number, number, number] {
   return [Number(m[1]), Number(m[2]), Number(m[3])];
 }
 
+const OFFICE_DAY_FORMAT = new Intl.DateTimeFormat("en-US", {
+  day: "numeric",
+  month: "short",
+  timeZone: OFFICE_TIME_ZONE,
+  year: "numeric",
+});
+
+/**
+ * The day `instant` falls on in the office's zone, as "Oct 25, 2026": the
+ * same bytes on the server and in every browser. A deadline staff picked as a
+ * day is the end of that day in Corvallis, so the reader's own zone would
+ * move it to the next day anywhere east of here (#805).
+ */
+export function formatOfficeDay(instant: Date | string): string {
+  return OFFICE_DAY_FORMAT.format(new Date(instant));
+}
+
 /** The calendar day `instant` falls on in `timeZone`, as `YYYY-MM-DD`. */
 export function localDay(instant: Date, timeZone = OFFICE_TIME_ZONE): string {
   const parts = Object.fromEntries(
@@ -74,6 +91,17 @@ export function localDay(instant: Date, timeZone = OFFICE_TIME_ZONE): string {
       .map((p) => [p.type, p.value])
   );
   return `${parts.year}-${parts.month}-${parts.day}`;
+}
+
+/**
+ * The furthest day staff may set a deadline on, a pickup day or a due date:
+ * a year past the office's today, for a date input's `max` and the server's
+ * refusal alike. A year out is already no arrangement anyone keeps, and the
+ * calendar arithmetic here stops at year 9999 with a message staff should
+ * never read.
+ */
+export function lastDeadlineDay(now: number = Date.now()): string {
+  return shiftDay(localDay(new Date(now)), 365);
 }
 
 /** Midnight at the start of `day` in `timeZone`, as an instant. */

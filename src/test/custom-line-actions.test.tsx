@@ -677,7 +677,7 @@ describe("FulfillCustomLineDialog", () => {
         customLineId: "c-1",
         itemIds: ["i-1"],
         outcomeNote: null,
-        pickupBy: new Date("2026-10-01"),
+        pickupDay: "2026-10-01",
         reserve: true,
         sendEmail: true,
       },

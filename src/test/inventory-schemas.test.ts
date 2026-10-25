@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
-import { itemPayloadSchema, transitionSchema } from "#/server/inventory";
+import {
+  itemPayloadSchema,
+  parseTransitionInput,
+  transitionSchema,
+} from "#/server/inventory";
+import { parseFulfillCustomLineInput } from "#/server/inventory-custom";
 
 const rejectSchema = z.object({
   requestItemId: z.string().uuid(),
@@ -44,7 +49,8 @@ describe("transitionSchema is the staff gate", () => {
   it("keeps exactly the fields it declares", () => {
     expect(Object.keys(transitionSchema.parse(valid)).sort()).toEqual([
       "comment",
-      "dueAt",
+      // The due date as the day picked (#805); composed on the server.
+      "dueDay",
       "holderEmail",
       "holderLabel",
       "holderName",
@@ -119,5 +125,51 @@ describe("inventory schemas", () => {
         reviewComment: "",
       })
     ).toThrow();
+  });
+});
+
+describe("a tab loaded before #805", () => {
+  // It sends the picked day under the old name, which the schema would drop
+  // silently: a Fulfil would reserve with the seven-day default instead.
+  const STALE = "This page is out of date. Reload it and pick the day again.";
+  const ITEM = "11111111-1111-4111-8111-111111111111";
+  const LINE = "22222222-2222-4222-8222-222222222222";
+
+  it("is refused when it sends a picked day", () => {
+    expect(() =>
+      parseTransitionInput({
+        itemId: ITEM,
+        nextStatus: "checked_out",
+        holderLabel: "Lab 204",
+        dueAt: "2026-10-25T00:00:00.000Z",
+      })
+    ).toThrow(STALE);
+    expect(() =>
+      parseFulfillCustomLineInput({
+        customLineId: LINE,
+        itemIds: [ITEM],
+        pickupBy: "2026-10-25T00:00:00.000Z",
+      })
+    ).toThrow(STALE);
+  });
+
+  it("goes through when it picked no day, which means the same today", () => {
+    // Old clients sent the key as null on every other transition, and on a
+    // Fulfil with reserve unticked or no day.
+    expect(
+      parseTransitionInput({
+        itemId: ITEM,
+        nextStatus: "available",
+        dueAt: null,
+      }).dueDay
+    ).toBeNull();
+    expect(
+      parseFulfillCustomLineInput({
+        customLineId: LINE,
+        itemIds: [ITEM],
+        pickupBy: null,
+        reserve: false,
+      }).pickupDay
+    ).toBeNull();
   });
 });

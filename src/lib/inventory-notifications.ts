@@ -17,6 +17,7 @@
  * that makes this file client-safe.
  */
 
+import { formatOfficeDay } from "./day-range";
 import { overdueFlags } from "./inventory-deadlines";
 import type { NotificationRow } from "./notification-row";
 import {
@@ -117,13 +118,10 @@ function formatDate(d: Date | null | undefined): string {
   if (!d) {
     return "soon";
   }
-  // `new Date(d)` rather than `d.toLocaleDateString` directly: a caller can
-  // hand this a date that arrived as a string over the wire.
-  return new Date(d).toLocaleDateString("en-US", {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-  });
+  // The office's zone, not the server's UTC, so the email names the day the
+  // page shows. Takes a string too: a caller can hand this a date that
+  // arrived over the wire.
+  return formatOfficeDay(d);
 }
 
 /**

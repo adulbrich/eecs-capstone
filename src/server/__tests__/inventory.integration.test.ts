@@ -48,8 +48,11 @@ import {
   cancelRequestItemAs,
   rejectRequestItemAs,
 } from "#/server/_internal/inventory-requests";
-import { transitionItem } from "#/server/_internal/inventory-transitions";
-import { itemPayloadSchema } from "#/server/inventory";
+import {
+  transitionInventoryItemAs,
+  transitionItem,
+} from "#/server/_internal/inventory-transitions";
+import { itemPayloadSchema, transitionSchema } from "#/server/inventory";
 
 async function makeUser(email: string, role: UserRole) {
   await auth.api.createUser({
@@ -1965,6 +1968,27 @@ describe("staff-assigned holds without a request line", () => {
     // The due date has to survive on the item itself; before this existed it
     // could only live on a request line the item never had.
     expect(after.currentDueAt?.getTime()).toBe(dueAt.getTime());
+  });
+
+  it("stores a due date picked on the item page as the end of that day in Corvallis", async () => {
+    const admin = await makeUser(`wi-due-${Date.now()}@x.com`, "admin");
+    const item = await makeItem();
+    // The wire shape the lifecycle dialog sends: the day, never a Date (#805).
+    const { sendEmail, ...fields } = transitionSchema.parse({
+      itemId: item.id,
+      nextStatus: "checked_out",
+      holderLabel: "Lab 204",
+      dueDay: "2026-11-01",
+    });
+
+    await transitionInventoryItemAs(admin, fields, { sendEmail });
+
+    const [after] = await db
+      .select()
+      .from(inventoryItems)
+      .where(eq(inventoryItems.id, item.id));
+    // Fall back day, so the end is on PST: midnight Pacific is 08:00 UTC.
+    expect(after.currentDueAt?.toISOString()).toBe("2026-11-02T07:59:59.999Z");
   });
 
   it("resolves an assigned email to the matching account and notifies it", async () => {

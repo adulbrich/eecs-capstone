@@ -8,7 +8,11 @@ import {
   INVENTORY_ITEM_STATUSES,
   INVENTORY_REQUEST_ITEM_STATUSES,
 } from "#/lib/vocabularies";
-import { PICKUP_FIELDS } from "./pickup-fields";
+import {
+  OFFICE_DAY_FIELD,
+  PICKUP_FIELDS,
+  refuseStaleDayField,
+} from "./pickup-fields";
 import { SEND_EMAIL_FIELD } from "./send-email-field";
 
 function expectFormData(data: unknown): FormData {
@@ -360,7 +364,9 @@ export const transitionSchema = z.object({
   // The pickup window as strings, never a coerced date; composed in the
   // office's zone before it reaches transitionItem.
   ...PICKUP_FIELDS,
-  dueAt: z.coerce.date().nullable().default(null),
+  // The due date as the day staff picked, composed into the end of that day
+  // in the office's zone by `dueAtForDay`, never a coerced date (#805).
+  dueDay: OFFICE_DAY_FIELD,
   comment: z.string().max(2000).nullable().default(null),
   // The email-only skip (#387), never `silent`: that one suppresses the bell
   // row too and stays internal.
@@ -369,8 +375,13 @@ export const transitionSchema = z.object({
 
 export type TransitionInventoryItemInput = z.infer<typeof transitionSchema>;
 
+/** The endpoint's validator, exported so the stale-tab refusal is tested. */
+export function parseTransitionInput(d: unknown) {
+  return transitionSchema.parse(refuseStaleDayField(d, "dueAt"));
+}
+
 export const transitionInventoryItem = createServerFn({ method: "POST" })
-  .validator((d: unknown) => transitionSchema.parse(d))
+  .validator(parseTransitionInput)
   .handler(async ({ data }) => {
     const { transitionInventoryItemForCurrentUser } = await import(
       "./_internal/inventory-transitions"

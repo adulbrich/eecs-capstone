@@ -13,6 +13,8 @@
  */
 import {
   dayEnd,
+  formatOfficeDay,
+  lastDeadlineDay,
   localDay,
   localInstant,
   OFFICE_TIME_ZONE,
@@ -64,9 +66,7 @@ export function resolvePickupWindow(
   if (shiftDay(day, 0) !== day) {
     throw new Error("Pick a pickup day that is on the calendar.");
   }
-  // A year out is already no arrangement anyone keeps, and the calendar
-  // arithmetic stops at year 9999 with a message staff should never read.
-  if (day > lastPickupDay(now)) {
+  if (day > lastDeadlineDay(now)) {
     throw new Error("Pick a pickup day within the next year.");
   }
   if (Boolean(from) !== Boolean(to)) {
@@ -115,11 +115,6 @@ export function officeToday(now: number = Date.now()): string {
   return localDay(new Date(now));
 }
 
-/** The furthest pickup day staff may pick, for a date input's `max`. */
-export function lastPickupDay(now: number = Date.now()): string {
-  return shiftDay(officeToday(now), 365);
-}
-
 /**
  * The fields that would reproduce a stored window, for a dialog reopened on
  * an item that already has one. A deadline with no start (a day alone, or the
@@ -161,7 +156,7 @@ export function formatPickupWindow(
     return null;
   }
   const by = new Date(pickupBy);
-  const date = DATE_FORMAT.format(by);
+  const date = formatOfficeDay(by);
   if (!pickupFrom) {
     return date;
   }
@@ -193,13 +188,6 @@ export function pickupContactSentence(
 ): string | null {
   return staffInbox ? `If this time doesn't work, email ${staffInbox}.` : null;
 }
-
-const DATE_FORMAT = new Intl.DateTimeFormat("en-US", {
-  day: "numeric",
-  month: "short",
-  timeZone: OFFICE_TIME_ZONE,
-  year: "numeric",
-});
 
 const TIME_FORMAT = new Intl.DateTimeFormat("en-US", {
   hour: "numeric",

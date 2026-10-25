@@ -11,6 +11,8 @@ import {
   user,
 } from "#/db/schema";
 import { auth } from "#/lib/auth";
+import { dayEnd, shiftDay } from "#/lib/day-range";
+import { officeToday } from "#/lib/pickup-window";
 import type { UserRole } from "#/lib/vocabularies";
 import { countPendingRequests } from "#/server/_internal/admin";
 import { addToCartAs, submitCartAs } from "#/server/_internal/inventory-cart";
@@ -308,13 +310,16 @@ describe("fulfillCustomLineAs", () => {
       customLineId: id,
       sourcingNote: "Ordered",
     });
-    const pickupBy = new Date("2026-10-01T00:00:00.000Z");
+    // A week out, so the day is never already over when the suite runs.
+    const pickupDay = shiftDay(officeToday(), 7);
+    // The day picked is the whole of that day in Corvallis (#805).
+    const pickupBy = dayEnd(pickupDay);
 
     const result = await fulfillCustomLineAs(fulfiller, {
       customLineId: id,
       itemIds: [two.id, one.id],
       outcomeNote: "On the shelf by the door",
-      pickupBy,
+      pickupDay,
       reserve: true,
     });
 
@@ -367,7 +372,7 @@ describe("fulfillCustomLineAs", () => {
       customLineId: id,
       itemIds: [item.id],
       outcomeNote: null,
-      pickupBy: null,
+      pickupDay: null,
       reserve: false,
     });
     const line = await lineById(id);
@@ -409,7 +414,7 @@ describe("fulfillCustomLineAs", () => {
         customLineId: id,
         itemIds: [free.id, taken.id],
         outcomeNote: null,
-        pickupBy: null,
+        pickupDay: null,
         reserve: true,
       })
     ).rejects.toThrow(`Taken ${stamp} is not available`);
@@ -444,7 +449,7 @@ describe("fulfillCustomLineAs", () => {
         customLineId: id,
         itemIds: [item.id],
         outcomeNote: null,
-        pickupBy: null,
+        pickupDay: null,
         reserve: true,
       })
     ).rejects.toThrow("Forbidden");
@@ -521,7 +526,7 @@ describe("the queue with both kinds", () => {
       customLineId: custom,
       itemIds: [item.id],
       outcomeNote: null,
-      pickupBy: null,
+      pickupDay: null,
       reserve: true,
     });
     const rows = await listInventoryRequestsAs(staff, {
@@ -567,7 +572,7 @@ describe("custom requests on my items", () => {
       customLineId: lineIds[0],
       itemIds: [produced.id],
       outcomeNote: "On the shelf",
-      pickupBy: null,
+      pickupDay: null,
       reserve: true,
     });
 
@@ -676,7 +681,7 @@ describe("custom line emails", () => {
         customLineId: lineIds[0],
         itemIds: [item.id],
         outcomeNote: "Arrived",
-        pickupBy: null,
+        pickupDay: null,
         reserve: true,
       },
       { send }
@@ -723,7 +728,7 @@ describe("custom line email skip (#387)", () => {
         customLineId: lineIds[0],
         itemIds: [item.id],
         outcomeNote: null,
-        pickupBy: null,
+        pickupDay: null,
         reserve: true,
       },
       { send, sendEmail: false }

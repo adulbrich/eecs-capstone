@@ -1,4 +1,4 @@
-import { LocalTime } from "./local-time";
+import { OfficeDate } from "./local-time";
 
 /**
  * When an unavailable item might be back, for whoever is reading the item
@@ -21,7 +21,7 @@ export function ExpectedBack({
   }
   return (
     <p className="mt-2 text-muted-foreground text-sm">
-      Expected back on <LocalTime dateOnly value={dueAt} />.
+      Expected back on <OfficeDate value={dueAt} />.
     </p>
   );
 }

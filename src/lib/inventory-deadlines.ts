@@ -1,6 +1,6 @@
 /**
- * Deadlines on inventory items: whether one is overdue, and how a list of
- * them is ordered.
+ * Deadlines on inventory items: what a due date picked as a day stands for,
+ * whether one is overdue, and how a list of them is ordered.
  *
  * Pure and client-safe, like `hold.ts`, `inventory-notifications.ts`,
  * `inventory-visibility.ts` and `inventory-workflow.ts`, and for the same
@@ -13,6 +13,34 @@
  * Deadlines are informational columns and overdue is derived at query time,
  * which is why this is a rule rather than a stored flag.
  */
+import { dayEnd, lastDeadlineDay, shiftDay } from "./day-range";
+
+/**
+ * The deadline a due date picked as a day stands for: the last millisecond
+ * of that day in the office's zone. Reading "2026-10-25" as UTC midnight made
+ * the item overdue at 5 pm on the 24th and showed the 24th on the page while
+ * the email said the 25th (#805). Blank means no due date; the workflow
+ * decides whether the transition may go without one. A past day is allowed,
+ * as it always was; `now` only bounds how far out the day may be.
+ */
+export function dueAtForDay(
+  day: string | null | undefined,
+  now: number = Date.now()
+): Date | null {
+  const picked = day?.trim() || null;
+  if (!picked) {
+    return null;
+  }
+  // The wire shape lets "2026-02-31" through, and the arithmetic would read
+  // it as March 3; `resolvePickupWindow` refuses it the same way.
+  if (shiftDay(picked, 0) !== picked) {
+    throw new Error("Pick a due date that is on the calendar.");
+  }
+  if (picked > lastDeadlineDay(now)) {
+    throw new Error("Pick a due date within the next year.");
+  }
+  return dayEnd(picked);
+}
 
 /**
  * The three fields the overdue rule reads.

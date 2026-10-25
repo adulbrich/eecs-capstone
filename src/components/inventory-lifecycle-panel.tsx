@@ -1,5 +1,6 @@
 import { useRouter } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
+import { lastDeadlineDay, localDay } from "#/lib/day-range";
 import {
   formatHoldDetailed,
   formatHoldShort,
@@ -113,13 +114,17 @@ interface Props {
   };
 }
 
-/** `<input type="date">` speaks YYYY-MM-DD, and reads back as UTC midnight. */
+/**
+ * The day a stored due date falls on in the office's zone, as the
+ * `YYYY-MM-DD` an `<input type="date">` takes. The UTC day would read the end
+ * of the 25th, Pacific, as the 26th (#805).
+ */
 function toDateInput(value: Date | string | null | undefined): string {
   if (!value) {
     return "";
   }
   const date = value instanceof Date ? value : new Date(value);
-  return Number.isNaN(date.getTime()) ? "" : date.toISOString().slice(0, 10);
+  return Number.isNaN(date.getTime()) ? "" : localDay(date);
 }
 
 /**
@@ -433,7 +438,7 @@ export function InventoryLifecyclePanel({
     holderName?: string | null;
     holderProgram?: string | null;
     pickup?: PickupFormValue;
-    dueAt?: Date | null;
+    dueDay?: string | null;
     comment?: string | null;
   }) {
     return await run(async () => {
@@ -448,7 +453,7 @@ export function InventoryLifecyclePanel({
           holderName: input.holderName ?? null,
           holderProgram: input.holderProgram ?? null,
           ...pickupPayload(input.pickup ?? EMPTY_PICKUP),
-          dueAt: input.dueAt ?? null,
+          dueDay: input.dueDay ?? null,
           comment: input.comment ?? null,
         },
       });
@@ -545,8 +550,8 @@ export function InventoryLifecyclePanel({
       requestItemId: holderRequired ? item.currentRequestItemId : null,
       ...holder,
       pickup: dlgTargetStatus === "reserved" ? pickup : EMPTY_PICKUP,
-      dueAt:
-        dlgTargetStatus === "checked_out" && dueDate ? new Date(dueDate) : null,
+      // The day as picked; the server reads it in the office's zone (#805).
+      dueDay: dlgTargetStatus === "checked_out" && dueDate ? dueDate : null,
       comment: dlgComment || null,
       sendEmail: dlgSendEmail,
     });
@@ -734,6 +739,7 @@ export function InventoryLifecyclePanel({
                 <Input
                   className="mt-1"
                   id="due-date"
+                  max={lastDeadlineDay()}
                   onChange={(e) => setDueDate(e.target.value)}
                   type="date"
                   value={dueDate}

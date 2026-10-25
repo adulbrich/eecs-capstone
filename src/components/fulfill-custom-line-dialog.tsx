@@ -1,4 +1,6 @@
 import { useEffect, useState } from "react";
+import { lastDeadlineDay } from "#/lib/day-range";
+import { officeToday } from "#/lib/pickup-window";
 import { useAction } from "#/lib/use-action";
 import { listAdminInventory } from "#/server/inventory";
 import { fulfillCustomLine } from "#/server/inventory-custom";
@@ -51,7 +53,7 @@ export function FulfillCustomLineDialog({
   const [matches, setMatches] = useState<Match[]>([]);
   const [chosen, setChosen] = useState<Match[]>([]);
   const [reserve, setReserve] = useState(true);
-  const [pickupBy, setPickupBy] = useState("");
+  const [pickupDay, setPickupDay] = useState("");
   const [note, setNote] = useState("");
   // A second activation in the same tick would write a second set of item
   // links; `use-action.ts` says why the hook's ref is what stops it (#443).
@@ -105,7 +107,7 @@ export function FulfillCustomLineDialog({
     setMatches([]);
     setChosen([]);
     setReserve(true);
-    setPickupBy("");
+    setPickupDay("");
     setNote("");
     setError(null);
     setSendEmail(true);
@@ -147,7 +149,8 @@ export function FulfillCustomLineDialog({
           customLineId: line.id,
           itemIds: chosen.map((item) => item.id),
           outcomeNote: note.trim() ? note : null,
-          pickupBy: reserve && pickupBy ? new Date(pickupBy) : null,
+          // The day as picked; the server reads it in the office's zone.
+          pickupDay: reserve && pickupDay ? pickupDay : null,
           reserve,
           sendEmail,
         },
@@ -259,11 +262,14 @@ export function FulfillCustomLineDialog({
               <Label htmlFor={`fulfil-pickup-${line.id}`}>
                 Pickup by (optional)
               </Label>
+              {/* The bounds the server refuses outside of, as in PickupFields. */}
               <Input
                 id={`fulfil-pickup-${line.id}`}
-                onChange={(e) => setPickupBy(e.target.value)}
+                max={lastDeadlineDay()}
+                min={officeToday()}
+                onChange={(e) => setPickupDay(e.target.value)}
                 type="date"
-                value={pickupBy}
+                value={pickupDay}
               />
             </div>
           )}
