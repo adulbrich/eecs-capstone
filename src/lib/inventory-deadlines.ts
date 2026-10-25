@@ -36,8 +36,6 @@ export function dueAtForDay(
   if (shiftDay(picked, 0) !== picked) {
     throw new Error("Pick a due date that is on the calendar.");
   }
-  // The same year as the pickup day, and for the same reason: the calendar
-  // arithmetic stops at year 9999 with a message staff should never read.
   if (picked > lastDeadlineDay(now)) {
     throw new Error("Pick a due date within the next year.");
   }

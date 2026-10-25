@@ -66,8 +66,6 @@ export function resolvePickupWindow(
   if (shiftDay(day, 0) !== day) {
     throw new Error("Pick a pickup day that is on the calendar.");
   }
-  // A year out is already no arrangement anyone keeps, and the calendar
-  // arithmetic stops at year 9999 with a message staff should never read.
   if (day > lastDeadlineDay(now)) {
     throw new Error("Pick a pickup day within the next year.");
   }

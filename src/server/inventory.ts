@@ -376,7 +376,7 @@ export const transitionSchema = z.object({
 export type TransitionInventoryItemInput = z.infer<typeof transitionSchema>;
 
 /** The endpoint's validator, exported so the stale-tab refusal is tested. */
-export function parseTransitionInput(d: unknown): TransitionInventoryItemInput {
+export function parseTransitionInput(d: unknown) {
   return transitionSchema.parse(refuseStaleDayField(d, "dueAt"));
 }
 
