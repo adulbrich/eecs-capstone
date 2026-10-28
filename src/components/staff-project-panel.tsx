@@ -1,5 +1,6 @@
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
-import { useCallback, useEffect, useState } from "react";
+import { useState } from "react";
 import { errorMessage } from "#/lib/error-message";
 import { STAFF_PANEL_AUDIENCE_HINT } from "#/lib/private-notes";
 import {
@@ -8,6 +9,12 @@ import {
   PROJECT_STATUS_LABEL,
   PROJECT_STATUSES_IN_DISPLAY_ORDER,
 } from "#/lib/project-workflow";
+import {
+  DRAFT_QUERY_OPTIONS,
+  refetchAfterSave,
+  staffProjectKeys,
+  staffRead,
+} from "#/lib/staff-project-queries";
 import { useAction } from "#/lib/use-action";
 import type { ProjectStatus } from "#/lib/vocabularies";
 import {
@@ -20,10 +27,9 @@ import {
 import {
   getProposerForEdit,
   listProjectEditLog,
-  type ProposerForEdit,
 } from "#/server/projects-queries";
 import { ConfirmDialog } from "./confirm-dialog";
-import { type EditLogEntry, EditLogList } from "./edit-log-list";
+import { EditLogList } from "./edit-log-list";
 import { Panel, PanelHeader, PanelNote, PanelSection } from "./panel";
 import { ScopeAssessmentSection } from "./scope-assessment-section";
 import { EMAIL_SKIP_HINT, SendEmailCheckbox } from "./send-email-checkbox";
@@ -117,60 +123,47 @@ export function StaffProjectPanel({
   const { busy, error, run, setError } = useAction({
     fallback: "Transition failed",
   });
-  const [editLog, setEditLog] = useState<EditLogEntry[]>([]);
+  const queryClient = useQueryClient();
+  const { data: editLog = [] } = useQuery({
+    queryKey: staffProjectKeys.editLog(project.id),
+    queryFn: () =>
+      staffRead(async () => {
+        const { rows } = await listProjectEditLog({
+          data: { id: project.id },
+        });
+        return rows;
+      }),
+  });
   const [sendEmail, setSendEmail] = useState(true);
   const [deleteEmail, setDeleteEmail] = useState(true);
-  // Null until loaded: the Proposer section keeps Save disabled until then.
-  const [proposer, setProposer] = useState<ProposerForEdit | null>(null);
-  const [proposerError, setProposerError] = useState<string | null>(null);
+  // Undefined until loaded: the Proposer section keeps Save disabled until
+  // then. It seeds that section's draft, so it never refetches on its own.
+  const proposerQuery = useQuery({
+    queryKey: staffProjectKeys.proposer(project.id),
+    queryFn: () =>
+      staffRead(() => getProposerForEdit({ data: { projectId: project.id } })),
+    ...DRAFT_QUERY_OPTIONS,
+  });
+  const proposer = proposerQuery.data ?? null;
+  // Reported in the Proposer section, where Save stays disabled, the way the
+  // other sections report a failed load. The dialog degrades to "no address
+  // on file" and sends nothing, which is the safe direction.
+  const proposerError = proposerQuery.isError
+    ? errorMessage(proposerQuery.error, "Could not load the proposer record")
+    : null;
   // The dialog's checkbox has always keyed off "is there an address at all",
   // so it keeps reading exactly that rather than the whole record.
   const proposerAddress = proposer?.email || null;
-
-  const loadEditLog = useCallback(async () => {
-    try {
-      const { rows } = await listProjectEditLog({
-        data: { id: project.id },
-      });
-      setEditLog(rows);
-    } catch {
-      // ignored
-    }
-  }, [project.id]);
-
-  const loadProposer = useCallback(async () => {
-    try {
-      setProposer(
-        await getProposerForEdit({ data: { projectId: project.id } })
-      );
-      setProposerError(null);
-    } catch (e) {
-      // Reported in the Proposer section, where Save stays disabled, the way
-      // the other sections report a failed load. The dialog degrades to "no
-      // address on file" and sends nothing, which is the safe direction.
-      setProposerError(errorMessage(e, "Could not load the proposer record"));
-    }
-  }, [project.id]);
-
-  useEffect(() => {
-    void loadEditLog();
-  }, [loadEditLog]);
-
-  useEffect(() => {
-    void loadProposer();
-  }, [loadProposer]);
 
   // A saved proposer has to reach the transition dialog's email checkbox
   // without a reload, and the edit log below it, so the section hands the
   // save back here rather than reloading a copy of its own.
   async function onProposerSaved() {
-    await Promise.all([loadProposer(), loadEditLog()]);
-    await onChanged();
-  }
-
-  // Same for the other writers in this panel: a save shows up in the log.
-  async function onSectionChanged() {
-    await loadEditLog();
+    await refetchAfterSave(
+      queryClient,
+      project.id,
+      staffProjectKeys.proposer(project.id)
+    );
     await onChanged();
   }
 
@@ -435,10 +428,7 @@ export function StaffProjectPanel({
         decision staff make right after deciding whether to take it, and
         before deciding whose it is (#450).
       */}
-      <StaffProgramSection
-        onChanged={onSectionChanged}
-        projectId={project.id}
-      />
+      <StaffProgramSection onChanged={onChanged} projectId={project.id} />
 
       <StaffProposerSection
         loadError={proposerError}
@@ -447,10 +437,7 @@ export function StaffProjectPanel({
         proposer={proposer}
       />
 
-      <StaffMentorshipSection
-        onChanged={onSectionChanged}
-        projectId={project.id}
-      />
+      <StaffMentorshipSection onChanged={onChanged} projectId={project.id} />
 
       {/* Private notes render on the shared project page, above this panel:
           they are visible to the proposer as well, so they are not staff-only
@@ -462,10 +449,7 @@ export function StaffProjectPanel({
         <ScopeAssessmentSection projectId={project.id} />
       </PanelSection>
 
-      <StaffCategoriesSection
-        onChanged={onSectionChanged}
-        projectId={project.id}
-      />
+      <StaffCategoriesSection onChanged={onChanged} projectId={project.id} />
 
       {/* Only staff, like the scope assessment above: the text is public as
           the page's og:description, but who wrote it and when is not, so it is

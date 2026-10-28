@@ -1,16 +1,20 @@
 // @vitest-environment jsdom
 import {
+  act,
   cleanup,
   fireEvent,
-  render,
   screen,
   waitFor,
   within,
 } from "@testing-library/react";
 import type * as React from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { renderWithQueryClient } from "./shared/query-client";
 
-vi.mock("@tanstack/react-router", () => ({
+// The real module beside the stub `Link`: the staff reads' `queryFn`s call
+// `isRedirect` on every failure.
+vi.mock("@tanstack/react-router", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@tanstack/react-router")>()),
   Link: ({
     children,
     ...rest
@@ -162,6 +166,8 @@ globalThis.ResizeObserver ??=
   ResizeObserverStub as unknown as typeof ResizeObserver;
 
 import { StaffProjectPanel } from "#/components/staff-project-panel";
+import { staffProjectKeys } from "#/lib/staff-project-queries";
+import { deferred } from "./shared/deferred";
 
 afterEach(cleanup);
 beforeEach(() => {
@@ -244,7 +250,14 @@ async function enabledProgramsSave() {
 }
 
 function renderPanel(status: string, viewerIsOwner = false) {
-  return render(panel(status, PROJECT_ID, viewerIsOwner));
+  return renderWithQueryClient(panel(status, PROJECT_ID, viewerIsOwner));
+}
+
+/** The Mentor email field, once its load has landed and enabled Save. */
+async function loadedMentorInput() {
+  const save = screen.getByRole("button", { name: "Save mentor" });
+  await waitFor(() => expect(save.hasAttribute("disabled")).toBe(false));
+  return screen.getByLabelText("Mentor email") as HTMLInputElement;
 }
 
 /** The confirm a save that would email someone opens (#379). */
@@ -609,6 +622,8 @@ describe("StaffProjectPanel review-email control", () => {
 
   it("sends sendEmail: false when the checked box is unchecked before confirming", async () => {
     renderPanel("submitted");
+    // The box stays disabled until the proposer's address has loaded.
+    await screen.findByLabelText("Proposer email");
     fireEvent.click(screen.getByTitle(/^Move to Approved\./));
     await waitFor(() => expect(screen.getByRole("checkbox")).toBeTruthy());
 
@@ -698,9 +713,7 @@ describe("StaffProjectPanel mentor block", () => {
     });
     renderPanel("submitted");
 
-    const input = (await screen.findByLabelText(
-      "Mentor email"
-    )) as HTMLInputElement;
+    const input = await loadedMentorInput();
     expect(input.value).toBe("mentor@x.test");
     // Same shape as the Proposer section (#304): name, link pill, address.
     expect(await screen.findByText("Dana Lee")).toBeTruthy();
@@ -731,7 +744,9 @@ describe("StaffProjectPanel mentor block", () => {
       studentProposed: false,
     });
     renderPanel("submitted");
-    expect(await screen.findAllByText("No account yet")).toHaveLength(2);
+    await waitFor(() =>
+      expect(screen.getAllByText("No account yet")).toHaveLength(2)
+    );
     // Scoped to each section, because the unlinked summary renders no label:
     // counting the two literals across the whole panel would pass just as
     // well with the hints swapped between the two components, which is the
@@ -759,9 +774,7 @@ describe("StaffProjectPanel mentor block", () => {
 
   it("saves the address through the server function and reloads the record", async () => {
     renderPanel("submitted");
-    const input = (await screen.findByLabelText(
-      "Mentor email"
-    )) as HTMLInputElement;
+    const input = await loadedMentorInput();
     fireEvent.change(input, { target: { value: " other@x.test " } });
     fireEvent.click(screen.getByRole("button", { name: "Save mentor" }));
 
@@ -845,7 +858,7 @@ describe("StaffProjectPanel mentor block", () => {
 
   it("checks the box again after a Cancel, so a skip is about one save", async () => {
     renderPanel("submitted");
-    fireEvent.change(await screen.findByLabelText("Mentor email"), {
+    fireEvent.change(await loadedMentorInput(), {
       target: { value: "next@x.test" },
     });
     fireEvent.click(screen.getByRole("button", { name: "Save mentor" }));
@@ -868,7 +881,7 @@ describe("StaffProjectPanel mentor block", () => {
   it("keeps a failed save's error inside the open confirm", async () => {
     updateProjectMentorship.mockRejectedValueOnce(new Error("SES is down"));
     renderPanel("submitted");
-    fireEvent.change(await screen.findByLabelText("Mentor email"), {
+    fireEvent.change(await loadedMentorInput(), {
       target: { value: "next@x.test" },
     });
     fireEvent.click(screen.getByRole("button", { name: "Save mentor" }));
@@ -1022,7 +1035,7 @@ describe("StaffProjectPanel proposer and categories across a project change", ()
         teamsSupported: 2,
       })
     );
-    render(panel("submitted"));
+    renderWithQueryClient(panel("submitted"));
 
     await waitFor(() =>
       expect(
@@ -1054,7 +1067,7 @@ describe("StaffProjectPanel proposer and categories across a project change", ()
         land = resolve;
       })
     );
-    render(panel("submitted"));
+    renderWithQueryClient(panel("submitted"));
     await screen.findByLabelText("Proposer email");
     const save = screen.getByRole("button", {
       name: "Save programs and teams",
@@ -1068,7 +1081,7 @@ describe("StaffProjectPanel proposer and categories across a project change", ()
 
   it("says so in the section when the load fails, and keeps Save disabled", async () => {
     getProjectPrograms.mockRejectedValue(new Error("Forbidden"));
-    render(panel("submitted"));
+    renderWithQueryClient(panel("submitted"));
 
     expect(await screen.findByText("Forbidden")).toBeTruthy();
     expect(
@@ -1080,7 +1093,7 @@ describe("StaffProjectPanel proposer and categories across a project change", ()
 
   it("loads the record again after its own save", async () => {
     updateProjectPrograms.mockResolvedValue({ id: PROJECT_ID, updated: true });
-    render(panel("submitted"));
+    renderWithQueryClient(panel("submitted"));
     fireEvent.click(await enabledProgramsSave());
 
     await waitFor(() => expect(getProjectPrograms).toHaveBeenCalledTimes(2));
@@ -1096,7 +1109,7 @@ describe("StaffProjectPanel proposer and categories across a project change", ()
         programsRecord(data.projectId === PROJECT_ID ? [PROGRAM_A] : [])
       )
     );
-    const view = render(panel("submitted"));
+    const view = renderWithQueryClient(panel("submitted"));
     await waitFor(() =>
       expect(
         screen
@@ -1127,7 +1140,7 @@ describe("StaffProjectPanel proposer and categories across a project change", ()
     getProjectPrograms.mockResolvedValue(
       programsRecord([PROGRAM_A, PROGRAM_B])
     );
-    render(panel("submitted"));
+    renderWithQueryClient(panel("submitted"));
     expect(
       await screen.findByText(/supports 1 team but runs in 2 programs/)
     ).toBeTruthy();
@@ -1135,7 +1148,7 @@ describe("StaffProjectPanel proposer and categories across a project change", ()
 
   it("stays quiet when the programs fit the teams supported", async () => {
     getProjectPrograms.mockResolvedValue(programsRecord([PROGRAM_A]));
-    render(panel("submitted"));
+    renderWithQueryClient(panel("submitted"));
     await enabledProgramsSave();
     expect(screen.queryByText(/but runs in/)).toBeNull();
   });
@@ -1144,7 +1157,7 @@ describe("StaffProjectPanel proposer and categories across a project change", ()
     getProjectPrograms.mockResolvedValue(
       programsRecord([PROGRAM_A, PROGRAM_B])
     );
-    render(panel("submitted"));
+    renderWithQueryClient(panel("submitted"));
     await screen.findByText(/supports 1 team but runs in 2 programs/);
 
     // Raising the draft alone does not clear it: nothing is saved yet.
@@ -1168,7 +1181,7 @@ describe("StaffProjectPanel proposer and categories across a project change", ()
   // The checkbox reads in the glossary's direction and the column stores the
   // inverse, so a project still taking students shows an unchecked box (#491).
   it("shows the team as full only when the project stopped accepting", async () => {
-    render(panel("submitted"));
+    renderWithQueryClient(panel("submitted"));
     await enabledProgramsSave();
     expect(
       screen
@@ -1181,7 +1194,7 @@ describe("StaffProjectPanel proposer and categories across a project change", ()
   // ADR-0032 accepts. It rides the same Save as the other two (#468).
   it("saves teams supported through the same endpoint", async () => {
     updateProjectPrograms.mockResolvedValue({ id: PROJECT_ID, updated: true });
-    render(panel("submitted"));
+    renderWithQueryClient(panel("submitted"));
     const save = await enabledProgramsSave();
 
     fireEvent.change(screen.getByLabelText("Teams supported"), {
@@ -1204,7 +1217,7 @@ describe("StaffProjectPanel proposer and categories across a project change", ()
   // The panel says the proposer owns the field, which is the whole mitigation
   // ADR-0032 rests on: nothing tells either writer the other moved it.
   it("says the proposer can set teams supported back", async () => {
-    render(panel("submitted"));
+    renderWithQueryClient(panel("submitted"));
     await screen.findByLabelText("Proposer email");
 
     expect(
@@ -1217,7 +1230,7 @@ describe("StaffProjectPanel proposer and categories across a project change", ()
   it("saves the flag and the program set through one endpoint", async () => {
     updateProjectPrograms.mockResolvedValue({ id: PROJECT_ID, updated: true });
     getProjectPrograms.mockResolvedValue(programsRecord([PROGRAM_A]));
-    render(panel("submitted"));
+    renderWithQueryClient(panel("submitted"));
     const save = await enabledProgramsSave();
 
     fireEvent.click(screen.getByRole("checkbox", { name: "Team is full" }));
@@ -1274,9 +1287,7 @@ describe("StaffProjectPanel mentor across a project change", () => {
       mentorName: null,
     });
     const view = renderPanel("submitted");
-    expect(
-      ((await screen.findByLabelText("Mentor email")) as HTMLInputElement).value
-    ).toBe("first@x.test");
+    expect((await loadedMentorInput()).value).toBe("first@x.test");
 
     getProjectMentorship.mockReturnValueOnce(new Promise(() => undefined));
     view.rerender(panel("submitted", "00000000-0000-0000-0000-0000000000p2"));
@@ -1288,5 +1299,154 @@ describe("StaffProjectPanel mentor across a project change", () => {
         .getByRole("button", { name: "Save mentor" })
         .hasAttribute("disabled")
     ).toBe(true);
+  });
+});
+
+/** Lets a `setQueryData` notification reach the sections and render. */
+function settle() {
+  return act(() => new Promise((resolve) => setTimeout(resolve, 10)));
+}
+
+describe("StaffProjectPanel drafts under a query data change", () => {
+  // Nothing in the app changes these queries' data without a save, since
+  // they never refetch on their own; `setQueryData` stands in for anything
+  // that would. The Programs and Mentor tests also assert a part of the
+  // section that reads the data rather than the draft, so a rerender is
+  // known to have happened.
+  it("keeps the Programs and teams draft", async () => {
+    const { queryClient } = renderPanel("submitted");
+    await enabledProgramsSave();
+    const teams = screen.getByLabelText("Teams supported") as HTMLInputElement;
+    fireEvent.change(teams, { target: { value: "3" } });
+
+    queryClient.setQueryData(
+      staffProjectKeys.programs(PROJECT_ID),
+      programsRecord([PROGRAM_A, PROGRAM_B], { teamsSupported: 1 })
+    );
+    await settle();
+
+    // The warning reads the saved values, so it moved with the data...
+    expect(screen.getByText(/runs in 2 programs/)).toBeTruthy();
+    // ...and the draft did not.
+    expect(teams.value).toBe("3");
+  });
+
+  it("keeps the Categories draft", async () => {
+    const { queryClient } = renderPanel("submitted");
+    const save = screen.getByRole("button", { name: "Save categories" });
+    await waitFor(() => expect(save.hasAttribute("disabled")).toBe(false));
+    const box = screen.getByRole("checkbox", {
+      name: "Robotics",
+    }) as HTMLInputElement;
+    fireEvent.click(box);
+    expect(box.checked).toBe(true);
+
+    queryClient.setQueryData(staffProjectKeys.categories(PROJECT_ID), [
+      "33333333-3333-4333-8333-333333333333",
+    ]);
+    await settle();
+
+    expect(box.checked).toBe(true);
+  });
+
+  it("keeps the Mentor draft", async () => {
+    const { queryClient } = renderPanel("submitted");
+    const input = await loadedMentorInput();
+    fireEvent.change(input, { target: { value: "typed@x.test" } });
+
+    queryClient.setQueryData(staffProjectKeys.mentorship(PROJECT_ID), {
+      mentorEmail: "colleague@x.test",
+      mentorName: null,
+    });
+    await settle();
+
+    // The summary reads the saved record, so it moved with the data...
+    expect(screen.getByText("colleague@x.test")).toBeTruthy();
+    // ...and the draft did not.
+    expect(input.value).toBe("typed@x.test");
+  });
+});
+
+describe("StaffProjectPanel late answers across a project change", () => {
+  it("never shows the previous project's programs, even with the panel unkeyed", async () => {
+    // Rendered without the route's `key`, so nothing remounts: only the
+    // query key, which names the project, keeps A's answer out of B.
+    const first = deferred<ReturnType<typeof programsRecord>>();
+    const second = deferred<ReturnType<typeof programsRecord>>();
+    getProjectPrograms.mockImplementation(({ data }) =>
+      data.projectId === PROJECT_ID ? first.promise : second.promise
+    );
+    const unkeyed = (id: string) => (
+      <StaffProjectPanel
+        onChanged={() => Promise.resolve()}
+        project={project("submitted", id)}
+        viewerIsOwner={false}
+      />
+    );
+    const next = "00000000-0000-0000-0000-0000000000p2";
+    const view = renderWithQueryClient(unkeyed(PROJECT_ID));
+    view.rerender(unkeyed(next));
+
+    first.resolve(programsRecord([], { teamsSupported: 7 }));
+    await settle();
+    const teams = screen.getByLabelText("Teams supported") as HTMLInputElement;
+    expect(teams.value).not.toBe("7");
+    expect(
+      screen
+        .getByRole("button", { name: "Save programs and teams" })
+        .hasAttribute("disabled")
+    ).toBe(true);
+
+    second.resolve(programsRecord([], { teamsSupported: 2 }));
+    await waitFor(() => expect(teams.value).toBe("2"));
+  });
+});
+
+describe("StaffProjectPanel refetches after a save", () => {
+  it("reads the edit log again after a Programs and teams save", async () => {
+    updateProjectPrograms.mockResolvedValue({ id: PROJECT_ID, updated: true });
+    renderPanel("submitted");
+    await waitFor(() => expect(listProjectEditLog).toHaveBeenCalledTimes(1));
+    fireEvent.click(await enabledProgramsSave());
+
+    await waitFor(() => expect(getProjectPrograms).toHaveBeenCalledTimes(2));
+    await waitFor(() => expect(listProjectEditLog).toHaveBeenCalledTimes(2));
+  });
+
+  it("reads the edit log again after a Categories save", async () => {
+    renderPanel("submitted");
+    const save = screen.getByRole("button", { name: "Save categories" });
+    await waitFor(() => expect(save.hasAttribute("disabled")).toBe(false));
+    await waitFor(() => expect(listProjectEditLog).toHaveBeenCalledTimes(1));
+    fireEvent.click(save);
+
+    await waitFor(() => expect(listProjectCategories).toHaveBeenCalledTimes(2));
+    await waitFor(() => expect(listProjectEditLog).toHaveBeenCalledTimes(2));
+  });
+
+  it("reads the edit log again after a Mentor save", async () => {
+    renderPanel("submitted");
+    await loadedMentorInput();
+    await waitFor(() => expect(listProjectEditLog).toHaveBeenCalledTimes(1));
+    // The same empty address: no confirm opens, and the save goes straight out.
+    fireEvent.click(screen.getByRole("button", { name: "Save mentor" }));
+
+    await waitFor(() => expect(getProjectMentorship).toHaveBeenCalledTimes(2));
+    await waitFor(() => expect(listProjectEditLog).toHaveBeenCalledTimes(2));
+  });
+
+  it("reads the proposer and the edit log again after a Proposer save", async () => {
+    renderPanel("submitted");
+    const save = (await screen.findByRole("button", {
+      name: "Save proposer",
+    })) as HTMLButtonElement;
+    await waitFor(() => expect(listProjectEditLog).toHaveBeenCalledTimes(1));
+    // The mark alone mails nobody, so no confirm stands in the way.
+    fireEvent.click(screen.getByRole("checkbox", { name: "Student proposed" }));
+    await waitFor(() => expect(save.disabled).toBe(false));
+    fireEvent.click(save);
+
+    await waitFor(() => expect(getProposerForEdit).toHaveBeenCalledTimes(2));
+    await waitFor(() => expect(listProjectEditLog).toHaveBeenCalledTimes(2));
   });
 });

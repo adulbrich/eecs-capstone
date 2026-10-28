@@ -1,5 +1,13 @@
-import { useCallback, useEffect, useState } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useState } from "react";
 import { errorMessage } from "#/lib/error-message";
+import {
+  DRAFT_QUERY_OPTIONS,
+  refetchAfterSave,
+  staffProjectKeys,
+  staffRead,
+  useSeedOnArrival,
+} from "#/lib/staff-project-queries";
 import { useAction } from "#/lib/use-action";
 import { updateProjectMentorship } from "#/server/projects";
 import {
@@ -40,37 +48,34 @@ export function StaffMentorshipSection({
   onChanged: () => Promise<void>;
   projectId: string;
 }) {
-  const [record, setRecord] = useState<ProjectMentorship | null>(null);
+  const queryClient = useQueryClient();
+  const queryKey = staffProjectKeys.mentorship(projectId);
+  const query = useQuery({
+    queryKey,
+    queryFn: () =>
+      staffRead(() => getProjectMentorship({ data: { projectId } })),
+    ...DRAFT_QUERY_OPTIONS,
+  });
+  const record = query.data;
   const [mentorEmail, setMentorEmail] = useState("");
+  useSeedOnArrival(projectId, record, (saved) =>
+    setMentorEmail(saved.mentorEmail)
+  );
   // A second activation in the same tick would mail the mentor twice;
   // `use-action.ts` says why the hook's ref is what stops it (#443).
-  // `setError` comes back out for the load below, which shares the slot.
-  const { busy, error, run, setError } = useAction({ fallback: "Save failed" });
+  const { busy, error, run } = useAction({ fallback: "Save failed" });
+  // Reported, not swallowed, and Save stays disabled: see the gate below.
+  const loadError = query.isError
+    ? errorMessage(query.error, "Could not load the mentor record")
+    : null;
   const [confirmOpen, setConfirmOpen] = useState(false);
-
-  const load = useCallback(async () => {
-    try {
-      const saved = await getProjectMentorship({ data: { projectId } });
-      setRecord(saved);
-      setMentorEmail(saved.mentorEmail);
-    } catch (e) {
-      // Reported, not swallowed, and Save stays disabled: see the gate below.
-      setError(errorMessage(e, "Could not load the mentor record"));
-    }
-    // `setError` is the hook's own state setter, so it is stable and the
-    // dependency costs nothing; Biome cannot see that from here.
-  }, [projectId, setError]);
-
-  useEffect(() => {
-    void load();
-  }, [load]);
 
   const trimmed = mentorEmail.trim();
   // The server mails only when the address changes to a non-empty value,
   // compared after normalizing; the dialog opens on exactly that, or it
   // would announce an email that never goes out.
   const announces =
-    record !== null &&
+    record !== undefined &&
     trimmed !== "" &&
     trimmed.toLowerCase() !== record.mentorEmail;
 
@@ -80,7 +85,14 @@ export function StaffMentorshipSection({
         data: { id: projectId, mentorEmail: trimmed, sendEmail },
       });
       setConfirmOpen(false);
-      await load();
+      const fresh = await refetchAfterSave<ProjectMentorship>(
+        queryClient,
+        projectId,
+        queryKey
+      );
+      if (fresh) {
+        setMentorEmail(fresh.mentorEmail);
+      }
       await onChanged();
     });
   }
@@ -117,12 +129,12 @@ export function StaffMentorshipSection({
             instructor who runs the team records their own.
           </p>
         </div>
-        {!confirmOpen && <FieldError message={error} />}
+        {!confirmOpen && <FieldError message={error ?? loadError} />}
         <Button
           // Disabled until the saved record has arrived: the drafts start
           // blank, and posting blank drafts over a real record would clear the
           // mentor and log an edit nobody made.
-          disabled={busy || record === null}
+          disabled={busy || record === undefined}
           onClick={() => (announces ? setConfirmOpen(true) : void save(true))}
           size="sm"
           type="button"

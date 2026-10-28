@@ -1,13 +1,8 @@
 // @vitest-environment jsdom
-import {
-  cleanup,
-  fireEvent,
-  render,
-  screen,
-  waitFor,
-} from "@testing-library/react";
+import { cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { renderWithQueryClient } from "./shared/query-client";
 
 const server = vi.hoisted(() => ({
   getSocialSummary: vi.fn(),
@@ -74,7 +69,7 @@ const RACED: RegenerateSocialSummaryResult = {
 
 async function renderWith(view: SocialSummaryView) {
   server.getSocialSummary.mockResolvedValue(view);
-  render(<SocialPreviewSection projectId="p1" />);
+  renderWithQueryClient(<SocialPreviewSection projectId="p1" />);
   await screen.findByLabelText("Social summary");
 }
 
@@ -264,7 +259,7 @@ describe("SocialPreviewSection actions", () => {
     // clears a summary staff wrote by hand, on a project whose real summary
     // the panel had never seen (#564).
     server.getSocialSummary.mockRejectedValue(new Error("Forbidden"));
-    render(<SocialPreviewSection projectId="p1" />);
+    renderWithQueryClient(<SocialPreviewSection projectId="p1" />);
     await screen.findByLabelText("Social summary");
 
     expect(screen.getByText(/Could not load the stored summary/)).toBeDefined();
@@ -277,7 +272,7 @@ describe("SocialPreviewSection actions", () => {
   it("comes back to life on a retry that succeeds", async () => {
     server.getSocialSummary.mockRejectedValueOnce(new Error("Forbidden"));
     server.getSocialSummary.mockResolvedValue(MANUAL);
-    render(<SocialPreviewSection projectId="p1" />);
+    renderWithQueryClient(<SocialPreviewSection projectId="p1" />);
     const retry = await screen.findByRole("button", { name: "Try again" });
 
     fireEvent.click(retry);

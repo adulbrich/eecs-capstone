@@ -1,10 +1,11 @@
-import { useEffect, useState } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   confidenceLabel,
   SCOPE_VERDICT_LABELS,
   type ScopeAssessmentView,
   type ScopeVerdict,
 } from "#/lib/scope-assessment";
+import { staffProjectKeys, staffRead } from "#/lib/staff-project-queries";
 import { useAction } from "#/lib/use-action";
 import {
   assessProjectScope,
@@ -21,8 +22,8 @@ import { FieldError } from "./ui/field";
  * rather than hidden or re-run: the hash check is the server's, this only
  * renders the flag.
  *
- * Remounted on a param change because the route keys the whole staff panel on
- * `project.id`, so one project's verdict is never shown over another's record.
+ * Read through a query keyed on the project, so one project's verdict is
+ * never shown over another's record, however late it answers.
  */
 
 const VERDICT_TONE: Record<ScopeVerdict, "success" | "warning" | "error"> = {
@@ -47,30 +48,32 @@ function VerdictBadge({ verdict }: { verdict: ScopeVerdict }) {
 }
 
 export function ScopeAssessmentSection({ projectId }: { projectId: string }) {
-  const [view, setView] = useState<ScopeAssessmentView | null | "loading">(
-    "loading"
-  );
+  const queryClient = useQueryClient();
+  const queryKey = staffProjectKeys.scope(projectId);
+  const query = useQuery({
+    queryKey,
+    queryFn: () => staffRead(() => getScopeAssessment({ data: { projectId } })),
+  });
+  // Staff-only endpoint; a failure reads as "not assessed yet", and the
+  // button below reports its own error if the write is refused too.
+  let view: ScopeAssessmentView | null | "loading" = null;
+  if (query.data !== undefined) {
+    view = query.data;
+  } else if (query.isPending) {
+    view = "loading";
+  }
   // A second activation in the same tick would spend a second Bedrock call;
   // `use-action.ts` says why the hook's ref is what stops it (#443).
   const { busy, error, run } = useAction({
     fallback: "Scope assessment failed",
   });
 
-  useEffect(() => {
-    void (async () => {
-      try {
-        setView(await getScopeAssessment({ data: { projectId } }));
-      } catch {
-        // Staff-only endpoint; a failure reads as "not assessed yet", and the
-        // button below reports its own error if the write is refused too.
-        setView(null);
-      }
-    })();
-  }, [projectId]);
-
   function assess() {
     return run(async () => {
-      setView(await assessProjectScope({ data: { projectId } }));
+      queryClient.setQueryData(
+        queryKey,
+        await assessProjectScope({ data: { projectId } })
+      );
     });
   }
 

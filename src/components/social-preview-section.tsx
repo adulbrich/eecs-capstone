@@ -1,10 +1,17 @@
-import { useCallback, useEffect, useState } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useState } from "react";
 import {
   SOCIAL_SUMMARY_MAX_LENGTH,
   SOCIAL_SUMMARY_TOO_LONG_MESSAGE,
   type SocialSummaryView,
   socialSummaryLength,
 } from "#/lib/social-summary";
+import {
+  DRAFT_QUERY_OPTIONS,
+  staffProjectKeys,
+  staffRead,
+  useSeedOnArrival,
+} from "#/lib/staff-project-queries";
 import { useAction } from "#/lib/use-action";
 import {
   getSocialSummary,
@@ -106,43 +113,43 @@ function SummaryAttemptStatus({ view }: { view: SocialSummaryView }) {
  * spends a model call and one spending button is easier to reason about than
  * two.
  *
- * Remounted on a param change because the route keys the whole staff panel on
- * `project.id`, so one project's wording is never shown over another's.
+ * Read through a query keyed on the project, so one project's wording is
+ * never shown over another's, however late it answers.
  */
 export function SocialPreviewSection({ projectId }: { projectId: string }) {
-  const [view, setView] = useState<SocialSummaryView | "loading" | "failed">(
-    "loading"
-  );
+  const queryClient = useQueryClient();
+  const queryKey = staffProjectKeys.socialSummary(projectId);
+  const query = useQuery({
+    queryKey,
+    queryFn: () => staffRead(() => getSocialSummary({ data: { projectId } })),
+    ...DRAFT_QUERY_OPTIONS,
+  });
   const [draft, setDraft] = useState("");
+  useSeedOnArrival(projectId, query.data, (first) =>
+    setDraft(first.summary ?? "")
+  );
   const [notice, setNotice] = useState<string | null>(null);
   // A second activation in the same tick would spend a second model call;
   // `use-action.ts` says why the hook's ref is what stops it (#443).
   const { busy, error, run } = useAction({ fallback: "Social summary failed" });
 
-  const load = useCallback(async () => {
-    setView("loading");
+  // Its own state, not a stand-in for an empty row (#564). Reading a failed
+  // load as "nothing stored" enabled Regenerate, because that button turns on
+  // when the summary is null, and Regenerate is the call that clears a summary
+  // staff wrote by hand. A transient error on a read must not offer a write.
+  const failed = query.data === undefined && query.isError && !query.isFetching;
+  const loaded = query.data ?? null;
+
+  /** Stores what a write answered and sets the box from it. */
+  function show(next: SocialSummaryView) {
+    queryClient.setQueryData(queryKey, next);
+    setDraft(next.summary ?? "");
+  }
+
+  function retry() {
     setNotice(null);
-    try {
-      const loaded = await getSocialSummary({ data: { projectId } });
-      setView(loaded);
-      setDraft(loaded.summary ?? "");
-    } catch {
-      // Its own state, not a stand-in for an empty row (#564). Reading a
-      // failed load as "nothing stored" enabled Regenerate, because that
-      // button turns on when the summary is null, and Regenerate is the call
-      // that clears a summary staff wrote by hand. A transient error on a read
-      // must not offer a write.
-      setView("failed");
-      setDraft("");
-    }
-  }, [projectId]);
-
-  useEffect(() => {
-    void load();
-  }, [load]);
-
-  const failed = view === "failed";
-  const loaded = view === "loading" || failed ? null : view;
+    void query.refetch();
+  }
   const stored = loaded?.summary ?? "";
   const trimmed = draft.trim();
   // Edited means "differs from what is stored", not "has been typed in": a
@@ -161,11 +168,11 @@ export function SocialPreviewSection({ projectId }: { projectId: string }) {
   function save() {
     return run(async () => {
       setNotice(null);
-      const saved = await saveSocialSummary({
-        data: { projectId, summary: trimmed },
-      });
-      setView(saved);
-      setDraft(saved.summary ?? "");
+      show(
+        await saveSocialSummary({
+          data: { projectId, summary: trimmed },
+        })
+      );
     }, "Could not save the summary");
   }
 
@@ -173,8 +180,7 @@ export function SocialPreviewSection({ projectId }: { projectId: string }) {
     return run(async () => {
       setNotice(null);
       const next = await regenerateSocialSummary({ data: { projectId } });
-      setView(next);
-      setDraft(next.summary ?? "");
+      show(next);
       // The server refused to overwrite a row that moved under it. Said out
       // loud, because the box is about to show wording nobody in this tab
       // asked for.
@@ -182,7 +188,7 @@ export function SocialPreviewSection({ projectId }: { projectId: string }) {
     }, "Could not rewrite the summary");
   }
 
-  if (view === "loading") {
+  if (!(loaded || failed)) {
     return <p className="text-muted-foreground text-sm">Loading...</p>;
   }
 
@@ -261,12 +267,7 @@ export function SocialPreviewSection({ projectId }: { projectId: string }) {
           {busy ? "Working..." : "Regenerate with AI"}
         </Button>
         {failed && (
-          <Button
-            onClick={() => void load()}
-            size="sm"
-            type="button"
-            variant="outline"
-          >
+          <Button onClick={retry} size="sm" type="button" variant="outline">
             Try again
           </Button>
         )}

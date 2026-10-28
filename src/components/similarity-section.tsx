@@ -1,8 +1,10 @@
-import { useCallback, useEffect, useState } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useState } from "react";
 import type {
   RecomputeSimilarityResult,
   SimilarityView,
 } from "#/lib/ai-refresh";
+import { staffProjectKeys, staffRead } from "#/lib/staff-project-queries";
 import { useAction } from "#/lib/use-action";
 import { getSimilarity, recomputeSimilarity } from "#/server/similarity";
 import { AttemptFailed, AttemptNote, triggerPhrase } from "./ai-attempt";
@@ -55,46 +57,34 @@ const SAVED_NOTICE: Partial<
  * none.
  */
 export function SimilaritySection({ projectId }: { projectId: string }) {
-  const [view, setView] = useState<SimilarityView | "loading" | "failed">(
-    "loading"
-  );
+  const queryClient = useQueryClient();
+  const queryKey = staffProjectKeys.similarity(projectId);
+  const query = useQuery({
+    queryKey,
+    queryFn: () => staffRead(() => getSimilarity({ data: { projectId } })),
+  });
   const [notice, setNotice] = useState<string | null>(null);
   const [saved, setSaved] = useState<string | null>(null);
   const { busy, error, run } = useAction({ fallback: "Recompute failed" });
-
-  const load = useCallback(async () => {
-    setView("loading");
-    try {
-      setView(await getSimilarity({ data: { projectId } }));
-    } catch {
-      setView("failed");
-    }
-  }, [projectId]);
-
-  useEffect(() => {
-    void load();
-  }, [load]);
 
   function recompute() {
     return run(async () => {
       setNotice(null);
       setSaved(null);
       const result = await recomputeSimilarity({ data: { projectId } });
-      setView(result);
+      queryClient.setQueryData<SimilarityView>(queryKey, result);
       setNotice(OUTCOME_NOTICE[result.outcome] ?? null);
       setSaved(SAVED_NOTICE[result.outcome] ?? null);
     }, "Could not recompute similarity");
   }
 
-  if (view === "loading") {
-    return <p className="text-muted-foreground text-sm">Loading...</p>;
-  }
-  if (view === "failed") {
+  const view = query.data;
+  if (view === undefined && query.isError && !query.isFetching) {
     return (
       <div className="space-y-3">
         <FieldError message={LOAD_FAILED} />
         <Button
-          onClick={() => void load()}
+          onClick={() => void query.refetch()}
           size="sm"
           type="button"
           variant="outline"
@@ -103,6 +93,9 @@ export function SimilaritySection({ projectId }: { projectId: string }) {
         </Button>
       </div>
     );
+  }
+  if (view === undefined) {
+    return <p className="text-muted-foreground text-sm">Loading...</p>;
   }
 
   const canRecompute =

@@ -1,5 +1,13 @@
-import { useCallback, useEffect, useState } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useState } from "react";
 import { errorMessage } from "#/lib/error-message";
+import {
+  DRAFT_QUERY_OPTIONS,
+  refetchAfterSave,
+  staffProjectKeys,
+  staffRead,
+  useSeedOnArrival,
+} from "#/lib/staff-project-queries";
 import {
   clampTeamsSupported,
   TEAMS_SUPPORTED_MAX,
@@ -34,9 +42,10 @@ type Saved = Awaited<ReturnType<typeof getProjectPrograms>>;
  * Save is disabled until the load lands, so the blank starting draft can never
  * be posted over a real set.
  *
- * The draft is set from each load and is not resynced otherwise. A set another
- * staff member saved while this panel sat open is not picked up until this
- * section saves or remounts, the same as the single picker before it.
+ * The draft is set when the record first arrives and after this section's own
+ * save, and is not resynced otherwise. A set another staff member saved while
+ * this panel sat open is not picked up until this section saves or remounts,
+ * the same as the single picker before it.
  *
  * One Save for both fields, because three Save buttons in one section would
  * be worse than the navigation #491 removed. The endpoint decides what
@@ -49,7 +58,14 @@ export function StaffProgramSection({
   onChanged: () => Promise<void>;
   projectId: string;
 }) {
-  const [saved, setSaved] = useState<Saved | null>(null);
+  const queryClient = useQueryClient();
+  const queryKey = staffProjectKeys.programs(projectId);
+  const query = useQuery({
+    queryKey,
+    queryFn: () => staffRead(() => getProjectPrograms({ data: { projectId } })),
+    ...DRAFT_QUERY_OPTIONS,
+  });
+  const saved = query.data;
   const [draft, setDraft] = useState<string[]>([]);
   const [teams, setTeams] = useState(1);
   // Held in the glossary's direction rather than the column's. The column is
@@ -57,26 +73,16 @@ export function StaffProgramSection({
   // word staff and students both read is "Team is full", so the checkbox says
   // that and the flip happens once, at the save.
   const [full, setFull] = useState(false);
-  // `setError` comes back out for the load below, which writes its failure
-  // into the same slot, as the Categories section does.
-  const { busy, error, run, setError } = useAction({ fallback: "Save failed" });
-
-  const load = useCallback(async () => {
-    try {
-      const record = await getProjectPrograms({ data: { projectId } });
-      setSaved(record);
-      setDraft(record.programs.map((p) => p.id));
-      setTeams(record.teamsSupported);
-      setFull(!record.acceptingApplicants);
-    } catch (e) {
-      setError(errorMessage(e, "Could not load the programs"));
-    }
-    // `setError` is the hook's own state setter, so it is stable.
-  }, [projectId, setError]);
-
-  useEffect(() => {
-    void load();
-  }, [load]);
+  function seed(record: Saved) {
+    setDraft(record.programs.map((p) => p.id));
+    setTeams(record.teamsSupported);
+    setFull(!record.acceptingApplicants);
+  }
+  useSeedOnArrival(projectId, saved, seed);
+  const { busy, error, run } = useAction({ fallback: "Save failed" });
+  const loadError = query.isError
+    ? errorMessage(query.error, "Could not load the programs")
+    : null;
 
   function save() {
     return run(async () => {
@@ -88,7 +94,14 @@ export function StaffProgramSection({
           teamsSupported: teams,
         },
       });
-      await load();
+      const fresh = await refetchAfterSave<Saved>(
+        queryClient,
+        projectId,
+        queryKey
+      );
+      if (fresh) {
+        seed(fresh);
+      }
       await onChanged();
     });
   }
@@ -164,9 +177,9 @@ export function StaffProgramSection({
             teamsSupported={saved.teamsSupported}
           />
         )}
-        <FieldError message={error} />
+        <FieldError message={error ?? loadError} />
         <Button
-          disabled={busy || saved === null}
+          disabled={busy || saved === undefined}
           onClick={() => void save()}
           size="sm"
           type="button"

@@ -1,5 +1,13 @@
-import { useCallback, useEffect, useState } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useState } from "react";
 import { errorMessage } from "#/lib/error-message";
+import {
+  DRAFT_QUERY_OPTIONS,
+  refetchAfterSave,
+  staffProjectKeys,
+  staffRead,
+  useSeedOnArrival,
+} from "#/lib/staff-project-queries";
 import { useAction } from "#/lib/use-action";
 import {
   listProjectCategories,
@@ -27,37 +35,39 @@ export function StaffCategoriesSection({
   onChanged: () => Promise<void>;
   projectId: string;
 }) {
-  const [saved, setSaved] = useState<string[] | null>(null);
+  const queryClient = useQueryClient();
+  const queryKey = staffProjectKeys.categories(projectId);
+  const saved = useQuery({
+    queryKey,
+    queryFn: () =>
+      staffRead(async () => {
+        const { rows } = await listProjectCategories({ data: { projectId } });
+        return rows.map((c) => c.id);
+      }),
+    ...DRAFT_QUERY_OPTIONS,
+  });
   const [draft, setDraft] = useState<string[]>([]);
+  useSeedOnArrival(projectId, saved.data, setDraft);
   // A second activation in the same tick would write the category set twice;
   // `use-action.ts` says why the hook's ref is what stops it (#443).
-  // `setError` comes back out for the load below, which writes its failure
-  // into the same slot.
-  const { busy, error, run, setError } = useAction({ fallback: "Save failed" });
-
-  const load = useCallback(async () => {
-    try {
-      const { rows } = await listProjectCategories({ data: { projectId } });
-      const ids = rows.map((c) => c.id);
-      setSaved(ids);
-      setDraft(ids);
-    } catch (e) {
-      setError(errorMessage(e, "Could not load the categories"));
-    }
-    // `setError` is the hook's own state setter, so it is stable and the
-    // dependency costs nothing; Biome cannot see that from here.
-  }, [projectId, setError]);
-
-  useEffect(() => {
-    void load();
-  }, [load]);
+  const { busy, error, run } = useAction({ fallback: "Save failed" });
+  const loadError = saved.isError
+    ? errorMessage(saved.error, "Could not load the categories")
+    : null;
 
   function save() {
     return run(async () => {
       await setProjectCategories({
         data: { projectId, categoryIds: draft },
       });
-      await load();
+      const fresh = await refetchAfterSave<string[]>(
+        queryClient,
+        projectId,
+        queryKey
+      );
+      if (fresh) {
+        setDraft(fresh);
+      }
       await onChanged();
     });
   }
@@ -70,9 +80,9 @@ export function StaffCategoriesSection({
           onChange={setDraft}
           value={draft}
         />
-        <FieldError message={error} />
+        <FieldError message={error ?? loadError} />
         <Button
-          disabled={busy || saved === null}
+          disabled={busy || saved.data === undefined}
           onClick={() => void save()}
           size="sm"
           type="button"
