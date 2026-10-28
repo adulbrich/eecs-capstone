@@ -62,21 +62,29 @@ describe("refetchAfterSave", () => {
     const editLog = staffProjectKeys.editLog(projectId);
     queryClient.setQueryData(editLog, []);
 
-    expect(await refetchAfterSave(queryClient, projectId, key)).toBe("after");
+    const onChanged = vi.fn(() => Promise.resolve());
+
+    expect(await refetchAfterSave(queryClient, projectId, key, onChanged)).toBe(
+      "after"
+    );
     expect(queryFn).toHaveBeenCalledTimes(2);
     expect(queryClient.getQueryState(editLog)?.isInvalidated).toBe(true);
+    expect(onChanged).toHaveBeenCalledTimes(1);
   });
 
-  it("says the save landed and the reread did not when the refetch failed", async () => {
+  it("says the save landed and the reread did not when the refetch failed, and still refreshes the page", async () => {
     const { queryClient } = await observed(() =>
       Promise.reject(new Error("down"))
     );
+    const onChanged = vi.fn(() => Promise.resolve());
 
-    await expect(refetchAfterSave(queryClient, projectId, key)).rejects.toThrow(
-      SAVED_BUT_NOT_RELOADED
-    );
+    await expect(
+      refetchAfterSave(queryClient, projectId, key, onChanged)
+    ).rejects.toThrow(SAVED_BUT_NOT_RELOADED);
     // The old record is still in the cache beside the error; reseeding a
     // draft from it would show the values from before the save.
     expect(queryClient.getQueryData(key)).toBe("before");
+    // The save landed, so the page's own data is read again regardless.
+    expect(onChanged).toHaveBeenCalledTimes(1);
   });
 });

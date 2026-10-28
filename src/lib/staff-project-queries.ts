@@ -81,22 +81,26 @@ export async function staffRead<T>(read: () => Promise<T>): Promise<T> {
 }
 
 /**
- * After a section's own save: refetch its record and the edit log, and hand
- * back the record. A failed refetch keeps the old data beside the error, so
- * it throws `SAVED_BUT_NOT_RELOADED` instead: reseeding the draft from the old
- * data would show the values from before the save, and the section's load
- * message would claim nothing was saved. The caller's `run` shows it.
+ * After a section's own save: refetch its record and the edit log, run the
+ * page's `onChanged` beside them, and hand back the record. A failed refetch
+ * keeps the old data beside the error, so it throws `SAVED_BUT_NOT_RELOADED`
+ * instead: reseeding the draft from the old data would show the values from
+ * before the save, and the section's load message would claim nothing was
+ * saved. `onChanged` runs either way, because the save itself landed. The
+ * caller's `run` shows the message.
  */
 export async function refetchAfterSave<T>(
   queryClient: QueryClient,
   projectId: string,
-  queryKey: QueryKey
+  queryKey: QueryKey,
+  onChanged: () => Promise<void>
 ): Promise<T> {
   await Promise.all([
     queryClient.invalidateQueries({ queryKey }),
     queryClient.invalidateQueries({
       queryKey: staffProjectKeys.editLog(projectId),
     }),
+    onChanged(),
   ]);
   const state = queryClient.getQueryState<T>(queryKey);
   if (state?.status !== "success" || state.data === undefined) {

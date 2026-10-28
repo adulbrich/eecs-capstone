@@ -51,9 +51,10 @@ export function StaffCategoriesSection({
   // A second activation in the same tick would write the category set twice;
   // `use-action.ts` says why the hook's ref is what stops it (#443).
   const { busy, error, run } = useAction({ fallback: "Save failed" });
-  const loadError = saved.isError
-    ? errorMessage(saved.error, "Could not load the categories")
-    : null;
+  const loadError =
+    saved.data === undefined && saved.isError
+      ? errorMessage(saved.error, "Could not load the categories")
+      : null;
 
   function save() {
     return run(async () => {
@@ -63,10 +64,10 @@ export function StaffCategoriesSection({
       const fresh = await refetchAfterSave<string[]>(
         queryClient,
         projectId,
-        queryKey
+        queryKey,
+        onChanged
       );
       setDraft(fresh);
-      await onChanged();
     });
   }
 

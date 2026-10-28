@@ -80,9 +80,10 @@ export function StaffProgramSection({
   }
   useSeedOnArrival(projectId, saved, seed);
   const { busy, error, run } = useAction({ fallback: "Save failed" });
-  const loadError = query.isError
-    ? errorMessage(query.error, "Could not load the programs")
-    : null;
+  const loadError =
+    query.data === undefined && query.isError
+      ? errorMessage(query.error, "Could not load the programs")
+      : null;
 
   function save() {
     return run(async () => {
@@ -97,10 +98,10 @@ export function StaffProgramSection({
       const fresh = await refetchAfterSave<Saved>(
         queryClient,
         projectId,
-        queryKey
+        queryKey,
+        onChanged
       );
       seed(fresh);
-      await onChanged();
     });
   }
 

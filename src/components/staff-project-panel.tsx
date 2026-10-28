@@ -164,9 +164,9 @@ export function StaffProjectPanel({
     await refetchAfterSave(
       queryClient,
       project.id,
-      staffProjectKeys.proposer(project.id)
+      staffProjectKeys.proposer(project.id),
+      onChanged
     );
-    await onChanged();
   }
 
   const currentStatus = project.status as ProjectStatus;

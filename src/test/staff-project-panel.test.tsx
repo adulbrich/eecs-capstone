@@ -1452,8 +1452,15 @@ describe("StaffProjectPanel edit log on a revisit", () => {
 });
 
 describe("StaffProjectPanel refetches after a save", () => {
-  it("says the save landed when only the reread after it failed", async () => {
-    renderPanel("submitted");
+  it("says the save landed when only the reread after it failed, and still refreshes the page", async () => {
+    const onChanged = vi.fn(() => Promise.resolve());
+    renderWithQueryClient(
+      <StaffProjectPanel
+        onChanged={onChanged}
+        project={project("submitted")}
+        viewerIsOwner={false}
+      />
+    );
     await loadedMentorInput();
     getProjectMentorship.mockRejectedValueOnce(new Error("down"));
     // The same empty address: no confirm opens, and the save goes straight out.
@@ -1462,6 +1469,21 @@ describe("StaffProjectPanel refetches after a save", () => {
     expect(await screen.findByText(SAVED_BUT_NOT_RELOADED)).toBeTruthy();
     // Not the load failure, which would claim nothing was saved.
     expect(screen.queryByText("down")).toBeNull();
+    expect(onChanged).toHaveBeenCalledTimes(1);
+  });
+
+  it("says the proposer save landed when only the reread after it failed", async () => {
+    renderPanel("submitted");
+    const save = (await screen.findByRole("button", {
+      name: "Save proposer",
+    })) as HTMLButtonElement;
+    getProposerForEdit.mockRejectedValueOnce(new Error("down"));
+    // The mark alone mails nobody, so no confirm stands in the way.
+    fireEvent.click(screen.getByRole("checkbox", { name: "Student proposed" }));
+    await waitFor(() => expect(save.disabled).toBe(false));
+    fireEvent.click(save);
+
+    expect(await screen.findByText(SAVED_BUT_NOT_RELOADED)).toBeTruthy();
   });
 
   it("reads the edit log again after a Programs and teams save", async () => {

@@ -65,9 +65,10 @@ export function StaffMentorshipSection({
   // `use-action.ts` says why the hook's ref is what stops it (#443).
   const { busy, error, run } = useAction({ fallback: "Save failed" });
   // Reported, not swallowed, and Save stays disabled: see the gate below.
-  const loadError = query.isError
-    ? errorMessage(query.error, "Could not load the mentor record")
-    : null;
+  const loadError =
+    query.data === undefined && query.isError
+      ? errorMessage(query.error, "Could not load the mentor record")
+      : null;
   const [confirmOpen, setConfirmOpen] = useState(false);
 
   const trimmed = mentorEmail.trim();
@@ -88,10 +89,10 @@ export function StaffMentorshipSection({
       const fresh = await refetchAfterSave<ProjectMentorship>(
         queryClient,
         projectId,
-        queryKey
+        queryKey,
+        onChanged
       );
       setMentorEmail(fresh.mentorEmail);
-      await onChanged();
     });
   }
 
