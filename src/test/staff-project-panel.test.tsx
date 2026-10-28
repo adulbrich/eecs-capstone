@@ -1402,6 +1402,28 @@ describe("StaffProjectPanel late answers across a project change", () => {
   });
 });
 
+describe("StaffProjectPanel on a revisit", () => {
+  it("seeds the draft from a fresh read, not from the previous visit's cache", async () => {
+    getProjectMentorship.mockResolvedValue({
+      mentorEmail: "before@x.test",
+      mentorName: null,
+    });
+    const view = renderPanel("submitted");
+    expect((await loadedMentorInput()).value).toBe("before@x.test");
+
+    // A colleague's save while this tab is on another project.
+    view.rerender(panel("submitted", "00000000-0000-0000-0000-0000000000p2"));
+    await settle();
+    getProjectMentorship.mockResolvedValue({
+      mentorEmail: "after@x.test",
+      mentorName: null,
+    });
+    view.rerender(panel("submitted"));
+
+    expect((await loadedMentorInput()).value).toBe("after@x.test");
+  });
+});
+
 describe("StaffProjectPanel refetches after a save", () => {
   it("reads the edit log again after a Programs and teams save", async () => {
     updateProjectPrograms.mockResolvedValue({ id: PROJECT_ID, updated: true });
