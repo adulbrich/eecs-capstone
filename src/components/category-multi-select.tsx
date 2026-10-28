@@ -7,7 +7,6 @@ import { Button } from "#/components/ui/button";
 import { Checkbox } from "#/components/ui/checkbox";
 import { Input } from "#/components/ui/input";
 import { Label } from "#/components/ui/label";
-import { errorMessage } from "#/lib/error-message";
 import {
   createCategory,
   listCategories,
@@ -51,7 +50,7 @@ function categoriesQuery(domain: Domain) {
         throw error;
       }
     },
-    refetchOnMount: "always",
+    staleTime: 0,
   });
 }
 
@@ -69,9 +68,13 @@ export function CategoryMultiSelect({ domain, value, onChange }: Props) {
   const [newType, setNewType] = useState("");
   const [creating, setCreating] = useState(false);
   const [createError, setCreateError] = useState<string | null>(null);
-  const loadError = query.isError
-    ? errorMessage(query.error, "Could not load categories")
-    : null;
+  let loadError: string | null = null;
+  if (query.isError) {
+    loadError =
+      query.error instanceof Error
+        ? query.error.message
+        : "Could not load categories";
+  }
 
   function toggle(id: string) {
     onChange(

@@ -131,6 +131,10 @@ A route's own data comes from its loader and the router's cache ([ADR-0066](./ad
 
 A query whose data seeds an editable draft spreads `DRAFT_QUERY_OPTIONS` (`src/lib/staff-project-queries.ts`). `staleTime: Infinity` with focus and reconnect refetch off stops anything refetching under an open draft; a failed fetch marks a query invalidated, so `staleTime` alone does not. `gcTime: 0` drops the cache with the component, since a revisit within five minutes otherwise seeds from the cached copy (ADR-0062). `useSeedOnArrival` seeds the draft during render on the first arrival, so no frame enables Save beside a blank draft; only the section's own save reseeds it, through `refetchAfterSave`. A staff read that fills no draft spreads `STAFF_READ_OPTIONS`, which rereads on every mount.
 
+### A read that must be fresh on every mount sets `staleTime: 0`, not `refetchOnMount: "always"`
+
+`refetchOnMount` is checked only when an observer subscribes. A query enabled after mount, as every key on `useSignedInUserId` is, and an observer whose key changes without a remount, as on a project-to-project navigation, are judged on staleness instead, so under the client's 30-second `staleTime` they serve the cache. A component read that replaced a fetch on mount, and whose data a write elsewhere changes without invalidating it, sets `staleTime: 0`: `STAFF_READ_OPTIONS`, the comments and the category list. `project-private-panel.test.tsx` pins the gated case.
+
 ### A redirect thrown from a `queryFn` navigates the tab
 
 `setupRouterSsrQueryIntegration` in `src/router.tsx` leaves `handleRedirects` on, so a TanStack redirect thrown by any query navigates the tab. `requireUser` refuses with `redirect({ to: "/sign-in" })`, so a background refetch after a session ends carries the tab to `/sign-in`, unsaved edits included. A query over a `requireUser` server function catches `isRedirect` and returns an empty result, as `notification-bell.tsx` does. A staff read cannot: an empty answer reads as a blank record and enables a Save over it, so `staffRead` (`src/lib/staff-project-queries.ts`) rethrows the redirect as an ordinary error and the section reports a failed load.

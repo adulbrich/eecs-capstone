@@ -50,7 +50,7 @@ function useProjectComments(projectId: string) {
       }
     },
     enabled: userId !== undefined,
-    refetchOnMount: "always",
+    staleTime: 0,
   });
   return data;
 }

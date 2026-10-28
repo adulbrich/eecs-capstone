@@ -29,14 +29,15 @@ export const staffProjectKeys = {
 };
 
 /**
- * For a staff read that fills no draft (the edit log, scope, similarity): read
+ * For a staff read that fills no draft (the edit logs, scope, similarity): read
  * on every mount, as the effects did, since a save on the edit page changes
  * them and invalidates nothing here; and one attempt, so a failure reports at
- * once instead of after the default three retries.
+ * once instead of after the default three retries. `staleTime: 0` rather than
+ * `refetchOnMount: "always"`, which misses a key change (docs/QUIRKS.md).
  */
 export const STAFF_READ_OPTIONS = {
-  refetchOnMount: "always",
   retry: false,
+  staleTime: 0,
 } as const;
 
 /**
