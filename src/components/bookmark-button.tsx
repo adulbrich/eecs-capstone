@@ -48,8 +48,10 @@ export function BookmarkButton({ projectId }: { projectId: string }) {
     // before the write, so its answer would put the button back to the state
     // the viewer just left and the page would contradict the database (#444):
     // cancel it before the optimistic value goes in.
-    await queryClient.cancelQueries({ queryKey });
+    // Disabled first, synchronously, so a second click in the await below
+    // cannot toggle again from the same value.
     setLoading(true);
+    await queryClient.cancelQueries({ queryKey });
     const next = !bookmarked;
     queryClient.setQueryData(queryKey, next);
     try {

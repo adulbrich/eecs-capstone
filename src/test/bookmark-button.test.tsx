@@ -19,12 +19,15 @@ let answerRead: ((bookmarked: boolean) => void) | null = null;
 let held = new Set<string>();
 /** How many times the button asked the server. */
 let reads = 0;
+/** How many adds reached the server. */
+let writes = 0;
 /** Holds the next add open until `finishWrite` is called. */
 let holdWrite = false;
 let finishWrite: (() => void) | null = null;
 
 vi.mock("#/server/bookmarks", () => ({
   addBookmark: ({ data }: { data: { projectId: string } }) => {
+    writes += 1;
     rows.add(data.projectId);
     if (holdWrite) {
       return new Promise((resolve) => {
@@ -63,6 +66,7 @@ afterEach(() => {
   answerRead = null;
   held = new Set();
   reads = 0;
+  writes = 0;
   holdWrite = false;
   finishWrite = null;
 });
@@ -163,6 +167,23 @@ describe("BookmarkButton", () => {
     });
 
     expect(view.getByRole("button", { name: "Remove bookmark" })).toBeTruthy();
+  });
+
+  it("writes once for a double click", async () => {
+    session = { user: { id: "u1" } };
+    const { findByRole, getByRole } = renderButton();
+    await findByRole("button", { name: "Bookmark" });
+    await answer(false);
+
+    // Each `fireEvent` is its own `act`, so React renders between the two
+    // clicks, as it does between two real ones.
+    const button = getByRole("button", { name: "Bookmark" });
+    fireEvent.click(button);
+    fireEvent.click(button);
+    await act(settle);
+
+    expect(writes).toBe(1);
+    expect(getByRole("button", { name: "Remove bookmark" })).toBeTruthy();
   });
 
   it("still toggles on a settled page", async () => {

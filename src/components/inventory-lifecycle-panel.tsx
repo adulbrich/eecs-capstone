@@ -272,7 +272,10 @@ function EditLogSection({ itemId }: { itemId: string }) {
         loud rather than swallowed: an empty list would otherwise claim the
         item has no edits, which is a different and possibly false thing.
       */}
-      <EditLogList error={query.isError} rows={query.data ?? []} />
+      <EditLogList
+        error={query.isError && query.data === undefined}
+        rows={query.data ?? []}
+      />
     </PanelSection>
   );
 }

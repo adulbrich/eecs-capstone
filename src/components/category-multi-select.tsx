@@ -50,6 +50,7 @@ function categoriesQuery(domain: Domain) {
         throw error;
       }
     },
+    retry: false,
     staleTime: 0,
   });
 }

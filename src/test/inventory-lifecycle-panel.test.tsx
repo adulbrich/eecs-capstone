@@ -637,6 +637,25 @@ describe("InventoryLifecyclePanel edit log", () => {
     expect(screen.queryByText("No edits yet.")).toBeNull();
   });
 
+  it("keeps the loaded log when a later reread fails", async () => {
+    server.listInventoryItemEditLog.mockResolvedValueOnce({
+      rows: [row],
+    } as never);
+    const view = renderPanel();
+    expect(await screen.findByText(/Grace Hopper/)).toBeTruthy();
+    server.listInventoryItemEditLog.mockRejectedValueOnce(new Error("down"));
+
+    await view.queryClient.refetchQueries({
+      queryKey: ["inventory-item", "item-1", "edit-log"],
+    });
+
+    await waitFor(() =>
+      expect(server.listInventoryItemEditLog).toHaveBeenCalledTimes(2)
+    );
+    expect(screen.getByText(/Grace Hopper/)).toBeTruthy();
+    expect(screen.queryByText("The edit log could not be loaded.")).toBeNull();
+  });
+
   it("reads the log again on a revisit, even inside the client's 30-second window", async () => {
     // The only writer is the edit page, which invalidates nothing here, so a
     // return from it must read again rather than show the cached log.

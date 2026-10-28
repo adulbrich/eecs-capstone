@@ -50,6 +50,7 @@ function useProjectComments(projectId: string) {
       }
     },
     enabled: userId !== undefined,
+    retry: false,
     staleTime: 0,
   });
   return data;

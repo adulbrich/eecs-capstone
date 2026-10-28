@@ -133,7 +133,7 @@ A query whose data seeds an editable draft spreads `DRAFT_QUERY_OPTIONS` (`src/l
 
 ### A read that must be fresh on every mount sets `staleTime: 0`, not `refetchOnMount: "always"`
 
-`refetchOnMount` is checked only when an observer subscribes. A query enabled after mount, as every key on `useSignedInUserId` is, and an observer whose key changes without a remount, as on a project-to-project navigation, are judged on staleness instead, so under the client's 30-second `staleTime` they serve the cache. A component read that replaced a fetch on mount, and whose data a write elsewhere changes without invalidating it, sets `staleTime: 0`: `STAFF_READ_OPTIONS`, the comments and the category list. `project-private-panel.test.tsx` pins the gated case.
+`refetchOnMount` is checked only when an observer subscribes. A query enabled after mount, as every key on `useSignedInUserId` is, and an observer whose key changes without a remount, as on a project-to-project navigation, are judged on staleness instead, so under the client's 30-second `staleTime` they serve the cache. A component read that replaced a fetch on mount, and whose data a write elsewhere changes without invalidating it, sets `staleTime: 0`: `STAFF_READ_OPTIONS`, the comments and the category list. Each window focus then rereads them too, which the effects never did; that is intended. `project-private-panel.test.tsx` pins the gated case.
 
 ### A redirect thrown from a `queryFn` navigates the tab
 
