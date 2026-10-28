@@ -1,5 +1,6 @@
+import { useQuery } from "@tanstack/react-query";
 import { useRouter } from "@tanstack/react-router";
-import { useEffect, useRef, useState } from "react";
+import { useRef, useState } from "react";
 import { lastDeadlineDay, localDay } from "#/lib/day-range";
 import {
   formatHoldDetailed,
@@ -12,6 +13,7 @@ import {
   needsHolder,
 } from "#/lib/inventory-workflow";
 import { formatPickupWindow } from "#/lib/pickup-window";
+import { STAFF_READ_OPTIONS, staffRead } from "#/lib/staff-project-queries";
 import { useAction } from "#/lib/use-action";
 import { INVENTORY_ITEM_STATUSES, type ItemStatus } from "#/lib/vocabularies";
 import {
@@ -19,7 +21,7 @@ import {
   listInventoryItemEditLog,
   transitionInventoryItem,
 } from "#/server/inventory";
-import { type EditLogEntry, EditLogList } from "./edit-log-list";
+import { EditLogList } from "./edit-log-list";
 import { HolderField } from "./holder-field";
 import { InventoryStatusBadge } from "./inventory-status-badge";
 import { LocalTime } from "./local-time";
@@ -248,31 +250,29 @@ const HISTORY_PAGE_SIZE = 10;
  *
  * Fetched here rather than folded into `getInventoryItemDetail`, so the public
  * loader feeding this page never carries staff-only rows it would then have to
- * remember to drop. Same shape as the project panel's own effect.
+ * remember to drop. Read the way the project panel reads its own log: keyed on
+ * the item, and again on every mount, since the only writer is the edit page.
  */
 function EditLogSection({ itemId }: { itemId: string }) {
-  const [rows, setRows] = useState<EditLogEntry[]>([]);
-  const [failed, setFailed] = useState(false);
-
-  useEffect(() => {
-    void (async () => {
-      try {
-        const result = await listInventoryItemEditLog({ data: { itemId } });
-        setRows(result.rows);
-        setFailed(false);
-      } catch {
-        // Staff-only endpoint rendered from a staff-only branch, so a failure
-        // here is a transport problem rather than a permission one. Said out
-        // loud rather than swallowed: an empty list would otherwise claim the
-        // item has no edits, which is a different and possibly false thing.
-        setFailed(true);
-      }
-    })();
-  }, [itemId]);
+  const query = useQuery({
+    queryKey: ["inventory-item", itemId, "edit-log"],
+    queryFn: () =>
+      staffRead(async () => {
+        const { rows } = await listInventoryItemEditLog({ data: { itemId } });
+        return rows;
+      }),
+    ...STAFF_READ_OPTIONS,
+  });
 
   return (
     <PanelSection title="Edit log">
-      <EditLogList error={failed} rows={rows} />
+      {/*
+        Staff-only endpoint rendered from a staff-only branch, so a failure
+        here is a transport problem rather than a permission one. Said out
+        loud rather than swallowed: an empty list would otherwise claim the
+        item has no edits, which is a different and possibly false thing.
+      */}
+      <EditLogList error={query.isError} rows={query.data ?? []} />
     </PanelSection>
   );
 }
