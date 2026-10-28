@@ -5,7 +5,11 @@ import {
   type ScopeAssessmentView,
   type ScopeVerdict,
 } from "#/lib/scope-assessment";
-import { staffProjectKeys, staffRead } from "#/lib/staff-project-queries";
+import {
+  STAFF_READ_OPTIONS,
+  staffProjectKeys,
+  staffRead,
+} from "#/lib/staff-project-queries";
 import { useAction } from "#/lib/use-action";
 import {
   assessProjectScope,
@@ -53,14 +57,15 @@ export function ScopeAssessmentSection({ projectId }: { projectId: string }) {
   const query = useQuery({
     queryKey,
     queryFn: () => staffRead(() => getScopeAssessment({ data: { projectId } })),
+    ...STAFF_READ_OPTIONS,
   });
   // Staff-only endpoint; a failure reads as "not assessed yet", and the
   // button below reports its own error if the write is refused too.
   let view: ScopeAssessmentView | null | "loading" = null;
-  if (query.data !== undefined) {
-    view = query.data;
-  } else if (query.isPending) {
+  if (query.status === "pending") {
     view = "loading";
+  } else if (query.data !== undefined) {
+    view = query.data;
   }
   // A second activation in the same tick would spend a second Bedrock call;
   // `use-action.ts` says why the hook's ref is what stops it (#443).

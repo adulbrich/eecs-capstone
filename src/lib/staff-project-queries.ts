@@ -29,17 +29,36 @@ export const staffProjectKeys = {
 };
 
 /**
+ * For a staff read that fills no draft (the edit log, scope, similarity): read
+ * on every mount, as the effects did, since a save on the edit page changes
+ * them and invalidates nothing here; and one attempt, so a failure reports at
+ * once instead of after the default three retries.
+ */
+export const STAFF_READ_OPTIONS = {
+  refetchOnMount: "always",
+  retry: false,
+} as const;
+
+/**
  * For a query that fills a draft: nothing refetches under it, and the cache
  * dies with the panel, so every mount reads a fresh record as the effects did.
  * A cached copy kept for the default five minutes would seed a revisit's draft
  * from values a colleague has since replaced (docs/QUIRKS.md, "A query that
- * fills a draft never refetches on its own").
+ * fills a draft never refetches on its own"). Reconnect is off as well as
+ * focus: a failed fetch marks the query invalidated, which `staleTime` alone
+ * does not outrank.
  */
 export const DRAFT_QUERY_OPTIONS = {
   gcTime: 0,
+  refetchOnReconnect: false,
   refetchOnWindowFocus: false,
+  retry: false,
   staleTime: Number.POSITIVE_INFINITY,
 } as const;
+
+/** What a section says when its save landed and the reread after it did not. */
+export const SAVED_BUT_NOT_RELOADED =
+  "Saved, but this section could not reload. Reload the page before saving again.";
 
 /**
  * A staff read, with a redirect turned into an ordinary failure. Every staff
@@ -63,15 +82,16 @@ export async function staffRead<T>(read: () => Promise<T>): Promise<T> {
 
 /**
  * After a section's own save: refetch its record and the edit log, and hand
- * back the record only if the refetch landed. A failed refetch keeps the old
- * data beside the error, and reseeding the draft from that would show the
- * values from before the save.
+ * back the record. A failed refetch keeps the old data beside the error, so
+ * it throws `SAVED_BUT_NOT_RELOADED` instead: reseeding the draft from the old
+ * data would show the values from before the save, and the section's load
+ * message would claim nothing was saved. The caller's `run` shows it.
  */
 export async function refetchAfterSave<T>(
   queryClient: QueryClient,
   projectId: string,
   queryKey: QueryKey
-): Promise<T | undefined> {
+): Promise<T> {
   await Promise.all([
     queryClient.invalidateQueries({ queryKey }),
     queryClient.invalidateQueries({
@@ -79,7 +99,10 @@ export async function refetchAfterSave<T>(
     }),
   ]);
   const state = queryClient.getQueryState<T>(queryKey);
-  return state?.status === "success" ? state.data : undefined;
+  if (state?.status !== "success" || state.data === undefined) {
+    throw new Error(SAVED_BUT_NOT_RELOADED);
+  }
+  return state.data;
 }
 
 /**

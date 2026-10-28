@@ -90,9 +90,7 @@ export function StaffMentorshipSection({
         projectId,
         queryKey
       );
-      if (fresh) {
-        setMentorEmail(fresh.mentorEmail);
-      }
+      setMentorEmail(fresh.mentorEmail);
       await onChanged();
     });
   }

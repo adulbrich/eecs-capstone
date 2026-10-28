@@ -4,7 +4,11 @@ import type {
   RecomputeSimilarityResult,
   SimilarityView,
 } from "#/lib/ai-refresh";
-import { staffProjectKeys, staffRead } from "#/lib/staff-project-queries";
+import {
+  STAFF_READ_OPTIONS,
+  staffProjectKeys,
+  staffRead,
+} from "#/lib/staff-project-queries";
 import { useAction } from "#/lib/use-action";
 import { getSimilarity, recomputeSimilarity } from "#/server/similarity";
 import { AttemptFailed, AttemptNote, triggerPhrase } from "./ai-attempt";
@@ -62,6 +66,7 @@ export function SimilaritySection({ projectId }: { projectId: string }) {
   const query = useQuery({
     queryKey,
     queryFn: () => staffRead(() => getSimilarity({ data: { projectId } })),
+    ...STAFF_READ_OPTIONS,
   });
   const [notice, setNotice] = useState<string | null>(null);
   const [saved, setSaved] = useState<string | null>(null);

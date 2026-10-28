@@ -12,6 +12,7 @@ import {
 import {
   DRAFT_QUERY_OPTIONS,
   refetchAfterSave,
+  STAFF_READ_OPTIONS,
   staffProjectKeys,
   staffRead,
 } from "#/lib/staff-project-queries";
@@ -133,6 +134,7 @@ export function StaffProjectPanel({
         });
         return rows;
       }),
+    ...STAFF_READ_OPTIONS,
   });
   const [sendEmail, setSendEmail] = useState(true);
   const [deleteEmail, setDeleteEmail] = useState(true);

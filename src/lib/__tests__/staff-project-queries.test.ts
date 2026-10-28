@@ -3,6 +3,7 @@ import { isRedirect, redirect } from "@tanstack/react-router";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   refetchAfterSave,
+  SAVED_BUT_NOT_RELOADED,
   staffProjectKeys,
   staffRead,
 } from "#/lib/staff-project-queries";
@@ -66,12 +67,14 @@ describe("refetchAfterSave", () => {
     expect(queryClient.getQueryState(editLog)?.isInvalidated).toBe(true);
   });
 
-  it("hands back nothing when the refetch failed, so the draft keeps the save's values", async () => {
+  it("says the save landed and the reread did not when the refetch failed", async () => {
     const { queryClient } = await observed(() =>
       Promise.reject(new Error("down"))
     );
 
-    expect(await refetchAfterSave(queryClient, projectId, key)).toBeUndefined();
+    await expect(refetchAfterSave(queryClient, projectId, key)).rejects.toThrow(
+      SAVED_BUT_NOT_RELOADED
+    );
     // The old record is still in the cache beside the error; reseeding a
     // draft from it would show the values from before the save.
     expect(queryClient.getQueryData(key)).toBe("before");

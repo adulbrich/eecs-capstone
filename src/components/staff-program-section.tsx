@@ -99,9 +99,7 @@ export function StaffProgramSection({
         projectId,
         queryKey
       );
-      if (fresh) {
-        seed(fresh);
-      }
+      seed(fresh);
       await onChanged();
     });
   }

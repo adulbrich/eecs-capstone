@@ -129,7 +129,7 @@ A route's own data comes from its loader and the router's cache ([ADR-0066](./ad
 
 ### A query that fills a draft never refetches on its own
 
-A query whose data seeds an editable draft spreads `DRAFT_QUERY_OPTIONS` (`src/lib/staff-project-queries.ts`). `staleTime: Infinity` and `refetchOnWindowFocus: false` stop anything refetching under an open draft; `gcTime: 0` drops the cache with the component, since a revisit within the default five minutes otherwise mounts on the cached copy with no refetch and seeds values a colleague has since replaced (ADR-0062). `useSeedOnArrival` seeds the draft during render when the data first arrives for a project, so no frame enables Save beside a blank draft. Only the section's own save reseeds it, through `refetchAfterSave`, and only if the refetch landed. `staff-project-panel.test.tsx` pins both.
+A query whose data seeds an editable draft spreads `DRAFT_QUERY_OPTIONS` (`src/lib/staff-project-queries.ts`). `staleTime: Infinity` with focus and reconnect refetch off stops anything refetching under an open draft; a failed fetch marks a query invalidated, so `staleTime` alone does not. `gcTime: 0` drops the cache with the component, since a revisit within five minutes otherwise seeds from the cached copy (ADR-0062). `useSeedOnArrival` seeds the draft during render on the first arrival, so no frame enables Save beside a blank draft; only the section's own save reseeds it, through `refetchAfterSave`. A staff read that fills no draft spreads `STAFF_READ_OPTIONS`, which rereads on every mount.
 
 ### A redirect thrown from a `queryFn` navigates the tab
 

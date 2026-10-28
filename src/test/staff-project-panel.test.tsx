@@ -166,7 +166,10 @@ globalThis.ResizeObserver ??=
   ResizeObserverStub as unknown as typeof ResizeObserver;
 
 import { StaffProjectPanel } from "#/components/staff-project-panel";
-import { staffProjectKeys } from "#/lib/staff-project-queries";
+import {
+  SAVED_BUT_NOT_RELOADED,
+  staffProjectKeys,
+} from "#/lib/staff-project-queries";
 import { deferred } from "./shared/deferred";
 
 afterEach(cleanup);
@@ -1424,7 +1427,43 @@ describe("StaffProjectPanel on a revisit", () => {
   });
 });
 
+describe("StaffProjectPanel edit log on a revisit", () => {
+  it("reads the log again even inside the client's 30-second window", async () => {
+    const view = renderPanel("submitted");
+    // The app client's default, which the test client leaves at zero.
+    view.queryClient.setDefaultOptions({
+      queries: { retry: false, staleTime: 30_000 },
+    });
+    await waitFor(() => expect(listProjectEditLog).toHaveBeenCalledTimes(1));
+
+    // Away to another project and straight back, as after an edit-page save.
+    view.rerender(panel("submitted", "00000000-0000-0000-0000-0000000000p2"));
+    await settle();
+    view.rerender(panel("submitted"));
+
+    await waitFor(() =>
+      expect(
+        listProjectEditLog.mock.calls.filter(
+          ([arg]) => arg.data.id === PROJECT_ID
+        )
+      ).toHaveLength(2)
+    );
+  });
+});
+
 describe("StaffProjectPanel refetches after a save", () => {
+  it("says the save landed when only the reread after it failed", async () => {
+    renderPanel("submitted");
+    await loadedMentorInput();
+    getProjectMentorship.mockRejectedValueOnce(new Error("down"));
+    // The same empty address: no confirm opens, and the save goes straight out.
+    fireEvent.click(screen.getByRole("button", { name: "Save mentor" }));
+
+    expect(await screen.findByText(SAVED_BUT_NOT_RELOADED)).toBeTruthy();
+    // Not the load failure, which would claim nothing was saved.
+    expect(screen.queryByText("down")).toBeNull();
+  });
+
   it("reads the edit log again after a Programs and teams save", async () => {
     updateProjectPrograms.mockResolvedValue({ id: PROJECT_ID, updated: true });
     renderPanel("submitted");

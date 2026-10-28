@@ -65,9 +65,7 @@ export function StaffCategoriesSection({
         projectId,
         queryKey
       );
-      if (fresh) {
-        setDraft(fresh);
-      }
+      setDraft(fresh);
       await onChanged();
     });
   }
