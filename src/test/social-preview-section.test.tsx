@@ -14,6 +14,7 @@ vi.mock("#/server/social-summary", () => server);
 import { SocialPreviewSection } from "#/components/social-preview-section";
 import type {
   RegenerateSocialSummaryResult,
+  SaveSocialSummaryResult,
   SocialSummaryView,
 } from "#/lib/social-summary";
 
@@ -63,6 +64,16 @@ const RACED: RegenerateSocialSummaryResult = {
   refreshable: true,
   summaryAttempt: null,
   summary: "Wording a colleague saved mid-flight.",
+  updatedAt: new Date("2026-09-03T10:00:00Z"),
+  outcome: "changed",
+};
+
+/** What Save returns when its write landed. */
+const SAVED: SaveSocialSummaryResult = { ...MANUAL, outcome: "saved" };
+/** What it returns when a colleague's save landed after this tab loaded. */
+const SAVE_LOST: SaveSocialSummaryResult = {
+  ...MANUAL,
+  summary: "Wording Carol saved.",
   updatedAt: new Date("2026-09-03T10:00:00Z"),
   outcome: "changed",
 };
@@ -195,13 +206,19 @@ describe("SocialPreviewSection actions", () => {
 
   it("saves the trimmed text and takes the manual mark back from the server", async () => {
     await renderWith(AUTOMATIC);
-    server.saveSocialSummary.mockResolvedValue(MANUAL);
+    server.saveSocialSummary.mockResolvedValue(SAVED);
     type("  Wording staff chose.  ");
     fireEvent.click(saveButton());
 
+    // `expected` is what this tab loaded, verbatim, so the server can refuse
+    // the save if a colleague's landed since (#583).
     await waitFor(() =>
       expect(server.saveSocialSummary).toHaveBeenCalledWith({
-        data: { projectId: "p1", summary: "Wording staff chose." },
+        data: {
+          projectId: "p1",
+          summary: "Wording staff chose.",
+          expected: { summary: AUTOMATIC.summary, isManual: false },
+        },
       })
     );
     // The stored value comes back from the server rather than being assumed,
@@ -238,6 +255,41 @@ describe("SocialPreviewSection actions", () => {
     expect(textarea().value).toBe(RACED.summary);
     // Still manual, so Regenerate is offered again rather than left dead.
     expect(regenerateButton().hasAttribute("disabled")).toBe(false);
+  });
+
+  it("says so when a save lost to a colleague's, and keeps what was typed", async () => {
+    // Carol saved after this tab loaded, so the server wrote nothing (#583).
+    // The box keeps this tab's wording, which nothing else has kept, and the
+    // notice carries Carol's, so both are on screen.
+    await renderWith(MANUAL);
+    server.saveSocialSummary.mockResolvedValueOnce(SAVE_LOST);
+    type("Wording Bob typed.");
+    fireEvent.click(saveButton());
+
+    const notice = await screen.findByText(/so yours was not saved/);
+    expect(notice.getAttribute("role")).toBe("alert");
+    expect(notice.textContent).toContain(`"${SAVE_LOST.summary}"`);
+    expect(textarea().value).toBe("Wording Bob typed.");
+
+    // A second Save is a knowing overwrite: it carries Carol's wording as
+    // what it replaces, and succeeds.
+    server.saveSocialSummary.mockResolvedValueOnce({
+      ...SAVED,
+      summary: "Wording Bob typed.",
+    });
+    fireEvent.click(saveButton());
+    await waitFor(() =>
+      expect(server.saveSocialSummary).toHaveBeenLastCalledWith({
+        data: {
+          projectId: "p1",
+          summary: "Wording Bob typed.",
+          expected: { summary: SAVE_LOST.summary, isManual: true },
+        },
+      })
+    );
+    await waitFor(() =>
+      expect(screen.queryByText(/so yours was not saved/)).toBeNull()
+    );
   });
 
   it("reports a failed rewrite and keeps the stored wording", async () => {
