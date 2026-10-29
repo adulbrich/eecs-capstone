@@ -292,6 +292,24 @@ describe("SocialPreviewSection actions", () => {
     );
   });
 
+  it("treats a miss that already stores the typed wording as saved", async () => {
+    // This tab's earlier save landed but its answer was lost, so the retry
+    // misses on its own write. Nothing was lost, so nothing is announced.
+    await renderWith(AUTOMATIC);
+    server.saveSocialSummary.mockResolvedValueOnce({
+      ...SAVE_LOST,
+      summary: "Wording Bob typed.",
+    });
+    type("Wording Bob typed.");
+    fireEvent.click(saveButton());
+
+    await waitFor(() =>
+      expect(regenerateButton().hasAttribute("disabled")).toBe(false)
+    );
+    expect(screen.queryByText(/so yours was not saved/)).toBeNull();
+    expect(saveButton().hasAttribute("disabled")).toBe(true);
+  });
+
   it("reports a failed rewrite and keeps the stored wording", async () => {
     // Unlike the automatic path, which swallows: someone pressed a button.
     await renderWith(MANUAL);

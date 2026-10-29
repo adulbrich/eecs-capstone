@@ -36,7 +36,7 @@ const RACE_LOST =
  */
 function saveLost(stored: string | null): string {
   const lead =
-    "Someone changed the summary after this page loaded it, so yours was not saved. Your wording is still in the box";
+    "The stored summary changed after this page loaded it, so yours was not saved. Your wording is still in the box";
   return stored === null
     ? `${lead}, and Save again stores it.`
     : `${lead}, and Save again replaces what is stored now: "${stored}"`;
@@ -190,7 +190,14 @@ export function SocialPreviewSection({ projectId }: { projectId: string }) {
           expected: { summary: loaded.summary, isManual: loaded.isManual },
         },
       });
-      if (next.outcome === "saved") {
+      // A miss that already stores this wording, by hand, is a save: this
+      // tab's earlier save landed with its answer lost, or a colleague typed
+      // the same. Telling staff theirs was lost would be wrong, and the
+      // "Save again" it offers would be disabled.
+      if (
+        next.outcome === "saved" ||
+        (next.isManual && next.summary === trimmed)
+      ) {
         show(next);
         return;
       }

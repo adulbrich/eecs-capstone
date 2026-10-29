@@ -112,7 +112,7 @@ export async function getSocialSummaryForCurrentUser(
  * Bob, who can read Carol's wording and save over it knowingly.
  *
  * The predicate is `data.expected`, what the panel loaded, and not the row
- * this function reads, which is one round trip old and so catches nothing: the
+ * this function reads, which would catch only a race inside this call: the
  * panel loads once on mount and a tab left open all afternoon holds a view
  * from whenever it was opened. It compares the stored text and the manual
  * flag, as Regenerate does and for the same reasons, including the ABA it
