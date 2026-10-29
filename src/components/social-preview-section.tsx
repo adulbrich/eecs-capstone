@@ -30,10 +30,16 @@ const LOAD_FAILED =
 const RACE_LOST =
   "The project or its summary changed while the rewrite was running, so the rewrite was thrown away. The box shows what is stored now.";
 
+/**
+ * The stored wording goes last, quoted, so a summary with or without a closing
+ * full stop never runs into the next sentence.
+ */
 function saveLost(stored: string | null): string {
-  const now =
-    stored === null ? "Nothing is stored now." : `Stored now: "${stored}"`;
-  return `Someone changed the summary after this page loaded it, so yours was not saved. ${now} Your wording is still in the box; Save again replaces theirs.`;
+  const lead =
+    "Someone changed the summary after this page loaded it, so yours was not saved. Your wording is still in the box";
+  return stored === null
+    ? `${lead}, and Save again stores it.`
+    : `${lead}, and Save again replaces what is stored now: "${stored}"`;
 }
 
 /**
