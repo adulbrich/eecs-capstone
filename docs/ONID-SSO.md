@@ -273,19 +273,22 @@ Everything asked on 2026-08-24 came back on 2026-08-25 except Key Vault access.
 UIT report that the Key Vault Secrets User role was assigned at vault creation
 and suspect a tenant misconfiguration rather than a missing grant; the suggested
 workaround is to sign in at `portal.azure.com`, accept the error prompt, and
-search for `kv-engr-coe-vault-caps` instead of following a direct link.
+search for `kv-engr-coe-vault-caps` instead of following a direct link. Whether
+that workaround fixed it is not recorded, but the production secret did reach
+AWS, because production sign-in works.
 
-Production sign-in works, so the production secret was read. **The live flow
-carries most real sign-ins**, measured from ALB access logs over
-2026-09-27T23:55Z to 2026-10-28T23:59Z, the bucket's whole 30-day retention when
-read. The ONID callback (`/api/auth/oauth2/callback/onid` until #770 moved it to
+**The live flow carries most real sign-ins**, measured from ALB access logs over
+2026-09-27T23:55Z to 2026-10-28T23:59Z, everything the bucket held when read.
+The ONID callback (`/api/auth/oauth2/callback/onid` until #770 moved it to
 `/api/auth/callback/onid` on 2026-10-06) took 107 requests. 104 carried an
 authorization code and two of those ended in `state_mismatch`; the other three
 were one hit on the retired path and two `state_not_found` with no code. Over
-the same window `/api/auth/sign-in/email-otp` took 6 requests, so ONID carries
-about nine in ten sign-ins. Every count is a floor, not a full count: anything
-before the retention window is gone. The client address in these logs is a
-CloudFront edge, so they cannot count distinct people.
+the same window `/api/auth/sign-in/email-otp` took 6 requests, successful or
+not, and `/api/auth/callback/github` took 4, each followed by a
+`state_mismatch` error. So 102 ONID sign-ins against at most 6 by emailed code
+and none by GitHub. Every count is a floor, not a full count: anything before
+the window is gone. The client address in these logs is a CloudFront edge, so
+they cannot count distinct people.
 
 Answered, and folded into this document: both redirect URIs are registered, a
 development secret exists for localhost, `openid profile email` is sufficient,
@@ -302,12 +305,13 @@ code:
 - **UIT have not published to external users before** and cannot confirm in
   advance whether it would work. Moot now that we are staying single tenant.
 
-The UPN claim name is settled as far as sign-in goes. UIT took `username` from a
-Proxmox realm configuration and agree it is non-standard, so the mapper accepts
-`email`, then `username`, `preferred_username` and `upn`. The app log group's
-30 days to 2026-10-28 hold no `ONID sign-in refused a token` line, so every real
-token carried at least one of them. Which one is still unknown, because the log
-never records a claim, so that is no reason to narrow the mapper to one name.
+The UPN claim name is still unknown, but no longer a sign-in risk. UIT took
+`username` from a Proxmox realm configuration and agree it is non-standard, so
+the mapper reads `email`, then `username`, `preferred_username` and `upn`. The
+app log group's 30 days to 2026-10-28 hold no `ONID sign-in refused a token`
+line, so no real token lacked all four. That says nothing about which UPN name
+Entra sends, because `email` is read first and may be what every token carried,
+so it is no reason to narrow the mapper to one name.
 
 ## What is deliberately not built
 
@@ -320,5 +324,4 @@ never records a claim, so that is no reason to narrow the mapper to one name.
 - **No single logout.** Not requested, and signing out of this app should not
   sign a user out of every Microsoft property in the tenant.
 - **No removal of the emailed code or GitHub sign-in.** Industry partners and
-  outside faculty have no ONID, and open question 6 may narrow the ONID audience
-  further.
+  outside faculty have no ONID.
