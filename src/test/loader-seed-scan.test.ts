@@ -137,6 +137,13 @@ const CENSUS = new Map<string, { class: SeedClass; why: string }>([
       why: "what the draft last committed or synced to, the bookkeeping behind that resync",
     },
   ],
+  [
+    'src/lib/use-search-draft.ts: useRef(here ?? "")',
+    {
+      class: "C",
+      why: "the last q read on the page that rendered the box, reassigned on every render the location is on that page",
+    },
+  ],
   // Class D.
   [
     "src/components/admin-data-table.tsx: useRef(open)",
