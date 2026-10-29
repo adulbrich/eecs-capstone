@@ -58,7 +58,7 @@ import { searchParamQuerySchema } from "#/lib/search-query";
 import { getPublicUrl } from "#/lib/storage";
 import type { SortState } from "#/lib/table-state";
 import { useAdminTable } from "#/lib/use-admin-table";
-import { useDebouncedDraft } from "#/lib/use-debounced-draft";
+import { useSearchDraft } from "#/lib/use-search-draft";
 import type { ItemStatus } from "#/lib/vocabularies";
 import {
   listAdminInventory,
@@ -593,7 +593,7 @@ function AdminInventory() {
     },
     [navigate]
   );
-  const [qDraft, setQDraft] = useDebouncedDraft(q, commitQuery);
+  const [qDraft, setQDraft] = useSearchDraft(commitQuery);
 
   const { controlsProps, orderRows, tableProps } = useAdminTable({
     columns: COLUMNS,

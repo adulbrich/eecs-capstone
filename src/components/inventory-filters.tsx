@@ -1,6 +1,6 @@
 import { useId } from "react";
 import { ACTIVE_STATUSES, type ActiveStatus } from "#/lib/inventory-visibility";
-import { useDebouncedDraft } from "#/lib/use-debounced-draft";
+import { useSearchDraft } from "#/lib/use-search-draft";
 import type { ViewMode } from "#/lib/view-preference";
 import { INVENTORY_ORDERS, type InventoryOrder } from "#/server/inventory";
 import {
@@ -86,7 +86,7 @@ export function InventorySearchBar({
   q,
   view,
 }: SearchProps) {
-  const [localQ, setLocalQ] = useDebouncedDraft(q, onQChange);
+  const [localQ, setLocalQ] = useSearchDraft(onQChange);
   // `useId` for the reason `ProjectsSearchBar` gives.
   const hintId = useId();
   return (

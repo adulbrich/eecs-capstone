@@ -137,7 +137,21 @@ const CENSUS = new Map<string, { class: SeedClass; why: string }>([
       why: "what the draft last committed or synced to, the bookkeeping behind that resync",
     },
   ],
+  [
+    "src/lib/use-search-draft.ts: useState(q)",
+    {
+      class: "C",
+      why: "the last q read on the page the box mounted on, set during render whenever the location is on that page",
+    },
+  ],
   // Class D.
+  [
+    "src/lib/use-search-draft.ts: useState(pathname)",
+    {
+      class: "D",
+      why: "the pathname the search box mounted on, fixed for its life on purpose; the router's location, not loader data",
+    },
+  ],
   [
     "src/components/admin-data-table.tsx: useRef(open)",
     {

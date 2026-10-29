@@ -24,6 +24,10 @@ import { useEffect, useRef, useState } from "react";
  * timer on every render instead of on every change. That was the second bug in
  * the same file, whose effect depended on the whole props object.
  *
+ * The listing search boxes call it through `useSearchDraft`, which feeds it
+ * the location's `q` rather than `Route.useSearch()`'s, so a commit that Back
+ * or Forward cancels is a change it can see (#588).
+ *
  * Router-agnostic on purpose, taking a value and a callback rather than
  * reaching for `useNavigate`, which is what keeps it unit-testable and lets it
  * serve a caller whose value arrives as a prop. What it needs from the source

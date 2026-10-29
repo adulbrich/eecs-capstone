@@ -159,7 +159,7 @@ function InventoryIndex() {
     [navigate]
   );
   useSeedViewFromStorage(search.view, seedView);
-  // Stable, because useDebouncedDraft inside the filter bar keys its timer on
+  // Stable, because useSearchDraft inside the filter bar keys its timer on
   // this callback: an inline arrow would re-arm the debounce on every render
   // of this page rather than on every keystroke.
   const onQChange = useCallback(
