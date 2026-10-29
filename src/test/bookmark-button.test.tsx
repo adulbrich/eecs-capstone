@@ -153,17 +153,24 @@ describe("BookmarkButton", () => {
 
   it("starts its name with the word it shows, in both states", async () => {
     // A voice user says the visible word, so the name has to contain it
-    // (WCAG 2.5.3, #789). jsdom ignores `hidden md:inline`, so the text read
-    // here is the text shown from `md` up.
+    // (WCAG 2.5.3, #789). `textContent` ignores CSS, so it reads the span
+    // that `hidden md:inline` shows from `md` up.
     session = { user: { id: "u1" } };
     const { findByRole, getByRole } = renderButton();
-    const unset = await findByRole("button", { name: "Bookmark" });
-    expect(unset.textContent).toBe("Bookmark");
+    const startsWithItsText = (button: HTMLElement) =>
+      Boolean(button.textContent) &&
+      button.getAttribute("aria-label")?.startsWith(button.textContent ?? "");
+    expect(
+      startsWithItsText(await findByRole("button", { name: "Bookmark" }))
+    ).toBe(true);
 
     await answer(true);
 
-    const set = getByRole("button", { name: "Bookmarked, remove bookmark" });
-    expect(set.textContent).toBe("Bookmarked");
+    expect(
+      startsWithItsText(
+        getByRole("button", { name: "Bookmarked, remove bookmark" })
+      )
+    ).toBe(true);
   });
 
   it("drops the previous project's read after the id changes", async () => {
