@@ -88,7 +88,7 @@ test.describe("project changes-requested round trip", () => {
       // back to the project, so a `goto` here aborts the update in flight and
       // the page renders the project exactly as it was: the edit step would
       // pass having changed nothing.
-      await owner.waitForURL(new RegExp(`/projects/${projectId}$`), {
+      await owner.waitForURL(new RegExp(`/projects/${projectId}$`, "u"), {
         timeout: 15_000,
       });
       await waitForHydration(owner);
@@ -273,7 +273,7 @@ test.describe("project program placement", () => {
       // once the write returned and the route refetched. Advisory: the save
       // was not refused, and teams_supported is still 1 (#462).
       await expect(
-        staff.getByText(/supports 1 team but runs in 2 programs/)
+        staff.getByText(/supports 1 team but runs in 2 programs/u)
       ).toBeVisible();
 
       // Reload rather than trust the control: this asserts the stored rows,
@@ -306,7 +306,7 @@ test.describe("project program placement", () => {
       // Still there after a reload, which is the point of reading it off
       // the saved set rather than the draft.
       await expect(
-        staff.getByText(/supports 1 team but runs in 2 programs/)
+        staff.getByText(/supports 1 team but runs in 2 programs/u)
       ).toBeVisible();
 
       // The save is in the edit log, which is what makes a placement
@@ -329,9 +329,9 @@ test.describe("project program placement", () => {
       await expect(
         owner.getByRole("combobox", { name: "Program" })
       ).toHaveCount(0);
-      await expect(owner.getByRole("checkbox", { name: /Course/ })).toHaveCount(
-        0
-      );
+      await expect(
+        owner.getByRole("checkbox", { name: /Course/u })
+      ).toHaveCount(0);
       // The panel is staff-only, so the section is not reachable that way
       // either.
       await owner.goto(`/projects/${projectId}`);

@@ -187,6 +187,6 @@ describe("the scan the contract is checked with", () => {
         'import { createServerFn } from "@tanstack/react-start";\n' +
           "export const a = createServerFn().handler(() => {\n"
       )
-    ).toThrow(/did not parse/);
+    ).toThrow(/did not parse/u);
   });
 });

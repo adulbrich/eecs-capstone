@@ -259,7 +259,7 @@ export function projectsWithoutTeam(
     .sort((a, b) => a.title.localeCompare(b.title));
 }
 
-const WHITESPACE = /\s+/;
+const WHITESPACE = /\s+/u;
 
 /**
  * Why a Move cannot put a student on `project`, or null when it can: a

@@ -13,7 +13,7 @@ import { cn } from "#/lib/utils.ts";
  * and expects the caller to supply both through `style`.
  */
 const badgeVariants = cva(
-  "inline-flex items-center gap-1 rounded px-2 py-0.5 font-medium text-xs",
+  "inline-flex items-center gap-1 rounded px-2 py-0.5 text-xs font-medium",
   {
     defaultVariants: {
       variant: "default",
@@ -21,7 +21,7 @@ const badgeVariants = cva(
     variants: {
       variant: {
         default: "bg-secondary text-secondary-foreground",
-        outline: "border border-border text-foreground",
+        outline: "border-border text-foreground border",
         secondary: "bg-secondary text-muted-foreground",
         // Painted by the caller's inline --status-* tokens.
         status: "",

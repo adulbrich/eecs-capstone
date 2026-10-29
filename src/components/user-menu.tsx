@@ -28,7 +28,7 @@ export function UserMenu({ user }: Props) {
             src={img}
           />
         ) : (
-          <div className="flex h-7 w-7 items-center justify-center rounded-full bg-(--surface-sunken) font-medium text-xs">
+          <div className="flex h-7 w-7 items-center justify-center rounded-full bg-(--surface-sunken) text-xs font-medium">
             {(user.name ?? user.email).charAt(0).toUpperCase()}
           </div>
         )}

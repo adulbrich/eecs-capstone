@@ -49,7 +49,7 @@ function MyProjects() {
   return (
     <div className="mx-auto max-w-4xl px-4 py-6 md:p-8">
       <div className="flex items-center justify-between">
-        <h1 className="font-semibold text-2xl">My Projects</h1>
+        <h1 className="text-2xl font-semibold">My Projects</h1>
         <Button asChild size="sm">
           <Link to="/projects/new">
             <FilePlus aria-hidden="true" />
@@ -59,9 +59,9 @@ function MyProjects() {
       </div>
       {/* Spans every non-archived project, so it does not move with the status
           filter below. */}
-      <p className="mt-1 text-muted-foreground text-sm">
+      <p className="text-muted-foreground mt-1 text-sm">
         Expected number of teams (active projects, excluding archived):{" "}
-        <span className="font-medium text-foreground tabular-nums">
+        <span className="text-foreground font-medium tabular-nums">
           {teamCapacity}
         </span>
       </p>
@@ -103,8 +103,8 @@ function MyProjects() {
           here (#380). Each card opens the public project page. */}
       {mentoring.length > 0 && (
         <section className="mt-10">
-          <h2 className="font-semibold text-xl">Mentoring</h2>
-          <p className="mt-1 text-muted-foreground text-sm">
+          <h2 className="text-xl font-semibold">Mentoring</h2>
+          <p className="text-muted-foreground mt-1 text-sm">
             Projects that list you as the mentor.
           </p>
           <div className="mt-4 flex flex-col gap-3">

@@ -24,7 +24,7 @@ export function AccountLinkSummary({
   if (!email) {
     return (
       <p className="text-muted-foreground text-sm">
-        <span className="font-medium text-foreground">{label}:</span> None on
+        <span className="text-foreground font-medium">{label}:</span> None on
         file
       </p>
     );
@@ -34,10 +34,10 @@ export function AccountLinkSummary({
     <div className="space-y-1">
       <div className="flex flex-wrap items-center gap-2">
         {accountLinked && accountName && (
-          <span className="font-medium text-sm">{accountName}</span>
+          <span className="text-sm font-medium">{accountName}</span>
         )}
         <span
-          className="inline-flex items-center rounded px-2 py-0.5 font-medium text-xs"
+          className="inline-flex items-center rounded px-2 py-0.5 text-xs font-medium"
           style={
             accountLinked
               ? {

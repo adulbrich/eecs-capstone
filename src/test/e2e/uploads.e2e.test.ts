@@ -63,7 +63,7 @@ test.describe("project image upload", () => {
       ).toBeVisible();
 
       await owner.getByRole("button", { name: "Save" }).click();
-      await owner.waitForURL(new RegExp(`/projects/${projectId}$`), {
+      await owner.waitForURL(new RegExp(`/projects/${projectId}$`, "u"), {
         timeout: 15_000,
       });
 
@@ -98,7 +98,7 @@ test.describe("project image upload", () => {
         owner.getByRole("button", { name: "Upload image" })
       ).toBeVisible();
       await owner.getByRole("button", { name: "Save" }).click();
-      await owner.waitForURL(new RegExp(`/projects/${projectId}$`), {
+      await owner.waitForURL(new RegExp(`/projects/${projectId}$`, "u"), {
         timeout: 15_000,
       });
       await expect(image).toHaveCount(0);
@@ -146,7 +146,7 @@ test.describe("@smoke project image pick", () => {
       await owner.goto(`/projects/${projectId}/edit`);
       await waitForHydration(owner, "form");
 
-      const editUrl = new RegExp(`/projects/${projectId}/edit$`);
+      const editUrl = new RegExp(`/projects/${projectId}/edit$`, "u");
       const serverCalls = recordServerFunctionCalls(owner);
 
       await pickImage(owner);
@@ -289,7 +289,7 @@ async function pickImage(
   // production unseen: no test ever clicked it. The click is the point.
   const chooser = page.waitForEvent("filechooser");
   await page
-    .getByRole("button", { name: /Upload image|Replace image/ })
+    .getByRole("button", { name: /Upload image|Replace image/u })
     .click();
   await (await chooser).setFiles({
     name: "e2e-upload.png",

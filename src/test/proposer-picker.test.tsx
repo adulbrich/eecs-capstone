@@ -93,7 +93,7 @@ describe("ProposerPicker", () => {
     fireEvent.change(getByPlaceholderText("Search accounts..."), {
       target: { value: "pat" },
     });
-    fireEvent.click(await findByText(/pat@example.edu/));
+    fireEvent.click(await findByText(/pat@example.edu/u));
     await waitFor(() =>
       expect(onChange).toHaveBeenCalledWith("pat@example.edu")
     );
@@ -115,7 +115,7 @@ describe("ProposerPicker", () => {
     fireEvent.click(getByText("Find account"));
     const search = getByPlaceholderText("Search accounts...");
     fireEvent.change(search, { target: { value: "pat" } });
-    await findByText(/pat@example.edu/);
+    await findByText(/pat@example.edu/u);
     fireEvent.keyDown(search, { key: "ArrowDown" });
     fireEvent.keyDown(search, { key: "Enter" });
     await waitFor(() =>
@@ -151,7 +151,7 @@ describe("ProposerPicker when an account is linked", () => {
       />
     );
 
-    expect(getByText(/Alex Kim/)).toBeTruthy();
+    expect(getByText(/Alex Kim/u)).toBeTruthy();
   });
 
   it("re-assigns to a selected account", async () => {
@@ -279,8 +279,10 @@ describe("ProposerPicker when the on-screen value has diverged from the saved li
     const input = getByLabelText("Proposer email") as HTMLInputElement;
     expect(input.readOnly).toBe(false);
     expect(input.value).toBe("jo@oregonstate.edu");
-    expect(queryByText(/Alex Kim/)).toBeNull();
-    expect(getByText(/will be re-assigned to jo@oregonstate.edu/)).toBeTruthy();
+    expect(queryByText(/Alex Kim/u)).toBeNull();
+    expect(
+      getByText(/will be re-assigned to jo@oregonstate.edu/u)
+    ).toBeTruthy();
   });
 
   it("unlocks and can be typed into after unlinking, and says the link will be removed", () => {
@@ -298,7 +300,7 @@ describe("ProposerPicker when the on-screen value has diverged from the saved li
     const input = getByLabelText("Proposer email") as HTMLInputElement;
     expect(input.readOnly).toBe(false);
     expect(input.value).toBe("");
-    expect(getByText(/link will be removed when saved/)).toBeTruthy();
+    expect(getByText(/link will be removed when saved/u)).toBeTruthy();
 
     fireEvent.change(input, { target: { value: "outsider@example.com" } });
     expect(input.value).toBe("outsider@example.com");

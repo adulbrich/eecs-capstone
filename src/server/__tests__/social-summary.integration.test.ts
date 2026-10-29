@@ -104,7 +104,7 @@ describe("the staff summary endpoints are staff only", () => {
 
     await expect(
       getSocialSummaryAs(student, { projectId: project.id })
-    ).rejects.toThrow(/Forbidden/);
+    ).rejects.toThrow(/Forbidden/u);
   });
 
   it("refuses a save from a signed-in student, even on their own project", async () => {
@@ -118,7 +118,7 @@ describe("the staff summary endpoints are staff only", () => {
         projectId: project.id,
         summary: "Wording the proposer preferred.",
       })
-    ).rejects.toThrow(/Forbidden/);
+    ).rejects.toThrow(/Forbidden/u);
     expect((await readRow(project.id)).socialSummary).toBeNull();
   });
 
@@ -129,7 +129,7 @@ describe("the staff summary endpoints are staff only", () => {
 
     await expect(
       regenerateSocialSummaryAs(student, { projectId: project.id }, model)
-    ).rejects.toThrow(/Forbidden/);
+    ).rejects.toThrow(/Forbidden/u);
     expect(model).not.toHaveBeenCalled();
     expect(await usageRowsFor(student.id)).toHaveLength(0);
   });
@@ -173,7 +173,7 @@ describe("saveSocialSummaryAs", () => {
 
     await expect(
       saveSocialSummaryAs(staff, { projectId: project.id, summary: "   " })
-    ).rejects.toThrow(/cannot be empty/);
+    ).rejects.toThrow(/cannot be empty/u);
     expect((await readRow(project.id)).socialSummary).toBe("Stored wording.");
   });
 
@@ -186,7 +186,7 @@ describe("saveSocialSummaryAs", () => {
         projectId: project.id,
         summary: "x".repeat(SOCIAL_SUMMARY_MAX_LENGTH + 1),
       })
-    ).rejects.toThrow(/at most 300 characters/);
+    ).rejects.toThrow(/at most 300 characters/u);
     expect((await readRow(project.id)).socialSummary).toBeNull();
   });
 
@@ -208,7 +208,7 @@ describe("saveSocialSummaryAs", () => {
       getSocialSummaryAs(staff, {
         projectId: "00000000-0000-0000-0000-000000000000",
       })
-    ).rejects.toThrow(/not found/);
+    ).rejects.toThrow(/not found/u);
   });
 });
 
@@ -250,7 +250,7 @@ describe("regenerateSocialSummaryAs", () => {
 
     await expect(
       regenerateSocialSummaryAs(staff, { projectId: project.id }, model)
-    ).rejects.toThrow(/no title, description or problem statement/);
+    ).rejects.toThrow(/no title, description or problem statement/u);
     expect(model).not.toHaveBeenCalled();
     expect(await usageRowsFor(staff.id)).toHaveLength(0);
   });
@@ -274,7 +274,7 @@ describe("regenerateSocialSummaryAs", () => {
     const third = fakeModel("Three.");
     await expect(
       regenerateSocialSummaryAs(staff, { projectId: project.id }, third)
-    ).rejects.toThrow(/for this hour/);
+    ).rejects.toThrow(/for this hour/u);
     // The limiter saves money rather than reporting an error afterwards.
     expect(third).not.toHaveBeenCalled();
     expect(await usageRowsFor(staff.id)).toHaveLength(2);
@@ -298,7 +298,7 @@ describe("regenerateSocialSummaryAs", () => {
       failing
     );
     await expect(refused).rejects.toThrow(
-      /^Couldn't write the summary, please try again\.$/
+      /^Couldn't write the summary, please try again\.$/u
     );
     expect(logged.mock.calls[0]?.[1]).toContain("Bedrock is down");
     logged.mockRestore();

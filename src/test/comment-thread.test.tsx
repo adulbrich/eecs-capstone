@@ -150,7 +150,7 @@ describe("CommentThread author identity", () => {
     renderThread([comment({})]);
     expect(screen.getByText("Ada Lovelace")).toBeTruthy();
     expect(screen.queryByText("user-abc")).toBeNull();
-    expect(screen.queryByText(/user-abcdef123456/)).toBeNull();
+    expect(screen.queryByText(/user-abcdef123456/u)).toBeNull();
   });
 
   it("shows the author's name on replies too", () => {
@@ -702,7 +702,7 @@ describe("CommentThread editing", () => {
       comment({ id: "c1", editedAt: "2026-05-28T11:00:00.000Z" }),
       comment({ id: "c2", content: "As posted." }),
     ]);
-    expect(screen.getAllByText(/\(edited/)).toHaveLength(1);
+    expect(screen.getAllByText(/\(edited/u)).toHaveLength(1);
     // The time itself, not just the word: a reader who cares that the words
     // moved cares when (#503).
     expect(

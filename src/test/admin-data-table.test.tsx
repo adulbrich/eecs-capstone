@@ -116,7 +116,7 @@ describe("AdminDataTable", () => {
     renderTable();
     expect(
       screen
-        .getByRole("columnheader", { name: /Name/ })
+        .getByRole("columnheader", { name: /Name/u })
         .getAttribute("aria-sort")
     ).toBe("ascending");
   });
@@ -146,7 +146,7 @@ describe("AdminDataTable", () => {
   it("reports a sort change when a header button is activated", () => {
     const onSortChange = vi.fn();
     renderTable({ onSortChange });
-    screen.getByRole("button", { name: /Name/ }).click();
+    screen.getByRole("button", { name: /Name/u }).click();
     expect(onSortChange).toHaveBeenCalledWith({ desc: true, id: "name" });
   });
 
@@ -188,7 +188,7 @@ describe("AdminDataTable", () => {
         storageKey="test"
       />
     );
-    screen.getByRole("button", { name: /Uses/ }).click();
+    screen.getByRole("button", { name: /Uses/u }).click();
     expect(onSortChange).toHaveBeenCalledWith({ desc: true, id: "uses" });
   });
 
@@ -197,7 +197,7 @@ describe("AdminDataTable", () => {
     // Text starts ascending, so descending is the end of the cycle and the
     // next click is TanStack's "remove", which the table maps to the default.
     renderTable({ onSortChange, sort: { desc: true, id: "name" } });
-    screen.getByRole("button", { name: /Name/ }).click();
+    screen.getByRole("button", { name: /Name/u }).click();
     expect(onSortChange).toHaveBeenCalledWith(DEFAULT_SORT);
   });
 
@@ -210,7 +210,7 @@ describe("AdminDataTable", () => {
 
     it("puts an info button named for its column beside the header", () => {
       renderTable({ columns: hinted, hidden: [] });
-      const header = screen.getByRole("columnheader", { name: /Location/ });
+      const header = screen.getByRole("columnheader", { name: /Location/u });
       expect(
         within(header).getByRole("button", {
           name: "About the Location column",
@@ -218,7 +218,7 @@ describe("AdminDataTable", () => {
       ).toBeTruthy();
       // Only the hinted column gets one.
       expect(
-        screen.queryByRole("button", { name: /About the Name/ })
+        screen.queryByRole("button", { name: /About the Name/u })
       ).toBeNull();
     });
 
@@ -244,7 +244,9 @@ describe("AdminDataTable", () => {
 
   it("hides a column's header and every one of its cells", () => {
     renderTable();
-    expect(screen.queryByRole("columnheader", { name: /Location/ })).toBeNull();
+    expect(
+      screen.queryByRole("columnheader", { name: /Location/u })
+    ).toBeNull();
     expect(screen.queryByText("Lab 2")).toBeNull();
   });
 
@@ -408,7 +410,7 @@ describe("AdminDataTable", () => {
     // list, paginated or not, so a screen reader hears one number, not two.
     renderTable();
     expect(screen.getByText("Sorted by Name, ascending")).not.toBeNull();
-    expect(screen.queryByText(/3 rows/)).toBeNull();
+    expect(screen.queryByText(/3 rows/u)).toBeNull();
   });
 
   it("announces the sort order even when the sorted column is hidden", () => {
@@ -418,7 +420,9 @@ describe("AdminDataTable", () => {
     // ordered by it at all.
     renderTable({ sort: { desc: true, id: "location" } });
     expect(screen.getByText("Sorted by Location, descending")).not.toBeNull();
-    expect(screen.queryByRole("columnheader", { name: /Location/ })).toBeNull();
+    expect(
+      screen.queryByRole("columnheader", { name: /Location/u })
+    ).toBeNull();
   });
 
   it("sorts text case-insensitively", () => {
@@ -552,7 +556,7 @@ describe("AdminDataTable", () => {
   it("still reports sort changes when serverSorted is set", () => {
     const onSortChange = vi.fn();
     renderTable({ onSortChange, serverSorted: true });
-    screen.getByRole("button", { name: /Name/ }).click();
+    screen.getByRole("button", { name: /Name/u }).click();
     expect(onSortChange).toHaveBeenCalledWith({ desc: true, id: "name" });
   });
 
@@ -560,7 +564,7 @@ describe("AdminDataTable", () => {
     renderTable({ serverSorted: true, sort: { desc: true, id: "name" } });
     expect(
       screen
-        .getByRole("columnheader", { name: /Name/ })
+        .getByRole("columnheader", { name: /Name/u })
         .getAttribute("aria-sort")
     ).toBe("descending");
   });
@@ -803,7 +807,7 @@ describe("an empty table", () => {
       hidden: [],
     });
     expect(screen.getByRole("table")).not.toBeNull();
-    expect(screen.getByRole("columnheader", { name: /Name/ })).not.toBeNull();
+    expect(screen.getByRole("columnheader", { name: /Name/u })).not.toBeNull();
     expect(screen.getByRole("button", { name: "Columns" })).not.toBeNull();
     expect(screen.getByRole("button", { name: "Export CSV" })).not.toBeNull();
     expect(screen.queryByText("Nothing here.")).toBeNull();

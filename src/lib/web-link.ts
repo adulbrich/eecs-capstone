@@ -13,11 +13,11 @@ import { z } from "zod";
 
 export type WebLinkProblem = "several" | "scheme" | "invalid";
 
-const SCHEME_RE = /^https?:\/\//i;
+const SCHEME_RE = /^https?:\/\//iu;
 // Whitespace, or a link straight after a comma, semicolon or bar, which is how
 // `https://a.com,https://b.com` arrives. Neither a comma nor a second `://` is
 // a signal alone: both are legal in one link, as in an archive.org snapshot.
-const SECOND_LINK_RE = /\s|[,;|]https?:\/\//i;
+const SECOND_LINK_RE = /\s|[,;|]https?:\/\//iu;
 
 // `new URL` rather than `URL.canParse`, which browsers gained only in 2023:
 // this runs on the public page at render, where an older one would throw.

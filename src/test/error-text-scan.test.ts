@@ -63,7 +63,8 @@ const ALLOWED = new Map([
 const DESTRUCTIVE = String.raw`\btext-destructive\b(?!-)`;
 const SIZE = String.raw`\btext-(?:xs|sm|base)\b`;
 const DESTRUCTIVE_TEXT = new RegExp(
-  `${DESTRUCTIVE}[^"'\`]*${SIZE}|${SIZE}[^"'\`]*${DESTRUCTIVE}`
+  `${DESTRUCTIVE}[^"'\`]*${SIZE}|${SIZE}[^"'\`]*${DESTRUCTIVE}`,
+  "u"
 );
 
 function* componentFiles(dir: string): Generator<string> {

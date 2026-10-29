@@ -207,10 +207,10 @@ describe("nvmrc-node", () => {
     });
 
   it("runs the command on the .nvmrc major", () => {
-    const wanted = readFileSync(".nvmrc", "utf8").trim().replace(/^v/, "");
+    const wanted = readFileSync(".nvmrc", "utf8").trim().replace(/^v/u, "");
     const result = wrapper(["node", "--version"]);
     expect(result.status).toBe(0);
-    expect(result.stdout.trim().replace(/^v/, "").split(".")[0]).toBe(
+    expect(result.stdout.trim().replace(/^v/u, "").split(".")[0]).toBe(
       wanted.split(".")[0]
     );
   });
@@ -239,10 +239,10 @@ describe("nvmrc-node", () => {
   // reads the Dockerfile's two FROM tags. Dependabot bumps the tags but not
   // `.nvmrc`, so its pull request fails here until `.nvmrc` follows.
   it("pins the Dockerfile's node images to the .nvmrc version", () => {
-    const wanted = readFileSync(".nvmrc", "utf8").trim().replace(/^v/, "");
+    const wanted = readFileSync(".nvmrc", "utf8").trim().replace(/^v/u, "");
     const tags = [
       ...readFileSync("Dockerfile", "utf8").matchAll(
-        /^FROM node:(\S+?)-bookworm-slim\b/gm
+        /^FROM node:(\S+?)-bookworm-slim\b/gmu
       ),
     ].map((match) => match[1]);
     expect(tags, "Dockerfile FROM node tags: bump .nvmrc to match").toEqual([

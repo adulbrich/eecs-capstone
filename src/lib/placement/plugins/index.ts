@@ -130,7 +130,7 @@ export function readAsChoice(
     : choice;
 }
 
-const TRAILING_STOP = /\.$/;
+const TRAILING_STOP = /\.$/u;
 
 /**
  * A plugin that threw, as the one problem with the whole file: `failure`

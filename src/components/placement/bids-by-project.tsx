@@ -99,7 +99,7 @@ export function BidsByProject({
                 </div>
               )}
               {row.original.placedTeam !== null && (
-                <div className="mt-1 font-medium text-xs">
+                <div className="mt-1 text-xs font-medium">
                   Placed here, team {row.original.placedTeam}
                 </div>
               )}
@@ -139,7 +139,7 @@ export function BidsByProject({
       {
         accessorFn: (row) => row.comment || undefined,
         cell: ({ row }) => (
-          <div className="whitespace-pre-line md:min-w-xs md:max-w-xl">
+          <div className="whitespace-pre-line md:max-w-xl md:min-w-xs">
             {row.original.comment || "-"}
           </div>
         ),
@@ -251,21 +251,21 @@ function ProjectHeader({
   return (
     <div>
       <span className="font-medium">{first.projectTitle}</span>
-      <span className="ml-2 font-normal text-muted-foreground text-xs">
+      <span className="text-muted-foreground ml-2 text-xs font-normal">
         {bidders.length} {bidders.length === 1 ? "bid" : "bids"}, {firstChoice}{" "}
         first {firstChoice === 1 ? "choice" : "choices"}
       </span>
       {pinned.length > 0 && (
-        <p className="font-normal text-sm">
+        <p className="text-sm font-normal">
           Pinned:{" "}
           {pinned
             .map((r) => `${r.name || r.email} (${pinSource(r)})`)
             .join(", ")}
         </p>
       )}
-      {placed && <p className="font-normal text-sm">{placed}</p>}
+      {placed && <p className="text-sm font-normal">{placed}</p>}
       {first.fixed && (
-        <p className="font-normal text-muted-foreground text-xs">
+        <p className="text-muted-foreground text-xs font-normal">
           Added from the roster: it holds only its pre-approved students, so it
           offers no Pin here.
         </p>

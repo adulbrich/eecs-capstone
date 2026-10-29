@@ -61,7 +61,7 @@ export function FilterSwitch({
           {label}
         </Label>
         {hint && (
-          <p className="mt-0.5 text-muted-foreground text-xs" id={hintId}>
+          <p className="text-muted-foreground mt-0.5 text-xs" id={hintId}>
             {hint}
           </p>
         )}

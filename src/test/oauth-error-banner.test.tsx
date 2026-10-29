@@ -56,7 +56,7 @@ describe("OAuthErrorBanner", () => {
     render(<OAuthErrorBanner code="access_denied" />);
     const text = screen.getByRole("alert").textContent;
     expect(text).toContain("Sign-in failed");
-    expect(text).not.toMatch(/ONID|GitHub/);
+    expect(text).not.toMatch(/ONID|GitHub/u);
   });
 
   it("points a GitHub account_not_linked at the emailed code", () => {
@@ -70,7 +70,7 @@ describe("OAuthErrorBanner", () => {
     // What reaches it from ONID is a row the emailed code refuses too, so
     // pointing at the code would send the person round in a circle.
     render(<OAuthErrorBanner code="account_not_linked" provider="onid" />);
-    expect(screen.getByRole("alert").textContent).not.toMatch(/emailed code/i);
+    expect(screen.getByRole("alert").textContent).not.toMatch(/emailed code/iu);
   });
 
   // The advice this used to give, sign in with the password and verify the
@@ -81,11 +81,11 @@ describe("OAuthErrorBanner", () => {
       render(
         <OAuthErrorBanner code="account_not_linked" provider={provider} />
       );
-      expect(screen.getByRole("alert").textContent).not.toMatch(/password/i);
+      expect(screen.getByRole("alert").textContent).not.toMatch(/password/iu);
       cleanup();
     }
     render(<OAuthErrorBanner code="something_better_auth_added" />);
-    expect(screen.getByRole("alert").textContent).not.toMatch(/password/i);
+    expect(screen.getByRole("alert").textContent).not.toMatch(/password/iu);
   });
 
   it("leaves signup_disabled alone", () => {

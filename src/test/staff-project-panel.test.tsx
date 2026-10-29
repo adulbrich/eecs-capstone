@@ -505,7 +505,7 @@ describe("StaffProjectPanel proposer block", () => {
     await waitFor(() => expect(getProposerForEdit).toHaveBeenCalledTimes(2));
     await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
 
-    fireEvent.click(screen.getByTitle(/^Move to Approved\./));
+    fireEvent.click(screen.getByTitle(/^Move to Approved\./u));
     await waitFor(() =>
       expect(screen.getByText("Email partner@example.com")).toBeTruthy()
     );
@@ -560,7 +560,7 @@ describe("StaffProjectPanel proposer block", () => {
 describe("StaffProjectPanel review-email control", () => {
   it("shows the checkbox checked and names the address for the Approved dialog", async () => {
     renderPanel("submitted");
-    fireEvent.click(screen.getByTitle(/^Move to Approved\./));
+    fireEvent.click(screen.getByTitle(/^Move to Approved\./u));
 
     await waitFor(() =>
       expect(screen.getByText("Email proposer@example.com")).toBeTruthy()
@@ -580,7 +580,7 @@ describe("StaffProjectPanel review-email control", () => {
     // Returning a submission to draft emails the proposer like changes
     // requested does, so the staff skip applies and the comment is required.
     renderPanel("submitted");
-    fireEvent.click(screen.getByTitle(/^Move to Draft\./));
+    fireEvent.click(screen.getByTitle(/^Move to Draft\./u));
 
     await waitFor(() =>
       expect(screen.getByText("Email proposer@example.com")).toBeTruthy()
@@ -595,7 +595,7 @@ describe("StaffProjectPanel review-email control", () => {
 
   it("shows no checkbox at all for the Published dialog", async () => {
     renderPanel("approved");
-    fireEvent.click(screen.getByTitle(/^Move to Published\./));
+    fireEvent.click(screen.getByTitle(/^Move to Published\./u));
 
     await waitFor(() =>
       expect(screen.getByText("Move to Published")).toBeTruthy()
@@ -611,7 +611,7 @@ describe("StaffProjectPanel review-email control", () => {
       studentProposed: false,
     });
     renderPanel("submitted");
-    fireEvent.click(screen.getByTitle(/^Move to Approved\./));
+    fireEvent.click(screen.getByTitle(/^Move to Approved\./u));
 
     await waitFor(() =>
       expect(
@@ -627,7 +627,7 @@ describe("StaffProjectPanel review-email control", () => {
     renderPanel("submitted");
     // The box stays disabled until the proposer's address has loaded.
     await screen.findByLabelText("Proposer email");
-    fireEvent.click(screen.getByTitle(/^Move to Approved\./));
+    fireEvent.click(screen.getByTitle(/^Move to Approved\./u));
     await waitFor(() => expect(screen.getByRole("checkbox")).toBeTruthy());
 
     fireEvent.click(screen.getByRole("checkbox"));
@@ -656,7 +656,7 @@ describe("StaffProjectPanel review-email control", () => {
       studentProposed: false,
     });
     renderPanel("submitted");
-    fireEvent.click(screen.getByTitle(/^Move to Approved\./));
+    fireEvent.click(screen.getByTitle(/^Move to Approved\./u));
     await waitFor(() =>
       expect(
         screen.getByText("No address on file, no email will be sent")
@@ -688,7 +688,7 @@ describe("StaffProjectPanel review-email control", () => {
       studentProposed: false,
     });
     renderPanel("draft");
-    fireEvent.click(screen.getByTitle(/^Move to Submitted\./));
+    fireEvent.click(screen.getByTitle(/^Move to Submitted\./u));
     await waitFor(() =>
       expect(screen.getByRole("button", { name: "Confirm" })).toBeTruthy()
     );
@@ -1145,7 +1145,7 @@ describe("StaffProjectPanel proposer and categories across a project change", ()
     );
     renderWithQueryClient(panel("submitted"));
     expect(
-      await screen.findByText(/supports 1 team but runs in 2 programs/)
+      await screen.findByText(/supports 1 team but runs in 2 programs/u)
     ).toBeTruthy();
   });
 
@@ -1153,7 +1153,7 @@ describe("StaffProjectPanel proposer and categories across a project change", ()
     getProjectPrograms.mockResolvedValue(programsRecord([PROGRAM_A]));
     renderWithQueryClient(panel("submitted"));
     await enabledProgramsSave();
-    expect(screen.queryByText(/but runs in/)).toBeNull();
+    expect(screen.queryByText(/but runs in/u)).toBeNull();
   });
 
   it("follows the saved values, not the draft", async () => {
@@ -1161,14 +1161,14 @@ describe("StaffProjectPanel proposer and categories across a project change", ()
       programsRecord([PROGRAM_A, PROGRAM_B])
     );
     renderWithQueryClient(panel("submitted"));
-    await screen.findByText(/supports 1 team but runs in 2 programs/);
+    await screen.findByText(/supports 1 team but runs in 2 programs/u);
 
     // Raising the draft alone does not clear it: nothing is saved yet.
     fireEvent.change(screen.getByLabelText("Teams supported"), {
       target: { value: "2" },
     });
     expect(
-      screen.getByText(/supports 1 team but runs in 2 programs/)
+      screen.getByText(/supports 1 team but runs in 2 programs/u)
     ).toBeTruthy();
 
     // The save's reload brings the saved values, and the warning with them.
@@ -1178,7 +1178,7 @@ describe("StaffProjectPanel proposer and categories across a project change", ()
     );
     fireEvent.click(await enabledProgramsSave());
 
-    await waitFor(() => expect(screen.queryByText(/but runs in/)).toBeNull());
+    await waitFor(() => expect(screen.queryByText(/but runs in/u)).toBeNull());
   });
 
   // The checkbox reads in the glossary's direction and the column stores the
@@ -1224,7 +1224,7 @@ describe("StaffProjectPanel proposer and categories across a project change", ()
     await screen.findByLabelText("Proposer email");
 
     expect(
-      screen.getByText(/the proposer sets this on their own form/i)
+      screen.getByText(/the proposer sets this on their own form/iu)
     ).toBeTruthy();
   });
 
@@ -1258,7 +1258,7 @@ describe("StaffProjectPanel transition dialog across a project change", () => {
     // across the rerender, and Confirm posts its target status with the
     // second project's id.
     const view = renderPanel("submitted");
-    fireEvent.click(screen.getByTitle(/^Move to Approved\./));
+    fireEvent.click(screen.getByTitle(/^Move to Approved\./u));
     await waitFor(() =>
       expect(screen.getByRole("button", { name: "Confirm" })).toBeTruthy()
     );
@@ -1273,7 +1273,7 @@ describe("StaffProjectPanel transition dialog across a project change", () => {
     expect(performTransition).not.toHaveBeenCalled();
     // The stepper now reflects the second project, so its dialog opens on a
     // fresh draft.
-    fireEvent.click(screen.getByTitle(/^Move to Submitted\./));
+    fireEvent.click(screen.getByTitle(/^Move to Submitted\./u));
     await waitFor(() =>
       expect(screen.getByRole("button", { name: "Confirm" })).toBeTruthy()
     );
@@ -1329,7 +1329,7 @@ describe("StaffProjectPanel drafts under a query data change", () => {
     await settle();
 
     // The warning reads the saved values, so it moved with the data...
-    expect(screen.getByText(/runs in 2 programs/)).toBeTruthy();
+    expect(screen.getByText(/runs in 2 programs/u)).toBeTruthy();
     // ...and the draft did not.
     expect(teams.value).toBe("3");
   });

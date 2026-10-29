@@ -87,7 +87,7 @@ test("@smoke a failed sign-in announces its error", async ({ page }) => {
   const alert = page.getByRole("alert");
   await expect(alert).toBeVisible();
   await expect(alert).not.toBeEmpty();
-  await expect(page).toHaveURL(/\/sign-in/);
+  await expect(page).toHaveURL(/\/sign-in/u);
   await checkA11y(page);
 });
 
@@ -100,8 +100,8 @@ for (const code of ["unable_to_get_user_info", "not_a_known_code"]) {
     await page.goto(`/sign-in?error=${code}`);
     const alert = page.getByRole("alert");
     await expect(alert).toBeVisible();
-    const link = alert.getByRole("link", { name: /@/ });
-    await expect(link).toHaveAttribute("href", /^mailto:/);
+    const link = alert.getByRole("link", { name: /@/u });
+    await expect(link).toHaveAttribute("href", /^mailto:/u);
     await expectUnderlinedAtRest(link);
     await link.focus();
     await expect(link).toBeFocused();
@@ -191,7 +191,7 @@ test("@smoke projects list", async ({ page }) => {
   // searchbox is described by it; the placeholder is only a name (#369).
   await expect(
     page.getByRole("searchbox", { name: "Search projects" })
-  ).toHaveAccessibleDescription(/Quote a "phrase"/);
+  ).toHaveAccessibleDescription(/Quote a "phrase"/u);
   await checkA11y(page);
 });
 
@@ -243,7 +243,7 @@ test("@smoke projects list, filters aside at xl", async ({ page }) => {
   await checkA11y(page);
   // Picking Archived lands on the same param a pasted link carries.
   await archived.click();
-  await expect(page).toHaveURL(/archivedOnly=true/);
+  await expect(page).toHaveURL(/archivedOnly=true/u);
   await expect(archived).toBeChecked();
   await expect(
     aside.getByRole("radio", { name: "Current projects" })
@@ -273,7 +273,7 @@ test("@smoke projects list, filters sheet at 375px", async ({ page }) => {
   // Off, not on: this switch opens checked (#419), so the click that moves it
   // away from its default is the one the Filters badge counts below.
   await accepting.click();
-  await expect(page).toHaveURL(/acceptingOnly=false/);
+  await expect(page).toHaveURL(/acceptingOnly=false/u);
   await expect(sheet).toBeVisible();
   await page.keyboard.press("Escape");
   await expect(sheet).toBeHidden();
@@ -310,24 +310,24 @@ test("projects list: the view toggle writes the mode into the URL and storage", 
   await page.goto("/projects");
   await waitForHydration(page);
   // A fresh session with nothing stored: the param is genuinely absent.
-  await expect(page).not.toHaveURL(/[?&]view=/);
+  await expect(page).not.toHaveURL(/[?&]view=/u);
 
   await page.getByRole("button", { name: "Table view" }).click();
-  await expect(page).toHaveURL(/[?&]view=table(&|$)/);
+  await expect(page).toHaveURL(/[?&]view=table(&|$)/u);
   await expect(page.locator(".admin-table")).toBeVisible();
   await checkA11y(page);
 
   await page.getByRole("button", { name: "Card view" }).click();
-  await expect(page).toHaveURL(/[?&]view=card(&|$)/);
+  await expect(page).toHaveURL(/[?&]view=card(&|$)/u);
   await expect(page.locator(".admin-table")).toHaveCount(0);
 
   // A bare navigation (no view param) is the actual test of the storage
   // seed: page.reload() would keep ?view= in the URL and prove nothing about
   // localStorage. Polls, because the seed effect runs after hydration.
   await page.getByRole("button", { name: "Table view" }).click();
-  await expect(page).toHaveURL(/[?&]view=table(&|$)/);
+  await expect(page).toHaveURL(/[?&]view=table(&|$)/u);
   await page.goto("/projects");
-  await expect(page).toHaveURL(/[?&]view=table(&|$)/);
+  await expect(page).toHaveURL(/[?&]view=table(&|$)/u);
   await expect(page.locator(".admin-table")).toBeVisible();
 });
 
@@ -348,7 +348,7 @@ test("projects table interactions", async ({ page }) => {
   expect(count).toBeGreaterThan(0);
   for (let i = 0; i < count; i++) {
     const header = headers.nth(i);
-    await expect(header).not.toHaveAttribute("aria-sort", /.*/);
+    await expect(header).not.toHaveAttribute("aria-sort", /.*/u);
     await expect(header.getByRole("button")).toHaveCount(0);
   }
   await checkA11y(page);
@@ -408,7 +408,7 @@ test("@smoke project detail", async ({ page }) => {
   // The contact address and the URL sit in body copy (#364); global-setup
   // gives the fixture both.
   await expectUnderlinedAtRest(
-    page.getByRole("link", { name: /^a11y-contact@/ })
+    page.getByRole("link", { name: /^a11y-contact@/u })
   );
   await expectUnderlinedAtRest(
     page.getByRole("link", { name: "https://example.com/a11y-project" })
@@ -482,7 +482,7 @@ test("@smoke inventory list", async ({ page }) => {
   await checkA11y(page);
   await expect(
     page.getByRole("searchbox", { name: "Search inventory" })
-  ).toHaveAccessibleDescription(/Quote a "phrase"/);
+  ).toHaveAccessibleDescription(/Quote a "phrase"/u);
 });
 
 test("@smoke inventory list, filters aside at xl", async ({ page }) => {
@@ -523,20 +523,20 @@ test("inventory list: the view toggle writes the mode into the URL", async ({
 }) => {
   await page.goto("/inventory");
   await waitForHydration(page);
-  await expect(page).not.toHaveURL(/[?&]view=/);
+  await expect(page).not.toHaveURL(/[?&]view=/u);
   await page.getByRole("button", { name: "Table view" }).click();
-  await expect(page).toHaveURL(/[?&]view=table(&|$)/);
+  await expect(page).toHaveURL(/[?&]view=table(&|$)/u);
   await expect(page.locator(".admin-table")).toBeVisible();
   await page.getByRole("button", { name: "Card view" }).click();
-  await expect(page).toHaveURL(/[?&]view=card(&|$)/);
+  await expect(page).toHaveURL(/[?&]view=card(&|$)/u);
   await expect(page.locator(".admin-table")).toHaveCount(0);
 
   // One stored preference for both listings: a bare revisit of /inventory is
   // seeded from what the toggle on either page last wrote.
   await page.getByRole("button", { name: "Table view" }).click();
-  await expect(page).toHaveURL(/[?&]view=table(&|$)/);
+  await expect(page).toHaveURL(/[?&]view=table(&|$)/u);
   await page.goto("/inventory");
-  await expect(page).toHaveURL(/[?&]view=table(&|$)/);
+  await expect(page).toHaveURL(/[?&]view=table(&|$)/u);
   await expect(page.locator(".admin-table")).toBeVisible();
 });
 
@@ -556,7 +556,7 @@ test("inventory table interactions", async ({ page }) => {
   expect(count).toBeGreaterThan(0);
   for (let i = 0; i < count; i++) {
     const header = headers.nth(i);
-    await expect(header).not.toHaveAttribute("aria-sort", /.*/);
+    await expect(header).not.toHaveAttribute("aria-sort", /.*/u);
     await expect(header.getByRole("button")).toHaveCount(0);
   }
 
@@ -570,8 +570,8 @@ test("inventory table interactions", async ({ page }) => {
   // suite is scanned open, /projects' Sort select included.
   await sort.click();
   await page.getByRole("option", { name: "Name A-Z" }).click();
-  await expect(page).toHaveURL(/[?&]order=name(&|$)/);
-  await expect(page).toHaveURL(/[?&]page=1(&|$)/);
+  await expect(page).toHaveURL(/[?&]order=name(&|$)/u);
+  await expect(page).toHaveURL(/[?&]page=1(&|$)/u);
   await expect(sort).toHaveText("Name A-Z");
   await checkA11y(page);
 });

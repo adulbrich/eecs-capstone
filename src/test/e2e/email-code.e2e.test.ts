@@ -90,7 +90,7 @@ test.describe("@smoke signing in with an emailed code", () => {
       await page.goto("/profile");
       await waitForHydration(page);
       await page.getByRole("button", { name: "Sign out" }).click();
-      await expect(page).toHaveURL(/\/(sign-in)?$/);
+      await expect(page).toHaveURL(/\/(sign-in)?$/u);
 
       await page.goto("/sign-in");
       await waitForHydration(page);
@@ -199,7 +199,7 @@ test.describe("refusals on the emailed code", () => {
       await expect(alert).toBeVisible();
       // Says what to do, not only that something went wrong. Every refusal on
       // this step has the same answer, and the server cannot tell them apart.
-      await expect(alert).toContainText(/ask for a new code/i);
+      await expect(alert).toContainText(/ask for a new code/iu);
       // Still on the code step rather than thrown back to the address, which
       // is what makes a mistyped digit recoverable. Emptied, marked invalid
       // and focused, ready for the next paste (#600): a full field pastes at
@@ -289,7 +289,7 @@ test.describe("refusals on the emailed code", () => {
       );
       await expect(field).toHaveValue("");
       await expect(field).toBeFocused();
-      await expect(page).toHaveURL(/\/sign-in/);
+      await expect(page).toHaveURL(/\/sign-in/u);
       await page.unroute(check);
       await page.unroute(redeem);
 
@@ -301,10 +301,10 @@ test.describe("refusals on the emailed code", () => {
       await field.fill("123456");
       await page.getByRole("button", { name: "Confirm code" }).click();
       await expect(page.getByRole("alert")).toContainText(
-        /could not reach the server/i
+        /could not reach the server/iu
       );
       await expect(page.getByRole("alert")).not.toContainText(
-        /ask for a new code/i
+        /ask for a new code/iu
       );
       await expect(field).toBeEnabled();
       await expect(field).toHaveValue("");
@@ -325,10 +325,10 @@ test.describe("refusals on the emailed code", () => {
       await page.route(redeem, (route) => route.abort("internetdisconnected"));
       await page.getByRole("button", { name: "Confirm code" }).click();
       await expect(page.getByRole("alert")).toContainText(
-        /could not reach the server/i
+        /could not reach the server/iu
       );
       await expect(page.getByRole("alert")).not.toContainText(
-        /ask for a new code/i
+        /ask for a new code/iu
       );
       await expect(field).toHaveValue("");
       await expect(field).toBeFocused();
@@ -386,7 +386,7 @@ test.describe("refusals on the emailed code", () => {
       await page.getByLabel("Your name", { exact: true }).fill("Took Too Long");
       await page.getByRole("button", { name: "Create account" }).click();
       await expect(page.getByRole("alert")).toContainText(
-        /ask for a new code/i
+        /ask for a new code/iu
       );
       await back.click();
       await expect(page.getByLabel("Email", { exact: true })).toBeVisible();
@@ -504,8 +504,8 @@ test.describe("refusals on the emailed code", () => {
       // Named, and with a way out. The server cannot say this: a browser that
       // dropped the claim and a stranger who never had one look identical to
       // it, and both have to get the same answer.
-      await expect(alert).toContainText(/cookie/i);
-      await expect(alert).toContainText(/ONID/i);
+      await expect(alert).toContainText(/cookie/iu);
+      await expect(alert).toContainText(/ONID/iu);
       // And it stops HERE, rather than sending them to their inbox for a code
       // that could never have worked.
       await expect(page.getByLabel("Code", { exact: true })).toHaveCount(0);

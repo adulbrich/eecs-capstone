@@ -27,10 +27,10 @@ import { describe, expect, it } from "vitest";
  */
 const APP_ROOT = "src";
 const SOURCE_ROOTS = [APP_ROOT, "scripts"];
-const SOURCE_FILE = /\.(?:tsx?|mjs)$/;
-const ENV_READ = /(?:process\.)?env\.([A-Z][A-Z0-9_]*)/g;
-const ENV_EXAMPLE_KEY = /^([A-Z][A-Z0-9_]*)=/;
-const TASK_DEFINITION_KEY = /name\s*=\s*"([A-Z][A-Z0-9_]*)"/g;
+const SOURCE_FILE = /\.(?:tsx?|mjs)$/u;
+const ENV_READ = /(?:process\.)?env\.([A-Z][A-Z0-9_]*)/gu;
+const ENV_EXAMPLE_KEY = /^([A-Z][A-Z0-9_]*)=/u;
+const TASK_DEFINITION_KEY = /name\s*=\s*"([A-Z][A-Z0-9_]*)"/gu;
 
 /**
  * Supplied by the runtime or an SDK, so not this app's configuration and not

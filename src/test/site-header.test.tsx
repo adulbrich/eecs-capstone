@@ -71,7 +71,7 @@ describe("SiteHeader source link", () => {
     // /sign-in renders "Continue with GitHub". A header link named just
     // "GitHub" would read as a second route to the same action.
     render(<SiteHeader />);
-    expect(screen.queryByRole("link", { name: /^GitHub$/ })).toBeNull();
+    expect(screen.queryByRole("link", { name: /^GitHub$/u })).toBeNull();
   });
 
   it("is the last item in the mobile navigation sheet", async () => {
@@ -98,7 +98,7 @@ describe("SiteHeader signed-out control", () => {
     const links = screen.getAllByRole("link", { name: "Sign in" });
     expect(links).toHaveLength(1);
     expect(links[0].getAttribute("href")).toBe("/sign-in");
-    expect(screen.queryByRole("link", { name: /sign up/i })).toBeNull();
+    expect(screen.queryByRole("link", { name: /sign up/iu })).toBeNull();
   });
 
   it("is one Sign in link in the mobile sheet, with no Sign up", async () => {
@@ -111,7 +111,7 @@ describe("SiteHeader signed-out control", () => {
     const links = within(sheet).getAllByRole("link", { name: "Sign in" });
     expect(links).toHaveLength(1);
     expect(links[0].getAttribute("href")).toBe("/sign-in");
-    expect(within(sheet).queryByRole("link", { name: /sign up/i })).toBeNull();
+    expect(within(sheet).queryByRole("link", { name: /sign up/iu })).toBeNull();
   });
 });
 

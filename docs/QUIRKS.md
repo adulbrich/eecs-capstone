@@ -498,9 +498,19 @@ Biome owns the formatting (2-space indent, double quotes) and the import order; 
 - `noAwaitInLoops`: the seeds, migrations and Bedrock callers await in sequence on purpose.
 - `noIncrementDecrement` and `useDestructuring`: style with no defect behind it.
 - The assists `useSortedKeys` and `useSortedTypeFields`: object literals here are ordered by meaning.
-- In tests (`*.test.ts(x)`, `__tests__/`, `src/test/`): `useTopLevelRegex`, `noEmptyBlockStatements`, `useAwait` and `noNonNullAssertion`.
+- `useNamedCaptureGroup`: a name on a group read once as `$1` is noise.
+- `useThisInClassMethods`: these classes implement an interface (`EmailSender`, `ResizeObserver` fakes).
+- `useDomQuerySelector`: each hit looks up an id read from an attribute, which `querySelector` would need escaped.
 
-Inline ignores cover `noNamespaceImport` (`import * as schema`, shadcn) and `noBarrelFile` (the schema re-export).
+### Rules relaxed in tests
+
+In `*.test.ts(x)`, `__tests__/` and `src/test/`, `biome.json` also turns off `useTopLevelRegex`, `noEmptyBlockStatements`, `useAwait`, `noNonNullAssertion`, `useImportsFirst` (imports follow the hoisted `vi.mock` calls they depend on) and `noComponentHookFactories` (a harness component defined inside its test).
+
+### Inline suppressions, and options `biome.json` repeats
+
+Inline ignores cover `noNamespaceImport` (`import * as schema`, shadcn), `noBarrelFile` (the schema re-export), the Radix group headings in `ui/`, the orphan labels of #820, and Biome 2.6 calling every case of `orderBySql`'s switch unreachable.
+
+`noLabelWithoutControl` adds `RadioGroupItem` as a control. Setting an option replaces Ultracite's whole list, so `biome.json` repeats `inputComponents` and `labelComponents`. The YAML formatter keeps `bracketSpacing` off, matching the existing flow lists.
 
 ### Do not run `biome check --write --unsafe` blindly
 

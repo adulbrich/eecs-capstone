@@ -88,13 +88,13 @@ const EMBEDDINGS = readFileSync(
 );
 const FLAG = readFileSync("src/lib/_internal/social-summary-flag.ts", "utf8");
 
-const BLOCK_COMMENT = /\/\*[\s\S]*?\*\//g;
-const LINE_COMMENT = /(^|\s)\/\/[^\n]*/g;
+const BLOCK_COMMENT = /\/\*[\s\S]*?\*\//gu;
+const LINE_COMMENT = /(^|\s)\/\/[^\n]*/gu;
 // Deliberately excludes whitespace from the character class. With `\s` in it,
 // `const parts: string[] = []` lost the space before the `=` as well as the
 // annotation, and compared unequal against an `.mjs` that never had one.
-const TYPE_ANNOTATION = /:\s*[A-Za-z][\w.<>[\]|]*(?=\s*[,)=;])/g;
-const WHITESPACE = /\s+/g;
+const TYPE_ANNOTATION = /:\s*[A-Za-z][\w.<>[\]|]*(?=\s*[,)=;])/gu;
+const WHITESPACE = /\s+/gu;
 
 /**
  * Extracts a pinned region, with the delimiters named per pin rather than
@@ -262,10 +262,10 @@ describe("the social summary backfill script", () => {
 
   it("drops the same half character when it cuts a source", () => {
     expect(SCRIPT).toContain(
-      "const LONE_TRAILING_SURROGATE = /[\\uD800-\\uDBFF]$/;"
+      "const LONE_TRAILING_SURROGATE = /[\\uD800-\\uDBFF]$/u;"
     );
     expect(SOURCE).toContain(
-      "const LONE_TRAILING_SURROGATE = /[\\uD800-\\uDBFF]$/;"
+      "const LONE_TRAILING_SURROGATE = /[\\uD800-\\uDBFF]$/u;"
     );
   });
 

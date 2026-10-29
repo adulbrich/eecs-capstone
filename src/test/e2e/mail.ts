@@ -66,7 +66,7 @@ function findCode(log: string, to: string): string | null {
     // Anchored on the line end, or `a@x.com` would read the code mailed to
     // `a@x.com.au`.
     if (block.includes(`to:      ${to}\n`)) {
-      const match = block.match(/Your sign-in code is (\d{6})\./);
+      const match = block.match(/Your sign-in code is (\d{6})\./u);
       if (match) {
         return match[1];
       }

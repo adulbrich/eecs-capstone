@@ -194,7 +194,7 @@ describe("ExportCsvButton", () => {
     await waitFor(() =>
       expect(screen.getByText("widgets exported.")).toBeTruthy()
     );
-    expect(anchor.download).toMatch(/^widgets-\d{4}-\d{2}-\d{2}\.csv$/);
+    expect(anchor.download).toMatch(/^widgets-\d{4}-\d{2}-\d{2}\.csv$/u);
   });
 
   it("prefixes the CSV text with the BOM when building the blob", async () => {

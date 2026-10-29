@@ -107,7 +107,7 @@ function FieldError({ errors, id, message }: FieldErrorProps) {
   }
   return (
     <p
-      className="mt-1 text-destructive text-sm"
+      className="text-destructive mt-1 text-sm"
       data-slot="field-error"
       id={id}
       role="alert"

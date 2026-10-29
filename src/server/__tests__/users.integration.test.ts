@@ -181,7 +181,7 @@ describe("setUserRoleAs", () => {
     const admin = await makeUser(`a2-${Date.now()}@x.com`, "admin");
     await expect(
       setUserRoleAs(admin, { userId: admin.id, role: "user" })
-    ).rejects.toThrow(/yourself/);
+    ).rejects.toThrow(/yourself/u);
   });
 
   it("refuses non-admin caller", async () => {
@@ -235,7 +235,7 @@ describe("banUserAs / unbanUserAs", () => {
         reason: "x",
         expiresAt: null,
       })
-    ).rejects.toThrow(/yourself/);
+    ).rejects.toThrow(/yourself/u);
   });
 
   it("unban clears the three columns", async () => {

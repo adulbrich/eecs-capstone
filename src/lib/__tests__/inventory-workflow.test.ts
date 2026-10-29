@@ -25,7 +25,7 @@ function input(over: Partial<TransitionInput> = {}): TransitionInput {
 describe("assertTransitionAllowed: the staff gate", () => {
   it("refuses a viewer with no staff role and no authority", () => {
     expect(() => assertTransitionAllowed(STUDENT, input())).toThrow(
-      /Forbidden/
+      /Forbidden/u
     );
   });
 
@@ -41,7 +41,7 @@ describe("assertTransitionAllowed: the staff gate", () => {
     // payload it was never allowed to send.
     expect(() =>
       assertTransitionAllowed(STUDENT, input({ nextStatus: "checked_out" }))
-    ).toThrow(/Forbidden/);
+    ).toThrow(/Forbidden/u);
   });
 
   it("refuses an authority it does not recognize", () => {
@@ -53,7 +53,7 @@ describe("assertTransitionAllowed: the staff gate", () => {
         STUDENT,
         input({ authority: "self_anything" as "self_cancel" })
       )
-    ).toThrow(/Forbidden/);
+    ).toThrow(/Forbidden/u);
   });
 
   it("lets a recognized authority past the gate", () => {
@@ -70,13 +70,13 @@ describe("assertTransitionAllowed: what an authority may do", () => {
         STUDENT,
         input({ authority: "self_cancel", nextStatus: "retired" })
       )
-    ).toThrow(/self_cancel may only move an item to available, not retired/);
+    ).toThrow(/self_cancel may only move an item to available, not retired/u);
     expect(() =>
       assertTransitionAllowed(
         STUDENT,
         input({ authority: "self_request", nextStatus: "checked_out" })
       )
-    ).toThrow(/self_request may only move an item to requested/);
+    ).toThrow(/self_request may only move an item to requested/u);
   });
 
   it("refuses a self-service transition that names another account", () => {
@@ -90,7 +90,7 @@ describe("assertTransitionAllowed: what an authority may do", () => {
           requestItemId: "line-1",
         })
       )
-    ).toThrow(/only act on its own viewer/);
+    ).toThrow(/only act on its own viewer/u);
   });
 
   it("refuses a self-service transition that names any address", () => {
@@ -106,7 +106,7 @@ describe("assertTransitionAllowed: what an authority may do", () => {
           requestItemId: "line-1",
         })
       )
-    ).toThrow(/may not name a holder address/);
+    ).toThrow(/may not name a holder address/u);
   });
 
   it("accepts a self-service transition onto the viewer's own account", () => {
@@ -153,7 +153,7 @@ describe("assertTransitionAllowed: line decisions", () => {
         })
       )
     ).toThrow(
-      /only meaningful on a release, not on a transition to checked_out/
+      /only meaningful on a release, not on a transition to checked_out/u
     );
   });
 
@@ -164,13 +164,13 @@ describe("assertTransitionAllowed: line decisions", () => {
     };
     expect(() =>
       assertTransitionAllowed(ADMIN, input({ lineDecision: rejected }))
-    ).toThrow(/Reject reason required/);
+    ).toThrow(/Reject reason required/u);
     expect(() =>
       assertTransitionAllowed(
         ADMIN,
         input({ comment: "   ", lineDecision: rejected })
       )
-    ).toThrow(/Reject reason required/);
+    ).toThrow(/Reject reason required/u);
     expect(() =>
       assertTransitionAllowed(
         ADMIN,
@@ -196,7 +196,8 @@ describe("assertTransitionAllowed: invariants per status", () => {
           assertTransitionAllowed(ADMIN, input({ ...field, nextStatus }))
         ).toThrow(
           new RegExp(
-            `Cannot set holder or request on transition to ${nextStatus}`
+            `Cannot set holder or request on transition to ${nextStatus}`,
+            "u"
           )
         );
       }
@@ -206,10 +207,10 @@ describe("assertTransitionAllowed: invariants per status", () => {
   it("refuses a deadline on a release", () => {
     expect(() =>
       assertTransitionAllowed(ADMIN, input({ pickupBy: LATER }))
-    ).toThrow(/Pickup and due terms not allowed on transition to available/);
+    ).toThrow(/Pickup and due terms not allowed on transition to available/u);
     expect(() =>
       assertTransitionAllowed(ADMIN, input({ dueAt: LATER }))
-    ).toThrow(/Pickup and due terms not allowed on transition to available/);
+    ).toThrow(/Pickup and due terms not allowed on transition to available/u);
   });
 
   it("refuses the rest of the pickup arrangement on a release", () => {
@@ -219,14 +220,14 @@ describe("assertTransitionAllowed: invariants per status", () => {
       { pickupNote: "Bring your ID." },
     ]) {
       expect(() => assertTransitionAllowed(ADMIN, input(terms))).toThrow(
-        /Pickup and due terms not allowed on transition to available/
+        /Pickup and due terms not allowed on transition to available/u
       );
     }
   });
 
   it("requires a line and a person, and no label, on requested", () => {
     const message =
-      /requested status requires requestItemId and a holder account or address, no label/;
+      /requested status requires requestItemId and a holder account or address, no label/u;
     expect(() =>
       assertTransitionAllowed(ADMIN, input({ nextStatus: "requested" }))
     ).toThrow(message);
@@ -308,7 +309,7 @@ describe("assertTransitionAllowed: invariants per status", () => {
         ADMIN,
         input({ holderName: "Ada", nextStatus: "reserved" })
       )
-    ).toThrow(/not both and not neither/);
+    ).toThrow(/not both and not neither/u);
   });
 
   it("catches an id paired with a label, the pair the constructor never sees", () => {
@@ -327,7 +328,7 @@ describe("assertTransitionAllowed: invariants per status", () => {
             nextStatus,
           })
         )
-      ).toThrow(/not both and not neither/);
+      ).toThrow(/not both and not neither/u);
     }
   });
 
@@ -349,7 +350,7 @@ describe("assertTransitionAllowed: invariants per status", () => {
         ADMIN,
         input({ holderLabel: "Bench 3", nextStatus: "checked_out" })
       )
-    ).toThrow(/checked_out requires dueAt/);
+    ).toThrow(/checked_out requires dueAt/u);
     expect(() =>
       assertTransitionAllowed(
         ADMIN,
@@ -400,7 +401,7 @@ describe("the form predicates agree with the rules", () => {
         ...(needsDueAt(nextStatus) ? { dueAt: LATER } : {}),
       });
       expect(
-        /not both and not neither/.test(message),
+        /not both and not neither/u.test(message),
         `needsHolder(${nextStatus}) disagrees with the rules`
       ).toBe(needsHolder(nextStatus));
     }
@@ -410,7 +411,7 @@ describe("the form predicates agree with the rules", () => {
     for (const nextStatus of PANEL_STATUSES.filter(needsHolder)) {
       const message = refusal({ holderLabel: "Bench 3", nextStatus });
       expect(
-        /requires dueAt/.test(message),
+        /requires dueAt/u.test(message),
         `needsDueAt(${nextStatus}) disagrees with the rules`
       ).toBe(needsDueAt(nextStatus));
     }
@@ -422,7 +423,7 @@ describe("the form predicates agree with the rules", () => {
     for (const nextStatus of PANEL_STATUSES.filter((s) => !needsHolder(s))) {
       expect(needsDueAt(nextStatus)).toBe(false);
       expect(refusal({ dueAt: LATER, nextStatus })).toMatch(
-        /Pickup and due terms not allowed/
+        /Pickup and due terms not allowed/u
       );
     }
   });

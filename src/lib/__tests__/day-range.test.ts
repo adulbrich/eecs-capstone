@@ -54,7 +54,7 @@ describe("dayStart", () => {
   });
 
   it("refuses anything that is not a day", () => {
-    expect(() => dayStart("2026-7-4")).toThrow(/not a YYYY-MM-DD day/);
+    expect(() => dayStart("2026-7-4")).toThrow(/not a YYYY-MM-DD day/u);
   });
 });
 
@@ -78,10 +78,10 @@ describe("localInstant", () => {
 
   it("refuses anything that is not a 24-hour HH:MM time", () => {
     expect(() => localInstant("2026-10-28", "2:00")).toThrow(
-      /not an HH:MM time/
+      /not an HH:MM time/u
     );
     expect(() => localInstant("2026-10-28", "24:00")).toThrow(
-      /not an HH:MM time/
+      /not an HH:MM time/u
     );
   });
 });

@@ -38,13 +38,13 @@ export function InventoryCard({ item, signedIn }: Props) {
         to="/inventory/$itemId"
       >
         <ImageOrFallback
-          className="aspect-[16/9] w-full bg-muted object-contain md:aspect-[3/2] md:w-40 md:shrink-0 md:rounded-md"
+          className="bg-muted aspect-[16/9] w-full object-contain md:aspect-[3/2] md:w-40 md:shrink-0 md:rounded-md"
           src={src}
         />
         <div className="flex min-w-0 flex-1 flex-col p-4 md:p-0">
-          <h3 className="font-semibold leading-tight">{item.name}</h3>
+          <h3 className="leading-tight font-semibold">{item.name}</h3>
           {item.description && (
-            <p className="mt-2 line-clamp-3 text-muted-foreground text-sm md:mt-1">
+            <p className="text-muted-foreground mt-2 line-clamp-3 text-sm md:mt-1">
               {item.description}
             </p>
           )}

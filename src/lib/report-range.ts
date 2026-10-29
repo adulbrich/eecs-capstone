@@ -7,7 +7,7 @@
 const DAY_MS = 86_400_000;
 
 /** A calendar day as a report's URL and its server function carry it. */
-export const DAY_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
+export const DAY_PATTERN = /^\d{4}-\d{2}-\d{2}$/u;
 
 /**
  * Today moved by `offset` days, as `YYYY-MM-DD`. The UTC day, not the

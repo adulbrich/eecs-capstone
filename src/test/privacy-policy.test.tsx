@@ -78,7 +78,7 @@ describe("PrivacyPolicy", () => {
 
     it("names the access log retention the infrastructure actually sets", () => {
       const days =
-        /variable "access_log_retention_days" \{[^}]*default\s*=\s*(\d+)/.exec(
+        /variable "access_log_retention_days" \{[^}]*default\s*=\s*(\d+)/u.exec(
           readFileSync(join(process.cwd(), "infra/variables.tf"), "utf8")
         )?.[1];
       expect(days).toBeDefined();

@@ -122,7 +122,7 @@ describe("ApproveDialog over a request", () => {
         // The route that defeated the first fix: `DialogContent` renders this
         // by default and it goes straight to `onOpenChange`, touching neither
         // `onEscapeKeyDown` nor `onInteractOutside`.
-        fireEvent.click(screen.getByRole("button", { name: /close/i }));
+        fireEvent.click(screen.getByRole("button", { name: /close/iu }));
       }
       expect(screen.getByRole("dialog")).toBeTruthy();
 

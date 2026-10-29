@@ -13,7 +13,7 @@ import { spawnSync } from "node:child_process";
 import { existsSync } from "node:fs";
 import { loadRuleScripts, readInput, repoRelative, repoRoot } from "./lib.mjs";
 
-const BIOME_EXTENSIONS = /\.(?:[cm]?jsx?|tsx?|jsonc?|css)$/;
+const BIOME_EXTENSIONS = /\.(?:[cm]?jsx?|tsx?|jsonc?|css)$/u;
 
 const input = readInput();
 const root = repoRoot(input.cwd ?? process.cwd());

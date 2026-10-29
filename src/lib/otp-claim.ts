@@ -62,9 +62,9 @@ export const OTP_CLAIM_COOKIE = "capstone_otp_claim";
 
 const encoder = new TextEncoder();
 
-const BASE64_PLUS = /\+/g;
-const BASE64_SLASH = /\//g;
-const BASE64_PADDING = /[=]+$/;
+const BASE64_PLUS = /\+/gu;
+const BASE64_SLASH = /\//gu;
+const BASE64_PADDING = /[=]+$/u;
 
 /**
  * The token for one pending code.

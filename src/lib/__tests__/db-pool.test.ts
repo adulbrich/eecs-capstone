@@ -13,7 +13,7 @@ import {
   warmPool,
 } from "../_internal/db-pool";
 
-const QUOTES = /^"|"$/g;
+const QUOTES = /^"|"$/gu;
 
 /**
  * A `<name> = <value>` argument inside one top-level block of a Terraform

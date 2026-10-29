@@ -92,6 +92,6 @@ describe("imageUrlToSave", () => {
         pendingImage: file(),
         upload,
       })
-    ).rejects.toThrow(/Unsupported image type/);
+    ).rejects.toThrow(/Unsupported image type/u);
   });
 });

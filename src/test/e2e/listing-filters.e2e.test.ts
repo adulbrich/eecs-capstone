@@ -49,13 +49,13 @@ test.describe("@smoke listing filters sheet", () => {
     // the fixture above created and turning it off is what changes the set.
     // This is the only one of the four cases that runs in that direction, and
     // the badge counts it the same way: one switch away from its default.
-    await expect(page).toHaveURL(/acceptingOnly=false/);
+    await expect(page).toHaveURL(/acceptingOnly=false/u);
     await expectWidened(page, sheet, before);
 
     await clearAll(page, sheet);
     // The value, not the absence of the key: `/projects` keeps its default
     // params in the URL, so a cleared filter reads as the default itself.
-    await expect(page).toHaveURL(/acceptingOnly=true/);
+    await expect(page).toHaveURL(/acceptingOnly=true/u);
     await expectRestored(page, sheet, before);
   });
 
@@ -65,11 +65,11 @@ test.describe("@smoke listing filters sheet", () => {
     const before = await openListing(page, "/inventory");
     const sheet = await openSheet(page);
     await pickStatus(page, sheet, "Maintenance");
-    await expect(page).toHaveURL(/status=maintenance/);
+    await expect(page).toHaveURL(/status=maintenance/u);
     await expectNarrowed(page, sheet, before);
 
     await clearAll(page, sheet);
-    await expect(page).not.toHaveURL(/status=maintenance/);
+    await expect(page).not.toHaveURL(/status=maintenance/u);
     await expectRestored(page, sheet, before);
   });
 
@@ -82,11 +82,11 @@ test.describe("@smoke listing filters sheet", () => {
       const before = await openListing(staff, "/admin/inventory");
       const sheet = await openSheet(staff);
       await pickStatus(staff, sheet, "Maintenance");
-      await expect(staff).toHaveURL(/status=maintenance/);
+      await expect(staff).toHaveURL(/status=maintenance/u);
       await expectNarrowed(staff, sheet, before);
 
       await clearAll(staff, sheet);
-      await expect(staff).not.toHaveURL(/status=maintenance/);
+      await expect(staff).not.toHaveURL(/status=maintenance/u);
       await expectRestored(staff, sheet, before);
     } finally {
       await context.close();
@@ -109,13 +109,13 @@ test.describe("@smoke listing filters sheet", () => {
       // The default set travels as an absent param and any other set in
       // full, so a narrowed status set is the key appearing at all. `[?&]`
       // keeps `sort=status` from satisfying this.
-      await expect(staff).toHaveURL(/[?&]status=/);
+      await expect(staff).toHaveURL(/[?&]status=/u);
       await expectNarrowed(staff, sheet, before);
 
       await clearAll(staff, sheet);
       // The key gone from the URL is what proves the set is the default
       // again, and the box is checked once more in the same navigation.
-      await expect(staff).not.toHaveURL(/[?&]status=/);
+      await expect(staff).not.toHaveURL(/[?&]status=/u);
       await expect(published).toBeChecked();
       await expectRestored(staff, sheet, before);
     } finally {
@@ -247,7 +247,7 @@ async function readTotal(page: Page): Promise<number> {
   const text = await page
     .locator('[data-slot="pagination-status"]')
     .textContent();
-  const match = /(\d+) results?$/.exec(text ?? "");
+  const match = /(\d+) results?$/u.exec(text ?? "");
   if (!match) {
     throw new Error(`No result count under the list, got: ${text}`);
   }

@@ -110,7 +110,7 @@ describe("CategoryMultiSelect", () => {
     fireEvent.change(screen.getByLabelText("Add a new category"), {
       target: { value: "laptop" },
     });
-    expect(screen.queryByText(/^Create "/)).toBeNull();
+    expect(screen.queryByText(/^Create "/u)).toBeNull();
   });
 
   it("creates an inventory category with domain: inventory, type: null and selects it", async () => {
@@ -193,7 +193,7 @@ describe("CategoryMultiSelect", () => {
       expect(mockedList).toHaveBeenCalledWith({ data: { domain: "inventory" } })
     );
     expect(screen.getByLabelText("Add a new category")).toBeTruthy();
-    expect(screen.queryByText(/create some in/i)).toBeNull();
+    expect(screen.queryByText(/create some in/iu)).toBeNull();
   });
 
   it("disables the project create action until a type is chosen", async () => {

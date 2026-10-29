@@ -99,7 +99,7 @@ export function DownloadAs({
         {button}
       </div>
       {plugin !== null && (
-        <p className="max-w-prose text-muted-foreground">
+        <p className="text-muted-foreground max-w-prose">
           {plugin.description}
         </p>
       )}

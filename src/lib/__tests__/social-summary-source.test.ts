@@ -9,7 +9,7 @@ const EMOJI = "\u{1F600}";
 
 /** A lone half of a surrogate pair, either half, anywhere in the string. */
 const BROKEN_PAIR =
-  /[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/;
+  /[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/u;
 
 function project(
   over: Partial<Parameters<typeof buildSocialSummarySource>[0]>

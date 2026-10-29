@@ -73,7 +73,7 @@ function openingTags(
   source: string,
   tag: string
 ): { at: number; text: string }[] {
-  const opener = new RegExp(`<${tag}(?=[\\s/>])`, "g");
+  const opener = new RegExp(`<${tag}(?=[\\s/>])`, "gu");
   return [...source.matchAll(opener)].map((match) => {
     let depth = 0;
     let i = match.index;
@@ -115,16 +115,16 @@ function buttonElements(
  * right: what the parent passes is the parent's to answer for.
  */
 function classTokens(openingTag: string): string[] {
-  const match = /className=(?:"([^"]*)"|\{([\s\S]*?)\})/.exec(openingTag);
+  const match = /className=(?:"([^"]*)"|\{([\s\S]*?)\})/u.exec(openingTag);
   const literal = match?.[1];
   const expression = match?.[2];
   const strings =
     literal === undefined
-      ? [...(expression ?? "").matchAll(/["'`]([^"'`]*)["'`]/g)].map(
+      ? [...(expression ?? "").matchAll(/["'`]([^"'`]*)["'`]/gu)].map(
           (m) => m[1]
         )
       : [literal];
-  return strings.flatMap((s) => s.split(/\s+/)).filter(Boolean);
+  return strings.flatMap((s) => s.split(/\s+/u)).filter(Boolean);
 }
 
 /**
@@ -136,7 +136,7 @@ function classTokens(openingTag: string): string[] {
  * stacked-variant colour override sailed through every check.
  */
 function utility(token: string): string {
-  return token.replace(/^(?:[^:\s]*:)+/, "").replace(/^!/, "");
+  return token.replace(/^(?:[^:\s]*:)+/u, "").replace(/^!/u, "");
 }
 
 // `text-`, `border-`, `ring-`, `outline-` and `shadow-` are the prefixes that
@@ -151,26 +151,28 @@ function utility(token: string): string {
 // hint, only a bare number and unit counts.
 const ARBITRARY_LENGTH = String.raw`\[(?:length:[^\]]+|[\d.]+(?:px|r?em|%|pt|ch|vw|vh))\]`;
 const TEXT_NOT_COLOR = new RegExp(
-  String.raw`^text-(?:xs|sm|base|lg|xl|\dxl|left|center|right|start|end|justify|balance|pretty|wrap|nowrap|ellipsis|clip|${ARBITRARY_LENGTH})`
+  String.raw`^text-(?:xs|sm|base|lg|xl|\dxl|left|center|right|start|end|justify|balance|pretty|wrap|nowrap|ellipsis|clip|${ARBITRARY_LENGTH})`,
+  "u"
 );
 // A side, a width, or both, plus the line styles. Everything else after
 // `border-` is a colour. The side and the width combine, as `border-t-4`, which
 // flattening this into one list of single tokens quietly broke.
 const BORDER_NOT_COLOR =
-  /^border(?:-[xytrbles])?(?:-(?:0|2|4|8|px))?$|^border-(?:solid|dashed|dotted|double|hidden|none)$/;
-const SHADOW_NOT_COLOR = /^shadow-(?:2?xs|sm|md|lg|xl|2xl|none|inner)$/;
+  /^border(?:-[xytrbles])?(?:-(?:0|2|4|8|px))?$|^border-(?:solid|dashed|dotted|double|hidden|none)$/u;
+const SHADOW_NOT_COLOR = /^shadow-(?:2?xs|sm|md|lg|xl|2xl|none|inner)$/u;
 const OUTLINE_NOT_COLOR =
-  /^outline-(?:none|hidden|offset-|solid|dashed|dotted|double|\d)/;
+  /^outline-(?:none|hidden|offset-|solid|dashed|dotted|double|\d)/u;
 // Ring widths, offsets and insets. `ring-ring/50` is the colour case.
 const RING_NOT_COLOR = new RegExp(
-  `^ring-(?:0|1|2|4|8|inset|offset-(?:0|1|2|4|8)|${ARBITRARY_LENGTH})$`
+  `^ring-(?:0|1|2|4|8|inset|offset-(?:0|1|2|4|8)|${ARBITRARY_LENGTH})$`,
+  "u"
 );
 
 function setsColor(token: string): boolean {
   const u = utility(token);
   // `from-`, `via-` and `to-` are gradient stops, which are colours too.
   if (
-    /^(?:bg|ring|fill|stroke|decoration|outline|shadow|accent|caret|divide|from|via|to)-/.test(
+    /^(?:bg|ring|fill|stroke|decoration|outline|shadow|accent|caret|divide|from|via|to)-/u.test(
       u
     )
   ) {
@@ -191,9 +193,9 @@ function setsColor(token: string): boolean {
 
 // `size-*` sets a height as well as a width, so it belongs here rather than
 // escaping as a width, which the rule allows.
-const SETS_HEIGHT = /^(?:(?:min-|max-)?h|size)-\S/;
-const SETS_PADDING = /^p[xytrbles]?-\S/;
-const SETS_RADIUS = /^rounded(?:$|-)/;
+const SETS_HEIGHT = /^(?:(?:min-|max-)?h|size)-\S/u;
+const SETS_PADDING = /^p[xytrbles]?-\S/u;
+const SETS_RADIUS = /^rounded(?:$|-)/u;
 
 function restyles(token: string): string | null {
   const u = utility(token);
@@ -230,7 +232,7 @@ function restyles(token: string): string | null {
  * preceded by a hyphen.
  */
 const ICON_SIZE_CLASS =
-  /(?<![\w-])(?:(?:h|w)-\d[\d.]*(?![\w-])|size-[34](?![\w.-]))/g;
+  /(?<![\w-])(?:(?:h|w)-\d[\d.]*(?![\w-])|size-[34](?![\w.-]))/gu;
 
 function lineOf(source: string, index: number): number {
   return source.slice(0, index).split("\n").length;
@@ -309,7 +311,7 @@ describe("button conventions", () => {
     // button should lose its entry, so the list cannot grow stale.
     const stale = [...RAW_BUTTON_ALLOWED.keys()].filter(
       (file) =>
-        !/<button[\s/>]/.test(readFileSync(join(process.cwd(), file), "utf8"))
+        !/<button[\s/>]/u.test(readFileSync(join(process.cwd(), file), "utf8"))
     );
     expect(stale).toEqual([]);
   });

@@ -44,6 +44,6 @@ describe("ConsoleEmailSender", () => {
     // whole integration suite once already, because the assertions above pass
     // on any output that merely mentions the same words.
     expect(output).toContain("subject: Verify your email");
-    expect(output).toMatch(/^\s*\S[^\n]*?: https?:\/\/\S+$/m);
+    expect(output).toMatch(/^\s*\S[^\n]*?: https?:\/\/\S+$/mu);
   });
 });

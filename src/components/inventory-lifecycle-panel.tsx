@@ -312,7 +312,7 @@ function StatusHistorySection({ history }: { history: HistoryRow[] }) {
                   </span>
                 </div>
                 {(h.holderEmail || h.holderLabel) && (
-                  <p className="mt-1 text-muted-foreground text-xs">
+                  <p className="text-muted-foreground mt-1 text-xs">
                     {/* The precedence comes from the Hold module; the two
                         suffixes are this list's own format, and a history row
                         shows a program even beside a label, which the item
@@ -665,7 +665,7 @@ export function InventoryLifecyclePanel({
               <SelectContent>
                 {ALL_STATUSES.map((s) => (
                   <SelectItem key={s} value={s}>
-                    {s.replace(/_/g, " ")}
+                    {s.replace(/_/gu, " ")}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -778,7 +778,7 @@ export function InventoryLifecyclePanel({
               {/* Two text boxes on a reserve; this one says which is sent. */}
               {dlgTargetStatus === "reserved" && (
                 <p
-                  className="mt-1 text-muted-foreground text-xs"
+                  className="text-muted-foreground mt-1 text-xs"
                   id="comment-hint"
                 >
                   Kept in the status history for staff. Not sent to the holder.

@@ -12,10 +12,10 @@ describe("SearchHint", () => {
     // route cannot ship a hint that forgets to say how phrases and
     // exclusions work, and cannot restate it differently (#369).
     render(<SearchHint fields="names and descriptions" id="hint" />);
-    const hint = screen.getByText(/Searches names and descriptions\./);
+    const hint = screen.getByText(/Searches names and descriptions\./u);
     expect(hint.id).toBe("hint");
     expect(hint.textContent).toMatch(
-      /Quote a "phrase", or put - before a word to exclude it\./
+      /Quote a "phrase", or put - before a word to exclude it\./u
     );
   });
 
@@ -32,7 +32,7 @@ describe("SearchHint", () => {
     const described = document.getElementById(
       box.getAttribute("aria-describedby") ?? ""
     );
-    expect(described?.textContent).toMatch(/Searches titles\./);
+    expect(described?.textContent).toMatch(/Searches titles\./u);
   });
 
   // The note the server's clamp owes the reader (#478). In the described
@@ -46,8 +46,8 @@ describe("SearchHint", () => {
         query={"a".repeat(SEARCH_QUERY_MAX)}
       />
     );
-    expect(screen.getByText(/Searches titles\./).textContent).not.toMatch(
-      /characters were used/
+    expect(screen.getByText(/Searches titles\./u).textContent).not.toMatch(
+      /characters were used/u
     );
   });
 
@@ -59,8 +59,8 @@ describe("SearchHint", () => {
         query={"a".repeat(SEARCH_QUERY_MAX + 1)}
       />
     );
-    expect(screen.getByText(/Searches titles\./).textContent).toMatch(
-      new RegExp(`only its first ${SEARCH_QUERY_MAX} characters were used`)
+    expect(screen.getByText(/Searches titles\./u).textContent).toMatch(
+      new RegExp(`only its first ${SEARCH_QUERY_MAX} characters were used`, "u")
     );
   });
 
@@ -68,8 +68,8 @@ describe("SearchHint", () => {
     // Every caller passes one today; the prop is optional so a listing that
     // does not can still render the hint.
     render(<SearchHint fields="titles" id="hint" />);
-    expect(screen.getByText(/Searches titles\./).textContent).not.toMatch(
-      /characters were used/
+    expect(screen.getByText(/Searches titles\./u).textContent).not.toMatch(
+      /characters were used/u
     );
   });
 });
@@ -88,7 +88,7 @@ describe("SearchQueryNote", () => {
     render(
       <SearchQueryNote id="note" query={"a".repeat(SEARCH_QUERY_MAX + 1)} />
     );
-    const note = screen.getByText(/characters were used/);
+    const note = screen.getByText(/characters were used/u);
     expect(note.id).toBe("note");
     expect(note.tagName).toBe("P");
   });

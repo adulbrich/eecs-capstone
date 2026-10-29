@@ -55,8 +55,8 @@ describe("isAdmin", () => {
 describe("assertAdmin", () => {
   it("passes an admin through and refuses an instructor", () => {
     expect(() => assertAdmin(admin)).not.toThrow();
-    expect(() => assertAdmin(instructor)).toThrow(/Forbidden/);
-    expect(() => assertAdmin(anon)).toThrow(/Forbidden/);
+    expect(() => assertAdmin(instructor)).toThrow(/Forbidden/u);
+    expect(() => assertAdmin(anon)).toThrow(/Forbidden/u);
   });
 
   it("narrows the viewer to non-null", () => {
@@ -74,8 +74,8 @@ describe("assertStaff", () => {
   });
 
   it("throws Forbidden for everyone else", () => {
-    expect(() => assertStaff(student)).toThrow(/Forbidden/);
-    expect(() => assertStaff(anon)).toThrow(/Forbidden/);
+    expect(() => assertStaff(student)).toThrow(/Forbidden/u);
+    expect(() => assertStaff(anon)).toThrow(/Forbidden/u);
   });
 
   it("narrows the viewer to non-null", () => {

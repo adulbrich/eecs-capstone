@@ -79,7 +79,7 @@ import {
   listAdminProjects,
 } from "#/server/projects-queries";
 
-const DAY = /^\d{4}-\d{2}-\d{2}$/;
+const DAY = /^\d{4}-\d{2}-\d{2}$/u;
 
 /**
  * The five switches, off. Stripped from the URL when they match, so a shared
@@ -235,7 +235,7 @@ const COLUMNS = defineAdminColumns<Row>()([
   {
     accessorFn: (row) => row.title,
     cell: ({ row }) => (
-      <div className="flex items-center gap-2 md:min-w-xs md:max-w-md">
+      <div className="flex items-center gap-2 md:max-w-md md:min-w-xs">
         <ImageOrFallback
           className="aspect-[3/2] w-16 shrink-0 rounded object-cover"
           src={projectImageSrc(row.original.imageUrl)}
@@ -249,7 +249,7 @@ const COLUMNS = defineAdminColumns<Row>()([
           {row.original.title}
         </Link>
         {row.original.deletedAt && (
-          <span className="rounded bg-destructive/10 px-1.5 py-0.5 text-destructive text-xs">
+          <span className="bg-destructive/10 text-destructive rounded px-1.5 py-0.5 text-xs">
             Deleted
           </span>
         )}
@@ -288,7 +288,7 @@ const COLUMNS = defineAdminColumns<Row>()([
       return (
         <div className="leading-tight">
           <span className="block">{proposerName}</span>
-          <span className="block text-muted-foreground text-xs">
+          <span className="text-muted-foreground block text-xs">
             {proposerEmail}
           </span>
         </div>
@@ -314,7 +314,7 @@ const COLUMNS = defineAdminColumns<Row>()([
       return (
         <div className="leading-tight">
           <span className="block">{mentorName}</span>
-          <span className="block text-muted-foreground text-xs">
+          <span className="text-muted-foreground block text-xs">
             {mentorEmail}
           </span>
         </div>
@@ -549,10 +549,10 @@ function AdminProjectsFilters({
   return (
     <div className="space-y-4">
       <fieldset>
-        <legend className="font-medium text-muted-foreground text-xs">
+        <legend className="text-muted-foreground text-xs font-medium">
           Status
         </legend>
-        <p className="mt-0.5 text-muted-foreground text-xs">
+        <p className="text-muted-foreground mt-0.5 text-xs">
           {statusSelectionLabel(resolved.statuses)}
         </p>
         <div className="mt-1 space-y-1">
@@ -707,7 +707,7 @@ function AdminProjectsFilters({
           Labels are one line each under the legend, so each fits the aside
           beside its switch. An off switch leaves the URL: see SWITCH_DEFAULTS.
         */}
-        <legend className="font-medium text-muted-foreground text-xs">
+        <legend className="text-muted-foreground text-xs font-medium">
           {PROJECT_SWITCH_LEGEND}
         </legend>
         <div className="mt-1">
@@ -821,7 +821,7 @@ function DatelessNotice({
     // `mt-4` to match `AdminDataTable`'s own top margin: `ListingLayout`
     // renders its children straight after the controls row with no spacing of
     // its own, so each block brings its own.
-    <div className="mt-4 rounded-md border border-border bg-muted/40 px-4 py-3 text-sm">
+    <div className="border-border bg-muted/40 mt-4 rounded-md border px-4 py-3 text-sm">
       <p className="text-muted-foreground">
         {count === 1
           ? `1 project in this view has no ${label} date and is not shown.`
@@ -966,7 +966,7 @@ function AdminProjects() {
               </BreadcrumbItem>
             </BreadcrumbList>
           </Breadcrumb>
-          <h1 className="mt-2 font-semibold text-2xl">Projects</h1>
+          <h1 className="mt-2 text-2xl font-semibold">Projects</h1>
         </>
       }
     >

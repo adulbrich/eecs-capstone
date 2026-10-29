@@ -1,7 +1,7 @@
 import { isAccessDenied } from "#/lib/access-denied";
 import { redactQueryError } from "./redact-query-error";
 
-const WHITESPACE_RUN = /\s+/g;
+const WHITESPACE_RUN = /\s+/gu;
 
 /** The part of a router match this reads. */
 interface RenderedMatch {

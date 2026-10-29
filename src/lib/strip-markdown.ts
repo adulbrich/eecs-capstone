@@ -15,56 +15,56 @@
  * need nothing: every later opener is also a closer, so a scan ends at the
  * next one.
  */
-const CODE_FENCE = /```[\s\S]*?```/g;
+const CODE_FENCE = /```[\s\S]*?```/gu;
 // One line at most, so a backtick typed as an apostrophe cannot pair with one
 // paragraphs later and shield everything between from the patterns below.
-const INLINE_CODE = /`([^`\n]*)`/g;
+const INLINE_CODE = /`([^`\n]*)`/gu;
 // Stands in for an inline code span while the other patterns run, so emphasis
 // and tag removal cannot reach into `__init__` or `<canvas>`. A private-use
 // character, removed from the input first so a pasted one cannot collide.
 const SLOT = "\uE000";
-const CODE_SLOT = new RegExp(`${SLOT}(\\d+)${SLOT}`, "g");
-const HORIZONTAL_RULE = /^\s{0,3}([-*_])(\s*\1){2,}\s*$/gm;
+const CODE_SLOT = new RegExp(`${SLOT}(\\d+)${SLOT}`, "gu");
+const HORIZONTAL_RULE = /^\s{0,3}([-*_])(\s*\1){2,}\s*$/gmu;
 // A GFM table delimiter row, e.g. `| --- | :--: |`: a line made up only of
 // pipes, colons, hyphens, and whitespace. The lookahead requires at least one
 // `|` on the line so this never matches a `- - -` horizontal rule (no pipe)
 // or a `- item` bullet line (starts with a list marker, not a pipe).
-const TABLE_SEPARATOR_ROW = /^(?=[^\n]*\|)[\s:|-]+$/gm;
+const TABLE_SEPARATOR_ROW = /^(?=[^\n]*\|)[\s:|-]+$/gmu;
 // A label stops at the next `[` or `]`, and a target at the next `[`, `(` or
 // `)` outside one balanced pair, which is at most a few characters past where
 // the next opener starts. The balanced pairs keep `?q[]=1` and Wikipedia's
 // `Rust_(programming_language)` inside the target. Nested brackets in a label
 // never matched.
-const IMAGE = /!\[[^[\]]*\]\((?:[^()[\]]|\[[^()[\]]*\]|\([^()[\]]*\))*\)/g;
-const LINK = /\[([^[\]]*)\]\((?:[^()[\]]|\[[^()[\]]*\]|\([^()[\]]*\))*\)/g;
-const HEADING_MARKER = /^\s{0,3}#{1,6}\s+/gm;
-const BLOCKQUOTE_MARKER = /^\s{0,3}>\s?/gm;
+const IMAGE = /!\[[^[\]]*\]\((?:[^()[\]]|\[[^()[\]]*\]|\([^()[\]]*\))*\)/gu;
+const LINK = /\[([^[\]]*)\]\((?:[^()[\]]|\[[^()[\]]*\]|\([^()[\]]*\))*\)/gu;
+const HEADING_MARKER = /^\s{0,3}#{1,6}\s+/gmu;
+const BLOCKQUOTE_MARKER = /^\s{0,3}>\s?/gmu;
 // `[ \t]*`, not `\s*`: under the `m` flag `\s` crosses newlines, so every line
 // start in a run of blank lines rescanned the rest of the run for a marker.
-const LIST_MARKER = /^[ \t]*([*+-]|\d+[.)])\s+/gm;
-const TASK_MARKER = /^\[[ xX]\]\s+/gm;
+const LIST_MARKER = /^[ \t]*([*+-]|\d+[.)])\s+/gmu;
+const TASK_MARKER = /^\[[ xX]\]\s+/gmu;
 // Emphasis opens inside its own span, so only a bound helps: 500 characters,
 // counted in UTF-16 code units. A longer run keeps its markers, as unclosed
 // emphasis does. `(?!\*)` and `(?!_)` take the whole delimiter run at once;
 // backing off to a shorter one walked the window up to three times.
-const ASTERISK_EMPHASIS = /(\*{1,3}(?!\*)|~~(?!~))(?=\S)([\s\S]{0,499}?\S)\1/g;
+const ASTERISK_EMPHASIS = /(\*{1,3}(?!\*)|~~(?!~))(?=\S)([\s\S]{0,499}?\S)\1/gu;
 // Guarded on both sides so it cannot fire inside a word. CommonMark makes the
 // same distinction for the same reason: `*` may emphasise intraword and `_`
 // may not, because `snake_case_names` are ordinary prose in a technical field.
 const UNDERSCORE_EMPHASIS =
-  /(^|[^\w])_{1,3}(?!_)(?=\S)([\s\S]{0,499}?\S)_{1,3}(?!\w)/g;
+  /(^|[^\w])_{1,3}(?!_)(?=\S)([\s\S]{0,499}?\S)_{1,3}(?!\w)/gu;
 // A comment with no `<` inside, which is also where its scan stops.
-const HTML_COMMENT = /<!--[^<]*?-->/g;
+const HTML_COMMENT = /<!--[^<]*?-->/gu;
 // An element, Word's `o:p` included. The name must end at whitespace, `/` or
 // `>`, so `a < b`, an autolink `<https://x.test>` and `<me@x.test>` survive.
 // `[^<>]` stops at the next `<`, which keeps an unclosed tag from scanning past
 // the one after it.
 const HTML_TAG =
-  /<\/?[A-Za-z][A-Za-z0-9-]*(?::[A-Za-z][A-Za-z0-9-]*)?(?=[\s/>])[^<>]*>/g;
+  /<\/?[A-Za-z][A-Za-z0-9-]*(?::[A-Za-z][A-Za-z0-9-]*)?(?=[\s/>])[^<>]*>/gu;
 // Remaining table pipes (header and data rows) become spaces so cell text
 // survives as separate words instead of running together.
-const PIPE = /\|/g;
-const WHITESPACE = /\s+/g;
+const PIPE = /\|/gu;
+const WHITESPACE = /\s+/gu;
 
 export function stripMarkdown(input: string | null | undefined): string {
   if (!input) {

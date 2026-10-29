@@ -89,7 +89,7 @@ const SUMMARY_FIELDS = [
 ];
 
 /** MUST match `LONE_TRAILING_SURROGATE` in `src/lib/social-summary-source.ts`. */
-const LONE_TRAILING_SURROGATE = /[\uD800-\uDBFF]$/;
+const LONE_TRAILING_SURROGATE = /[\uD800-\uDBFF]$/u;
 
 /**
  * MUST match `buildSocialSummarySource` in `src/lib/social-summary-source.ts`.

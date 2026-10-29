@@ -16,7 +16,7 @@ const BY_ID = GENERATED.slice(
   GENERATED.indexOf("export interface FileRoutesById {"),
   GENERATED.indexOf("}", GENERATED.indexOf("export interface FileRoutesById {"))
 );
-const ROUTE_IDS = [...BY_ID.matchAll(/^ {2}'([^']+)': typeof/gm)].map(
+const ROUTE_IDS = [...BY_ID.matchAll(/^ {2}'([^']+)': typeof/gmu)].map(
   (m) => m[1]
 );
 

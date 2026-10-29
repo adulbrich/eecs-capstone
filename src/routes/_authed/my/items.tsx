@@ -177,7 +177,7 @@ function GroupHeader({ rows }: { rows: Row[] }) {
       return (
         <p>
           Not submitted yet
-          <span className="font-normal text-muted-foreground">
+          <span className="text-muted-foreground font-normal">
             {" "}
             ({count} {count === 1 ? "item" : "items"})
           </span>
@@ -190,7 +190,7 @@ function GroupHeader({ rows }: { rows: Row[] }) {
           <p className="flex flex-wrap items-center gap-2">
             <span>
               Requested
-              <span className="font-normal text-muted-foreground">
+              <span className="text-muted-foreground font-normal">
                 {" "}
                 on <LocalTime dateOnly value={first.requestedAt} />, {count}{" "}
                 {count === 1 ? "line" : "lines"}
@@ -201,7 +201,7 @@ function GroupHeader({ rows }: { rows: Row[] }) {
             )}
           </p>
           {first.note && (
-            <p className="whitespace-pre-wrap font-normal text-muted-foreground text-xs">
+            <p className="text-muted-foreground text-xs font-normal whitespace-pre-wrap">
               {first.note}
             </p>
           )}
@@ -518,7 +518,7 @@ function MyItems() {
 
   return (
     <div className="mx-auto max-w-4xl px-4 py-6 md:p-8">
-      <h1 className="font-semibold text-2xl">My Items</h1>
+      <h1 className="text-2xl font-semibold">My Items</h1>
       <NeedsAttention entries={attention} />
       <AdminDataTable
         caption="My items"
@@ -709,7 +709,7 @@ function fieldsOf(row: Row, staffInbox: string | null): LineSheetField[] {
               <>
                 Email{" "}
                 <a
-                  className="break-all text-brand-dark underline"
+                  className="text-brand-dark break-all underline"
                   href={`mailto:${staffInbox}`}
                 >
                   {staffInbox}

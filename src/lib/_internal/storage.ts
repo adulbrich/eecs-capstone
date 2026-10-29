@@ -169,7 +169,7 @@ export interface KeySpace {
  * integrity nit on its own, but it means the prefix alone does not mean what
  * it looks like it means, and both call sites read this one predicate.
  */
-const OWNED_FILENAME = /^[A-Za-z0-9_-]+\.[A-Za-z0-9]+$/;
+const OWNED_FILENAME = /^[A-Za-z0-9_-]+\.[A-Za-z0-9]+$/u;
 
 function keySpace(prefix: string): KeySpace {
   return {

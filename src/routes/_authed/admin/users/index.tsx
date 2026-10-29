@@ -254,7 +254,7 @@ function UsersAdmin() {
           </BreadcrumbItem>
         </BreadcrumbList>
       </Breadcrumb>
-      <h1 className="mt-2 font-semibold text-2xl">Users</h1>
+      <h1 className="mt-2 text-2xl font-semibold">Users</h1>
 
       <AdminDataTable
         actions={

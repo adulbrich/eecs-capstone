@@ -783,21 +783,21 @@ describe("staff-only data and actions are inaccessible to non-staff", () => {
     const intruder = { id: other.id, role: other.role };
 
     await expect(forceTransitionAs(intruder, id, "published")).rejects.toThrow(
-      /Forbidden/
+      /Forbidden/u
     );
     await expect(
       performTransitionAs(intruder, id, "submitted")
-    ).rejects.toThrow(/Forbidden/);
+    ).rejects.toThrow(/Forbidden/u);
     await expect(hardDeleteProjectAs(intruder, id)).rejects.toThrow(
-      /Forbidden/
+      /Forbidden/u
     );
     // These two refuse before they load the project, so a draft refuses with
     // Forbidden rather than with the "Cannot soft-delete a draft" state check
     // one line further down. That ordering is the assertion.
     await expect(softDeleteProjectAs(intruder, id)).rejects.toThrow(
-      /Forbidden/
+      /Forbidden/u
     );
-    await expect(restoreProjectAs(intruder, id)).rejects.toThrow(/Forbidden/);
+    await expect(restoreProjectAs(intruder, id)).rejects.toThrow(/Forbidden/u);
   });
 });
 
@@ -897,7 +897,7 @@ describe("status timeline visibility and changes-requested feedback", () => {
 
     await expect(
       performTransitionAs(admin, id, "changes_requested")
-    ).rejects.toThrow(/comment describing the requested changes/);
+    ).rejects.toThrow(/comment describing the requested changes/u);
     await expect(
       performTransitionAs(admin, id, "changes_requested", "Add unit tests.")
     ).resolves.toMatchObject({ status: "changes_requested" });
@@ -1289,7 +1289,7 @@ describe("review emails", () => {
     send.mockClear();
     await expect(
       performTransitionAs(admin, id, "draft", undefined, { send })
-    ).rejects.toThrow(/comment/);
+    ).rejects.toThrow(/comment/u);
     expect(send).not.toHaveBeenCalled();
 
     await performTransitionAs(admin, id, "draft", "Scope this to one term.", {
@@ -1965,7 +1965,7 @@ describe("updateProjectAs cross-user guard", () => {
         title: "taken over",
         notes: "written by a stranger",
       })
-    ).rejects.toThrow(/Forbidden/);
+    ).rejects.toThrow(/Forbidden/u);
 
     const [row] = await db.select().from(projects).where(eq(projects.id, id));
     expect(row.title).toBe("owned");

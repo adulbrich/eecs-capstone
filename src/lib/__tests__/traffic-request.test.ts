@@ -120,7 +120,7 @@ describe("visitorHash", () => {
 
   it("is 16 bytes of base64url and never contains the address", () => {
     const hash = visitorHash("salt-a", VIEWER, agent);
-    expect(hash).toMatch(/^[A-Za-z0-9_-]{22}$/);
+    expect(hash).toMatch(/^[A-Za-z0-9_-]{22}$/u);
     expect(hash).not.toContain(VIEWER);
   });
 

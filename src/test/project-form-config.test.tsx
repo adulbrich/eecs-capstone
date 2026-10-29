@@ -63,7 +63,7 @@ describe("ProjectForm validators", () => {
     // Zod and changes between its versions. The limit is the rule.
     await waitFor(() =>
       expect(
-        screen.getByText(new RegExp(String(FIELD_MAX_LENGTHS.description)))
+        screen.getByText(new RegExp(String(FIELD_MAX_LENGTHS.description), "u"))
       ).toBeTruthy()
     );
     expect(mockedCreate).not.toHaveBeenCalled();
@@ -88,12 +88,16 @@ describe("ProjectForm validators", () => {
 describe("ProjectForm configuration props", () => {
   it("offers no AI review without enableAiReview", () => {
     renderForm();
-    expect(screen.queryByRole("button", { name: /Review with AI/ })).toBeNull();
+    expect(
+      screen.queryByRole("button", { name: /Review with AI/u })
+    ).toBeNull();
   });
 
   it("offers the AI review with enableAiReview", () => {
     renderForm({ enableAiReview: true });
-    expect(screen.getByRole("button", { name: /Review with AI/ })).toBeTruthy();
+    expect(
+      screen.getByRole("button", { name: /Review with AI/u })
+    ).toBeTruthy();
   });
 
   it("draws no private notes field without showNotes", () => {

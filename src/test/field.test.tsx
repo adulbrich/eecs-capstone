@@ -97,9 +97,9 @@ describe("every Input and Textarea", () => {
       }
       const source = readFileSync(file, "utf8");
       for (const match of source.matchAll(
-        /<(Input|Textarea)\b([\s\S]*?)\/?>/g
+        /<(Input|Textarea)\b([\s\S]*?)\/?>/gu
       )) {
-        if (!(/\bid=/.test(match[2]) || /aria-label/.test(match[2]))) {
+        if (!(/\bid=/u.test(match[2]) || /aria-label/u.test(match[2]))) {
           offenders.push(`${file}: <${match[1]}>`);
         }
       }

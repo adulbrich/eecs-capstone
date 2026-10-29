@@ -18,6 +18,6 @@ describe("TeamFullBadge", () => {
 
   it("never says applicant, which the glossary forbids", () => {
     render(<TeamFullBadge acceptingApplicants={false} />);
-    expect(screen.queryByText(/applicant/i)).toBeNull();
+    expect(screen.queryByText(/applicant/iu)).toBeNull();
   });
 });

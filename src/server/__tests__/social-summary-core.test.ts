@@ -64,7 +64,7 @@ describe("parseSocialSummaryResponse", () => {
   it("refuses a response that ran out of room", () => {
     expect(() =>
       parseSocialSummaryResponse({ status: "incomplete", output: [] })
-    ).toThrow(/ran out of room/);
+    ).toThrow(/ran out of room/u);
   });
 
   it("refuses a response with no tool call in it", () => {

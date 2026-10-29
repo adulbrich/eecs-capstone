@@ -52,8 +52,8 @@ describe("truncateOnWordBoundary", () => {
     // the unbroken-token fallback, which slices at the raw code unit.
     const text = "\u{1F600}".repeat(200);
     const result = truncateOnWordBoundary(text);
-    expect(result).not.toMatch(/[\uD800-\uDBFF](?![\uDC00-\uDFFF])/);
-    expect(result).not.toMatch(/(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/);
+    expect(result).not.toMatch(/[\uD800-\uDBFF](?![\uDC00-\uDFFF])/u);
+    expect(result).not.toMatch(/(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/u);
   });
 
   it("keeps the text when stripping punctuation would empty it", () => {
@@ -94,8 +94,8 @@ describe("truncateOnWordBoundary", () => {
     // the only one that can halve a surrogate pair. An early space now reaches
     // it where it used to reach the first word instead.
     const result = truncateOnWordBoundary(`ab ${"\u{1F600}".repeat(200)}`);
-    expect(result).not.toMatch(/[\uD800-\uDBFF](?![\uDC00-\uDFFF])/);
-    expect(result).not.toMatch(/(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/);
+    expect(result).not.toMatch(/[\uD800-\uDBFF](?![\uDC00-\uDFFF])/u);
+    expect(result).not.toMatch(/(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/u);
   });
 
   it("never returns more than the budget, even below the ellipsis", () => {

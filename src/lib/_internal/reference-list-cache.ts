@@ -21,7 +21,7 @@
  * again rather than being handed the failure.
  */
 
-const DIGITS = /^\d+$/;
+const DIGITS = /^\d+$/u;
 
 export function referenceListTtlMs(
   env: Record<string, string | undefined> = process.env

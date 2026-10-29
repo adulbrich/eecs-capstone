@@ -499,7 +499,7 @@ describe("solvePlacement", () => {
       })
     );
     expect(result.status).toBe("error");
-    expect(result.message).toMatch(/colCost/);
+    expect(result.message).toMatch(/colCost/u);
   });
 
   it("returns an empty optimal result when nobody can be placed", () => {

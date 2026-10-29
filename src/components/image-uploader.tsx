@@ -170,7 +170,7 @@ export function ImageUploader({
           {displayUrl ? (
             <img
               alt="Current"
-              className="max-h-48 border border-border object-contain"
+              className="border-border max-h-48 border object-contain"
               src={displayUrl}
             />
           ) : (

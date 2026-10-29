@@ -34,10 +34,10 @@ export interface ParsedRoster {
   issues: ImportIssue[];
 }
 
-const EMAIL = /^[^\s@<>,;"]+@[^\s@<>,;"]+\.[^\s@<>,;"]+$/;
-const NAMED = /^(.*)<([^<>]+)>$/;
-const WHITESPACE = /\s+/;
-const QUOTES = /^["']|["']$/g;
+const EMAIL = /^[^\s@<>,;"]+@[^\s@<>,;"]+\.[^\s@<>,;"]+$/u;
+const NAMED = /^(.*)<([^<>]+)>$/u;
+const WHITESPACE = /\s+/u;
+const QUOTES = /^["']|["']$/gu;
 
 export const isEmail = (text: string) => EMAIL.test(text);
 

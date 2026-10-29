@@ -75,7 +75,7 @@ describe("refreshProjectInBackground", () => {
     await settleProjectRefreshes();
     expect(log).toHaveBeenCalledOnce();
     expect(log.mock.calls[0][0]).toMatch(
-      /^Project refresh for p1: embedding updated, social summary failed, \d+ ms$/
+      /^Project refresh for p1: embedding updated, social summary failed, \d+ ms$/u
     );
   });
 
@@ -139,7 +139,7 @@ function filterPattern(): string {
  * alternative starts with `^`, since a phrase matched anywhere in a line can
  * be text a stranger sent.
  */
-const ANCHORED_REGEX = /^%\^[\w :#=@/;,\-^$?[\]{}|\\*+.]+%$/;
+const ANCHORED_REGEX = /^%\^[\w :#=@/;,\-^$?[\]{}|\\*+.]+%$/u;
 
 /**
  * CloudWatch's match for a standalone `%regex%` pattern: the event matches
@@ -148,7 +148,7 @@ const ANCHORED_REGEX = /^%\^[\w :#=@/;,\-^$?[\]{}|\\*+.]+%$/;
  * imitates.
  */
 function filterMatches(line: string): boolean {
-  return new RegExp(filterPattern().slice(1, -1)).test(line);
+  return new RegExp(filterPattern().slice(1, -1), "u").test(line);
 }
 
 /** The line a real refresh logs for one pair of outcomes. */
@@ -211,7 +211,7 @@ describe("the ai_write_failures metric filter in infra/alarms.tf", () => {
     const pattern = filterPattern();
     expect(pattern).toMatch(ANCHORED_REGEX);
     for (const alternative of pattern.slice(1, -1).split("|")) {
-      expect(alternative).toMatch(/^\^/);
+      expect(alternative).toMatch(/^\^/u);
     }
   });
 
@@ -247,7 +247,7 @@ describe("the ai_write_failures metric filter in infra/alarms.tf", () => {
     "counts a refresh line with embedding %s and social summary %s: %s",
     async (embedding, summary, counted) => {
       const line = await refreshLine("counted", embedding, summary);
-      expect(line).toMatch(/^Project refresh for counted: /);
+      expect(line).toMatch(/^Project refresh for counted: /u);
       expect(filterMatches(line)).toBe(counted);
     }
   );
@@ -256,7 +256,7 @@ describe("the ai_write_failures metric filter in infra/alarms.tf", () => {
     {
       writer: "refreshInterestsEmbedding",
       counted: true,
-      printed: /^Embedding failed for user interests u1$/,
+      printed: /^Embedding failed for user interests u1$/u,
       fail: async () => {
         selectRows.mockResolvedValue([INTEREST_ROW]);
         const { refreshInterestsEmbedding } = await realEmbeddings();
@@ -266,7 +266,7 @@ describe("the ai_write_failures metric filter in infra/alarms.tf", () => {
     {
       writer: "refreshProjectEmbedding",
       counted: false,
-      printed: /^Embedding failed for project p1$/,
+      printed: /^Embedding failed for project p1$/u,
       fail: async () => {
         selectRows.mockResolvedValue([PROJECT_ROW]);
         const { refreshProjectEmbedding } = await realEmbeddings();
@@ -276,7 +276,7 @@ describe("the ai_write_failures metric filter in infra/alarms.tf", () => {
     {
       writer: "refreshSocialSummary, the model call failing,",
       counted: false,
-      printed: /^Social summary failed for project p1: /,
+      printed: /^Social summary failed for project p1: /u,
       fail: async () => {
         selectRows.mockResolvedValue([PROJECT_ROW]);
         const { refreshSocialSummary } = await realSocialSummary();
@@ -286,7 +286,7 @@ describe("the ai_write_failures metric filter in infra/alarms.tf", () => {
     {
       writer: "refreshSocialSummary, the read throwing,",
       counted: false,
-      printed: /^Social summary failed for project p1$/,
+      printed: /^Social summary failed for project p1$/u,
       fail: async () => {
         selectRows.mockRejectedValue(new Error("connection refused"));
         const { refreshSocialSummary } = await realSocialSummary();

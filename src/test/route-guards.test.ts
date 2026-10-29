@@ -81,8 +81,8 @@ const ADMIN_GATED = {
 const ROUTES_DIR = join(process.cwd(), "src/routes/_authed");
 
 /** Any redirect at all: every guarded file below is a role guard. */
-const REDIRECT = /\bredirect\(/;
-const ROLE_GUARD = /require(Staff|Admin)\(context\.user\)/;
+const REDIRECT = /\bredirect\(/u;
+const ROLE_GUARD = /require(Staff|Admin)\(context\.user\)/u;
 
 function routeFiles(): string[] {
   return readdirSync(ROUTES_DIR, { recursive: true, encoding: "utf8" }).filter(

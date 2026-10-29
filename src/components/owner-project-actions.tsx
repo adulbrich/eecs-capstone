@@ -85,7 +85,7 @@ export function OwnerProjectActions({
   const sentBack = project.status === "changes_requested";
 
   return (
-    <Card asChild className="mt-6 bg-secondary p-4">
+    <Card asChild className="bg-secondary mt-6 p-4">
       <section>
         <SectionHeading>Your actions</SectionHeading>
         {/*
@@ -98,11 +98,11 @@ export function OwnerProjectActions({
           <div className="mt-2 text-sm">
             <p className="font-medium">Staff asked for changes</p>
             {changeRequest ? (
-              <p className="mt-1 whitespace-pre-wrap text-muted-foreground">
+              <p className="text-muted-foreground mt-1 whitespace-pre-wrap">
                 {changeRequest}
               </p>
             ) : (
-              <p className="mt-1 text-muted-foreground">
+              <p className="text-muted-foreground mt-1">
                 No note was left. Check the status history below or ask staff.
               </p>
             )}

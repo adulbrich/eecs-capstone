@@ -952,7 +952,7 @@ export function AdminDataTable<T extends RowData>({
         {content !== null && (
           <tr data-row-detail="">
             <td
-              className="border-b p-2 md:bg-muted/50"
+              className="md:bg-muted/50 border-b p-2"
               colSpan={visibleColumnCount}
             >
               {content}
@@ -1065,7 +1065,7 @@ export function AdminDataTable<T extends RowData>({
                     of the message, and this row is a message, not a record.
                   */}
                   <TableCell
-                    className="justify-center py-8 text-center text-muted-foreground text-sm"
+                    className="text-muted-foreground justify-center py-8 text-center text-sm"
                     colSpan={visibleColumnCount}
                   >
                     {noMatchMessage}

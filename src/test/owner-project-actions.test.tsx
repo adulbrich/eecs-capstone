@@ -62,7 +62,7 @@ describe("OwnerProjectActions", () => {
 
   it("says when no note was left rather than showing an empty request", () => {
     renderBlock("changes_requested", null);
-    expect(screen.getByText(/No note was left/)).toBeDefined();
+    expect(screen.getByText(/No note was left/u)).toBeDefined();
   });
 
   it("offers submit and delete on a draft, with no staff note", () => {

@@ -46,7 +46,7 @@ describe("NeedsAttention", () => {
         now={now}
       />
     );
-    expect(screen.getByText(/Nothing needs your attention/)).toBeDefined();
+    expect(screen.getByText(/Nothing needs your attention/u)).toBeDefined();
     expect(screen.queryByRole("link")).toBeNull();
   });
 
@@ -67,7 +67,7 @@ describe("NeedsAttention", () => {
     expect(region.textContent).toContain("1 pickup overdue");
     expect(region.textContent).toContain("1 return due within 3 days");
     expect(
-      screen.getByRole("link", { name: /below/ }).getAttribute("href")
+      screen.getByRole("link", { name: /below/u }).getAttribute("href")
     ).toBe("/my/items?filter=open");
   });
 });

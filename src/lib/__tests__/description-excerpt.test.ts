@@ -40,7 +40,7 @@ describe.each(BUDGETS)("descriptionExcerpt at %i", (max) => {
     expect(excerpt).not.toBeNull();
     expect(excerpt?.length).toBeLessThanOrEqual(max);
     expect(excerpt?.endsWith("...")).toBe(true);
-    expect(excerpt).toMatch(/ipsum\.\.\.$|lorem\.\.\.$/);
+    expect(excerpt).toMatch(/ipsum\.\.\.$|lorem\.\.\.$/u);
   });
 
   it("leaves no markdown behind when a link or emphasis straddles the budget", () => {

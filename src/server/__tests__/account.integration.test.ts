@@ -335,17 +335,17 @@ describe("deleteAccountAs", () => {
     expect(schemaFiles.sort()).toEqual(["auth-schema.ts", "schema.ts"]);
     for (const file of schemaFiles) {
       const source = readFileSync(join(schemaDir, file), "utf-8");
-      tablesDeclared += source.match(/pgTable\(/g)?.length ?? 0;
-      const blocks = source.split(/(?=pgTable\(\s*")/);
+      tablesDeclared += source.match(/pgTable\(/gu)?.length ?? 0;
+      const blocks = source.split(/(?=pgTable\(\s*")/u);
       for (const block of blocks) {
-        const name = block.match(/pgTable\(\s*"([a-z0-9_]+)"/)?.[1];
+        const name = block.match(/pgTable\(\s*"([a-z0-9_]+)"/u)?.[1];
         if (!name) {
           continue;
         }
         tablesSeen += 1;
         // The options object may carry other keys first, and the formatter
         // may split it across lines; only the pair itself has to be there.
-        if (/user\.id,\s*\{[^}]*onDelete:\s*"cascade"/.test(block)) {
+        if (/user\.id,\s*\{[^}]*onDelete:\s*"cascade"/u.test(block)) {
           cascadeEdges.push(name);
         }
       }

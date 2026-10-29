@@ -46,7 +46,7 @@ const ALLOWED_ELEMENTS = [
 ];
 
 function Heading({ children }: { children?: ReactNode }) {
-  return <h3 className="font-semibold text-sm">{children}</h3>;
+  return <h3 className="text-sm font-semibold">{children}</h3>;
 }
 
 function Anchor({ href, children }: { children?: ReactNode; href?: string }) {

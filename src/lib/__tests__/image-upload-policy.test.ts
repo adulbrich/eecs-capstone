@@ -30,23 +30,25 @@ describe("assertImageFile", () => {
   });
 
   it("rejects a value that is not a File", () => {
-    expect(() => assertImageFile(null)).toThrow(/Missing file/);
-    expect(() => assertImageFile("not a file")).toThrow(/Missing file/);
+    expect(() => assertImageFile(null)).toThrow(/Missing file/u);
+    expect(() => assertImageFile("not a file")).toThrow(/Missing file/u);
   });
 
   it("rejects a type off the allowlist", () => {
     expect(() => assertImageFile(file("text/plain"))).toThrow(
-      /Unsupported image type/
+      /Unsupported image type/u
     );
     expect(() => assertImageFile(file("image/svg+xml"))).toThrow(
-      /Unsupported image type/
+      /Unsupported image type/u
     );
   });
 
   it("rejects a file over the cap, and accepts one exactly at it", () => {
     expect(() =>
       assertImageFile(file("image/png", MAX_IMAGE_BYTES + 1))
-    ).toThrow(new RegExp(`File too large \\(max ${MAX_IMAGE_BYTES} bytes\\)`));
+    ).toThrow(
+      new RegExp(`File too large \\(max ${MAX_IMAGE_BYTES} bytes\\)`, "u")
+    );
     expect(() =>
       assertImageFile(file("image/png", MAX_IMAGE_BYTES))
     ).not.toThrow();
@@ -77,12 +79,12 @@ describe("IMAGE_FILE_ACCEPT", () => {
     //
     // One type is not drift: `image/webp` alone is the output content type
     // Sharp and the canvas both name, which is why the threshold is two.
-    const MIME = /image\/[a-z0-9.+-]+/g;
+    const MIME = /image\/[a-z0-9.+-]+/gu;
     // Only reachable when the count did not fire, so this is about a picker
     // narrowed to a SINGLE type in a file that names no other. Anything
     // naming two, a ternary with one type per branch included, is already an
     // offender by count.
-    const NARROWS_A_PICKER = /accept[^"'`]*["'`][^"'`]*image\//;
+    const NARROWS_A_PICKER = /accept[^"'`]*["'`][^"'`]*image\//u;
     const offenders: string[] = [];
     for (const path of walk("src")) {
       if (

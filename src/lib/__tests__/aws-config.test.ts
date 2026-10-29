@@ -51,11 +51,11 @@ describe("buildStorageConfig", () => {
     // A default named the local bucket, so a production task that forgot the
     // variable would have used it silently. See #137.
     expect(() => buildStorageConfig({} as NodeJS.ProcessEnv)).toThrow(
-      /S3_BUCKET is not set/
+      /S3_BUCKET is not set/u
     );
     expect(() =>
       buildStorageConfig({ S3_BUCKET: "  " } as NodeJS.ProcessEnv)
-    ).toThrow(/S3_BUCKET is not set/);
+    ).toThrow(/S3_BUCKET is not set/u);
   });
 
   it("pairs the bucket with the client config the SDK type cannot carry", () => {

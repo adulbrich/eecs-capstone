@@ -105,7 +105,7 @@ describe("a code sign-in", () => {
     });
     await enterCode();
 
-    expect(await screen.findByText(/Invalid code/)).toBeTruthy();
+    expect(await screen.findByText(/Invalid code/u)).toBeTruthy();
     expect(clearCache).not.toHaveBeenCalled();
     expect(navigate).not.toHaveBeenCalled();
   });

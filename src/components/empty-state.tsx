@@ -7,6 +7,6 @@ import type { ReactNode } from "react";
  */
 export function EmptyState({ children }: { children: ReactNode }) {
   return (
-    <p className="mt-8 text-center text-muted-foreground text-sm">{children}</p>
+    <p className="text-muted-foreground mt-8 text-center text-sm">{children}</p>
   );
 }

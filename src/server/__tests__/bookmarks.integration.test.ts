@@ -72,7 +72,7 @@ describe("bookmarks", () => {
 
     await expect(
       addBookmarkAs(student, { projectId: draftId })
-    ).rejects.toThrow(/Forbidden/);
+    ).rejects.toThrow(/Forbidden/u);
     expect(await bookmarkRows(student.id)).toHaveLength(0);
   });
 
@@ -82,7 +82,7 @@ describe("bookmarks", () => {
       addBookmarkAs(student, {
         projectId: "11111111-1111-4111-8111-111111111111",
       })
-    ).rejects.toThrow(/not found/i);
+    ).rejects.toThrow(/not found/iu);
   });
 
   it("adds once, and adding again is idempotent", async () => {

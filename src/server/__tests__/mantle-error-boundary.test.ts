@@ -79,13 +79,13 @@ describe.each(RUNNERS)("a failed Mantle call in $feature", ({ fixed, run }) => {
     expect(line?.[0]).toContain("x-amz-security-token: SECRET");
     // The request's own signed value is redacted, and the body is one line
     // cut at 500 characters, so what follows the cut never reaches it.
-    expect(authorization).toMatch(/^AWS4-HMAC-SHA256 Credential=AKIDEXAMPLE/);
+    expect(authorization).toMatch(/^AWS4-HMAC-SHA256 Credential=AKIDEXAMPLE/u);
     expect(line?.[0]).toContain("authorization:[redacted]");
     expect(line?.[0]).not.toContain(authorization);
-    expect(line?.[0]).not.toMatch(/AKIDEXAMPLE|\n/);
+    expect(line?.[0]).not.toMatch(/AKIDEXAMPLE|\n/u);
     expect(line?.[0]).not.toContain("TAIL");
     // And none of it reaches the caller.
-    expect(result.error).not.toMatch(/SECRET|403/);
+    expect(result.error).not.toMatch(/SECRET|403/u);
   });
 
   it("keeps a failed fetch's cause in the log and out of the message", async () => {

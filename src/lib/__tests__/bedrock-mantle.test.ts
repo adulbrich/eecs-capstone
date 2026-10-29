@@ -114,7 +114,7 @@ describe("redactSignedValues", () => {
     ],
     [
       "a lower-case percent-encoding",
-      `t=${encodeURIComponent(TOKEN).replace(/%[0-9A-F]{2}/g, (e) => e.toLowerCase())}`,
+      `t=${encodeURIComponent(TOKEN).replace(/%[0-9A-F]{2}/gu, (e) => e.toLowerCase())}`,
     ],
     [
       "JSON",

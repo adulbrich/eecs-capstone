@@ -162,7 +162,7 @@ describe("DeleteAccountDialog", () => {
     );
     expect(document.body.textContent).toContain("Oscilloscope");
     expect(
-      screen.getByRole("link", { name: /my items/i }).getAttribute("href")
+      screen.getByRole("link", { name: /my items/iu }).getAttribute("href")
     ).toBe("/my/items");
     expect(screen.queryByLabelText("Confirm email")).toBeNull();
     expect(

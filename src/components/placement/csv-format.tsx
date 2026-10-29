@@ -19,11 +19,11 @@ export function CsvFormatHelp({
       <summary className="cursor-pointer font-medium">
         Expected format for the {label} file
       </summary>
-      <p className="mt-2 text-muted-foreground">
+      <p className="text-muted-foreground mt-2">
         A CSV with this header row. Column order does not matter, and header
         case is ignored.
       </p>
-      <pre className="mt-2 overflow-x-auto rounded bg-muted px-2 py-1 font-mono text-xs">
+      <pre className="bg-muted mt-2 overflow-x-auto rounded px-2 py-1 font-mono text-xs">
         {format.columns.map((c) => c.name).join(",")}
       </pre>
       <table className="mt-2 w-full text-left text-xs">

@@ -138,7 +138,7 @@ function ProjectDetail() {
         tree, so a role query still finds exactly one.
       */}
       <div className="flex items-start justify-between gap-3">
-        <h1 className="font-semibold text-2xl">{project.title}</h1>
+        <h1 className="text-2xl font-semibold">{project.title}</h1>
         <div className="flex shrink-0 items-center gap-2">
           <BookmarkButton projectId={project.id} />
           {canEdit && (
@@ -368,7 +368,7 @@ function UrlSection({ url }: { url: string | null }) {
   return (
     <section className="mt-8">
       <SectionHeading>URL</SectionHeading>
-      <p className="mt-2 whitespace-pre-line break-all">
+      <p className="mt-2 break-all whitespace-pre-line">
         {href ? (
           <a
             className="text-brand-dark underline"

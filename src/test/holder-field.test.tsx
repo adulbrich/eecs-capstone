@@ -67,14 +67,14 @@ describe("HolderField", () => {
   it("asks for a label only when the email is blank", () => {
     resolvesTo(null);
     renderField({});
-    expect(screen.getByLabelText(/label/i)).toBeTruthy();
-    expect(screen.queryByLabelText(/^name$/i)).toBeNull();
+    expect(screen.getByLabelText(/label/iu)).toBeTruthy();
+    expect(screen.queryByLabelText(/^name$/iu)).toBeNull();
   });
 
   it("hides the label field once an address is typed", () => {
     resolvesTo(null);
     renderField({ email: "someone@nowhere.test" });
-    expect(screen.queryByLabelText(/label/i)).toBeNull();
+    expect(screen.queryByLabelText(/label/iu)).toBeNull();
   });
 
   it("keeps name and program closed while the account lookup is pending", () => {
@@ -84,24 +84,24 @@ describe("HolderField", () => {
     // flashed them open and shut.
     resolvesTo({ email: "ada@x.test", id: "u1", name: "Ada" });
     renderField({ email: "ada@x.test" });
-    expect(screen.queryByLabelText(/^name$/i)).toBeNull();
-    expect(screen.queryByLabelText(/program/i)).toBeNull();
+    expect(screen.queryByLabelText(/^name$/iu)).toBeNull();
+    expect(screen.queryByLabelText(/program/iu)).toBeNull();
   });
 
   it("offers name and program once the lookup finds no account", async () => {
     resolvesTo(null);
     renderField({ email: "someone@nowhere.test" });
-    expect(await screen.findByLabelText(/^name$/i)).toBeTruthy();
-    expect(screen.getByLabelText(/program/i)).toBeTruthy();
+    expect(await screen.findByLabelText(/^name$/iu)).toBeTruthy();
+    expect(screen.getByLabelText(/program/iu)).toBeTruthy();
   });
 
   it("names the matched account and never opens the fields", async () => {
     resolvesTo({ email: "ada@x.test", id: "u1", name: "Ada Lovelace" });
     renderField({ email: "ada@x.test" });
     expect(
-      await screen.findByText(/Matches account: Ada Lovelace/)
+      await screen.findByText(/Matches account: Ada Lovelace/u)
     ).toBeTruthy();
-    expect(screen.queryByLabelText(/^name$/i)).toBeNull();
+    expect(screen.queryByLabelText(/^name$/iu)).toBeNull();
   });
 
   it("recognises an account the search endpoint's result window drops", async () => {
@@ -115,10 +115,10 @@ describe("HolderField", () => {
     renderField({ email: "ada@x.test" });
 
     expect(
-      await screen.findByText(/Matches account: Ada Lovelace/)
+      await screen.findByText(/Matches account: Ada Lovelace/u)
     ).toBeTruthy();
-    expect(screen.queryByLabelText(/^name$/i)).toBeNull();
-    expect(screen.queryByLabelText(/program/i)).toBeNull();
+    expect(screen.queryByLabelText(/^name$/iu)).toBeNull();
+    expect(screen.queryByLabelText(/program/iu)).toBeNull();
   });
 
   it("opens the account search on demand and fills the address from a pick", async () => {
@@ -156,8 +156,8 @@ describe("HolderField", () => {
     // walk-in fields appear once the address is known to have no account.
     resolvesTo(null);
     renderField({ email: "someone@nowhere.test" });
-    expect(screen.queryByLabelText(/^name$/i)).toBeNull();
-    await waitFor(() => expect(screen.getByLabelText(/^name$/i)).toBeTruthy());
-    expect(screen.getByLabelText(/program/i)).toBeTruthy();
+    expect(screen.queryByLabelText(/^name$/iu)).toBeNull();
+    await waitFor(() => expect(screen.getByLabelText(/^name$/iu)).toBeTruthy());
+    expect(screen.getByLabelText(/program/iu)).toBeTruthy();
   });
 });

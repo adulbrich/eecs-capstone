@@ -54,7 +54,7 @@ function classesOf(slot: string): string[] {
   if (!el) {
     throw new Error(`no ${slot} rendered`);
   }
-  return el.className.split(/\s+/);
+  return el.className.split(/\s+/u);
 }
 
 describe("DialogContent", () => {

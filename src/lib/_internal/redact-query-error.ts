@@ -69,7 +69,7 @@ function isQueryError(value: unknown): value is QueryErrorShape {
  * service that writes to a log group, and that change would otherwise reopen
  * this silently.
  */
-const PARAM_MARKER = /(?:\s|\\[nrt])params:|"params":/;
+const PARAM_MARKER = /(?:\s|\\[nrt])params:|"params":/u;
 
 /**
  * Strips the parameter tail off a message that already carries one.
@@ -101,7 +101,7 @@ function scrubQueryText(text: string): string {
 }
 
 function truncate(sql: string): string {
-  const collapsed = sql.replace(/\s+/g, " ").trim();
+  const collapsed = sql.replace(/\s+/gu, " ").trim();
   return collapsed.length > QUERY_LIMIT
     ? `${collapsed.slice(0, QUERY_LIMIT)}...`
     : collapsed;
@@ -186,6 +186,6 @@ export function redactingAuthLogger(
     // Better Auth logs a rejected callbackURL word for word, so a newline in
     // one would start an event a stranger wrote, which the `ai_write_failures`
     // metric filter in `infra/alarms.tf` would count.
-    write(line.replace(/[\r\n]+/g, " "));
+    write(line.replace(/[\r\n]+/gu, " "));
   };
 }

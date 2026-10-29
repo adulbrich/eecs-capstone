@@ -63,7 +63,7 @@ export function PanelHeader({
 /** Who can see this panel, stated once at the top rather than per section. */
 export function PanelNote({ children }: { children: ReactNode }) {
   return (
-    <p className="flex items-start gap-2 rounded-md border border-border bg-background/60 px-3 py-2 text-muted-foreground text-xs">
+    <p className="border-border bg-background/60 text-muted-foreground flex items-start gap-2 rounded-md border px-3 py-2 text-xs">
       <Lock aria-hidden className="mt-px size-3.5 shrink-0" />
       <span>{children}</span>
     </p>
@@ -87,7 +87,7 @@ export function PanelSection({
         danger ? "border-destructive/30" : "border-border"
       )}
     >
-      <h3 className={cn("font-medium text-sm", danger && "text-destructive")}>
+      <h3 className={cn("text-sm font-medium", danger && "text-destructive")}>
         {title}
       </h3>
       <div className="mt-2">{children}</div>

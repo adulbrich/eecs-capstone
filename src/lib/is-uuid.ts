@@ -9,7 +9,7 @@
  * strings that a truncated copy-paste produces.
  */
 const UUID_RE =
-  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/iu;
 
 export function isUuid(value: string | null | undefined): boolean {
   return !!value && UUID_RE.test(value);

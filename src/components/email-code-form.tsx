@@ -61,7 +61,7 @@ const CODE_LENGTH = 6;
 /** One slot per digit, as indexes for `InputOTPSlot`. */
 const SLOTS = Array.from({ length: CODE_LENGTH }, (_, index) => index);
 
-const NON_DIGITS = /\D/g;
+const NON_DIGITS = /\D/gu;
 
 /** What the code input's `aria-describedby` names, and the elements it names. */
 const CODE_HINT_ID = "code-otp-hint";
@@ -83,7 +83,7 @@ function digitsOnly(pasted: string): string {
 const COOKIE_PROBE = "capstone_cookie_probe";
 
 /** Trailing full stops on a message this form is about to extend. */
-const TRAILING_STOPS = /\.+$/;
+const TRAILING_STOPS = /\.+$/u;
 
 /**
  * Better Auth's refusal, plus the way out of it.
@@ -368,7 +368,7 @@ export function EmailCodeForm({
         <div className="space-y-3 text-center">
           <p className="text-muted-foreground text-sm" id={CODE_HINT_ID}>
             Enter the code we sent to
-            <span className="wrap-anywhere block font-medium text-foreground">
+            <span className="text-foreground block font-medium wrap-anywhere">
               {email}
             </span>
           </p>

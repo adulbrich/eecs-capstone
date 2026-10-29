@@ -87,20 +87,20 @@ describe("parseScopeResponse", () => {
   it("rejects a verdict outside the enum", () => {
     expect(() =>
       parseScopeResponse(toolResponse({ ...verdict, oneTerm: "fine" }), "m")
-    ).toThrow(/Couldn't assess/);
+    ).toThrow(/Couldn't assess/u);
   });
 
   it("rejects a rationale over the cap rather than truncating it", () => {
     const long = "x".repeat(SCOPE_RATIONALE_MAX_LENGTH + 1);
     expect(() =>
       parseScopeResponse(toolResponse({ ...verdict, rationale: long }), "m")
-    ).toThrow(/Couldn't assess/);
+    ).toThrow(/Couldn't assess/u);
   });
 
   it("names a truncated response separately, since the fix differs", () => {
     expect(() =>
       parseScopeResponse({ status: "incomplete", output: [] }, "m")
-    ).toThrow(/ran out of room/);
+    ).toThrow(/ran out of room/u);
   });
 });
 
@@ -157,6 +157,6 @@ describe("runScopeAssessment", () => {
     }));
     const run = await runScopeAssessment("x", invoke);
     expect(run.outcome).toBe("truncated");
-    expect(run.error).toMatch(/ran out of room/);
+    expect(run.error).toMatch(/ran out of room/u);
   });
 });

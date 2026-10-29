@@ -10,5 +10,5 @@
  * than the headings around it.
  */
 export function SectionHeading({ children }: { children: string }) {
-  return <h2 className="font-semibold text-xl tracking-tight">{children}</h2>;
+  return <h2 className="text-xl font-semibold tracking-tight">{children}</h2>;
 }

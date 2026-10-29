@@ -26,7 +26,7 @@ const SRC_DIR = join(process.cwd(), "src");
 const TEST_DIR = join(SRC_DIR, "test");
 
 /** `text-brand` on its own: `text-brand-dark` and `text-brand-light` pass. */
-const BARE_BRAND = /\btext-brand\b(?!-)/;
+const BARE_BRAND = /\btext-brand\b(?!-)/u;
 
 /**
  * Files whose underline is not a link's, with the reason.
@@ -49,7 +49,7 @@ const UNDERLINE_EXEMPT = new Map([
  * different thing), not `no-underline`, and not `underline-offset-2` or
  * `decoration-*`, which are the line's shape rather than its presence.
  */
-const TURNS_UNDERLINE_ON = /(?<![\w:-])underline(?![\w-])/;
+const TURNS_UNDERLINE_ON = /(?<![\w:-])underline(?![\w-])/u;
 /**
  * The global `a` rule owns the offset, so a call site restating it is noise.
  *
@@ -58,7 +58,7 @@ const TURNS_UNDERLINE_ON = /(?<![\w:-])underline(?![\w-])/;
  * its own reason to set an offset goes in `UNDERLINE_EXEMPT` with that reason,
  * as the `link` Button variant does.
  */
-const RESTATES_OFFSET = /\bunderline-offset-/;
+const RESTATES_OFFSET = /\bunderline-offset-/u;
 
 function* componentFiles(dir: string): Generator<string> {
   for (const entry of readdirSync(dir, { withFileTypes: true })) {

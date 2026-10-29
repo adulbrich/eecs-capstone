@@ -27,7 +27,7 @@ export function RosterTab({
   return (
     <div>
       {workspace.projects.length === 0 && (
-        <p className="mb-4 text-muted-foreground text-sm">
+        <p className="text-muted-foreground mb-4 text-sm">
           A pre-approval on the roster names its project by title, and is
           matched once the projects are loaded on the Projects tab.
         </p>

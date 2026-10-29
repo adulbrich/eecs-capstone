@@ -189,11 +189,11 @@ export const COLUMNS = defineAdminColumns<Row>()([
     cell: ({ row }) => {
       const img = getPublicUrl(row.original.imageUrl);
       return (
-        <div className="flex items-center gap-2 md:min-w-xs md:max-w-md">
+        <div className="flex items-center gap-2 md:max-w-md md:min-w-xs">
           {img ? (
             <img alt="" className="h-8 w-8 rounded object-cover" src={img} />
           ) : (
-            <div className="h-8 w-8 rounded bg-secondary" />
+            <div className="bg-secondary h-8 w-8 rounded" />
           )}
           <Link
             className="min-w-0 hover:underline md:line-clamp-2 md:whitespace-normal"
@@ -664,7 +664,7 @@ function AdminInventory() {
             </BreadcrumbList>
           </Breadcrumb>
           <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
-            <h1 className="font-semibold text-2xl">Inventory</h1>
+            <h1 className="text-2xl font-semibold">Inventory</h1>
             <div className="flex gap-2">
               <Button asChild size="sm" variant="outline">
                 <Link to="/admin/inventory/requests">Request queue</Link>

@@ -97,7 +97,7 @@ describe("BorrowListButton", () => {
       </>
     );
     await findByText("sentinel");
-    expect(queryByRole("link", { name: /Borrow list/ })).toBeNull();
+    expect(queryByRole("link", { name: /Borrow list/u })).toBeNull();
   });
 
   it("renders the count when > 0", async () => {

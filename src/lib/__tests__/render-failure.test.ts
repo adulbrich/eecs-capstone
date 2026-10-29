@@ -59,7 +59,7 @@ describe("renderFailureLines", () => {
       },
     ]);
     expect(lines).toHaveLength(1);
-    expect(lines[0]).not.toMatch(/[\r\n]/);
+    expect(lines[0]).not.toMatch(/[\r\n]/u);
     expect(lines[0]).toContain('"program"');
   });
 

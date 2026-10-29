@@ -165,7 +165,7 @@ describe("parseReviewResponse", () => {
       output: [],
     };
     expect(() => parseReviewResponse(truncated, "m")).toThrow(
-      /ran out of room/
+      /ran out of room/u
     );
   });
 });
@@ -235,7 +235,7 @@ describe("runProjectReview", () => {
     const run = await runProjectReview({ title: "old title" }, invoke);
     expect(run.outcome).toBe("truncated");
     expect(run.called).toBe(true);
-    expect(run.error).toMatch(/ran out of room/);
+    expect(run.error).toMatch(/ran out of room/u);
     // The counts are the whole point: a truncated run is what says the
     // reasoning budget is crowding out the answer.
     expect(run.usage?.reasoningTokens).toBe(16_000);

@@ -22,7 +22,7 @@ describe("ProjectBadges", () => {
       <ProjectBadges {...OFF} studentProposed />
     );
     expect(getByText("Student proposed")).toBeTruthy();
-    expect(queryByText(/mentor/i)).toBeNull();
+    expect(queryByText(/mentor/iu)).toBeNull();
     expect(queryByText("NDA/IP required")).toBeNull();
   });
 

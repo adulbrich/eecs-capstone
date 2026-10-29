@@ -166,6 +166,7 @@ export function InventoryForm({
       <form.Field name="categoryIds">
         {(field: AnyForm) => (
           <div className="flex flex-col gap-2">
+            {/* biome-ignore lint/a11y/noLabelWithoutControl: names a checkbox group, not one control; #820 */}
             <Label className="text-base">Categories</Label>
             <CategoryMultiSelect
               domain="inventory"
@@ -179,6 +180,7 @@ export function InventoryForm({
       <form.Field name="imageUrl">
         {(field: AnyForm) => (
           <div>
+            {/* biome-ignore lint/a11y/noLabelWithoutControl: names the uploader's buttons, not one control; #820 */}
             <Label className="text-base">Image</Label>
             <div className="mt-1">
               <InventoryImageUploader
@@ -191,7 +193,7 @@ export function InventoryForm({
                 }}
               />
             </div>
-            <p className="mt-1 text-muted-foreground text-xs">
+            <p className="text-muted-foreground mt-1 text-xs">
               Cropped to 1:1 and resized to max 1200x1200. Saved when you submit
               the form.
             </p>
@@ -280,7 +282,7 @@ function Field({
           </Label>
           {description && (
             <p
-              className="mt-0.5 text-muted-foreground text-xs"
+              className="text-muted-foreground mt-0.5 text-xs"
               id={descriptionId}
             >
               {description}

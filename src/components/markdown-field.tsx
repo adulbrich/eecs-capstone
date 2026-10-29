@@ -77,7 +77,7 @@ export function MarkdownField({
       {/* biome-ignore lint/a11y/useSemanticElements: role=group with label is the right pattern for a toolbar of buttons, not a <fieldset> of form fields */}
       <div
         aria-label="Formatting"
-        className="flex flex-wrap items-center gap-1 rounded-t-md border border-input border-b-0 p-1"
+        className="border-input flex flex-wrap items-center gap-1 rounded-t-md border border-b-0 p-1"
         role="group"
       >
         {ACTIONS.map(({ action, icon: Icon, label }) => (
@@ -133,11 +133,11 @@ export function MarkdownField({
           value={value}
         />
       ) : (
-        <div className="min-h-24 rounded-b-md border border-input p-3">
+        <div className="border-input min-h-24 rounded-b-md border p-3">
           <Markdown>{value}</Markdown>
         </div>
       )}
-      <p className="mt-1 text-muted-foreground text-xs" id={hintId}>
+      <p className="text-muted-foreground mt-1 text-xs" id={hintId}>
         Markdown supported: **bold**, *italic*, - bullet lists, [links](url).
         Leave a blank line between paragraphs.
       </p>

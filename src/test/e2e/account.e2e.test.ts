@@ -47,7 +47,7 @@ test.describe("account lifecycle", () => {
     // Landing on a page is not proof of a session; a route behind the auth
     // guard is.
     await page.goto("/my/projects");
-    await expect(page).toHaveURL(/\/my\/projects/);
+    await expect(page).toHaveURL(/\/my\/projects/u);
 
     // Deletion below anonymizes the row rather than removing it (ADR-0008), so
     // the address on the row changes and the prefix sweep can no longer find
@@ -66,14 +66,14 @@ test.describe("account lifecycle", () => {
       await waitForHydration(page);
       await page.getByRole("button", { name: "End To End" }).click();
       await page.getByRole("menuitem", { name: "Sign out" }).click();
-      await page.waitForURL(/\/sign-in/, { timeout: 15_000 });
+      await page.waitForURL(/\/sign-in/u, { timeout: 15_000 });
 
       // Coming back is a second code, and an existing row goes straight in
       // with no name step: asking a returning person for their name again
       // would be the bug.
       await signInWithCode(page, email);
       await page.goto("/my/projects");
-      await expect(page).toHaveURL(/\/my\/projects/);
+      await expect(page).toHaveURL(/\/my\/projects/u);
 
       await page.goto("/profile");
       await waitForHydration(page);
@@ -103,7 +103,7 @@ test.describe("account lifecycle", () => {
       await confirmed(page, () =>
         interestsForm.getByRole("button", { name: "Save interests" }).click()
       );
-      await expect(interestsForm.getByRole("status")).toHaveText(/^Saved/);
+      await expect(interestsForm.getByRole("status")).toHaveText(/^Saved/u);
       const [interests] = await withDb((db) =>
         db
           .select({ text: schema.userInterests.interestsText })
@@ -115,7 +115,7 @@ test.describe("account lifecycle", () => {
       // The profile page's own Sign out, which is a different control from
       // the header menu item pressed earlier in this flow.
       await page.getByRole("button", { name: "Sign out" }).click();
-      await page.waitForURL(/\/sign-in/, { timeout: 15_000 });
+      await page.waitForURL(/\/sign-in/u, { timeout: 15_000 });
       await signInWithCode(page, email);
 
       // Closing the account is the last thing the person can do, and the one

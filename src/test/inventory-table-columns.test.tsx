@@ -142,7 +142,7 @@ describe("the public inventory table", () => {
         .getAllByRole("columnheader")
         .map((h) => h.getAttribute("aria-sort"))
     ).toEqual([null, null, null]);
-    expect(screen.queryAllByRole("button", { name: /Name|Status/ })).toEqual(
+    expect(screen.queryAllByRole("button", { name: /Name|Status/u })).toEqual(
       []
     );
   });

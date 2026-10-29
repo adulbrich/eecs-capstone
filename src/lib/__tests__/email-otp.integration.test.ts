@@ -681,7 +681,7 @@ describe("the per-recipient cap on sends", () => {
     const suppressed = await postSend(email, claims.get(email));
     expect(suppressed.status).toBe(200);
     expect(await suppressed.json()).toEqual({ success: true });
-    await expect(sendCode(email)).rejects.toThrow(/No sign-in code/);
+    await expect(sendCode(email)).rejects.toThrow(/No sign-in code/u);
   });
 
   it("counts per recipient, so one address cannot spend another's", async () => {

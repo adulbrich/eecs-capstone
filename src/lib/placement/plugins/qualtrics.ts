@@ -86,11 +86,11 @@ export function isQualtricsExport(text: string): boolean {
   return hasImportIds(data) || isSurveyShaped(data);
 }
 
-const RANK_QUESTION = /\brank\b/i;
-const REASON = /reason for choice (\d+)\s*$/i;
-const AVOID_QUESTION = /prefer not to work with/i;
-const PRE_ASSIGNED_QUESTION = /pre-?assigned/i;
-const PROJECT_NAME_QUESTION = /name of your project/i;
+const RANK_QUESTION = /\brank\b/iu;
+const REASON = /reason for choice (\d+)\s*$/iu;
+const AVOID_QUESTION = /prefer not to work with/iu;
+const PRE_ASSIGNED_QUESTION = /pre-?assigned/iu;
+const PROJECT_NAME_QUESTION = /name of your project/iu;
 
 /**
  * The metadata columns by their ImportId, and, for an export without that

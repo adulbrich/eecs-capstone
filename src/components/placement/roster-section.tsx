@@ -112,7 +112,7 @@ export function RosterSection({
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h2 className="font-medium" id="placement-roster-heading">
           Class roster{" "}
-          <span className="font-normal text-muted-foreground">
+          <span className="text-muted-foreground font-normal">
             {plural(roster.entries.length, "student", "students")} from {from}
           </span>
         </h2>

@@ -109,7 +109,7 @@ function renderTwoBells() {
 }
 
 function bells() {
-  return screen.getAllByRole("button", { name: /^Notifications/ });
+  return screen.getAllByRole("button", { name: /^Notifications/u });
 }
 
 async function settledOnMount() {
@@ -194,7 +194,7 @@ describe("NotificationBell, mounted twice", () => {
     fireEvent.click(bells()[0]);
     await waitFor(() => expect(mockedRead).toHaveBeenCalledTimes(2));
     const row = await screen.findByRole("button", {
-      name: /Your hold is ready/,
+      name: /Your hold is ready/u,
     });
     await waitFor(() => expect(row.hasAttribute("disabled")).toBe(false));
 

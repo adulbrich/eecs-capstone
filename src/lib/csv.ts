@@ -53,7 +53,7 @@ export function defineCsvColumns<T>() {
 
 // Hoisted rather than built per cell: these run once per value in a file
 // that may hold hundreds of rows times twenty columns.
-const NEEDS_QUOTING = /["\r\n,]/;
+const NEEDS_QUOTING = /["\r\n,]/u;
 
 /**
  * Leading characters a spreadsheet treats as the start of a formula. An item
@@ -83,7 +83,7 @@ const NEEDS_QUOTING = /["\r\n,]/;
  * starts "'-" is guarded once more and reading one apostrophe back off
  * restores it exactly, where it used to come back as "-" (#733).
  */
-const GUARDED = /^'*[=+\-@\t\r]/;
+const GUARDED = /^'*[=+\-@\t\r]/u;
 
 /**
  * Reverses the guard on a cell read back from one of this app's own files:

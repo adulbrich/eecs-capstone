@@ -29,7 +29,7 @@ export function ErrorBanner({
   return (
     <div
       className={cn(
-        "rounded-md border border-destructive/30 bg-destructive/5 p-3 text-destructive text-sm",
+        "border-destructive/30 bg-destructive/5 text-destructive rounded-md border p-3 text-sm",
         className
       )}
       data-slot="error-banner"

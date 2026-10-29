@@ -23,18 +23,18 @@ import {
 } from "./lib.mjs";
 
 const PUBLISHES =
-  /\bgh\s+(?:(?:pr|issue)\s+(?:create|edit|comment|review|close|merge)|release\s+(?:create|edit))\b/;
-const API_WITH_BODY = /\bgh\s+api\b[\s\S]*\bbody\b/;
-const TITLED = /\bgh\s+pr\s+(?:create|edit|merge)\b/;
+  /\bgh\s+(?:(?:pr|issue)\s+(?:create|edit|comment|review|close|merge)|release\s+(?:create|edit))\b/u;
+const API_WITH_BODY = /\bgh\s+api\b[\s\S]*\bbody\b/u;
+const TITLED = /\bgh\s+pr\s+(?:create|edit|merge)\b/u;
 const TITLE_FLAG =
-  /(?:^|\s)(?:-t|--title|--subject)(?:=|\s+)(?:"((?:[^"\\]|\\.)*)"|'([^']*)')/;
-const BODIED = /\bgh\s+pr\s+(?:create|edit)\b/;
+  /(?:^|\s)(?:-t|--title|--subject)(?:=|\s+)(?:"((?:[^"\\]|\\.)*)"|'([^']*)')/u;
+const BODIED = /\bgh\s+pr\s+(?:create|edit)\b/u;
 // Quoted values only, like TITLE_FLAG: a bare `--body word` is legal but a
 // body worth checking has spaces, and a miss here is a warning not given.
 const BODY_FLAG =
-  /(?:^|\s)(?:-b|--body)(?:=|\s+)(?:"((?:[^"\\]|\\.)*)"|'([^']*)')/;
+  /(?:^|\s)(?:-b|--body)(?:=|\s+)(?:"((?:[^"\\]|\\.)*)"|'([^']*)')/u;
 const BODY_FILE_FLAG =
-  /(?:^|\s)(?:-F|--body-file)(?:=|\s+)(?:"([^"]+)"|'([^']+)'|(\S+))/;
+  /(?:^|\s)(?:-F|--body-file)(?:=|\s+)(?:"([^"]+)"|'([^']+)'|(\S+))/u;
 
 /**
  * The PR body a `gh pr create` or `gh pr edit` would send, from `--body` or

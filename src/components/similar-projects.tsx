@@ -88,7 +88,7 @@ export function SimilarProjectsLayout({ children, projectId }: Props) {
             className="hidden xl:sticky xl:top-8 xl:block xl:max-h-[calc(100vh-4rem)] xl:self-start xl:overflow-y-auto"
           >
             <Card className="p-4">
-              <h2 className="font-semibold text-sm">{HEADING}</h2>
+              <h2 className="text-sm font-semibold">{HEADING}</h2>
               <SimilarProjectsList rows={rows} />
             </Card>
           </aside>
@@ -131,7 +131,7 @@ function FloatingCard({ rows }: { rows: SimilarProject[] }) {
         <aside aria-label={HEADING} id={listId}>
           <Card className="w-80 p-4 shadow-lg">
             <div className="flex items-center justify-between gap-2">
-              <h2 className="font-semibold text-sm">{HEADING}</h2>
+              <h2 className="text-sm font-semibold">{HEADING}</h2>
               <Button
                 aria-controls={listId}
                 aria-expanded={true}
@@ -210,7 +210,7 @@ function SimilarProjectsList({
       {rows.map((row) => (
         <li key={row.id}>
           <Link
-            className="font-medium text-sm"
+            className="text-sm font-medium"
             onClick={onNavigate}
             params={{ projectId: row.id }}
             to="/projects/$projectId"
@@ -218,7 +218,7 @@ function SimilarProjectsList({
             {row.title}
           </Link>
           {row.excerpt && (
-            <p className="mt-0.5 line-clamp-2 text-muted-foreground text-xs">
+            <p className="text-muted-foreground mt-0.5 line-clamp-2 text-xs">
               {row.excerpt}
             </p>
           )}

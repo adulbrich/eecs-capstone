@@ -86,7 +86,7 @@ const COLUMNS = defineAdminColumns<Row>()([
     cell: ({ row }) =>
       row.original.description ? (
         <div
-          className="md:line-clamp-2 md:min-w-xs md:max-w-md md:whitespace-normal"
+          className="md:line-clamp-2 md:max-w-md md:min-w-xs md:whitespace-normal"
           title={row.original.description}
         >
           {row.original.description}
@@ -227,7 +227,7 @@ function ProgramsAdmin() {
         </BreadcrumbList>
       </Breadcrumb>
       <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
-        <h1 className="font-semibold text-2xl">Programs</h1>
+        <h1 className="text-2xl font-semibold">Programs</h1>
         <Dialog onOpenChange={setOpen} open={open}>
           <DialogTrigger asChild>
             <Button size="sm" type="button">

@@ -54,7 +54,7 @@ describe("the instructor-bearing reads are staff-only", () => {
     // Only the staff gate is exercised here. `requireUser()` in the wrapper
     // is what shuts the endpoint to anonymous callers, and it reads a request
     // session, so it is not reachable from an integration test.
-    await expect(getProgramAs(student, { id })).rejects.toThrow(/Forbidden/);
+    await expect(getProgramAs(student, { id })).rejects.toThrow(/Forbidden/u);
     await expect(getProgramAs(admin, { id })).resolves.toMatchObject({
       program: { id },
     });
@@ -65,7 +65,7 @@ describe("the instructor-bearing reads are staff-only", () => {
     const student = await makeUser(`li-s-${Date.now()}@x.com`, "user");
 
     await expect(listEligibleInstructorsAs(student)).rejects.toThrow(
-      /Forbidden/
+      /Forbidden/u
     );
     const { rows } = await listEligibleInstructorsAs(admin);
     expect(rows.some((r) => r.id === admin.id)).toBe(true);
@@ -156,7 +156,7 @@ describe("the admin index reads instructor names through its own staff seam", ()
   it("refuses a non-staff viewer", async () => {
     const plain = await makeUser(`li-p-${Date.now()}@x.com`, "user");
     await expect(listProgramsWithInstructorsAs(plain)).rejects.toThrow(
-      /Forbidden/
+      /Forbidden/u
     );
   });
 });

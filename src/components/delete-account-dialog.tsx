@@ -2,11 +2,6 @@ import { Link } from "@tanstack/react-router";
 import { useState } from "react";
 import { useAction } from "#/lib/use-action";
 import { type DeletionPreview, deleteAccount } from "#/server/account";
-
-// Re-exported so the profile page can type the preview it holds without a
-// second import path; type-only, erased from every bundle.
-export type { DeletionPreview } from "#/server/account";
-
 import {
   AlertDialog,
   AlertDialogBody,
@@ -22,6 +17,10 @@ import { Button } from "./ui/button";
 import { FieldError } from "./ui/field";
 import { Input } from "./ui/input";
 import { Label } from "./ui/label";
+
+// Re-exported so the profile page can type the preview it holds without a
+// second import path; type-only, erased from every bundle.
+export type { DeletionPreview } from "#/server/account";
 
 /**
  * The most irreversible action in the app for the person taking it, on a

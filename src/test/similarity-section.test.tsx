@@ -57,27 +57,27 @@ const recompute = () => screen.queryByRole("button", { name: "Recompute" });
 describe("SimilaritySection status", () => {
   it("says it was never computed, what that costs, and offers Recompute", async () => {
     await renderWith(NEVER);
-    expect(screen.getByText(/Not computed yet/)).toBeDefined();
-    expect(screen.getByText(/missing from Similar projects/)).toBeDefined();
+    expect(screen.getByText(/Not computed yet/u)).toBeDefined();
+    expect(screen.getByText(/missing from Similar projects/u)).toBeDefined();
     expect(recompute()).not.toBeNull();
   });
 
   it("tells a failure apart from never computed", async () => {
     await renderWith({ ...NEVER, attempt: failed("automatic") });
     expect(
-      screen.getByText(/The last attempt failed automatically/)
+      screen.getByText(/The last attempt failed automatically/u)
     ).toBeDefined();
-    expect(screen.getByText(/Nothing is computed/)).toBeDefined();
-    expect(screen.queryByText(/Not computed yet/)).toBeNull();
+    expect(screen.getByText(/Nothing is computed/u)).toBeDefined();
+    expect(screen.queryByText(/Not computed yet/u)).toBeNull();
     expect(recompute()).not.toBeNull();
   });
 
   it("says a failure leaves the older computation in use, and offers Recompute", async () => {
     await renderWith({ ...COMPUTED, attempt: failed("staff") });
     expect(
-      screen.getByText(/The last attempt failed from Recompute/)
+      screen.getByText(/The last attempt failed from Recompute/u)
     ).toBeDefined();
-    expect(screen.getByText(/from before the last change/)).toBeDefined();
+    expect(screen.getByText(/from before the last change/u)).toBeDefined();
     expect(recompute()).not.toBeNull();
   });
 
@@ -86,15 +86,15 @@ describe("SimilaritySection status", () => {
     // "Computed <time>." The time is its own element, so the line is read
     // through it rather than by a text match the split would defeat.
     const time = document.querySelector("time");
-    expect(time?.closest("p")?.textContent).toMatch(/^Computed .+\.$/);
-    expect(screen.queryByText(/failed|Not computed/)).toBeNull();
+    expect(time?.closest("p")?.textContent).toMatch(/^Computed .+\.$/u);
+    expect(screen.queryByText(/failed|Not computed/u)).toBeNull();
     expect(recompute()).toBeNull();
   });
 
   it("reads a vector with no timestamp as computed, not as missing", async () => {
     await renderWith({ ...COMPUTED, attempt: null, computedAt: null });
     expect(screen.getByText("Computed.")).toBeDefined();
-    expect(screen.queryByText(/Not computed/)).toBeNull();
+    expect(screen.queryByText(/Not computed/u)).toBeNull();
     expect(recompute()).toBeNull();
   });
 
@@ -108,7 +108,7 @@ describe("SimilaritySection status", () => {
 
   it("never says embedding", async () => {
     await renderWith({ ...NEVER, attempt: failed("automatic") });
-    expect(screen.queryByText(/embedding/i)).toBeNull();
+    expect(screen.queryByText(/embedding/iu)).toBeNull();
   });
 });
 
@@ -124,7 +124,7 @@ describe("SimilaritySection Recompute", () => {
     fireEvent.click(recompute() as HTMLElement);
 
     expect(await screen.findByText("Recomputed.")).toBeDefined();
-    expect(screen.queryByText(/failed/)).toBeNull();
+    expect(screen.queryByText(/failed/u)).toBeNull();
     expect(recompute()).toBeNull();
     expect(server.recomputeSimilarity).toHaveBeenCalledWith({
       data: { projectId: "p1" },
@@ -137,7 +137,7 @@ describe("SimilaritySection Recompute", () => {
       attempt: { at: AT, outcome: "updated", trigger: "staff" },
     });
     expect(document.querySelector("time")?.closest("p")?.textContent).toMatch(
-      / from Recompute\.$/
+      / from Recompute\.$/u
     );
   });
 
@@ -152,7 +152,7 @@ describe("SimilaritySection Recompute", () => {
 
     const note = await screen.findByText("Already up to date.");
     expect(note.getAttribute("role")).not.toBe("alert");
-    expect(screen.queryByText(/failed/)).toBeNull();
+    expect(screen.queryByText(/failed/u)).toBeNull();
   });
 
   it("explains an outcome the status line cannot", async () => {
@@ -165,7 +165,7 @@ describe("SimilaritySection Recompute", () => {
     fireEvent.click(recompute() as HTMLElement);
 
     expect(
-      await screen.findByText(/no longer published or archived/)
+      await screen.findByText(/no longer published or archived/u)
     ).toBeDefined();
   });
 
@@ -179,7 +179,7 @@ describe("SimilaritySection Recompute", () => {
     fireEvent.click(recompute() as HTMLElement);
 
     expect(
-      await screen.findByText(/The last attempt failed from Recompute/)
+      await screen.findByText(/The last attempt failed from Recompute/u)
     ).toBeDefined();
     expect(recompute()).not.toBeNull();
   });

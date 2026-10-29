@@ -65,7 +65,7 @@ describe("assertTransitionAllowed", () => {
   it("throws on a forbidden transition with a message naming from, to, role", () => {
     expect(() =>
       assertTransitionAllowed("draft", "published", "owner")
-    ).toThrow(/draft.*published.*owner/);
+    ).toThrow(/draft.*published.*owner/u);
   });
 });
 
@@ -74,7 +74,7 @@ describe("status copy", () => {
     const labels = PROJECT_STATUSES.map((s) => PROJECT_STATUS_LABEL[s]);
     expect(new Set(labels).size).toBe(PROJECT_STATUSES.length);
     for (const label of labels) {
-      expect(label).toMatch(/^[A-Z][a-z]+( [a-z]+)*$/);
+      expect(label).toMatch(/^[A-Z][a-z]+( [a-z]+)*$/u);
     }
     // The spelling the glossary uses, which three components used to disagree
     // on: the badge said "changes requested", the stepper "Changes Req.".
@@ -83,7 +83,7 @@ describe("status copy", () => {
 
   it("describes every status in one sentence or two, ending in a full stop", () => {
     for (const s of PROJECT_STATUSES) {
-      expect(PROJECT_STATUS_DESCRIPTION[s]).toMatch(/^[A-Z].*\.$/);
+      expect(PROJECT_STATUS_DESCRIPTION[s]).toMatch(/^[A-Z].*\.$/u);
     }
   });
 

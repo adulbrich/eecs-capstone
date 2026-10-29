@@ -33,7 +33,7 @@ import { getAnalytics } from "#/server/analytics";
 import { listPrograms } from "#/server/programs";
 
 const DAY_MS = 86_400_000;
-const DATE = /^\d{4}-\d{2}-\d{2}$/;
+const DATE = /^\d{4}-\d{2}-\d{2}$/u;
 
 /** The wrapper's return type, so the route never reaches into `_internal`. */
 type AnalyticsView = Awaited<ReturnType<typeof getAnalytics>>;
@@ -126,7 +126,7 @@ function Figure({
 }) {
   return (
     <Card className="p-4">
-      <p className="flex items-baseline justify-between gap-2 text-muted-foreground text-sm">
+      <p className="text-muted-foreground flex items-baseline justify-between gap-2 text-sm">
         <span>{label}</span>
         {/* Named on every card so the controls are not read as doing
             something they are not: a global figure ignores the program. */}
@@ -134,8 +134,8 @@ function Figure({
           {scope === "program" ? "per program" : "global"}
         </span>
       </p>
-      <p className="mt-1 font-semibold text-2xl tabular-nums">{value}</p>
-      {hint && <p className="mt-0.5 text-muted-foreground text-xs">{hint}</p>}
+      <p className="mt-1 text-2xl font-semibold tabular-nums">{value}</p>
+      {hint && <p className="text-muted-foreground mt-0.5 text-xs">{hint}</p>}
     </Card>
   );
 }
@@ -189,7 +189,7 @@ function Breakdown({
         </span>
       </p>
       {rows.length === 0 ? (
-        <p className="mt-2 text-muted-foreground text-sm">Nothing yet.</p>
+        <p className="text-muted-foreground mt-2 text-sm">Nothing yet.</p>
       ) : (
         <dl className="mt-2 grid grid-cols-[1fr_auto] gap-x-4 gap-y-1 text-sm">
           {rows.map((row) => (
@@ -215,7 +215,7 @@ function SectionHeading({
 }) {
   return (
     <div className="mt-8 flex flex-wrap items-baseline justify-between gap-2">
-      <h2 className="font-medium text-muted-foreground text-xs uppercase tracking-wide">
+      <h2 className="text-muted-foreground text-xs font-medium tracking-wide uppercase">
         {children}
       </h2>
       {note && <p className="text-muted-foreground text-xs">{note}</p>}
@@ -244,8 +244,8 @@ function AnalyticsPage() {
           </BreadcrumbItem>
         </BreadcrumbList>
       </Breadcrumb>
-      <h1 className="mt-2 font-semibold text-2xl">Analytics</h1>
-      <p className="mt-1 text-muted-foreground text-sm">
+      <h1 className="mt-2 text-2xl font-semibold">Analytics</h1>
+      <p className="text-muted-foreground mt-1 text-sm">
         What is in the database, as of <LocalTime value={view.asOf} />. The date
         range governs the flows only; the program selector governs every figure
         marked per program.

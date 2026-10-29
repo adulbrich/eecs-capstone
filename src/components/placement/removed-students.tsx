@@ -109,7 +109,7 @@ export function RemovedStudents({
     >
       <h2 className="font-medium" id="placement-removed-heading">
         Removed from placement{" "}
-        <span className="font-normal text-muted-foreground">
+        <span className="text-muted-foreground font-normal">
           {removed.length} {removed.length === 1 ? "student" : "students"}
         </span>
       </h2>

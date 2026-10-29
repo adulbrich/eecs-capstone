@@ -176,8 +176,8 @@ describe("the public project table", () => {
     // point of #434.
     renderTable(DEFAULT_HIDDEN);
     const row = rowFor("Rover Telemetry");
-    expect(row.queryByText(/mentor/i)).toBeNull();
-    expect(row.queryByText(/@/)).toBeNull();
+    expect(row.queryByText(/mentor/iu)).toBeNull();
+    expect(row.queryByText(/@/u)).toBeNull();
   });
 
   it("renders categories as name-only chips with the facet on hover, and a dash for none", () => {
@@ -235,7 +235,7 @@ describe("the public project table", () => {
   it("leaves the team count to its own column rather than badging it", () => {
     renderTable(DEFAULT_HIDDEN);
     const badged = within(badgesCellFor("Rover Telemetry"));
-    expect(badged.queryByText(/teams?$/i)).toBeNull();
+    expect(badged.queryByText(/teams?$/iu)).toBeNull();
     expect(cellFor("Rover Telemetry", "Teams supported").textContent).toContain(
       "3"
     );
@@ -369,6 +369,6 @@ describe("the public project table", () => {
     // header strip, which must stay as wide as the card and no wider.
     expect(link.parentElement?.className).toContain("md:min-w-xs");
     expect(link.parentElement?.className).toContain("md:max-w-md");
-    expect(link.parentElement?.className).not.toMatch(/(^|\s)max-w-md/);
+    expect(link.parentElement?.className).not.toMatch(/(^|\s)max-w-md/u);
   });
 });

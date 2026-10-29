@@ -21,7 +21,7 @@ function TabsList({
 }: React.ComponentProps<typeof TabsPrimitive.List>) {
   return (
     <TabsPrimitive.List
-      className={cn("flex gap-4 border-border border-b", className)}
+      className={cn("border-border flex gap-4 border-b", className)}
       data-slot="tabs-list"
       {...props}
     />
@@ -35,9 +35,9 @@ function TabsTrigger({
   return (
     <TabsPrimitive.Trigger
       className={cn(
-        "px-2 py-1 text-muted-foreground outline-none transition-colors hover:text-foreground",
-        "focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50",
-        "data-[state=active]:border-b-2 data-[state=active]:border-b-[var(--brand-primary)] data-[state=active]:font-medium data-[state=active]:text-foreground",
+        "text-muted-foreground hover:text-foreground px-2 py-1 transition-colors outline-none",
+        "focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px]",
+        "data-[state=active]:text-foreground data-[state=active]:border-b-2 data-[state=active]:border-b-[var(--brand-primary)] data-[state=active]:font-medium",
         className
       )}
       data-slot="tabs-trigger"

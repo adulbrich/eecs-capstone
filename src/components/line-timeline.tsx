@@ -15,7 +15,7 @@ export function LineTimeline({ events }: { events: TimelineEvent[] }) {
           <p className="font-medium">
             {event.label}
             {event.actor && (
-              <span className="font-normal text-muted-foreground">
+              <span className="text-muted-foreground font-normal">
                 {" "}
                 by {event.actor}
               </span>

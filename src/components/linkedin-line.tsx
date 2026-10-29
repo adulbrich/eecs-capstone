@@ -8,7 +8,7 @@ import { webLinkHref } from "#/lib/web-link";
 export function LinkedinLine({ stored }: { stored: string }) {
   const href = webLinkHref(stored);
   return (
-    <p className="break-all text-sm">
+    <p className="text-sm break-all">
       <span className="text-muted-foreground">LinkedIn: </span>
       {href ? (
         <a className="text-brand-dark underline" href={href}>

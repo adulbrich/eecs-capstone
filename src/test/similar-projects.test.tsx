@@ -152,7 +152,7 @@ describe("SimilarProjectsLayout, phone", () => {
     fireEvent.click(open);
 
     const sheet = getByRole("dialog", { name: "Similar projects" });
-    fireEvent.click(within(sheet).getByRole("link", { name: /Rover/ }));
+    fireEvent.click(within(sheet).getByRole("link", { name: /Rover/u }));
     expect(queryByRole("dialog")).toBeNull();
   });
 });
