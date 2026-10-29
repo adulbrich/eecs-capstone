@@ -117,7 +117,7 @@ A match a preload created is judged against `preloadStaleTime`, also when the cl
 
 ### `Route.useSearch()` lags `navigate()` by the loader round trip
 
-The URL changes at once, but `useSearch` reads the rendered match, and a search change that alters `loaderDeps` renders only when its loader resolves. Code that writes a search param and watches it for outside changes sees its own write come back late. `useDebouncedDraft` compares against what it last committed; `src/lib/__tests__/use-debounced-draft.test.tsx` covers the echo, a cancelled commit, and Back and Forward.
+The URL changes at once, but `useSearch` reads the rendered match, and a search change that alters `loaderDeps` renders only when its loader resolves. Code that writes a search param and watches it for outside changes sees its own write come back late, and never sees a write that Back or Forward cancels before it lands. A listing search box therefore reads `q` from the location, which moves at once, through `useSearchDraft` (#588); `src/lib/__tests__/use-search-draft.test.tsx` holds a loader open to cover the cancelled cases.
 
 ---
 

@@ -1,6 +1,6 @@
 import { Link, useNavigate } from "@tanstack/react-router";
 import { useCallback, useId } from "react";
-import { useDebouncedDraft } from "#/lib/use-debounced-draft";
+import { useSearchDraft } from "#/lib/use-search-draft";
 import type { ViewMode } from "#/lib/view-preference";
 import { ClearFiltersButton } from "./clear-filters-button";
 import { FilterSwitch } from "./filter-switch";
@@ -232,7 +232,7 @@ export function ProjectsSearchBar({
   view,
 }: Omit<SearchProps, "signedIn">) {
   const { commitQuery, setOrder, setView } = useProjectsFilterNavigation();
-  const [queryDraft, setQueryDraft] = useDebouncedDraft(q, commitQuery);
+  const [queryDraft, setQueryDraft] = useSearchDraft(commitQuery);
   // `useId` rather than a literal: the bar mounts once, so a literal would
   // work, but the hint is this component's own and nothing outside needs
   // the id. The admin routes render input and hint inline and keep a

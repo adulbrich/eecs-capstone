@@ -55,7 +55,7 @@ import { formatPickupWindow } from "#/lib/pickup-window";
 import { searchParamQuerySchema } from "#/lib/search-query";
 import type { SortState } from "#/lib/table-state";
 import { useAdminTable } from "#/lib/use-admin-table";
-import { useDebouncedDraft } from "#/lib/use-debounced-draft";
+import { useSearchDraft } from "#/lib/use-search-draft";
 import { cn } from "#/lib/utils";
 import {
   INVENTORY_CUSTOM_LINE_STATUSES,
@@ -396,7 +396,7 @@ function AdminRequestQueue() {
     },
     [navigate]
   );
-  const [qDraft, setQDraft] = useDebouncedDraft(q, commitQuery);
+  const [qDraft, setQDraft] = useSearchDraft(commitQuery);
   // The committed query, never `qDraft`: the note describes the search
   // that ran, and must not appear and vanish between keystrokes (#478).
   const queryNote = searchQueryNote(q);

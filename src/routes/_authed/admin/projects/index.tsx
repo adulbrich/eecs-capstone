@@ -71,7 +71,7 @@ import {
 import { searchParamQuerySchema } from "#/lib/search-query";
 import type { SortState } from "#/lib/table-state";
 import { useAdminTable } from "#/lib/use-admin-table";
-import { useDebouncedDraft } from "#/lib/use-debounced-draft";
+import { useSearchDraft } from "#/lib/use-search-draft";
 import { PROJECT_STATUSES, type ProjectStatus } from "#/lib/vocabularies";
 import { listPrograms } from "#/server/programs";
 import {
@@ -885,7 +885,7 @@ function AdminProjects() {
     },
     [navigate]
   );
-  const [queryDraft, setQueryDraft] = useDebouncedDraft(q, commitQuery);
+  const [queryDraft, setQueryDraft] = useSearchDraft(commitQuery);
 
   const { controlsProps, orderRows, tableProps } = useAdminTable({
     columns: COLUMNS,
