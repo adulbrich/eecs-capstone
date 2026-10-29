@@ -1,12 +1,7 @@
 // @vitest-environment jsdom
-import {
-  cleanup,
-  fireEvent,
-  render,
-  screen,
-  waitFor,
-} from "@testing-library/react";
+import { cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
+import { renderWithQueryClient } from "./shared/query-client";
 
 // Radix Popover (Floating UI) and cmdk rely on a few DOM APIs jsdom omits.
 // The project domain always mounts a CategoryTypeCombobox for the create
@@ -58,7 +53,7 @@ afterEach(() => {
 describe("CategoryMultiSelect", () => {
   it("renders project categories grouped by type", async () => {
     mockedList.mockResolvedValue({ rows: PROJECT_ROWS } as never);
-    render(
+    renderWithQueryClient(
       <CategoryMultiSelect
         domain="project"
         onChange={() => undefined}
@@ -73,7 +68,7 @@ describe("CategoryMultiSelect", () => {
 
   it("renders inventory categories as one flat list with no legend", async () => {
     mockedList.mockResolvedValue({ rows: INVENTORY_ROWS } as never);
-    const { container } = render(
+    const { container } = renderWithQueryClient(
       <CategoryMultiSelect
         domain="inventory"
         onChange={() => undefined}
@@ -88,7 +83,7 @@ describe("CategoryMultiSelect", () => {
 
   it("offers a create option for an unmatched name", async () => {
     mockedList.mockResolvedValue({ rows: INVENTORY_ROWS } as never);
-    render(
+    renderWithQueryClient(
       <CategoryMultiSelect
         domain="inventory"
         onChange={() => undefined}
@@ -104,7 +99,7 @@ describe("CategoryMultiSelect", () => {
 
   it("offers no create option for a name that already exists", async () => {
     mockedList.mockResolvedValue({ rows: INVENTORY_ROWS } as never);
-    render(
+    renderWithQueryClient(
       <CategoryMultiSelect
         domain="inventory"
         onChange={() => undefined}
@@ -126,7 +121,7 @@ describe("CategoryMultiSelect", () => {
       } as never);
     mockedCreate.mockResolvedValue({ id: "i3" } as never);
     const onChange = vi.fn();
-    render(
+    renderWithQueryClient(
       <CategoryMultiSelect domain="inventory" onChange={onChange} value={[]} />
     );
     await screen.findByText("Laptop");
@@ -153,7 +148,7 @@ describe("CategoryMultiSelect", () => {
       .mockRejectedValueOnce(new Error("network down"));
     mockedCreate.mockResolvedValue({ id: "i3" } as never);
     const onChange = vi.fn();
-    render(
+    renderWithQueryClient(
       <CategoryMultiSelect domain="inventory" onChange={onChange} value={[]} />
     );
     await screen.findByText("Laptop");
@@ -175,7 +170,7 @@ describe("CategoryMultiSelect", () => {
   // must not silently render nothing when the rejection isn't an Error.
   it("still shows a visible message when the initial load rejects with a non-Error value", async () => {
     mockedList.mockRejectedValue("boom");
-    render(
+    renderWithQueryClient(
       <CategoryMultiSelect
         domain="inventory"
         onChange={() => undefined}
@@ -187,7 +182,7 @@ describe("CategoryMultiSelect", () => {
 
   it("shows a starting-point create control, not a dead end, with zero categories", async () => {
     mockedList.mockResolvedValue({ rows: [] } as never);
-    render(
+    renderWithQueryClient(
       <CategoryMultiSelect
         domain="inventory"
         onChange={() => undefined}
@@ -203,7 +198,7 @@ describe("CategoryMultiSelect", () => {
 
   it("disables the project create action until a type is chosen", async () => {
     mockedList.mockResolvedValue({ rows: PROJECT_ROWS } as never);
-    render(
+    renderWithQueryClient(
       <CategoryMultiSelect
         domain="project"
         onChange={() => undefined}
@@ -231,7 +226,7 @@ describe("CategoryMultiSelect", () => {
       } as never);
     mockedCreate.mockResolvedValue({ id: "p3" } as never);
     const onChange = vi.fn();
-    render(
+    renderWithQueryClient(
       <CategoryMultiSelect domain="project" onChange={onChange} value={[]} />
     );
     await screen.findByText("AI");

@@ -198,7 +198,7 @@ const CENSUS = new Map<string, { class: SeedClass; why: string }>([
     "src/components/comment-thread.tsx: useState(comment.content)",
     {
       class: "D",
-      why: "comments are fetched in an effect, since the detail loader carries none, and opening an edit resets the draft from the saved text",
+      why: "comments are read through `useQuery` in ProjectPrivatePanel, since the detail loader carries none, and opening an edit resets the draft from the saved text",
     },
   ],
   [

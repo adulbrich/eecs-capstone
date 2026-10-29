@@ -1,4 +1,6 @@
-import { useCallback, useEffect, useId, useState } from "react";
+import { queryOptions, useQuery, useQueryClient } from "@tanstack/react-query";
+import { isRedirect } from "@tanstack/react-router";
+import { useId, useState } from "react";
 import type { z } from "zod";
 import { CategoryTypeCombobox } from "#/components/category-type-combobox";
 import { Button } from "#/components/ui/button";
@@ -26,36 +28,54 @@ interface Props {
   value: string[];
 }
 
+/**
+ * The category list for one domain. A public catalog, so the key names the
+ * domain and no viewer. Read again on every mount, as the effect did: staff
+ * add categories on the admin pages, which invalidate nothing here.
+ */
+function categoriesQuery(domain: Domain) {
+  return queryOptions({
+    queryKey: ["categories", domain],
+    queryFn: async () => {
+      try {
+        const data = { domain } satisfies z.input<typeof listSchema>;
+        const { rows } = await listCategories({ data });
+        return rows as Category[];
+      } catch (error) {
+        // A public read never redirects today; caught all the same, since a
+        // redirect thrown from a `queryFn` navigates the tab (docs/QUIRKS.md).
+        if (isRedirect(error)) {
+          return [];
+        }
+        throw error;
+      }
+    },
+    retry: false,
+    staleTime: 0,
+  });
+}
+
 export function CategoryMultiSelect({ domain, value, onChange }: Props) {
   const nameInputId = useId();
   const typeInputId = useId();
-  const [categories, setCategories] = useState<Category[]>([]);
+  const queryClient = useQueryClient();
+  // A failed refetch keeps the last-good list beside the error rather than
+  // blanking it: it runs again after a successful create (see handleCreate),
+  // and must not wipe out categories that `value` still references and that
+  // submit will still write.
+  const query = useQuery(categoriesQuery(domain));
+  const categories = query.data ?? [];
   const [newName, setNewName] = useState("");
   const [newType, setNewType] = useState("");
   const [creating, setCreating] = useState(false);
   const [createError, setCreateError] = useState<string | null>(null);
-  const [loadError, setLoadError] = useState<string | null>(null);
-
-  const loadCategories = useCallback(async () => {
-    try {
-      const data = { domain } satisfies z.input<typeof listSchema>;
-      const { rows } = await listCategories({ data });
-      setCategories(rows as Category[]);
-      setLoadError(null);
-    } catch (err) {
-      // Keep the last-good list on failure instead of blanking it: this
-      // runs again after a successful create (see handleCreate), and a
-      // failed refetch must not wipe out categories that `value` still
-      // references and that submit will still write.
-      setLoadError(
-        err instanceof Error ? err.message : "Could not load categories"
-      );
-    }
-  }, [domain]);
-
-  useEffect(() => {
-    void loadCategories();
-  }, [loadCategories]);
+  let loadError: string | null = null;
+  if (query.isError) {
+    loadError =
+      query.error instanceof Error
+        ? query.error.message
+        : "Could not load categories";
+  }
 
   function toggle(id: string) {
     onChange(
@@ -95,7 +115,9 @@ export function CategoryMultiSelect({ domain, value, onChange }: Props) {
       onChange([...value, id]);
       setNewName("");
       setNewType("");
-      await loadCategories();
+      await queryClient.invalidateQueries({
+        queryKey: categoriesQuery(domain).queryKey,
+      });
     } catch (err) {
       setCreateError(
         err instanceof Error ? err.message : "Could not create category"

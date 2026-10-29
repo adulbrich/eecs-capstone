@@ -2,13 +2,13 @@
 import {
   cleanup,
   fireEvent,
-  render,
   screen,
   waitFor,
   within,
 } from "@testing-library/react";
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import { INVENTORY_ITEM_STATUSES, type ItemStatus } from "#/lib/vocabularies";
+import { renderWithQueryClient } from "./shared/query-client";
 
 const { router, server } = vi.hoisted(() => ({
   router: {
@@ -29,7 +29,12 @@ vi.mock("#/server/users", () => ({
   lookupUserByEmail: vi.fn(() => Promise.resolve(null)),
   searchUsers: vi.fn(() => Promise.resolve([])),
 }));
-vi.mock("@tanstack/react-router", () => ({ useRouter: () => router }));
+// The real module beside the stub router: the edit log's `queryFn` calls
+// `isRedirect` on a failure.
+vi.mock("@tanstack/react-router", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@tanstack/react-router")>()),
+  useRouter: () => router,
+}));
 
 import {
   type HistoryRow,
@@ -54,7 +59,18 @@ function renderPanel(
     history?: HistoryRow[];
   } = {}
 ) {
-  return render(
+  return renderWithQueryClient(panel(overrides));
+}
+
+function panel(
+  overrides: {
+    status?: ItemStatus;
+    hasRequestHistory?: boolean;
+    history?: HistoryRow[];
+  } = {},
+  key?: string
+) {
+  return (
     <InventoryLifecyclePanel
       hasRequestHistory={overrides.hasRequestHistory ?? false}
       history={overrides.history ?? []}
@@ -66,6 +82,7 @@ function renderPanel(
         currentHolderLabel: null,
         currentRequestItemId: null,
       }}
+      key={key}
     />
   );
 }
@@ -475,7 +492,7 @@ describe("InventoryLifecyclePanel: the checkout dialog", () => {
 
 describe("InventoryLifecyclePanel: the pickup terms on a reserve (#799)", () => {
   function renderRequested(location: string | null) {
-    return render(
+    return renderWithQueryClient(
       <InventoryLifecyclePanel
         hasRequestHistory
         history={[]}
@@ -539,7 +556,7 @@ describe("InventoryLifecyclePanel: the pickup terms on a reserve (#799)", () => 
   });
 
   it("reads back what the holder was told, and nothing it was not", () => {
-    render(
+    renderWithQueryClient(
       <InventoryLifecyclePanel
         hasRequestHistory={false}
         history={[]}
@@ -587,5 +604,73 @@ describe("InventoryLifecyclePanel: the pickup terms on a reserve (#799)", () => 
         }),
       })
     );
+  });
+});
+
+describe("InventoryLifecyclePanel edit log", () => {
+  const row = {
+    id: "log-1",
+    changedFields: ["location"],
+    createdAt: "2026-10-01T10:00:00.000Z",
+    editorName: "Grace Hopper",
+  };
+
+  it("renders the log it reads for the item", async () => {
+    server.listInventoryItemEditLog.mockResolvedValueOnce({
+      rows: [row],
+    } as never);
+    renderPanel();
+
+    expect(await screen.findByText(/Grace Hopper/)).toBeTruthy();
+    expect(server.listInventoryItemEditLog).toHaveBeenCalledWith({
+      data: { itemId: "item-1" },
+    });
+  });
+
+  it("says the read failed rather than claiming the item has no edits", async () => {
+    server.listInventoryItemEditLog.mockRejectedValueOnce(new Error("down"));
+    renderPanel();
+
+    expect(
+      await screen.findByText("The edit log could not be loaded.")
+    ).toBeTruthy();
+    expect(screen.queryByText("No edits yet.")).toBeNull();
+  });
+
+  it("keeps the loaded log when a later reread fails", async () => {
+    server.listInventoryItemEditLog.mockResolvedValueOnce({
+      rows: [row],
+    } as never);
+    const view = renderPanel();
+    expect(await screen.findByText(/Grace Hopper/)).toBeTruthy();
+    server.listInventoryItemEditLog.mockRejectedValueOnce(new Error("down"));
+
+    await view.queryClient.refetchQueries({
+      queryKey: ["inventory-item", "item-1", "edit-log"],
+    });
+
+    await waitFor(() =>
+      expect(server.listInventoryItemEditLog).toHaveBeenCalledTimes(2)
+    );
+    expect(screen.getByText(/Grace Hopper/)).toBeTruthy();
+    expect(screen.queryByText("The edit log could not be loaded.")).toBeNull();
+  });
+
+  it("reads the log again on a revisit, even inside the client's 30-second window", async () => {
+    // The only writer is the edit page, which invalidates nothing here, so a
+    // return from it must read again rather than show the cached log.
+    const view = renderPanel();
+    view.queryClient.setDefaultOptions({
+      queries: { retry: false, staleTime: 30_000 },
+    });
+    expect(await screen.findByText("No edits yet.")).toBeTruthy();
+    server.listInventoryItemEditLog.mockResolvedValueOnce({
+      rows: [row],
+    } as never);
+
+    // A new key remounts the panel on the same client, as a revisit does.
+    view.rerender(panel({}, "again"));
+
+    expect(await screen.findByText(/Grace Hopper/)).toBeTruthy();
   });
 });

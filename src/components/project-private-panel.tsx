@@ -1,8 +1,11 @@
-import { Link } from "@tanstack/react-router";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { isRedirect, Link } from "@tanstack/react-router";
 import {
   PRIVATE_NOTES_LABEL,
   PRIVATE_PANEL_AUDIENCE_HINT,
 } from "#/lib/private-notes";
+import { useSignedInUserId } from "#/lib/use-signed-in";
+import { listProjectComments } from "#/server/projects-queries";
 import { CommentThread } from "./comment-thread";
 import { Panel, PanelHeader, PanelNote, PanelSection } from "./panel";
 import { StatusTimeline } from "./status-timeline";
@@ -10,6 +13,48 @@ import { Button } from "./ui/button";
 
 type Comment = Parameters<typeof CommentThread>[0]["comments"][number];
 type HistoryRow = Parameters<typeof StatusTimeline>[0]["rows"][number];
+
+/**
+ * The comment key: the project, and the viewer, because what comes back
+ * depends on who asks (internal comments are withheld from the proposer, and
+ * `isMine` is per viewer). Writers invalidate the two-element prefix.
+ */
+export function projectCommentsKey(projectId: string, userId?: string) {
+  return userId === undefined
+    ? (["project-comments", projectId] as const)
+    : (["project-comments", projectId, userId] as const);
+}
+
+/**
+ * Read here rather than by the route: the detail loader carries no comments,
+ * and only this panel shows them. Read again on every mount, as the route's
+ * effect did, since a comment another party posts invalidates nothing in
+ * this tab.
+ */
+function useProjectComments(projectId: string) {
+  const userId = useSignedInUserId();
+  const { data = [] } = useQuery({
+    queryKey: projectCommentsKey(projectId, userId),
+    queryFn: async () => {
+      try {
+        const { rows } = await listProjectComments({ data: { id: projectId } });
+        return rows as Comment[];
+      } catch (error) {
+        // A public read, gated by `canSeeProject` rather than a session, so
+        // nothing redirects today; caught all the same (docs/QUIRKS.md, "A
+        // redirect thrown from a `queryFn` navigates the tab").
+        if (isRedirect(error)) {
+          return [];
+        }
+        throw error;
+      }
+    },
+    enabled: userId !== undefined,
+    retry: false,
+    staleTime: 0,
+  });
+  return data;
+}
 
 /**
  * Everything on the project page that the proposer and staff share and the
@@ -22,23 +67,29 @@ type HistoryRow = Parameters<typeof StatusTimeline>[0]["rows"][number];
  */
 export function ProjectPrivatePanel({
   canEdit,
-  comments,
   history,
   notes,
-  onCommentsChanged,
   projectId,
   viewerIsOwner,
   viewerIsStaff,
 }: {
   canEdit: boolean;
-  comments: Comment[];
   history: HistoryRow[];
   notes: string | null;
-  onCommentsChanged: () => Promise<void>;
   projectId: string;
   viewerIsOwner: boolean;
   viewerIsStaff: boolean;
 }) {
+  const queryClient = useQueryClient();
+  const comments = useProjectComments(projectId);
+  // Only the comment list rereads after a post or an edit. The loader carries
+  // no comments, so invalidating the route would re-run it for nothing.
+  function onCommentsChanged() {
+    return queryClient.invalidateQueries({
+      queryKey: projectCommentsKey(projectId),
+    });
+  }
+
   return (
     <Panel tone="private">
       <PanelHeader

@@ -4,7 +4,6 @@ import {
   notFound,
   useRouter,
 } from "@tanstack/react-router";
-import { useCallback, useEffect, useState } from "react";
 import { BookmarkButton } from "#/components/bookmark-button";
 import { CategoryChip } from "#/components/category-chip";
 import { Markdown } from "#/components/markdown";
@@ -26,7 +25,7 @@ import { projectUrlHref } from "#/lib/project-url";
 import { programLabel } from "#/lib/project-visibility";
 import { absoluteUrl } from "#/lib/site-url";
 import { NOINDEX, socialDescription } from "#/lib/social-meta";
-import { getProject, listProjectComments } from "#/server/projects-queries";
+import { getProject } from "#/server/projects-queries";
 
 type GetProjectResult = Awaited<ReturnType<typeof getProject>>;
 
@@ -110,8 +109,6 @@ export const Route = createFileRoute("/_public/projects/$projectId")({
   component: ProjectDetail,
 });
 
-type Comment = Parameters<typeof ProjectPrivatePanel>[0]["comments"][number];
-
 function ProjectDetail() {
   const router = useRouter();
   const {
@@ -124,27 +121,6 @@ function ProjectDetail() {
     // TanStack's loaderData inference collapses to never/undefined on this
     // route (see ProjectDetailData above); the loader provably returns it.
   } = Route.useLoaderData() as unknown as ProjectDetailData;
-  const [comments, setComments] = useState<Comment[]>([]);
-  const projectId = project.id;
-
-  const refreshComments = useCallback(async () => {
-    if (!projectId) {
-      return;
-    }
-    try {
-      const { rows } = await listProjectComments({
-        data: { id: projectId },
-      });
-      setComments(rows as Comment[]);
-    } catch {
-      setComments([]);
-    }
-  }, [projectId]);
-
-  useEffect(() => {
-    void refreshComments();
-  }, [refreshComments]);
-
   if (!project) {
     return null;
   }
@@ -263,12 +239,8 @@ function ProjectDetail() {
       {(viewerIsStaff || viewerIsOwner) && (
         <ProjectPrivatePanel
           canEdit={canEdit}
-          comments={comments}
           history={history}
           notes={project.notes}
-          // Only the comment list refetches. The loader carries no comments,
-          // so invalidating the route after a post re-ran it for nothing.
-          onCommentsChanged={() => refreshComments()}
           projectId={project.id}
           viewerIsOwner={viewerIsOwner}
           viewerIsStaff={viewerIsStaff}
