@@ -80,6 +80,14 @@ async function makeProject(
   return project;
 }
 
+/** What a panel that loaded `project` would send as `expected` (#583). */
+function loadedFrom(project: typeof projects.$inferSelect) {
+  return {
+    summary: project.socialSummary,
+    isManual: project.socialSummaryIsManual,
+  };
+}
+
 async function readRow(id: string) {
   const [row] = await db.select().from(projects).where(eq(projects.id, id));
   return row;
@@ -116,6 +124,7 @@ describe("the staff summary endpoints are staff only", () => {
     await expect(
       saveSocialSummaryAs(student, {
         projectId: project.id,
+        expected: loadedFrom(project),
         summary: "Wording the proposer preferred.",
       })
     ).rejects.toThrow(/Forbidden/u);
@@ -156,6 +165,7 @@ describe("saveSocialSummaryAs", () => {
 
     const view = await saveSocialSummaryAs(staff, {
       projectId: project.id,
+      expected: loadedFrom(project),
       summary: "  Wording staff chose.  ",
     });
 
@@ -172,7 +182,11 @@ describe("saveSocialSummaryAs", () => {
     const project = await makeProject({ socialSummary: "Stored wording." });
 
     await expect(
-      saveSocialSummaryAs(staff, { projectId: project.id, summary: "   " })
+      saveSocialSummaryAs(staff, {
+        projectId: project.id,
+        summary: "   ",
+        expected: loadedFrom(project),
+      })
     ).rejects.toThrow(/cannot be empty/u);
     expect((await readRow(project.id)).socialSummary).toBe("Stored wording.");
   });
@@ -184,6 +198,7 @@ describe("saveSocialSummaryAs", () => {
     await expect(
       saveSocialSummaryAs(staff, {
         projectId: project.id,
+        expected: loadedFrom(project),
         summary: "x".repeat(SOCIAL_SUMMARY_MAX_LENGTH + 1),
       })
     ).rejects.toThrow(/at most 300 characters/u);
@@ -198,7 +213,11 @@ describe("saveSocialSummaryAs", () => {
     const summary = EMOJI.repeat(151);
 
     await expect(
-      saveSocialSummaryAs(staff, { projectId: project.id, summary })
+      saveSocialSummaryAs(staff, {
+        projectId: project.id,
+        summary,
+        expected: loadedFrom(project),
+      })
     ).resolves.toMatchObject({ summary });
   });
 
@@ -209,6 +228,101 @@ describe("saveSocialSummaryAs", () => {
         projectId: "00000000-0000-0000-0000-000000000000",
       })
     ).rejects.toThrow(/not found/u);
+  });
+});
+
+describe("saveSocialSummaryAs against another staff save (#583)", () => {
+  it("refuses a save built from the row a colleague's save replaced, and says so", async () => {
+    const bob = await makeUser("admin");
+    const carol = await makeUser("admin");
+    const project = await makeProject({
+      socialSummary: "Wording Alice typed earlier.",
+      socialSummaryIsManual: true,
+    });
+    // Both tabs loaded `project`. Carol saves first.
+    await saveSocialSummaryAs(carol, {
+      projectId: project.id,
+      summary: "Wording Carol typed.",
+      expected: loadedFrom(project),
+    });
+
+    const result = await saveSocialSummaryAs(bob, {
+      projectId: project.id,
+      summary: "Wording Bob typed.",
+      expected: loadedFrom(project),
+    });
+
+    expect(result.outcome).toBe("changed");
+    expect(result.summary).toBe("Wording Carol typed.");
+    expect((await readRow(project.id)).socialSummary).toBe(
+      "Wording Carol typed."
+    );
+  });
+
+  it("refuses a save from a tab that loaded an empty row the refresh has since filled", async () => {
+    // The automatic refresh leaves the flag false, as the tab loaded it, so
+    // only the null-to-text change can refuse this.
+    const bob = await makeUser("admin");
+    const project = await makeProject();
+    await db
+      .update(projects)
+      .set({ socialSummary: "Generated wording." })
+      .where(eq(projects.id, project.id));
+
+    const result = await saveSocialSummaryAs(bob, {
+      projectId: project.id,
+      summary: "Wording Bob typed.",
+      expected: loadedFrom(project),
+    });
+
+    expect(result.outcome).toBe("changed");
+    expect((await readRow(project.id)).socialSummary).toBe(
+      "Generated wording."
+    );
+  });
+
+  it("refuses a save when only the manual flag moved", async () => {
+    // Carol saved the generated text unchanged, taking the field by hand. The
+    // text alone cannot see that; the flag can.
+    const bob = await makeUser("admin");
+    const project = await makeProject({ socialSummary: "Generated wording." });
+    await db
+      .update(projects)
+      .set({ socialSummaryIsManual: true })
+      .where(eq(projects.id, project.id));
+
+    const result = await saveSocialSummaryAs(bob, {
+      projectId: project.id,
+      summary: "Wording Bob typed.",
+      expected: loadedFrom(project),
+    });
+
+    expect(result.outcome).toBe("changed");
+    expect((await readRow(project.id)).socialSummary).toBe(
+      "Generated wording."
+    );
+  });
+
+  it("saves when what the tab loaded is still what is stored", async () => {
+    const bob = await makeUser("admin");
+    const project = await makeProject({ socialSummary: "Generated wording." });
+
+    const first = await saveSocialSummaryAs(bob, {
+      projectId: project.id,
+      summary: "Wording Bob typed.",
+      expected: loadedFrom(project),
+    });
+    expect(first.outcome).toBe("saved");
+
+    const second = await saveSocialSummaryAs(bob, {
+      projectId: project.id,
+      summary: "Wording Bob typed again.",
+      expected: { summary: first.summary, isManual: first.isManual },
+    });
+    expect(second.outcome).toBe("saved");
+    expect((await readRow(project.id)).socialSummary).toBe(
+      "Wording Bob typed again."
+    );
   });
 });
 
@@ -425,6 +539,7 @@ describe("regenerateSocialSummaryAs against a save that lands mid-flight", () =>
       racingModel("Model text nobody keeps.", () =>
         saveSocialSummaryAs(bob, {
           projectId: project.id,
+          expected: loadedFrom(project),
           summary: "Wording Bob typed.",
         })
       )
@@ -454,6 +569,7 @@ describe("regenerateSocialSummaryAs against a save that lands mid-flight", () =>
       racingModel("Model text nobody keeps.", () =>
         saveSocialSummaryAs(bob, {
           projectId: project.id,
+          expected: loadedFrom(project),
           summary: "Wording Bob typed.",
         })
       )
@@ -477,6 +593,7 @@ describe("regenerateSocialSummaryAs against a save that lands mid-flight", () =>
       racingModel("Model text nobody keeps.", () =>
         saveSocialSummaryAs(bob, {
           projectId: project.id,
+          expected: loadedFrom(project),
           summary: "Wording Bob typed.",
         })
       )

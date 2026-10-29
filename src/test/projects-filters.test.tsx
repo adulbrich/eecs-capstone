@@ -2,7 +2,10 @@
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-const { navigate } = vi.hoisted(() => ({ navigate: vi.fn() }));
+const { navigate, location } = vi.hoisted(() => ({
+  navigate: vi.fn(),
+  location: { pathname: "/projects", search: { q: "" } },
+}));
 
 vi.mock("@tanstack/react-router", () => ({
   // `to` becomes the href so the anchor has the link role. `search` is
@@ -26,6 +29,9 @@ vi.mock("@tanstack/react-router", () => ({
     </a>
   ),
   useNavigate: () => navigate,
+  // The search box reads `q` from the location (#588), not from its prop.
+  useRouterState: ({ select }: { select: (state: unknown) => unknown }) =>
+    select({ location }),
 }));
 
 // Radix's RadioGroup and Switch measure themselves on mount; jsdom ships no
@@ -288,6 +294,7 @@ describe("the effective order the loader resolved", () => {
  */
 describe("the Sort select's options", () => {
   function renderBar(q: string, canRecommend = false) {
+    location.search.q = q;
     render(
       <ProjectsSearchBar
         canRecommend={canRecommend}

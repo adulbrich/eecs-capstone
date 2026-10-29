@@ -122,3 +122,17 @@ export type RegenerateSocialSummaryOutcome = "rewritten" | "changed";
 export interface RegenerateSocialSummaryResult extends SocialSummaryView {
   outcome: RegenerateSocialSummaryOutcome;
 }
+
+/**
+ * What a staff Save did (#583).
+ *
+ * `changed` is the same lost race Regenerate reports, with two humans in it:
+ * the row no longer held the summary the panel loaded, so the save matched
+ * nothing and wrote nothing. The view beside it is the row re-read, so the
+ * panel can show the wording that is actually stored.
+ */
+export type SaveSocialSummaryOutcome = "saved" | "changed";
+
+export interface SaveSocialSummaryResult extends SocialSummaryView {
+  outcome: SaveSocialSummaryOutcome;
+}

@@ -32,7 +32,7 @@ import { searchParamQuerySchema } from "#/lib/search-query";
 import type { SortState } from "#/lib/table-state";
 import { useAction } from "#/lib/use-action";
 import { useAdminTable } from "#/lib/use-admin-table";
-import { useDebouncedDraft } from "#/lib/use-debounced-draft";
+import { useSearchDraft } from "#/lib/use-search-draft";
 import {
   exportMentors,
   listMentors,
@@ -203,7 +203,7 @@ function MentorsAdmin() {
     },
     [navigate]
   );
-  const [qDraft, setQDraft] = useDebouncedDraft(q, commitQuery);
+  const [qDraft, setQDraft] = useSearchDraft(commitQuery);
   // The committed query, never `qDraft`: the note describes the search
   // that ran, and must not appear and vanish between keystrokes (#478).
   const queryNote = searchQueryNote(q);

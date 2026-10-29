@@ -185,7 +185,7 @@ export function onidProfileOrRejection(
   // guarantee `email`, which is why the fallback is load-bearing rather than
   // defensive: without it, those users cannot sign in at all.
   //
-  // Three names for the UPN, because we have never seen a token from this
+  // Three names for the UPN, because nobody has decoded a token from this
   // tenant. UIT named `username`, then told us where it came from: a Proxmox
   // realm configuration, not Entra's own reference, and they concede it is
   // non-standard. The tenant's discovery document advertises
@@ -225,12 +225,12 @@ export function onidProfileOrRejection(
     // university enforces. That is stronger proof of address control than the
     // sign-in code we mail ourselves.
     //
-    // What makes it sound is the conjunction of the issuer check above and
-    // UIT publishing this registration only to engineering-account holders,
-    // not the email claim itself, which Entra does not verify. A guest invited
-    // into the OSU tenant would pass the issuer check while carrying a
-    // home-tenant email; `idp` differing from `iss` is the discriminator if
-    // that ever stops being acceptable.
+    // What makes it sound is the issuer check above, not the email claim
+    // itself, which Entra does not verify. The check does not cover a guest
+    // invited into the OSU tenant, who would pass it while carrying a
+    // home-tenant email. Any ONID holder can sign in, and whether UIT publish
+    // this registration to guests too is unconfirmed: an open risk tracked in
+    // #578. `idp` differing from `iss` is the discriminator for a guest.
     //
     // Two things follow, both intended. It fires the project-claim hook in
     // `src/lib/auth.ts`, the same way a GitHub-verified email does. And it

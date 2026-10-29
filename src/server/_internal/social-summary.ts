@@ -1,4 +1,4 @@
-import { and, eq } from "drizzle-orm";
+import { and, eq, isNull } from "drizzle-orm";
 import { db } from "#/db";
 import { projects } from "#/db/schema";
 import { requireUser } from "#/lib/_internal/auth-guards";
@@ -10,6 +10,7 @@ import { socialSummariesEnabled } from "#/lib/_internal/social-summary-flag";
 import { currentAttempt } from "#/lib/ai-refresh";
 import {
   type RegenerateSocialSummaryResult,
+  type SaveSocialSummaryResult,
   SOCIAL_SUMMARY_TOO_LONG_MESSAGE,
   type SocialSummaryView,
   socialSummaryTextSchema,
@@ -102,11 +103,26 @@ export async function getSocialSummaryForCurrentUser(
  *
  * Staff only, and the seam is where that is enforced. The panel is hidden from
  * everyone else, and a hidden panel is not a gate.
+ *
+ * A compare-and-swap, like Regenerate's, so a save that loses to another
+ * staff save says so instead of erasing it (#583). Bob opens the panel and
+ * types, Carol saves hers, Bob saves: last write wins would drop Carol's
+ * wording with nothing anywhere recording that it existed. Neither of them is
+ * more entitled to the field, so the guard does not pick a winner; it tells
+ * Bob, who can read Carol's wording and save over it knowingly.
+ *
+ * The predicate is `data.expected`, what the panel loaded, and not the row
+ * this function reads, which would catch only a race inside this call: the
+ * panel loads once on mount and a tab left open all afternoon holds a view
+ * from whenever it was opened. It compares the stored text and the manual
+ * flag, as Regenerate does and for the same reasons, including the ABA it
+ * deliberately lets through: Carol saving Bob's own text back is not a
+ * wording Bob never saw.
  */
 export async function saveSocialSummaryAs(
   viewer: AuthUser,
   data: SaveSocialSummaryInput
-): Promise<SocialSummaryView> {
+): Promise<SaveSocialSummaryResult> {
   assertStaff(viewer);
   const project = await loadProject(data.projectId);
   // The same schema the `createServerFn` validator and the panel counter
@@ -129,26 +145,45 @@ export async function saveSocialSummaryAs(
     );
   }
   const summary = parsed.data;
+  const { expected } = data;
   const updatedAt = new Date();
-  await db
+  const written = await db
     .update(projects)
     .set({
       socialSummary: summary,
       socialSummaryIsManual: true,
       socialSummaryUpdatedAt: updatedAt,
     })
-    .where(eq(projects.id, project.id));
+    .where(
+      and(
+        eq(projects.id, project.id),
+        expected.summary === null
+          ? isNull(projects.socialSummary)
+          : eq(projects.socialSummary, expected.summary),
+        eq(projects.socialSummaryIsManual, expected.isManual)
+      )
+    )
+    .returning({ id: projects.id });
+  if (written.length === 0) {
+    // Re-read rather than assumed, as Regenerate does, so the panel can show
+    // what is stored. No `recordAiRefresh`: a save is not a model attempt.
+    return {
+      ...(await toView(await loadProject(project.id))),
+      outcome: "changed",
+    };
+  }
   return {
     summary,
     updatedAt,
     isManual: true,
+    outcome: "saved",
     ...(await aiStatus(project, updatedAt)),
   };
 }
 
 export async function saveSocialSummaryForCurrentUser(
   data: SaveSocialSummaryInput
-): Promise<SocialSummaryView> {
+): Promise<SaveSocialSummaryResult> {
   const viewer = await requireUser();
   return saveSocialSummaryAs(viewer, data);
 }
@@ -192,9 +227,7 @@ export async function saveSocialSummaryForCurrentUser(
  * replace is what the button does; the guard exists to stop it replacing
  * wording the caller never saw.
  *
- * What neither case covers, because it is a different bug: two Saves racing
- * each other. `saveSocialSummaryAs` is last write wins and says nothing, so
- * Carol's save over Bob's is silent. That is tracked separately.
+ * Two Saves racing each other are `saveSocialSummaryAs`'s own guard (#583).
  *
  * Deliberately not `socialSummaryUpdatedAt`, which looks like the obvious
  * version column and is not one. `scripts/backfill-social-summaries.mjs`

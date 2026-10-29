@@ -2,6 +2,17 @@
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { act } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
+
+// The search box reads `q` from the router's location (#588), not from its
+// prop, so the location stands in for the URL here.
+const { location } = vi.hoisted(() => ({
+  location: { pathname: "/inventory", search: { q: "" } },
+}));
+vi.mock("@tanstack/react-router", () => ({
+  useRouterState: ({ select }: { select: (state: unknown) => unknown }) =>
+    select({ location }),
+}));
+
 import {
   INVENTORY_ORDER_LABEL,
   InventoryFilters,
@@ -17,6 +28,7 @@ Element.prototype.scrollIntoView = vi.fn();
 function renderSearch(
   overrides: Partial<Parameters<typeof InventorySearchBar>[0]> = {}
 ) {
+  location.search.q = overrides.q ?? "";
   return render(
     <InventorySearchBar
       onOrderChange={() => {}}
@@ -76,6 +88,7 @@ describe("InventorySearchBar", () => {
       target: { value: "typed" },
     });
 
+    location.search.q = "fromBack";
     rerender(
       <InventorySearchBar
         onOrderChange={() => {
