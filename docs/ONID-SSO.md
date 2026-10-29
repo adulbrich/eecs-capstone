@@ -20,7 +20,7 @@ plugin and not the `@better-auth/sso` package. The design reasoning lives in
 | Scopes requested | `openid profile email` |
 | Claims released | `email`, `given_name`, `family_name`, and a UPN claim UIT call `username` |
 | Tenancy | Single tenant, and pinned to it in code. See "Why single tenant". |
-| Audience | Holders of an active College of Engineering account |
+| Audience | Any ONID holder (maintainer, 2026-09-22). Whether tenant guests get in too is open: #578. |
 
 The client ID, tenant ID and discovery URL are public values. They appear in
 `.env.example` and `infra/variables.tf` on purpose; treating them as secrets
@@ -124,7 +124,7 @@ would fork every account.
 OIDC. The next-best record would be the UPN, passed through the username claim."
 The UPN is shaped `onid@oregonstate.edu`. The mapper tries `username`,
 `preferred_username` and `upn` in that order, because all three spell the UPN for
-a work or school account and we have never seen a token from this tenant.
+a work or school account and nobody has decoded a token from this tenant.
 
 That belt-and-braces turned out to be warranted. Asked where `username` came
 from, UIT said they had taken it from a Proxmox server's realm configuration
@@ -183,10 +183,10 @@ it is unconfigured rather than accepting tokens from anywhere.
 
 What the check does **not** do is make trusting `email` safe on its own. A guest
 invited into the OSU tenant carries this tenant's `iss` with a home-tenant email
-and passes. The email trust rests on the conjunction of the issuer pin and UIT
-publishing this registration only to engineering-account holders. If that ever
-stops being acceptable, `idp` differing from `iss` is the discriminator for a
-guest.
+and passes. Any ONID holder can sign in, and nobody has confirmed whether UIT
+publish this registration to tenant guests as well, so the email trust is sound
+only as far as the answer is no. That guest case is an open risk, tracked in
+#578, and `idp` differing from `iss` is the discriminator for a guest.
 
 Industry partners and outside faculty do not need any of this. They sign in
 with an emailed code, or GitHub. Since #576 removed the password, the code is
@@ -269,14 +269,23 @@ the registration.
 
 ## Open with UIT
 
-Everything asked on 2026-08-24 came back on 2026-08-25 except one thing, and it
-is the one that blocks: **we still cannot read the client secrets.** UIT report
-that the Key Vault Secrets User role was assigned at vault creation and suspect a
-tenant misconfiguration rather than a missing grant; the suggested workaround is
-to sign in at `portal.azure.com`, accept the error prompt, and search for
-`kv-engr-coe-vault-caps` instead of following a direct link. Until that works,
-**no part of the live flow has been exercised**: not the authorization redirect,
-not the token exchange, not the claim shape.
+Everything asked on 2026-08-24 came back on 2026-08-25 except Key Vault access.
+UIT report that the Key Vault Secrets User role was assigned at vault creation
+and suspect a tenant misconfiguration rather than a missing grant; the suggested
+workaround is to sign in at `portal.azure.com`, accept the error prompt, and
+search for `kv-engr-coe-vault-caps` instead of following a direct link.
+
+Production sign-in works, so the production secret was read. **The live flow
+carries most real sign-ins**, measured from ALB access logs over
+2026-09-27T23:55Z to 2026-10-28T23:59Z, the bucket's whole 30-day retention when
+read. The ONID callback (`/api/auth/oauth2/callback/onid` until #770 moved it to
+`/api/auth/callback/onid` on 2026-10-06) took 107 requests. 104 carried an
+authorization code and two of those ended in `state_mismatch`; the other three
+were one hit on the retired path and two `state_not_found` with no code. Over
+the same window `/api/auth/sign-in/email-otp` took 6 requests, so ONID carries
+about nine in ten sign-ins. Every count is a floor, not a full count: anything
+before the retention window is gone. The client address in these logs is a
+CloudFront edge, so they cannot count distinct people.
 
 Answered, and folded into this document: both redirect URIs are registered, a
 development secret exists for localhost, `openid profile email` is sufficient,
@@ -287,17 +296,18 @@ code:
 
 - **A user without access sees a generic Entra error**, and UIT confirm it is not
   customizable. We cannot detect that case or explain it in our own UI, because
-  the user never reaches our application. Anyone turned away has to be told out
-  of band that ONID sign-in requires an active College of Engineering account and
-  that an emailed code is the alternative.
+  the user never reaches our application. Any ONID holder has access, so nobody
+  is turned away for lacking a particular account; whether a tenant guest is
+  turned away or let in is the open question in #578.
 - **UIT have not published to external users before** and cannot confirm in
   advance whether it would work. Moot now that we are staying single tenant.
 
-One assumption remains untestable from here: the UPN claim name. UIT took
-`username` from a Proxmox realm configuration and agree it is non-standard, so
-the mapper accepts `username`, `preferred_username` and `upn`. That should make
-it a non-event. What it cannot cover is a fourth name nobody has guessed, and you
-will only find that out by signing in.
+The UPN claim name is settled as far as sign-in goes. UIT took `username` from a
+Proxmox realm configuration and agree it is non-standard, so the mapper accepts
+`email`, then `username`, `preferred_username` and `upn`. The app log group's
+30 days to 2026-10-28 hold no `ONID sign-in refused a token` line, so every real
+token carried at least one of them. Which one is still unknown, because the log
+never records a claim, so that is no reason to narrow the mapper to one name.
 
 ## What is deliberately not built
 
