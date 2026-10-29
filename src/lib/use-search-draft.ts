@@ -20,7 +20,11 @@ import { useDebouncedDraft } from "./use-debounced-draft";
  * would blank the box under the reader for the whole load, so a location on
  * another pathname holds the last `q`. The mount's own pathname, not
  * `resolvedLocation`'s: on a mount by client navigation that still names the
- * page being left, and the box mounted empty.
+ * page being left, and the box mounted empty. Off the page it commits
+ * nothing either: a draft still inside its debounce would navigate back to
+ * the listing, off the page the reader clicked to. That assumes the box
+ * lives in its listing's route component; one in a layout that survives a
+ * change of page would freeze on the first page it mounted on.
  *
  * In one place rather than at each call site, where an eighth search box
  * reading `Route.useSearch().q` would bring the bug back. The raw location is
@@ -51,5 +55,15 @@ export function useSearchDraft(
   if (onPage && q !== held) {
     setHeld(q);
   }
-  return useDebouncedDraft(onPage ? q : held, commit, delayMs);
+  // Swapping the callback re-runs the hook's timer effect, which clears the
+  // timer armed with the real one.
+  return useDebouncedDraft(
+    onPage ? q : held,
+    onPage ? commit : commitNothing,
+    delayMs
+  );
+}
+
+function commitNothing() {
+  // Off the page the box mounted on, nothing is committed.
 }

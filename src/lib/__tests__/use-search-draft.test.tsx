@@ -220,6 +220,22 @@ describe("useSearchDraft", () => {
     expect(commits).toEqual([]);
   });
 
+  it("does not commit a pending draft once a click has left the page", async () => {
+    // A draft still inside its debounce when the reader clicks away: its
+    // commit would navigate back to the listing, off the page they chose.
+    const { router, commits } = await start(["/projects?q="]);
+
+    fireEvent.change(box(), { target: { value: "ard" } });
+    await act(() => {
+      void router.navigate({ to: "/admin" });
+      return Promise.resolve();
+    });
+    await settle(DELAY + 20);
+
+    expect(commits).toEqual([]);
+    expect(router.state.location.pathname).toBe("/admin");
+  });
+
   it("shows the URL's q from its first frame when a click brings it in", async () => {
     // On a mount by client navigation `resolvedLocation` still names the page
     // being left (QUIRKS, the traffic writer entry), so a hold keyed on it
