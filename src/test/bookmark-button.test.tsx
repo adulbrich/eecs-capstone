@@ -151,6 +151,21 @@ describe("BookmarkButton", () => {
     ).toBeTruthy();
   });
 
+  it("starts its name with the word it shows, in both states", async () => {
+    // A voice user says the visible word, so the name has to contain it
+    // (WCAG 2.5.3, #789). jsdom ignores `hidden md:inline`, so the text read
+    // here is the text shown from `md` up.
+    session = { user: { id: "u1" } };
+    const { findByRole, getByRole } = renderButton();
+    const unset = await findByRole("button", { name: "Bookmark" });
+    expect(unset.textContent).toBe("Bookmark");
+
+    await answer(true);
+
+    const set = getByRole("button", { name: "Bookmarked, remove bookmark" });
+    expect(set.textContent).toBe("Bookmarked");
+  });
+
   it("drops the previous project's read after the id changes", async () => {
     // The same staleness, reached through the effect rather than a click: the
     // button is reused for a second project while the first project's read is

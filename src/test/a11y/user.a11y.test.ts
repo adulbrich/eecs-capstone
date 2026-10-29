@@ -289,9 +289,9 @@ test("my bookmarks, as a table with a saved project", async ({
   await page.goto(`/projects/${bookmarkProjectId}`);
   await waitForHydration(page);
   await initialRead;
-  // Only now does the label mean anything. "Bookmarked, remove bookmark" here is a retry
-  // of a run that failed after saving: global-setup clears this slot's rows
-  // once per run, not once per attempt.
+  // Only now does the label mean anything. "Bookmarked, remove bookmark"
+  // here is a retry of a run that failed after saving: global-setup clears
+  // this slot's rows once per run, not once per attempt.
   const remove = page.getByRole("button", {
     name: "Bookmarked, remove bookmark",
   });
@@ -315,8 +315,8 @@ test("my bookmarks, as a table with a saved project", async ({
   // with it, so there was never an un-bookmarked row to check.
   //
   // Held by the title link, which names the row this test saved and survives
-  // the click. A locator filtered on "Bookmarked, remove bookmark" would not: it
-  // re-resolves afterwards and lands on whichever row still has one.
+  // the click. A locator filtered on "Bookmarked, remove bookmark" would not:
+  // it re-resolves afterwards and lands on whichever row still has one.
   const row = page
     .getByRole("row")
     .filter({ has: page.locator(`a[href="/projects/${bookmarkProjectId}"]`) });

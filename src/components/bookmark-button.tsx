@@ -79,8 +79,8 @@ export function BookmarkButton({ projectId }: { projectId: string }) {
       {/*
         Text from `md` only: on a phone this is the small icon button right
         of the project title (#400). The aria-label above is the accessible
-        name at every width, so no role query changes, and it starts with
-        this text so the two never disagree (#789).
+        name at every width, and it starts with the word shown here, so what
+        a voice user reads off the button is in its name (#789).
       */}
       <span className="hidden md:inline">
         {bookmarked ? "Bookmarked" : "Bookmark"}
