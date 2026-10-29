@@ -481,7 +481,7 @@ vi.mock("@tanstack/react-router", async (importOriginal) => ({
 
 ### Hard rules
 
-Biome owns the formatting (2-space indent, double quotes) and the import order; do not fight either. `biome.json` excludes `src/routeTree.gen.ts`, `src/styles.css`, `scripts/`, `drizzle/` and `**/*.svg`.
+Biome owns the formatting (2-space indent, double quotes) and the import order; do not fight either. `biome.json` excludes `src/routeTree.gen.ts`, `src/styles.css`, `scripts/`, `drizzle/` and `**/*.svg`, so an autofix never reaches a `scripts/` copy that a parity test pins to its `src/` twin; change both by hand. The YAML formatter keeps `bracketSpacing` off, matching the existing flow lists.
 
 ### The git hooks
 
@@ -499,18 +499,17 @@ Biome owns the formatting (2-space indent, double quotes) and the import order; 
 - `noIncrementDecrement` and `useDestructuring`: style with no defect behind it.
 - The assists `useSortedKeys` and `useSortedTypeFields`: object literals here are ordered by meaning.
 - `useNamedCaptureGroup`: a name on a group read once as `$1` is noise.
-- `useThisInClassMethods`: these classes implement an interface (`EmailSender`, `ResizeObserver` fakes).
-- `useDomQuerySelector`: each hit looks up an id read from an attribute, which `querySelector` would need escaped.
+- `useThisInClassMethods`: the storage and email classes implement an interface, and test stubs fake DOM globals, so a method without `this` is the shape required.
 
 ### Rules relaxed in tests
 
-In `*.test.ts(x)`, `__tests__/` and `src/test/`, `biome.json` also turns off `useTopLevelRegex`, `noEmptyBlockStatements`, `useAwait`, `noNonNullAssertion`, `useImportsFirst` (imports follow the hoisted `vi.mock` calls they depend on) and `noComponentHookFactories` (a harness component defined inside its test).
+In `*.test.ts(x)`, `__tests__/` and `src/test/`, `biome.json` also turns off `useTopLevelRegex`, `noEmptyBlockStatements`, `useAwait`, `noNonNullAssertion`, `useImportsFirst` (imports follow the hoisted `vi.mock` calls they depend on), `noComponentHookFactories` (a harness component defined inside its test) and `useDomQuerySelector` (`getElementById` takes an id as is, where `querySelector` needs it escaped).
 
 ### Inline suppressions, and options `biome.json` repeats
 
 Inline ignores cover `noNamespaceImport` (`import * as schema`, shadcn), `noBarrelFile` (the schema re-export), the Radix group headings in `ui/`, the orphan labels of #820, and Biome 2.6 calling every case of `orderBySql`'s switch unreachable.
 
-`noLabelWithoutControl` adds `RadioGroupItem` as a control. Setting an option replaces Ultracite's whole list, so `biome.json` repeats `inputComponents` and `labelComponents`. The YAML formatter keeps `bracketSpacing` off, matching the existing flow lists.
+`noLabelWithoutControl` adds `RadioGroupItem` as a control. Setting an option replaces Ultracite's whole list, so `biome.json` repeats `inputComponents` and `labelComponents`.
 
 ### Do not run `biome check --write --unsafe` blindly
 

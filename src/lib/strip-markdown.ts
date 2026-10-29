@@ -44,9 +44,9 @@ const BLOCKQUOTE_MARKER = /^\s{0,3}>\s?/gmu;
 const LIST_MARKER = /^[ \t]*([*+-]|\d+[.)])\s+/gmu;
 const TASK_MARKER = /^\[[ xX]\]\s+/gmu;
 // Emphasis opens inside its own span, so only a bound helps: 500 characters,
-// counted in UTF-16 code units. A longer run keeps its markers, as unclosed
-// emphasis does. `(?!\*)` and `(?!_)` take the whole delimiter run at once;
-// backing off to a shorter one walked the window up to three times.
+// counted in code points under the `u` flag. A longer run keeps its markers,
+// as unclosed emphasis does. `(?!\*)` and `(?!_)` take the whole delimiter run
+// at once; backing off to a shorter one walked the window up to three times.
 const ASTERISK_EMPHASIS = /(\*{1,3}(?!\*)|~~(?!~))(?=\S)([\s\S]{0,499}?\S)\1/gu;
 // Guarded on both sides so it cannot fire inside a word. CommonMark makes the
 // same distinction for the same reason: `*` may emphasise intraword and `_`

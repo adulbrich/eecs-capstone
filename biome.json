@@ -55,7 +55,6 @@
       "style": {
         "noIncrementDecrement": "off",
         "useDestructuring": "off",
-        "useDomQuerySelector": "off",
         "useNamedCaptureGroup": "off",
         "useThisInClassMethods": "off"
       }
@@ -93,6 +92,7 @@
           },
           "style": {
             "noNonNullAssertion": "off",
+            "useDomQuerySelector": "off",
             "useImportsFirst": "off"
           }
         }
