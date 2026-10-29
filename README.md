@@ -331,7 +331,7 @@ for the Terraform specifics.
 
 ## Acknowledgements
 
-Three earlier OSU capstone portals inspired this one:
+These earlier projects inspired this version of the portal:
 
 - Donald Heer, Nathaniel Baird and the other contributors to the first Capstone
   portal: [osu-tekbots/capstone-website](https://github.com/osu-tekbots/capstone-website).
