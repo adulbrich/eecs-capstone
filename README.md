@@ -328,3 +328,15 @@ one-click GitHub Actions workflow (`.github/workflows/deploy.yml`):
 See [`DEPLOYMENT.md`](./DEPLOYMENT.md) for the full operational runbook
 (first-time setup through teardown) and [`infra/README.md`](./infra/README.md)
 for the Terraform specifics.
+
+## Acknowledgements
+
+These earlier projects inspired this version of the portal:
+
+- Donald Heer, Nathaniel Baird and the other contributors to the first Capstone
+  portal: [osu-tekbots/capstone-website](https://github.com/osu-tekbots/capstone-website).
+- The 2024-2025 Capstone team, Dani Zahariev, Sankalp Patil, Muhammad Faks,
+  Joel Angus, Hanhua Zhu and Justin Pham:
+  [Capstone-Portal-Project/capstone-portal-project](https://github.com/Capstone-Portal-Project/capstone-portal-project).
+- Mike Akins, for the Laravel iteration and the first UI draft:
+  [akinsmosu/osu_cs_capstone_portal](https://github.com/akinsmosu/osu_cs_capstone_portal).
