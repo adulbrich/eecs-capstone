@@ -13,8 +13,7 @@ const projectIdSchema = z.object({ projectId: z.string().uuid() });
 // is still stored (#583). Verbatim, not through the text schema: it is compared
 // with the column, so trimming or capping it would make a stored summary that
 // was written some other way never match. Required, so a tab loaded before it
-// existed fails its save rather than overwriting a colleague unguarded, with a
-// sentence rather than the JSON a ZodError's message is.
+// existed fails its save rather than overwriting a colleague unguarded.
 const saveSchema = projectIdSchema.extend({
   summary: socialSummaryTextSchema,
   expected: z.object({
@@ -23,12 +22,16 @@ const saveSchema = projectIdSchema.extend({
   }),
 });
 
-const STALE_PAGE =
-  "This page is out of date, so the summary was not saved. Reload it and save again.";
-
-function parseSave(data: unknown) {
+/**
+ * The key is checked before the schema so a tab loaded before #583 is told to
+ * reload in a sentence, the way `refuseStaleDayField` tells one before #805,
+ * rather than shown the JSON a ZodError's message is.
+ */
+export function parseSaveSocialSummaryInput(data: unknown) {
   if (typeof data === "object" && data !== null && !("expected" in data)) {
-    throw new Error(STALE_PAGE);
+    throw new Error(
+      "This page is out of date. Reload it and save the summary again."
+    );
   }
   return saveSchema.parse(data);
 }
@@ -46,7 +49,7 @@ export const getSocialSummary = createServerFn({ method: "GET" })
   });
 
 export const saveSocialSummary = createServerFn({ method: "POST" })
-  .validator(parseSave)
+  .validator(parseSaveSocialSummaryInput)
   .handler(async ({ data }) => {
     const { saveSocialSummaryForCurrentUser } = await import(
       "./_internal/social-summary"
