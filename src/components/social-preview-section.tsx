@@ -31,6 +31,18 @@ const RACE_LOST =
   "The project or its summary changed while the rewrite was running, so the rewrite was thrown away. The box shows what is stored now.";
 
 /**
+ * The stored wording goes last, quoted, so a summary with or without a closing
+ * full stop never runs into the next sentence.
+ */
+function saveLost(stored: string | null): string {
+  const lead =
+    "The stored summary changed after this page loaded it, so yours was not saved. Your wording is still in the box";
+  return stored === null
+    ? `${lead}, and Save again stores it.`
+    : `${lead}, and Save again replaces what is stored now: "${stored}"`;
+}
+
+/**
  * Regenerate is enabled when staff own the wording, when there is none at
  * all, and when the last rewrite failed. The second and third are the
  * Bedrock outage: without them the panel would show an empty box, or a
@@ -166,13 +178,36 @@ export function SocialPreviewSection({ projectId }: { projectId: string }) {
   const regenerateAllowed = !!loaded && canRegenerate(loaded);
 
   function save() {
+    if (!loaded) {
+      return;
+    }
     return run(async () => {
       setNotice(null);
-      show(
-        await saveSocialSummary({
-          data: { projectId, summary: trimmed },
-        })
-      );
+      const next = await saveSocialSummary({
+        data: {
+          projectId,
+          summary: trimmed,
+          expected: { summary: loaded.summary, isManual: loaded.isManual },
+        },
+      });
+      // A miss that already stores this wording, by hand, is a save: this
+      // tab's earlier save landed with its answer lost, or a colleague typed
+      // the same. Telling staff theirs was lost would be wrong, and the
+      // "Save again" it offers would be disabled.
+      if (
+        next.outcome === "saved" ||
+        (next.isManual && next.summary === trimmed)
+      ) {
+        show(next);
+        return;
+      }
+      // Lost to another save (#583). The stored view moves so the meta line
+      // and the next Save's `expected` are current, but the draft stays: it
+      // is wording someone typed and nothing has kept it. The stored wording
+      // goes in the notice instead, so both are on screen and a second Save
+      // replaces the colleague's knowingly.
+      queryClient.setQueryData(queryKey, next);
+      setNotice(saveLost(next.summary));
     }, "Could not save the summary");
   }
 
@@ -239,10 +274,10 @@ export function SocialPreviewSection({ projectId }: { projectId: string }) {
       <FieldError message={error} />
       {/*
         A FieldError rather than a SavedNote or a paragraph of its own, per
-        "Where the success goes" in docs/UI-CONVENTIONS.md. Regenerate did not
-        fail, but it did not do what was asked either: the text in the box is
-        not the text the model produced, and a reader who cannot see the box
-        change would otherwise be told nothing at all. That is the case
+        "Where the success goes" in docs/UI-CONVENTIONS.md. A Regenerate or a
+        Save that lost a race did not fail, but it did not do what was asked
+        either: what was asked for was not stored, and a reader who cannot see
+        the box would otherwise be told nothing at all. That is the case
         `role="alert"` exists for, and a `SavedNote` would announce it politely
         in the colour reserved for a result the reader asked for.
       */}
