@@ -273,11 +273,11 @@ Everything asked on 2026-08-24 came back on 2026-08-25 except Key Vault access.
 UIT report that the Key Vault Secrets User role was assigned at vault creation
 and suspect a tenant misconfiguration rather than a missing grant; the suggested
 workaround is to sign in at `portal.azure.com`, accept the error prompt, and
-search for `kv-engr-coe-vault-caps` instead of following a direct link. Whether
-that workaround fixed it is not recorded, but the production secret did reach
-AWS, because production sign-in works.
+search for `kv-engr-coe-vault-caps` instead of following a direct link. The
+production secret did reach AWS, because production sign-in works; how it left
+the vault, and whether this workaround was needed, is not recorded.
 
-**The live flow carries most real sign-ins**, measured from ALB access logs over
+**ONID carries most real sign-ins**, measured from ALB access logs over
 2026-09-27T23:55Z to 2026-10-28T23:59Z, everything the bucket held when read.
 The ONID callback (`/api/auth/oauth2/callback/onid` until #770 moved it to
 `/api/auth/callback/onid` on 2026-10-06) took 107 requests. 104 carried an
@@ -285,9 +285,9 @@ authorization code and two of those ended in `state_mismatch`; the other three
 were one hit on the retired path and two `state_not_found` with no code. Over
 the same window `/api/auth/sign-in/email-otp` took 6 requests, successful or
 not, and `/api/auth/callback/github` took 4, each followed by a
-`state_mismatch` error. So 102 ONID sign-ins against at most 6 by emailed code
-and none by GitHub. Every count is a floor, not a full count: anything before
-the window is gone. The client address in these logs is a CloudFront edge, so
+`state_mismatch` error. So at most 102 ONID callbacks got past the state check
+with a code, against at most 6 emailed-code sign-ins and no GitHub sign-in.
+Every count covers only this window; anything before it is gone. The client address in these logs is a CloudFront edge, so
 they cannot count distinct people.
 
 Answered, and folded into this document: both redirect URIs are registered, a
