@@ -111,7 +111,9 @@ describe("BookmarkButton", () => {
     await click(await findByRole("button", { name: "Bookmark" }));
     await answer(false);
 
-    expect(getByRole("button", { name: "Remove bookmark" })).toBeTruthy();
+    expect(
+      getByRole("button", { name: "Bookmarked, remove bookmark" })
+    ).toBeTruthy();
     expect(rows.has("p1")).toBe(true);
   });
 
@@ -124,13 +126,17 @@ describe("BookmarkButton", () => {
 
     await click(await findByRole("button", { name: "Bookmark" }));
     await answer(false);
-    expect(getByRole("button", { name: "Remove bookmark" })).toBeTruthy();
+    expect(
+      getByRole("button", { name: "Bookmarked, remove bookmark" })
+    ).toBeTruthy();
 
     await act(async () => {
       finishWrite?.();
       await settle();
     });
-    expect(getByRole("button", { name: "Remove bookmark" })).toBeTruthy();
+    expect(
+      getByRole("button", { name: "Bookmarked, remove bookmark" })
+    ).toBeTruthy();
   });
 
   it("shows what the read returns when no click races it", async () => {
@@ -140,7 +146,31 @@ describe("BookmarkButton", () => {
 
     await answer(true);
 
-    expect(getByRole("button", { name: "Remove bookmark" })).toBeTruthy();
+    expect(
+      getByRole("button", { name: "Bookmarked, remove bookmark" })
+    ).toBeTruthy();
+  });
+
+  it("starts its name with the word it shows, in both states", async () => {
+    // A voice user says the visible word, so the name has to contain it
+    // (WCAG 2.5.3, #789). `textContent` ignores CSS, so it reads the span
+    // that `hidden md:inline` shows from `md` up.
+    session = { user: { id: "u1" } };
+    const { findByRole, getByRole } = renderButton();
+    const startsWithItsText = (button: HTMLElement) =>
+      Boolean(button.textContent) &&
+      button.getAttribute("aria-label")?.startsWith(button.textContent ?? "");
+    expect(
+      startsWithItsText(await findByRole("button", { name: "Bookmark" }))
+    ).toBe(true);
+
+    await answer(true);
+
+    expect(
+      startsWithItsText(
+        getByRole("button", { name: "Bookmarked, remove bookmark" })
+      )
+    ).toBe(true);
   });
 
   it("drops the previous project's read after the id changes", async () => {
@@ -159,14 +189,18 @@ describe("BookmarkButton", () => {
       </QueryClientProvider>
     );
     await answer(true);
-    expect(view.getByRole("button", { name: "Remove bookmark" })).toBeTruthy();
+    expect(
+      view.getByRole("button", { name: "Bookmarked, remove bookmark" })
+    ).toBeTruthy();
 
     await act(async () => {
       answerForP1?.(false);
       await settle();
     });
 
-    expect(view.getByRole("button", { name: "Remove bookmark" })).toBeTruthy();
+    expect(
+      view.getByRole("button", { name: "Bookmarked, remove bookmark" })
+    ).toBeTruthy();
   });
 
   it("writes once for a double click", async () => {
@@ -183,7 +217,9 @@ describe("BookmarkButton", () => {
     await act(settle);
 
     expect(writes).toBe(1);
-    expect(getByRole("button", { name: "Remove bookmark" })).toBeTruthy();
+    expect(
+      getByRole("button", { name: "Bookmarked, remove bookmark" })
+    ).toBeTruthy();
   });
 
   it("still toggles on a settled page", async () => {
@@ -194,7 +230,9 @@ describe("BookmarkButton", () => {
 
     await click(getByRole("button", { name: "Bookmark" }));
 
-    expect(getByRole("button", { name: "Remove bookmark" })).toBeTruthy();
+    expect(
+      getByRole("button", { name: "Bookmarked, remove bookmark" })
+    ).toBeTruthy();
     expect(rows.has("p1")).toBe(true);
     // The write's invalidation of `["bookmarks"]` reached this key: once on
     // mount, once after the toggle.

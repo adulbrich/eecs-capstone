@@ -269,13 +269,15 @@ describe("the bookmarks table", () => {
     renderTable();
     await waitFor(() =>
       expect(
-        within(rowFor("Two")).getByRole("button", { name: "Remove bookmark" })
+        within(rowFor("Two")).getByRole("button", {
+          name: "Bookmarked, remove bookmark",
+        })
       ).toBeTruthy()
     );
     // Right-aligned inside the Title cell, the same place /projects table mode
     // puts it, rather than a column of its own.
     const toggle = within(rowFor("Two")).getByRole("button", {
-      name: "Remove bookmark",
+      name: "Bookmarked, remove bookmark",
     });
     expect(toggle.className).toContain("ml-auto");
     expect(toggle.closest("td")).toBe(
@@ -293,10 +295,12 @@ describe("the bookmarks table", () => {
     renderTable();
     const toggle = () =>
       within(rowFor("Two")).getByRole("button", {
-        name: /^(Bookmark|Remove bookmark)$/u,
+        name: /^(Bookmark|Bookmarked, remove bookmark)$/u,
       });
     await waitFor(() =>
-      expect(toggle().getAttribute("aria-label")).toBe("Remove bookmark")
+      expect(toggle().getAttribute("aria-label")).toBe(
+        "Bookmarked, remove bookmark"
+      )
     );
 
     fireEvent.click(toggle());
@@ -318,7 +322,9 @@ describe("the bookmarks table", () => {
       })
     );
     await waitFor(() =>
-      expect(toggle().getAttribute("aria-label")).toBe("Remove bookmark")
+      expect(toggle().getAttribute("aria-label")).toBe(
+        "Bookmarked, remove bookmark"
+      )
     );
   });
 
@@ -327,15 +333,19 @@ describe("the bookmarks table", () => {
     renderTable();
     const toggle = () =>
       within(rowFor("Two")).getByRole("button", {
-        name: /^(Bookmark|Remove bookmark)$/u,
+        name: /^(Bookmark|Bookmarked, remove bookmark)$/u,
       });
     await waitFor(() =>
-      expect(toggle().getAttribute("aria-label")).toBe("Remove bookmark")
+      expect(toggle().getAttribute("aria-label")).toBe(
+        "Bookmarked, remove bookmark"
+      )
     );
 
     fireEvent.click(toggle());
     await waitFor(() => expect(toast.error).toHaveBeenCalledWith("Nope"));
-    expect(toggle().getAttribute("aria-label")).toBe("Remove bookmark");
+    expect(toggle().getAttribute("aria-label")).toBe(
+      "Bookmarked, remove bookmark"
+    );
     expect(titlesInOrder()).toEqual(["Ten", "Two", "Three", "Four"]);
   });
 });

@@ -49,7 +49,7 @@ test.describe("project bookmarks", () => {
       await waitForHydration(user);
 
       // The accessible name is the aria-label, which flips with the state; the
-      // visible text says "Bookmarked" while the label says "Remove bookmark".
+      // visible text says "Bookmarked" and the label adds what a press does.
       // Naming the label is what makes this assertion about the control the
       // screen reader announces rather than the glyph beside it.
       // Waited for, not just clicked. `BookmarkButton` flips its own label
@@ -60,7 +60,7 @@ test.describe("project bookmarks", () => {
         user.getByRole("button", { name: "Bookmark", exact: true }).click()
       );
       await expect(
-        user.getByRole("button", { name: "Remove bookmark" })
+        user.getByRole("button", { name: "Bookmarked, remove bookmark" })
       ).toBeVisible();
 
       await user.goto("/my/bookmarks");
@@ -77,10 +77,12 @@ test.describe("project bookmarks", () => {
       // before the click below flips it. Not a guard on `confirmed`, which
       // matches POST only and could never have armed on that GET fetch.
       await expect(
-        savedRow.getByRole("button", { name: "Remove bookmark" })
+        savedRow.getByRole("button", { name: "Bookmarked, remove bookmark" })
       ).toBeVisible();
       await confirmed(user, () =>
-        savedRow.getByRole("button", { name: "Remove bookmark" }).click()
+        savedRow
+          .getByRole("button", { name: "Bookmarked, remove bookmark" })
+          .click()
       );
       await expect(
         savedRow.getByRole("button", { name: "Bookmark", exact: true })
@@ -90,7 +92,7 @@ test.describe("project bookmarks", () => {
         savedRow.getByRole("button", { name: "Bookmark", exact: true }).click()
       );
       await expect(
-        savedRow.getByRole("button", { name: "Remove bookmark" })
+        savedRow.getByRole("button", { name: "Bookmarked, remove bookmark" })
       ).toBeVisible();
 
       const other = await otherContext.newPage();
@@ -106,7 +108,9 @@ test.describe("project bookmarks", () => {
       await user.goto(`/projects/${projectId}`);
       await waitForHydration(user);
       await confirmed(user, () =>
-        user.getByRole("button", { name: "Remove bookmark" }).click()
+        user
+          .getByRole("button", { name: "Bookmarked, remove bookmark" })
+          .click()
       );
       await expect(
         user.getByRole("button", { name: "Bookmark", exact: true })

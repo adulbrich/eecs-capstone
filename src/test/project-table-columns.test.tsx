@@ -346,7 +346,7 @@ describe("the public project table", () => {
       "projects/p1/a.webp"
     );
     const toggle = await within(title).findByRole("button", {
-      name: "Remove bookmark",
+      name: "Bookmarked, remove bookmark",
     });
     expect(toggle.closest("a")).toBeNull();
     expect(
