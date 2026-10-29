@@ -279,10 +279,10 @@ function ProjectDetail() {
         // Keyed so a navigation between two project pages remounts it: the
         // route component is reused across a param change (see QUIRKS), and
         // the panel holds the transition dialog's target and comment, which
-        // would otherwise be posted onto the next project. The sections that
-        // hold a draft load their own record on mount (#762), and the remount
-        // is also what clears each draft before the next project's load
-        // lands, so a Save in between cannot post A's draft onto B.
+        // would otherwise be posted onto the next project. The key protects
+        // the dialog; the reads are protected by their Query keys, which name
+        // the project, so a late answer for A lands in A's entry and never in
+        // B's section (#767).
         <StaffProjectPanel
           key={project.id}
           onChanged={() => router.invalidate()}

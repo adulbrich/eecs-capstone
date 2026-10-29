@@ -240,14 +240,14 @@ const CENSUS = new Map<string, { class: SeedClass; why: string }>([
     "src/components/staff-proposer-section.tsx: useState(proposer.email)",
     {
       class: "D",
-      why: "the proposer record the staff panel fetches in an effect, not loader data",
+      why: "the proposer record the staff panel reads through `useQuery`, not loader data; its query never refetches under the draft",
     },
   ],
   [
     "src/components/staff-proposer-section.tsx: useState(proposer.studentProposed)",
     {
       class: "D",
-      why: "the proposer record the staff panel fetches in an effect, not loader data",
+      why: "the proposer record the staff panel reads through `useQuery`, not loader data; its query never refetches under the draft",
     },
   ],
   [

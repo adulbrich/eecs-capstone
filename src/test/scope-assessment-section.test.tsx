@@ -1,12 +1,7 @@
 // @vitest-environment jsdom
-import {
-  cleanup,
-  fireEvent,
-  render,
-  screen,
-  waitFor,
-} from "@testing-library/react";
+import { cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { renderWithQueryClient } from "./shared/query-client";
 
 const server = vi.hoisted(() => ({
   assessProjectScope: vi.fn(),
@@ -38,14 +33,14 @@ const view: ScopeAssessmentView = {
 describe("ScopeAssessmentSection", () => {
   it("offers the assessment when there is none yet", async () => {
     server.getScopeAssessment.mockResolvedValue(null);
-    render(<ScopeAssessmentSection projectId="p1" />);
+    renderWithQueryClient(<ScopeAssessmentSection projectId="p1" />);
     expect(await screen.findByText(/Not assessed yet/)).toBeDefined();
     expect(screen.getByRole("button", { name: "Assess scope" })).toBeDefined();
   });
 
   it("renders both verdicts, the confidence label and the rationale", async () => {
     server.getScopeAssessment.mockResolvedValue(view);
-    render(<ScopeAssessmentSection projectId="p1" />);
+    renderWithQueryClient(<ScopeAssessmentSection projectId="p1" />);
     expect(await screen.findByText("Too large")).toBeDefined();
     expect(screen.getByText("About right")).toBeDefined();
     // Low confidence is where "high uncertainty" comes from: one number, one
@@ -58,7 +53,7 @@ describe("ScopeAssessmentSection", () => {
 
   it("says when the verdict is about an earlier version, and keeps showing it", async () => {
     server.getScopeAssessment.mockResolvedValue({ ...view, stale: true });
-    render(<ScopeAssessmentSection projectId="p1" />);
+    renderWithQueryClient(<ScopeAssessmentSection projectId="p1" />);
     expect(
       await screen.findByText(/assessed against an earlier version/i)
     ).toBeDefined();
@@ -70,7 +65,7 @@ describe("ScopeAssessmentSection", () => {
   it("runs the assessment on demand and renders what comes back", async () => {
     server.getScopeAssessment.mockResolvedValue(null);
     server.assessProjectScope.mockResolvedValue(view);
-    render(<ScopeAssessmentSection projectId="p1" />);
+    renderWithQueryClient(<ScopeAssessmentSection projectId="p1" />);
     fireEvent.click(
       await screen.findByRole("button", { name: "Assess scope" })
     );
@@ -87,7 +82,7 @@ describe("ScopeAssessmentSection", () => {
     server.assessProjectScope.mockRejectedValue(
       new Error("You have used all 10 scope assessments for this hour.")
     );
-    render(<ScopeAssessmentSection projectId="p1" />);
+    renderWithQueryClient(<ScopeAssessmentSection projectId="p1" />);
     fireEvent.click(
       await screen.findByRole("button", { name: "Assess scope" })
     );

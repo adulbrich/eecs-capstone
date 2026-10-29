@@ -10,19 +10,20 @@ The stack is fast-moving. TanStack Start, TanStack Router, Better Auth and Drizz
 
 1. [TanStack Start](#tanstack-start)
 2. [TanStack Router](#tanstack-router)
-3. [TanStack Form](#tanstack-form)
-4. [Better Auth](#better-auth)
-5. [Drizzle ORM + Postgres](#drizzle-orm--postgres)
-6. [Vitest test infrastructure](#vitest-test-infrastructure)
-7. [Biome / Ultracite and code style](#biome--ultracite-and-code-style)
-8. [Project conventions](#project-conventions)
-9. [Object storage (S3-compatible)](#object-storage-s3-compatible)
-10. [When you add a quirk](#when-you-add-a-quirk)
-11. [Inventory](#inventory)
-12. [Projects](#projects)
-13. [Amazon Bedrock](#amazon-bedrock)
-14. [Site traffic](#site-traffic)
-15. [Site metadata](#site-metadata)
+3. [TanStack Query](#tanstack-query)
+4. [TanStack Form](#tanstack-form)
+5. [Better Auth](#better-auth)
+6. [Drizzle ORM + Postgres](#drizzle-orm--postgres)
+7. [Vitest test infrastructure](#vitest-test-infrastructure)
+8. [Biome / Ultracite and code style](#biome--ultracite-and-code-style)
+9. [Project conventions](#project-conventions)
+10. [Object storage (S3-compatible)](#object-storage-s3-compatible)
+11. [When you add a quirk](#when-you-add-a-quirk)
+12. [Inventory](#inventory)
+13. [Projects](#projects)
+14. [Amazon Bedrock](#amazon-bedrock)
+15. [Site traffic](#site-traffic)
+16. [Site metadata](#site-metadata)
 
 ---
 
@@ -114,13 +115,29 @@ A `useState` initializer never re-runs, so an input seeded from loader data is c
 
 A match a preload created is judged against `preloadStaleTime`, also when the click then commits it, so within the window hover and click cost one fetch and the click skips the blocking reload. The router default is `0`; `/projects` and `/projects/$projectId` set 5 minutes ([ADR-0062](./adr/0062-a-preload-is-kept-only-where-no-form-seeds-from-the-loader.md)). A preloaded match is garbage-collected after `preloadGcTime`, default 5 minutes, which caps any longer window. Once committed, a revisit follows `staleTime`, which stays `0`. `router.clearCache({ filter })` drops cached and preloaded matches and aborts a preload in flight; filter on `routeId` as well as params, since a pathless layout's match carries its child's params.
 
-### A redirect thrown from a `queryFn` navigates the tab
-
-`setupRouterSsrQueryIntegration` in `src/router.tsx` leaves `handleRedirects` on, so a TanStack redirect thrown by any query navigates the tab. `requireUser` refuses with `redirect({ to: "/sign-in" })`, so a background refetch after a session ends carries the tab to `/sign-in`, unsaved edits included. A query over a `requireUser` server function catches `isRedirect` and returns an empty result, as `notification-bell.tsx` does.
-
 ### `Route.useSearch()` lags `navigate()` by the loader round trip
 
 The URL changes at once, but `useSearch` reads the rendered match, and a search change that alters `loaderDeps` renders only when its loader resolves. Code that writes a search param and watches it for outside changes sees its own write come back late. `useDebouncedDraft` compares against what it last committed; `src/lib/__tests__/use-debounced-draft.test.tsx` covers the echo, a cancelled commit, and Back and Forward.
+
+---
+
+## TanStack Query
+
+### Page data comes from the loader; a component's own read goes through `useQuery`
+
+A route's own data comes from its loader and the router's cache ([ADR-0066](./adr/0066-page-data-stays-on-loaders-and-component-reads-go-through-query.md)). A read a component makes for itself after the page appears goes through `useQuery`, never a `useEffect` with state, with a key naming the record (and the viewer, for the viewer's own data) and a `queryFn` that catches `isRedirect`; both entries are below. A write invalidates the key rather than calling a reload by hand. The client in `src/integrations/tanstack-query/root-provider.tsx` sets `staleTime: 30_000` and keeps refetch on window focus, which the header's borrow-list and bookmark counts rely on to pick up another tab's change. The staff panel's keys are built once in `src/lib/staff-project-queries.ts`.
+
+### A query that fills a draft never refetches on its own
+
+A query whose data seeds an editable draft spreads `DRAFT_QUERY_OPTIONS` (`src/lib/staff-project-queries.ts`). `staleTime: Infinity` with focus and reconnect refetch off stops anything refetching under an open draft; a failed fetch marks a query invalidated, so `staleTime` alone does not. `gcTime: 0` drops the cache with the component, since a revisit within five minutes otherwise seeds from the cached copy (ADR-0062). `useSeedOnArrival` seeds the draft during render on the first arrival, so no frame enables Save beside a blank draft; only the section's own save reseeds it, through `refetchAfterSave`. A staff read that fills no draft spreads `STAFF_READ_OPTIONS`, which rereads on every mount.
+
+### A redirect thrown from a `queryFn` navigates the tab
+
+`setupRouterSsrQueryIntegration` in `src/router.tsx` leaves `handleRedirects` on, so a TanStack redirect thrown by any query navigates the tab. `requireUser` refuses with `redirect({ to: "/sign-in" })`, so a background refetch after a session ends carries the tab to `/sign-in`, unsaved edits included. A query over a `requireUser` server function catches `isRedirect` and returns an empty result, as `notification-bell.tsx` does. A staff read cannot: an empty answer reads as a blank record and enables a Save over it, so `staffRead` (`src/lib/staff-project-queries.ts`) rethrows the redirect as an ordinary error and the section reports a failed load.
+
+### A TanStack Query key for the viewer's own data carries their user id
+
+The query cache outlives the session that filled it, and a session can end without a reload (another tab, expiry, a ban), so a key like `["notifications"]` shows the next user the last one's rows. Key per-viewer reads on `useSignedInUserId` (`src/lib/use-signed-in.ts`) with `enabled: userId !== undefined`, as `notification-bell.tsx` does. Writers invalidate the bare prefix (`["cart"]`), which reaches every viewer's entry.
 
 ---
 
@@ -495,10 +512,6 @@ Component files are `kebab-case.tsx`, and cross-directory imports inside `src/` 
 
 The git rules (stage by name, never commit to `main`, no session links on a remote)
 bind every turn, so they live in [`../AGENTS.md`](../AGENTS.md) instead of here.
-
-### A TanStack Query key for the viewer's own data carries their user id
-
-The query cache outlives the session that filled it, and a session can end without a reload (another tab, expiry, a ban), so a key like `["notifications"]` shows the next user the last one's rows. Key per-viewer reads on `useSignedInUserId` (`src/lib/use-signed-in.ts`) with `enabled: userId !== undefined`, as `notification-bell.tsx` does. Writers invalidate the bare prefix (`["cart"]`), which reaches every viewer's entry.
 
 ### Every search field is `searchQuerySchema`, and it clamps rather than rejects
 

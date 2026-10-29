@@ -1,12 +1,7 @@
 // @vitest-environment jsdom
-import {
-  cleanup,
-  fireEvent,
-  render,
-  screen,
-  waitFor,
-} from "@testing-library/react";
+import { cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { renderWithQueryClient } from "./shared/query-client";
 
 const server = vi.hoisted(() => ({
   getSimilarity: vi.fn(),
@@ -49,7 +44,7 @@ const COMPUTED: SimilarityView = {
 
 async function renderWith(view: SimilarityView) {
   server.getSimilarity.mockResolvedValue(view);
-  render(<SimilaritySection projectId="p1" />);
+  renderWithQueryClient(<SimilaritySection projectId="p1" />);
   await waitFor(() => expect(screen.queryByText("Loading...")).toBeNull());
 }
 
