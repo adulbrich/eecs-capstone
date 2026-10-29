@@ -111,7 +111,9 @@ describe("BookmarkButton", () => {
     await click(await findByRole("button", { name: "Bookmark" }));
     await answer(false);
 
-    expect(getByRole("button", { name: "Remove bookmark" })).toBeTruthy();
+    expect(
+      getByRole("button", { name: "Bookmarked, remove bookmark" })
+    ).toBeTruthy();
     expect(rows.has("p1")).toBe(true);
   });
 
@@ -124,13 +126,17 @@ describe("BookmarkButton", () => {
 
     await click(await findByRole("button", { name: "Bookmark" }));
     await answer(false);
-    expect(getByRole("button", { name: "Remove bookmark" })).toBeTruthy();
+    expect(
+      getByRole("button", { name: "Bookmarked, remove bookmark" })
+    ).toBeTruthy();
 
     await act(async () => {
       finishWrite?.();
       await settle();
     });
-    expect(getByRole("button", { name: "Remove bookmark" })).toBeTruthy();
+    expect(
+      getByRole("button", { name: "Bookmarked, remove bookmark" })
+    ).toBeTruthy();
   });
 
   it("shows what the read returns when no click races it", async () => {
@@ -140,7 +146,9 @@ describe("BookmarkButton", () => {
 
     await answer(true);
 
-    expect(getByRole("button", { name: "Remove bookmark" })).toBeTruthy();
+    expect(
+      getByRole("button", { name: "Bookmarked, remove bookmark" })
+    ).toBeTruthy();
   });
 
   it("drops the previous project's read after the id changes", async () => {
@@ -159,14 +167,18 @@ describe("BookmarkButton", () => {
       </QueryClientProvider>
     );
     await answer(true);
-    expect(view.getByRole("button", { name: "Remove bookmark" })).toBeTruthy();
+    expect(
+      view.getByRole("button", { name: "Bookmarked, remove bookmark" })
+    ).toBeTruthy();
 
     await act(async () => {
       answerForP1?.(false);
       await settle();
     });
 
-    expect(view.getByRole("button", { name: "Remove bookmark" })).toBeTruthy();
+    expect(
+      view.getByRole("button", { name: "Bookmarked, remove bookmark" })
+    ).toBeTruthy();
   });
 
   it("writes once for a double click", async () => {
@@ -183,7 +195,9 @@ describe("BookmarkButton", () => {
     await act(settle);
 
     expect(writes).toBe(1);
-    expect(getByRole("button", { name: "Remove bookmark" })).toBeTruthy();
+    expect(
+      getByRole("button", { name: "Bookmarked, remove bookmark" })
+    ).toBeTruthy();
   });
 
   it("still toggles on a settled page", async () => {
@@ -194,7 +208,9 @@ describe("BookmarkButton", () => {
 
     await click(getByRole("button", { name: "Bookmark" }));
 
-    expect(getByRole("button", { name: "Remove bookmark" })).toBeTruthy();
+    expect(
+      getByRole("button", { name: "Bookmarked, remove bookmark" })
+    ).toBeTruthy();
     expect(rows.has("p1")).toBe(true);
     // The write's invalidation of `["bookmarks"]` reached this key: once on
     // mount, once after the toggle.

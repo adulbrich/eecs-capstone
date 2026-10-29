@@ -5,7 +5,7 @@ import { toast } from "sonner";
 import { errorMessage } from "#/lib/error-message";
 import { useSignedInUserId } from "#/lib/use-signed-in";
 import { isBookmarked } from "#/server/bookmarks";
-import { BookmarkIcon, useWriteBookmark } from "./bookmark-set";
+import { BookmarkIcon, bookmarkLabel, useWriteBookmark } from "./bookmark-set";
 import { Button } from "./ui/button";
 
 export function BookmarkButton({ projectId }: { projectId: string }) {
@@ -64,13 +64,14 @@ export function BookmarkButton({ projectId }: { projectId: string }) {
     }
   }
 
+  const label = bookmarkLabel(bookmarked);
   return (
     <Button
-      aria-label={bookmarked ? "Remove bookmark" : "Bookmark"}
+      aria-label={label}
       disabled={loading}
       onClick={() => void toggle()}
       size="sm"
-      title={bookmarked ? "Remove bookmark" : "Bookmark"}
+      title={label}
       type="button"
       variant="outline"
     >
@@ -78,7 +79,8 @@ export function BookmarkButton({ projectId }: { projectId: string }) {
       {/*
         Text from `md` only: on a phone this is the small icon button right
         of the project title (#400). The aria-label above is the accessible
-        name at every width, so no role query changes.
+        name at every width, so no role query changes, and it starts with
+        this text so the two never disagree (#789).
       */}
       <span className="hidden md:inline">
         {bookmarked ? "Bookmarked" : "Bookmark"}

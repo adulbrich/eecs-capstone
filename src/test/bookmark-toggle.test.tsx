@@ -77,7 +77,7 @@ describe("BookmarkToggle", () => {
   it("reads each row's state from one fetch of the viewer's ids", async () => {
     render(<Listing />);
     expect(
-      await screen.findByRole("button", { name: "Remove bookmark" })
+      await screen.findByRole("button", { name: "Bookmarked, remove bookmark" })
     ).toBeTruthy();
     expect(screen.getByRole("button", { name: "Bookmark" })).toBeTruthy();
     expect(server.listMyBookmarkIds).toHaveBeenCalledTimes(1);
@@ -86,7 +86,7 @@ describe("BookmarkToggle", () => {
   it("flips on click and tells the server", async () => {
     render(<Listing />);
     const remove = await screen.findByRole("button", {
-      name: "Remove bookmark",
+      name: "Bookmarked, remove bookmark",
     });
     remove.click();
     await waitFor(() =>
@@ -103,7 +103,7 @@ describe("BookmarkToggle", () => {
       })
     );
     expect(
-      screen.getAllByRole("button", { name: "Remove bookmark" })
+      screen.getAllByRole("button", { name: "Bookmarked, remove bookmark" })
     ).toHaveLength(1);
   });
 
@@ -114,12 +114,12 @@ describe("BookmarkToggle", () => {
     });
     render(<Listing />);
     const remove = await screen.findByRole("button", {
-      name: "Remove bookmark",
+      name: "Bookmarked, remove bookmark",
     });
     remove.click();
     await waitFor(() => expect(server.removeBookmark).toHaveBeenCalled());
     expect(
-      await screen.findByRole("button", { name: "Remove bookmark" })
+      await screen.findByRole("button", { name: "Bookmarked, remove bookmark" })
     ).toBeTruthy();
   });
 
@@ -141,7 +141,7 @@ describe("BookmarkToggle", () => {
       </BookmarkSetProvider>
     );
     const button = await screen.findByRole("button", {
-      name: "Remove bookmark",
+      name: "Bookmarked, remove bookmark",
     });
     // A button inside an anchor is invalid HTML and a nested interactive
     // control to axe, which is why the card is no longer an `asChild` link.

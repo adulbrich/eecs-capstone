@@ -110,7 +110,7 @@ describe("BookmarksButton", () => {
     );
     await findByRole("link", { name: "Bookmarks 2" });
     fireEvent.click(await findByRole("button", { name: "Bookmark" }));
-    await findByRole("button", { name: "Remove bookmark" });
+    await findByRole("button", { name: "Bookmarked, remove bookmark" });
     expect(await findByRole("link", { name: "Bookmarks 3" })).toBeTruthy();
   });
 });

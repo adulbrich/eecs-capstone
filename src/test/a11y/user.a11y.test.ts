@@ -78,7 +78,11 @@ test("projects list, signed in, with bookmark controls", async ({ page }) => {
   await page.goto("/projects");
   await waitForHydration(page);
   await expect(
-    page.getByRole("button", { name: /^(Bookmark|Remove bookmark)$/u }).first()
+    page
+      .getByRole("button", {
+        name: /^(Bookmark|Bookmarked, remove bookmark)$/u,
+      })
+      .first()
   ).toBeVisible();
   await expect(page.getByRole("link", { name: /^Bookmarks/u })).toBeVisible();
   const propose = page.getByRole("link", { name: "Propose project" });
@@ -121,7 +125,7 @@ test("@smoke an outline Button and an outline asChild Link read the same", async
   await page.goto(`/projects/${projectId}`);
   await waitForHydration(page);
   const button = page.getByRole("button", {
-    name: /^(Bookmark|Remove bookmark)$/u,
+    name: /^(Bookmark|Bookmarked, remove bookmark)$/u,
   });
   // Scoped to the header's action row, because the page carries three Edit
   // links: this one, a full-width copy below the image for phone widths, and
@@ -232,7 +236,11 @@ test("projects table, signed in, with bookmark controls", async ({ page }) => {
   await page.goto("/projects?view=table");
   await waitForHydration(page);
   await expect(
-    page.getByRole("button", { name: /^(Bookmark|Remove bookmark)$/u }).first()
+    page
+      .getByRole("button", {
+        name: /^(Bookmark|Bookmarked, remove bookmark)$/u,
+      })
+      .first()
   ).toBeVisible();
   await checkA11y(page);
 });
@@ -281,16 +289,22 @@ test("my bookmarks, as a table with a saved project", async ({
   await page.goto(`/projects/${bookmarkProjectId}`);
   await waitForHydration(page);
   await initialRead;
-  // Only now does the label mean anything. "Remove bookmark" here is a retry
+  // Only now does the label mean anything. "Bookmarked, remove bookmark" here is a retry
   // of a run that failed after saving: global-setup clears this slot's rows
   // once per run, not once per attempt.
-  const remove = page.getByRole("button", { name: "Remove bookmark" });
+  const remove = page.getByRole("button", {
+    name: "Bookmarked, remove bookmark",
+  });
   if ((await remove.count()) === 0) {
     await page.getByRole("button", { name: "Bookmark", exact: true }).click();
   }
   // The label flips before the write lands and the button is disabled
   // until it does; navigating on the label alone aborts the request.
   await expect(remove).toBeEnabled();
+  // The only scan of a bookmarked `BookmarkButton` at a width that shows its
+  // text, so the one where axe's `label-content-name-mismatch` can see the
+  // name and the visible word disagree (#789).
+  await checkA11y(page);
   await page.goto("/my/bookmarks");
   await waitForHydration(page);
   await expect(page.getByRole("table", { name: "My bookmarks" })).toBeVisible();
@@ -301,13 +315,15 @@ test("my bookmarks, as a table with a saved project", async ({
   // with it, so there was never an un-bookmarked row to check.
   //
   // Held by the title link, which names the row this test saved and survives
-  // the click. A locator filtered on "Remove bookmark" would not: it
+  // the click. A locator filtered on "Bookmarked, remove bookmark" would not: it
   // re-resolves afterwards and lands on whichever row still has one.
   const row = page
     .getByRole("row")
     .filter({ has: page.locator(`a[href="/projects/${bookmarkProjectId}"]`) });
   const before = await page.getByRole("row").count();
-  await row.getByRole("button", { name: "Remove bookmark" }).click();
+  await row
+    .getByRole("button", { name: "Bookmarked, remove bookmark" })
+    .click();
   // Enabled, not merely visible. `BookmarkToggle` flips its label from the
   // optimistic set update and stays disabled while the write is in flight, and
   // axe exempts a disabled control from colour contrast, so scanning on the

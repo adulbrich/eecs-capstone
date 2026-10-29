@@ -142,13 +142,22 @@ export function BookmarkSetProvider({ children }: { children: ReactNode }) {
 }
 
 /**
+ * The accessible name of both bookmark controls. `BookmarkButton` shows
+ * "Bookmarked" from `md` up, so the set name starts with that word for voice
+ * control (WCAG 2.5.3, #789) and then says what a press does.
+ */
+export function bookmarkLabel(bookmarked: boolean): string {
+  return bookmarked ? "Bookmarked, remove bookmark" : "Bookmark";
+}
+
+/**
  * The icon-only bookmark control for a listing row. Renders nothing until the
  * enclosing `BookmarkSetProvider` has a set, which covers every case in which
  * there is nobody to bookmark for: outside a provider, before mount, signed
  * out, or before the ids arrive.
  *
- * The labels match `BookmarkButton` on the detail page, so a role query for
- * "Bookmark" or "Remove bookmark" finds either.
+ * Named by `bookmarkLabel`, as `BookmarkButton` on the detail page is, so a
+ * role query for either state finds either control.
  */
 export function BookmarkToggle({
   className,
@@ -164,7 +173,7 @@ export function BookmarkToggle({
     return null;
   }
   const bookmarked = set.has(projectId);
-  const label = bookmarked ? "Remove bookmark" : "Bookmark";
+  const label = bookmarkLabel(bookmarked);
 
   async function toggle() {
     if (!set) {
