@@ -38,6 +38,13 @@ updates:
       # noUnnecessaryConditions flags every match guard (#599).
       - dependency-name: "@biomejs/biome"
         versions: ["2.5.14"]
+      # Biome 2.6 renamed useSortedClasses, so ultracite 8.0 fails to load
+      # under it and 8.1 switches on rules with about 1500 hits. The two move
+      # together in #822, which removes this hold.
+      - dependency-name: "@biomejs/biome"
+        versions: [">=2.6.0"]
+      - dependency-name: "ultracite"
+        versions: [">=8.1.0"]
       # TypeScript 7 ships no compiler API yet, and the server-function scanner
       # test needs one (#316).
       - dependency-name: "typescript"
