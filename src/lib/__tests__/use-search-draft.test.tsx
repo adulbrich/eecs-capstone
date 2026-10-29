@@ -28,6 +28,8 @@ afterEach(cleanup);
 function makeRouter(initialEntries: string[]) {
   const pending = new Map<string, () => void>();
   const commits: string[] = [];
+  // What the box showed on each render, to catch a frame that flashed.
+  const shown: string[] = [];
 
   function SearchBox() {
     const navigate = useNavigate();
@@ -39,6 +41,7 @@ function makeRouter(initialEntries: string[]) {
       [navigate]
     );
     const [draft, setDraft] = useSearchDraft(commit, DELAY);
+    shown.push(draft);
     return (
       <input
         aria-label="Search"
@@ -78,7 +81,7 @@ function makeRouter(initialEntries: string[]) {
       initialIndex: initialEntries.length - 1,
     }),
   });
-  return { router, commits, pending };
+  return { router, commits, pending, shown };
 }
 
 async function settle(ms = 0) {
@@ -99,6 +102,16 @@ async function start(initialEntries: string[]) {
   });
   await screen.findByLabelText("Search");
   return made;
+}
+
+/** Answers the held loader for `key` once it has been asked. */
+async function answer(made: ReturnType<typeof makeRouter>, key: string) {
+  await vi.waitFor(() => expect(made.pending.has(key)).toBe(true));
+  await act(async () => {
+    made.pending.get(key)?.();
+    made.pending.delete(key);
+    await Promise.resolve();
+  });
 }
 
 const box = () => screen.getByLabelText("Search") as HTMLInputElement;
@@ -126,8 +139,11 @@ describe("useSearchDraft", () => {
   });
 
   it("commits nothing over an older entry that holds the last committed q", async () => {
-    // History foo, bar, foo; the last commit was foo. A draft typed after it,
-    // then Back twice inside the debounce, lands on the first foo.
+    // History foo, bar, foo, and the box sits on the last foo. A draft typed
+    // there, then Back twice inside the debounce, lands on the first foo.
+    // The earlier entries were never loaded in this tab, as after a reload:
+    // had the box committed them here, the router would show their cached
+    // matches at once and `Route.useSearch()` would not lag either.
     const { router, commits } = await start([
       "/projects?q=foo",
       "/projects?q=bar",
@@ -202,6 +218,24 @@ describe("useSearchDraft", () => {
     expect(router.state.location.pathname).toBe("/admin");
     expect(box().value).toBe("arduino");
     expect(commits).toEqual([]);
+  });
+
+  it("shows the URL's q from its first frame when a click brings it in", async () => {
+    // On a mount by client navigation `resolvedLocation` still names the page
+    // being left (QUIRKS, the traffic writer entry), so a hold keyed on it
+    // mounted the box empty.
+    const made = makeRouter(["/admin"]);
+    render(<RouterProvider router={made.router} />);
+    await answer(made, "detail");
+    await act(() => {
+      void made.router.navigate({ to: "/projects", search: { q: "arduino" } });
+      return Promise.resolve();
+    });
+    await answer(made, "arduino");
+    await screen.findByLabelText("Search");
+
+    expect(made.shown[0]).toBe("arduino");
+    expect(box().value).toBe("arduino");
   });
 
   it("reads a hand-typed numeric q as the route does", async () => {
