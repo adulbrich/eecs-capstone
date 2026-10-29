@@ -188,7 +188,7 @@ describe("InventoryLifecyclePanel: the status override", () => {
       { button: 0, ctrlKey: false, pointerType: "mouse" }
     );
     fireEvent.click(
-      await screen.findByRole("option", { name: next.replace(/_/g, " ") })
+      await screen.findByRole("option", { name: next.replace(/_/gu, " ") })
     );
   }
 
@@ -621,7 +621,7 @@ describe("InventoryLifecyclePanel edit log", () => {
     } as never);
     renderPanel();
 
-    expect(await screen.findByText(/Grace Hopper/)).toBeTruthy();
+    expect(await screen.findByText(/Grace Hopper/u)).toBeTruthy();
     expect(server.listInventoryItemEditLog).toHaveBeenCalledWith({
       data: { itemId: "item-1" },
     });
@@ -642,7 +642,7 @@ describe("InventoryLifecyclePanel edit log", () => {
       rows: [row],
     } as never);
     const view = renderPanel();
-    expect(await screen.findByText(/Grace Hopper/)).toBeTruthy();
+    expect(await screen.findByText(/Grace Hopper/u)).toBeTruthy();
     server.listInventoryItemEditLog.mockRejectedValueOnce(new Error("down"));
 
     await view.queryClient.refetchQueries({
@@ -652,7 +652,7 @@ describe("InventoryLifecyclePanel edit log", () => {
     await waitFor(() =>
       expect(server.listInventoryItemEditLog).toHaveBeenCalledTimes(2)
     );
-    expect(screen.getByText(/Grace Hopper/)).toBeTruthy();
+    expect(screen.getByText(/Grace Hopper/u)).toBeTruthy();
     expect(screen.queryByText("The edit log could not be loaded.")).toBeNull();
   });
 
@@ -671,6 +671,6 @@ describe("InventoryLifecyclePanel edit log", () => {
     // A new key remounts the panel on the same client, as a revisit does.
     view.rerender(panel({}, "again"));
 
-    expect(await screen.findByText(/Grace Hopper/)).toBeTruthy();
+    expect(await screen.findByText(/Grace Hopper/u)).toBeTruthy();
   });
 });

@@ -49,7 +49,7 @@ export async function searchProjectsForRequest(data: SearchProjectsInput) {
  * rather than fixed in passing (#476).
  */
 function escapeLikePattern(value: string): string {
-  return value.replace(/[\\%_]/g, (char) => `\\${char}`);
+  return value.replace(/[\\%_]/gu, (char) => `\\${char}`);
 }
 
 /**
@@ -93,6 +93,7 @@ function orderBySql(
   }
 ): SQL {
   const { interestsVector, listingDate, relevanceOrder } = parts;
+  // biome-ignore-start lint/suspicious/noUnnecessaryConditions: Biome 2.6 cannot read `order` through z.infer and calls every case unreachable
   switch (order) {
     case "newest":
       return sql`${listingDate} DESC`;
@@ -136,6 +137,7 @@ function orderBySql(
       // of silently rendering in relevance order (#475).
       return assertNever(order);
   }
+  // biome-ignore-end lint/suspicious/noUnnecessaryConditions: see the start
 }
 
 export async function searchProjectsImpl(

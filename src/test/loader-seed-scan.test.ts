@@ -423,23 +423,23 @@ function splitTopLevel(text: string, stops = ""): string[] {
 /** One line, no padding inside brackets, no trailing comma: Biome's wrap undone. */
 function normalize(text: string): string {
   return text
-    .replace(/\s+/g, " ")
-    .replace(/([([{]) /g, "$1")
-    .replace(/,? ?([)\]}])/g, "$1")
+    .replace(/\s+/gu, " ")
+    .replace(/([([{]) /gu, "$1")
+    .replace(/,? ?([)\]}])/gu, "$1")
     .trim();
 }
 
 const PRIMITIVE =
-  /^(?:-?\d[\d_]*(?:\.\d+)?|true|false|null|undefined|"(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*'|`[^`$]*`)$/;
-const EMPTY_COLLECTION = /^new (?:Set|Map)(?:<[^()]*>)?\(\)$/;
-const LAZY = /^\(\)\s*=>\s*([\s\S]*)$/;
-const PROPERTY = /^\s*(?:[\w$]+|"[^"]*"|'[^']*')\s*:\s*([\s\S]*)$/;
+  /^(?:-?\d[\d_]*(?:\.\d+)?|true|false|null|undefined|"(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*'|`[^`$]*`)$/u;
+const EMPTY_COLLECTION = /^new (?:Set|Map)(?:<[^()]*>)?\(\)$/u;
+const LAZY = /^\(\)\s*=>\s*([\s\S]*)$/u;
+const PROPERTY = /^\s*(?:[\w$]+|"[^"]*"|'[^']*')\s*:\s*([\s\S]*)$/u;
 // One named type, so `[] as Row[] && loaderData.rows` is not a literal. Its
 // type arguments are names, commas and `[]` only, so the group closes at the
 // first `>` and cannot reach across an operator into a second `as A<B>`; a
 // nested or structural type argument reads as a seed, which is the safe way.
 const ASSERTION =
-  /^\s+(?:satisfies|as)\s+(?:const|[\w$.]+(?:<[\w$.,\s[\]]*>)?(?:\[\])*)\s*$/;
+  /^\s+(?:satisfies|as)\s+(?:const|[\w$.]+(?:<[\w$.,\s[\]]*>)?(?:\[\])*)\s*$/u;
 
 /**
  * A plain literal, which cannot carry loader data: a primitive, an empty
@@ -502,13 +502,13 @@ interface Seed {
  */
 function opensRegex(source: string, at: number): boolean {
   let i = at - 1;
-  while (i >= 0 && /\s/.test(source[i])) {
+  while (i >= 0 && /\s/u.test(source[i])) {
     i--;
   }
   return (
     i < 0 ||
     "(,=:[!&|?{};+-*%~^".includes(source[i]) ||
-    /\breturn$/.test(source.slice(Math.max(0, i - 6), i + 1))
+    /\breturn$/u.test(source.slice(Math.max(0, i - 6), i + 1))
   );
 }
 
@@ -603,9 +603,9 @@ function blankComments(source: string): string {
   return out.join("");
 }
 
-const HOOK = /\b(useState|useRef|useReducer)\s*(?=[<(])/g;
-const FORM_DEFAULTS = /\bdefaultValues\s*([:,}])/g;
-const UNCONTROLLED = /\b(defaultValue|defaultChecked)=([{"'])/g;
+const HOOK = /\b(useState|useRef|useReducer)\s*(?=[<(])/gu;
+const FORM_DEFAULTS = /\bdefaultValues\s*([:,}])/gu;
+const UNCONTROLLED = /\b(defaultValue|defaultChecked)=([{"'])/gu;
 
 function hookSeeds(source: string): Seed[] {
   const seeds: Seed[] = [];
@@ -614,7 +614,7 @@ function hookSeeds(source: string): Seed[] {
     let open = match.index + match[0].length;
     if (source[open] === "<") {
       open = closeOf(source, open) + 1;
-      while (/\s/.test(source[open] ?? "")) {
+      while (/\s/u.test(source[open] ?? "")) {
         open++;
       }
     }
@@ -673,7 +673,7 @@ function* sourceFiles(dir: string): Generator<string> {
       if (path !== TEST_DIR && entry.name !== "__tests__") {
         yield* sourceFiles(path);
       }
-    } else if (/\.tsx?$/.test(entry.name) && !entry.name.includes(".test.")) {
+    } else if (/\.tsx?$/u.test(entry.name) && !entry.name.includes(".test.")) {
       yield path;
     }
   }
@@ -971,7 +971,7 @@ describe("the stale reload mode the census rests on", () => {
       readFileSync(join(SRC_DIR, "router.tsx"), "utf8")
     );
     expect(
-      /\bdefaultStaleReloadMode:\s*"blocking"/.test(router),
+      /\bdefaultStaleReloadMode:\s*"blocking"/u.test(router),
       `src/router.tsx no longer sets defaultStaleReloadMode: "blocking".\n${remedy}`
     ).toBe(true);
   });
@@ -981,7 +981,7 @@ describe("the stale reload mode the census rests on", () => {
     // spread into a route carries its staleReloadMode with it.
     const overrides = [...sourceFiles(SRC_DIR)]
       .filter((path) =>
-        /\bstaleReloadMode\b/.test(blankComments(readFileSync(path, "utf8")))
+        /\bstaleReloadMode\b/u.test(blankComments(readFileSync(path, "utf8")))
       )
       .map((path) => relative(process.cwd(), path))
       .sort();
@@ -1009,7 +1009,7 @@ describe("the preload window ADR-0062 allows", () => {
       readFileSync(join(SRC_DIR, "router.tsx"), "utf8")
     );
     expect(
-      /\bdefaultPreloadStaleTime:\s*0\s*,/.test(router),
+      /\bdefaultPreloadStaleTime:\s*0\s*,/u.test(router),
       "src/router.tsx no longer sets defaultPreloadStaleTime: 0, which opts\n" +
         "every route into a preload window. ADR-0062 allows one only on a page\n" +
         "that seeds no form from its loader; set it per route instead."
@@ -1018,8 +1018,8 @@ describe("the preload window ADR-0062 allows", () => {
 
   it("is kept only by a route whose page no census reason names", () => {
     // Any value but a literal zero counts, so a named constant is a window.
-    const WINDOW = /\bpreloadStaleTime:\s*([^,}\n]+)/;
-    const ROUTE_PATH = /\bcreateFileRoute\(\s*["']([^"']+)["']/;
+    const WINDOW = /\bpreloadStaleTime:\s*([^,}\n]+)/u;
+    const ROUTE_PATH = /\bcreateFileRoute\(\s*["']([^"']+)["']/u;
     const named: string[] = [];
     for (const path of sourceFiles(join(SRC_DIR, "routes"))) {
       const code = blankComments(readFileSync(path, "utf8"));
@@ -1031,11 +1031,11 @@ describe("the preload window ADR-0062 allows", () => {
       // `/_public/projects/` is the page at `/projects`: no pathless layout
       // is part of the URL a census reason names, nor is the slash.
       const page =
-        routeId.replace(/^(?:\/_[^/]+)+/, "").replace(/\/$/, "") || "/";
-      const escaped = page.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+        routeId.replace(/^(?:\/_[^/]+)+/u, "").replace(/\/$/u, "") || "/";
+      const escaped = page.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&");
       // Bounded on both sides: `/projects` is not named by
       // `/admin/projects` nor by `/projects/$projectId/edit`.
-      const names = new RegExp(`(?<![\\w/$])${escaped}(?![\\w/$])`);
+      const names = new RegExp(`(?<![\\w/$])${escaped}(?![\\w/$])`, "u");
       for (const [site, { why }] of CENSUS) {
         if (names.test(why)) {
           named.push(`${relative(process.cwd(), path)} (${page}): ${site}`);

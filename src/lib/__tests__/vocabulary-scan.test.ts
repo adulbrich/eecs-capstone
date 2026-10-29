@@ -270,7 +270,7 @@ describe("a file it cannot read fails rather than passing", () => {
     // The defect this guards against is the one server-fn-scan.ts records: a
     // tree the parser gave up on is empty, and an empty tree looks exactly
     // like a clean file.
-    expect(() => copiesIn("const x = (((;")).toThrow(/did not parse/);
+    expect(() => copiesIn("const x = (((;")).toThrow(/did not parse/u);
   });
 
   it("finds no vocabulary in a file that declares none", () => {

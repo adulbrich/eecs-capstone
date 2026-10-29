@@ -17,7 +17,7 @@ import { describe, expect, it } from "vitest";
  */
 
 const SRC_DIR = join(process.cwd(), "src");
-const CAST = /\(\s*\w+\s+as\s+Error\s*\)\s*\.\s*message/;
+const CAST = /\(\s*\w+\s+as\s+Error\s*\)\s*\.\s*message/u;
 
 function* sourceFiles(dir: string): Generator<string> {
   for (const entry of readdirSync(dir, { withFileTypes: true })) {

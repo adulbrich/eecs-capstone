@@ -44,7 +44,7 @@ describe("CategoryTypeCombobox", () => {
       target: { value: "technology" },
     });
     await screen.findByRole("option", { name: "Technology" });
-    expect(screen.queryByText(/^Create type/)).toBeNull();
+    expect(screen.queryByText(/^Create type/u)).toBeNull();
   });
 
   it("explains the empty list when there are no types yet", async () => {

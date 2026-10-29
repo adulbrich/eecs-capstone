@@ -175,7 +175,7 @@ describe("ProjectForm AI review without a project", () => {
     }) as HTMLButtonElement;
     expect(button.disabled).toBe(true);
 
-    fireEvent.change(getByLabelText(/Title/), {
+    fireEvent.change(getByLabelText(/Title/u), {
       target: { value: "A real title" },
     });
 

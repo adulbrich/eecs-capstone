@@ -118,7 +118,7 @@ export function ProjectPrivatePanel({
 
       {notes && (
         <PanelSection title={PRIVATE_NOTES_LABEL}>
-          <p className="whitespace-pre-wrap text-sm">{notes}</p>
+          <p className="text-sm whitespace-pre-wrap">{notes}</p>
         </PanelSection>
       )}
 

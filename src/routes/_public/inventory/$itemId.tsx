@@ -52,7 +52,7 @@ function ItemDetail() {
   return (
     <div className="mx-auto max-w-4xl px-4 py-6 md:p-8">
       <Link
-        className="text-muted-foreground text-sm hover:text-foreground hover:underline"
+        className="text-muted-foreground hover:text-foreground text-sm hover:underline"
         to="/inventory"
       >
         ← All inventory
@@ -67,7 +67,7 @@ function ItemDetail() {
           )}
         </div>
         <div>
-          <h1 className="font-semibold text-2xl">{item.name}</h1>
+          <h1 className="text-2xl font-semibold">{item.name}</h1>
           <div className="mt-2 flex flex-wrap items-center gap-2">
             <InventoryStatusBadge
               showRetired={detail.viewerIsStaff}

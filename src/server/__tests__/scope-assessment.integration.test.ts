@@ -86,10 +86,10 @@ describe("the scope assessment is staff only, at the seam", () => {
     const { id } = await createProjectAs(owner, baseProject());
     await expect(
       assessProjectScopeAs(owner, { projectId: id }, invoke)
-    ).rejects.toThrow(/Forbidden/);
+    ).rejects.toThrow(/Forbidden/u);
     await expect(
       getScopeAssessmentAs(owner, { projectId: id })
-    ).rejects.toThrow(/Forbidden/);
+    ).rejects.toThrow(/Forbidden/u);
     const rows = await db
       .select()
       .from(aiReviewUsage)
@@ -204,7 +204,7 @@ describe("a failed call", () => {
 
     await expect(
       assessProjectScopeAs(admin, { projectId: id }, failing)
-    ).rejects.toThrow(/^Couldn't assess the scope, please try again\.$/);
+    ).rejects.toThrow(/^Couldn't assess the scope, please try again\.$/u);
     expect(logged.mock.calls[0]?.[1]).toContain("SECRET");
     logged.mockRestore();
   });
@@ -227,7 +227,7 @@ describe("the scope limit is its own", () => {
       outcome: "ok",
     });
     await expect(assertWithinLimit(admin.id, "review")).rejects.toThrow(
-      /AI reviews/
+      /AI reviews/u
     );
     // The scope assessment still runs.
     await assessProjectScopeAs(admin, { projectId: id }, invoke);
@@ -235,7 +235,7 @@ describe("the scope limit is its own", () => {
     // Now the scope hour is spent, named as such, and the review is untouched.
     await expect(
       assessProjectScopeAs(admin, { projectId: id }, invoke)
-    ).rejects.toThrow(/scope assessments/);
+    ).rejects.toThrow(/scope assessments/u);
     const rows = await db
       .select()
       .from(aiReviewUsage)

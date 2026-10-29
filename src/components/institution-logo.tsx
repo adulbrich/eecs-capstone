@@ -42,7 +42,7 @@ export function InstitutionLogo() {
       {brand.programName && (
         <>
           <span aria-hidden="true" className="h-5 w-px bg-[var(--line)]" />
-          <span className="hidden font-medium text-[var(--text-secondary)] text-xs sm:inline">
+          <span className="hidden text-xs font-medium text-[var(--text-secondary)] sm:inline">
             {brand.programName}
           </span>
         </>

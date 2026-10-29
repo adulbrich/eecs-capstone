@@ -167,7 +167,7 @@ describe("reviewProjectAs metering", () => {
 
     await expect(
       reviewProjectAs(u, { fields: { description: "old" } })
-    ).rejects.toThrow(/ran out of room/);
+    ).rejects.toThrow(/ran out of room/u);
 
     const rows = await usageRowsFor(u.id);
     expect(rows).toHaveLength(1);
@@ -185,7 +185,7 @@ describe("reviewProjectAs metering", () => {
 
     await expect(
       reviewProjectAs(u, { fields: { description: "three" } })
-    ).rejects.toThrow(/for this hour/);
+    ).rejects.toThrow(/for this hour/u);
 
     // The assertion that matters: the limiter saves money rather than merely
     // reporting an error after the fact.
@@ -202,7 +202,7 @@ describe("reviewProjectAs metering", () => {
     await reviewProjectAs(a, { fields: { description: "one" } });
     await expect(
       reviewProjectAs(a, { fields: { description: "two" } })
-    ).rejects.toThrow(/for this hour/);
+    ).rejects.toThrow(/for this hour/u);
 
     await expect(
       reviewProjectAs(b, { fields: { description: "one" } })

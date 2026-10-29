@@ -22,5 +22,5 @@ export function clampTeamsSupported(value: number): number {
   if (!Number.isFinite(value) || value < TEAMS_SUPPORTED_MIN) {
     return TEAMS_SUPPORTED_MIN;
   }
-  return value > TEAMS_SUPPORTED_MAX ? TEAMS_SUPPORTED_MAX : value;
+  return Math.min(value, TEAMS_SUPPORTED_MAX);
 }

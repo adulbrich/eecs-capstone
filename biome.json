@@ -15,8 +15,29 @@
       "!**/*.svg"
     ]
   },
+  "yaml": {
+    "formatter": {
+      "bracketSpacing": false
+    }
+  },
   "linter": {
     "rules": {
+      "a11y": {
+        "noLabelWithoutControl": {
+          "level": "error",
+          "options": {
+            "inputComponents": [
+              "Input",
+              "Select",
+              "Textarea",
+              "Checkbox",
+              "Radio",
+              "RadioGroupItem"
+            ],
+            "labelComponents": ["Label"]
+          }
+        }
+      },
       "complexity": {
         "noVoid": "off"
       },
@@ -33,7 +54,9 @@
       },
       "style": {
         "noIncrementDecrement": "off",
-        "useDestructuring": "off"
+        "useDestructuring": "off",
+        "useNamedCaptureGroup": "off",
+        "useThisInClassMethods": "off"
       }
     }
   },
@@ -57,6 +80,9 @@
       ],
       "linter": {
         "rules": {
+          "correctness": {
+            "noComponentHookFactories": "off"
+          },
           "performance": {
             "useTopLevelRegex": "off"
           },
@@ -65,7 +91,9 @@
             "useAwait": "off"
           },
           "style": {
-            "noNonNullAssertion": "off"
+            "noNonNullAssertion": "off",
+            "useDomQuerySelector": "off",
+            "useImportsFirst": "off"
           }
         }
       }

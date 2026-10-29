@@ -56,7 +56,7 @@ test.describe("@smoke recommendations gate", () => {
         name: "Sign in to get recommendations",
       });
       await expect(signIn).toBeVisible();
-      await expect(signIn).toHaveAttribute("href", /\/sign-in\?.*redirect=/);
+      await expect(signIn).toHaveAttribute("href", /\/sign-in\?.*redirect=/u);
       await expect(
         anonymous.getByRole("link", { name: "Add your interests" })
       ).toHaveCount(0);
@@ -115,7 +115,7 @@ test.describe("recommended order", () => {
     // writes its own defaults after mount, so reading the URL before that
     // lands would find the bare `/projects` we navigated to and pass without
     // the resolution having run at all.
-    await expect(page).toHaveURL(/acceptingOnly=true/);
+    await expect(page).toHaveURL(/acceptingOnly=true/u);
     expect(new URL(page.url()).searchParams.has("order")).toBe(false);
     await expect(page.getByText("Ranked by your interests.")).toBeVisible();
 
@@ -179,7 +179,7 @@ test.describe("recommended order", () => {
       page.getByRole("option", { name: "Most relevant", exact: true })
     ).toHaveCount(0);
     await newest.click();
-    await page.waitForURL(/order=newest/);
+    await page.waitForURL(/order=newest/u);
 
     await expect(page.getByText("Ranked by your interests.")).toHaveCount(0);
     await expect(titles.first()).toBeVisible();

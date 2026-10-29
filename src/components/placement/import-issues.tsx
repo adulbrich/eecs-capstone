@@ -45,7 +45,7 @@ export function ImportIssues({
           {errors.length > 0 && warnings.length > 0 && ", "}
           {warnings.length > 0 &&
             `${warnings.length} ${warnings.length === 1 ? "warning" : "warnings"}`}{" "}
-          <span className="font-normal text-muted-foreground">in {where}</span>
+          <span className="text-muted-foreground font-normal">in {where}</span>
         </p>
       )}
       <ul className="mt-1 max-h-60 space-y-0.5 overflow-y-auto">

@@ -22,7 +22,7 @@ const config = defineConfig({
         "./src/nitro/keep-alive-timeout.ts",
         "./src/nitro/asset-error-headers.ts",
       ],
-      rollupConfig: { external: [/^@sentry\//] },
+      rollupConfig: { external: [/^@sentry\//u] },
     }),
     tailwindcss(),
     tanstackStart(),

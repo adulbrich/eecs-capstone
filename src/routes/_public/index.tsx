@@ -34,7 +34,7 @@ function Home() {
       <section className="page-wrap pt-16 pb-10 text-center md:pt-20 md:pb-12">
         <p className="island-kicker">{brand.institutionName}</p>
         <h1 className="display-title mt-4">{brand.programName}</h1>
-        <p className="mx-auto mt-5 max-w-2xl text-lg text-muted-foreground">
+        <p className="text-muted-foreground mx-auto mt-5 max-w-2xl text-lg">
           Propose a capstone project, follow it through staff review into the
           public catalog, and borrow the equipment your team needs.
         </p>
@@ -45,7 +45,7 @@ function Home() {
       <section className="page-wrap pb-12 md:pb-16">
         <div className="grid gap-4 md:grid-cols-2 md:gap-6">
           <Panel icon={<BookOpen className="h-5 w-5" />} title="Projects">
-            <p className="mt-4 text-muted-foreground">
+            <p className="text-muted-foreground mt-4">
               Every published project, filterable by program, category and
               technology. Anyone can propose one: faculty, staff, students and
               industry partners submit the same way.
@@ -61,7 +61,7 @@ function Home() {
             </div>
           </Panel>
           <Panel icon={<Package className="h-5 w-5" />} title="Inventory">
-            <p className="mt-4 text-muted-foreground">
+            <p className="text-muted-foreground mt-4">
               Shared equipment for capstone teams. Put items on a borrow list,
               send the request, and pick them up once staff approve it.
             </p>
@@ -85,17 +85,17 @@ function Home() {
               <div className="flex items-center gap-3">
                 <span
                   aria-hidden="true"
-                  className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-primary font-bold text-primary-foreground text-xs"
+                  className="bg-primary text-primary-foreground inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-bold"
                 >
                   {index + 1}
                 </span>
                 <span className="hidden h-px flex-1 bg-[var(--line)] md:block" />
               </div>
               <div className="pt-0.5 md:pt-0">
-                <h3 className="font-semibold text-[15px] leading-[22px]">
+                <h3 className="text-[15px] leading-[22px] font-semibold">
                   {step.label}
                 </h3>
-                <p className="mt-1 text-muted-foreground text-sm md:pr-6">
+                <p className="text-muted-foreground mt-1 text-sm md:pr-6">
                   {step.note}
                 </p>
               </div>
@@ -119,10 +119,10 @@ function Panel({
   return (
     <div className="feature-card flex flex-col rounded-xl border border-[var(--line)] p-6 md:p-8">
       <div className="flex items-center gap-3">
-        <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-[var(--brand-primary-tint)] text-brand">
+        <div className="text-brand flex h-9 w-9 items-center justify-center rounded-lg bg-[var(--brand-primary-tint)]">
           {icon}
         </div>
-        <h2 className="font-bold text-2xl">{title}</h2>
+        <h2 className="text-2xl font-bold">{title}</h2>
       </div>
       {children}
     </div>

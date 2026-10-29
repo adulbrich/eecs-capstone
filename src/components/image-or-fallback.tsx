@@ -12,7 +12,7 @@ export function ImageOrFallback({
     return <img alt="" className={className} loading="lazy" src={src} />;
   }
   return (
-    <div className={cn(className, "flex items-center justify-center bg-muted")}>
+    <div className={cn(className, "bg-muted flex items-center justify-center")}>
       <ImageIcon
         aria-hidden
         className="size-8 text-[var(--text-secondary)] opacity-30"

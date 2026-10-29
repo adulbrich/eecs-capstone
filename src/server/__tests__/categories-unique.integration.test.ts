@@ -120,8 +120,8 @@ describe("the dedupe step in migration 0015", () => {
     // If the migration is ever restructured, the test below would silently run
     // the wrong statement. Pin the shape instead.
     expect(statements).toHaveLength(2);
-    expect(dedupe).toMatch(/DELETE FROM "categories"/);
-    expect(createIndex).toMatch(/CREATE UNIQUE INDEX/);
+    expect(dedupe).toMatch(/DELETE FROM "categories"/u);
+    expect(createIndex).toMatch(/CREATE UNIQUE INDEX/u);
   });
 
   it("keeps the oldest row and leaves a project carrying it exactly once", async () => {

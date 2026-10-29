@@ -46,7 +46,7 @@ export const SOCIAL_SUMMARY_SOURCE_LIMIT = 12_000;
  * `social-meta.ts` carries its own copy for its own cut; this one is pinned
  * against the backfill script's, so the two cannot drift.
  */
-const LONE_TRAILING_SURROGATE = /[\uD800-\uDBFF]$/;
+const LONE_TRAILING_SURROGATE = /[\uD800-\uDBFF]$/u;
 
 /**
  * The budget is spent field by field rather than by slicing the joined string,

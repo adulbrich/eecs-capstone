@@ -47,7 +47,7 @@ function MyBookmarks() {
   return (
     <div className="px-4 py-6 md:p-8">
       <div className="mx-auto max-w-4xl">
-        <h1 className="font-semibold text-2xl">My Bookmarks</h1>
+        <h1 className="text-2xl font-semibold">My Bookmarks</h1>
         {rows.length === 0 && (
           <EmptyState>
             {unavailableCount > 0 ? (
@@ -99,7 +99,7 @@ function MyBookmarks() {
             returns.
           */}
           {unavailableCount > 0 && (
-            <p className="mt-3 text-muted-foreground text-sm">
+            <p className="text-muted-foreground mt-3 text-sm">
               {unavailableLine(unavailableCount)}
             </p>
           )}

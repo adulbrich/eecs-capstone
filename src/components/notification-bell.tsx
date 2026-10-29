@@ -172,18 +172,18 @@ export function NotificationBell() {
             <Bell aria-hidden="true" />
           )}
           {unread > 0 && (
-            <span className="absolute -top-0.5 -right-0.5 min-w-[1.25rem] rounded-full bg-destructive px-1 text-center text-destructive-foreground text-xs">
+            <span className="bg-destructive text-destructive-foreground absolute -top-0.5 -right-0.5 min-w-[1.25rem] rounded-full px-1 text-center text-xs">
               {badge}
             </span>
           )}
         </Button>
       </PopoverTrigger>
       <PopoverContent align="end" className="w-80 max-w-[calc(100vw-1rem)] p-0">
-        <div className="border-border border-b p-2 font-medium text-sm">
+        <div className="border-border border-b p-2 text-sm font-medium">
           Notifications
         </div>
         {rows.length === 0 ? (
-          <p className="p-4 text-muted-foreground text-sm">Nothing yet.</p>
+          <p className="text-muted-foreground p-4 text-sm">Nothing yet.</p>
         ) : (
           <ul className="max-h-[60vh] overflow-y-auto">
             {rows.map((n) => (
@@ -196,7 +196,7 @@ export function NotificationBell() {
                 key={n.id}
               >
                 <button
-                  className="block w-full p-2 text-left text-sm outline-none hover:bg-secondary focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:opacity-50"
+                  className="hover:bg-secondary focus-visible:ring-ring/50 block w-full p-2 text-left text-sm outline-none focus-visible:ring-[3px] disabled:opacity-50"
                   disabled={busy}
                   onClick={() => onClickNotification(n)}
                   type="button"
@@ -212,7 +212,7 @@ export function NotificationBell() {
         )}
         {rows.length > 0 && (
           <button
-            className="block w-full border-border border-t p-2 text-center text-xs outline-none hover:bg-secondary focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:opacity-50"
+            className="border-border hover:bg-secondary focus-visible:ring-ring/50 block w-full border-t p-2 text-center text-xs outline-none focus-visible:ring-[3px] disabled:opacity-50"
             disabled={busy}
             onClick={onMarkAllRead}
             type="button"

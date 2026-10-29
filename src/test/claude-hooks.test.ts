@@ -467,7 +467,7 @@ describe("session-context", () => {
   it("prints the branch, tree, node and compose lines", () => {
     const result = hook("session-context", {});
     expect(result.status).toBe(0);
-    expect(result.stdout).toMatch(/^Branch: /);
+    expect(result.stdout).toMatch(/^Branch: /u);
     expect(result.stdout).toContain("Working tree:");
     expect(result.stdout).toContain("Node:");
     expect(result.stdout).toContain("Compose:");
@@ -479,7 +479,7 @@ describe("session-context", () => {
     // worktree and the dev server inside it survived long enough to make a
     // browser suite scan the wrong branch and pass (#515).
     const result = hook("session-context", {});
-    expect(result.stdout).toMatch(/Leftover/);
+    expect(result.stdout).toMatch(/Leftover/u);
   }, 30_000);
 
   it("says the compose check did not finish rather than that nothing runs", () => {

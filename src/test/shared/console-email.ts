@@ -23,7 +23,7 @@ export async function captureStderr(
 }
 
 /** The sign-in code arrives inside the sentence, not as a link. */
-const CONSOLE_EMAIL_CODE = /Your sign-in code is (\d{6})\./;
+const CONSOLE_EMAIL_CODE = /Your sign-in code is (\d{6})\./u;
 
 /**
  * Runs `fn` and pulls the sign-in code out of what the console transport

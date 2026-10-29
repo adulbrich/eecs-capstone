@@ -61,12 +61,12 @@ describe("InventoryForm validation", () => {
     render(<InventoryForm />);
 
     // Absent first, so a string that was always on the page cannot pass this.
-    expect(screen.queryByText(/Name is required/)).toBeNull();
+    expect(screen.queryByText(/Name is required/u)).toBeNull();
 
-    fireEvent.click(screen.getByRole("button", { name: /save|create/i }));
+    fireEvent.click(screen.getByRole("button", { name: /save|create/iu }));
 
     await waitFor(() =>
-      expect(screen.getByText(/Name is required/)).toBeTruthy()
+      expect(screen.getByText(/Name is required/u)).toBeTruthy()
     );
   });
 });
@@ -79,11 +79,11 @@ describe("InventoryForm image ordering", () => {
     uploadMock.mockRejectedValue(new Error("Unsupported image type"));
 
     render(<InventoryForm initial={{ name: "Scope" }} itemId="item-1" />);
-    fireEvent.click(screen.getByRole("button", { name: /pick image/i }));
-    fireEvent.click(screen.getByRole("button", { name: /save|create/i }));
+    fireEvent.click(screen.getByRole("button", { name: /pick image/iu }));
+    fireEvent.click(screen.getByRole("button", { name: /save|create/iu }));
 
     await waitFor(() =>
-      expect(screen.getByText(/Unsupported image type/)).toBeTruthy()
+      expect(screen.getByText(/Unsupported image type/u)).toBeTruthy()
     );
     expect(uploadMock).toHaveBeenCalledTimes(1);
     expect(updateMock).not.toHaveBeenCalled();
@@ -94,8 +94,8 @@ describe("InventoryForm image ordering", () => {
     updateMock.mockResolvedValue({ id: "item-1" });
 
     render(<InventoryForm initial={{ name: "Scope" }} itemId="item-1" />);
-    fireEvent.click(screen.getByRole("button", { name: /pick image/i }));
-    fireEvent.click(screen.getByRole("button", { name: /save|create/i }));
+    fireEvent.click(screen.getByRole("button", { name: /pick image/iu }));
+    fireEvent.click(screen.getByRole("button", { name: /save|create/iu }));
 
     await waitFor(() => expect(updateMock).toHaveBeenCalledTimes(1));
     expect(updateMock.mock.calls[0][0].data).toMatchObject({

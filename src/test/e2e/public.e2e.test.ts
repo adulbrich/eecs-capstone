@@ -31,7 +31,7 @@ test.describe("@smoke public shell", () => {
     // /projects lands on /projects?q=&categories=%5B%5D&... Match the path and
     // let the query string be whatever the route's defaults are.
     await page.goto("/projects");
-    await expect(page).toHaveURL(/\/projects\?/);
+    await expect(page).toHaveURL(/\/projects\?/u);
     // The URL alone proves nothing: a 307 to the normalized search params
     // followed by an error boundary would satisfy it, which is the
     // production-build failure this test exists to catch. A link into a

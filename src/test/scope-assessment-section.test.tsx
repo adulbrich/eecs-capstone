@@ -34,7 +34,7 @@ describe("ScopeAssessmentSection", () => {
   it("offers the assessment when there is none yet", async () => {
     server.getScopeAssessment.mockResolvedValue(null);
     renderWithQueryClient(<ScopeAssessmentSection projectId="p1" />);
-    expect(await screen.findByText(/Not assessed yet/)).toBeDefined();
+    expect(await screen.findByText(/Not assessed yet/u)).toBeDefined();
     expect(screen.getByRole("button", { name: "Assess scope" })).toBeDefined();
   });
 
@@ -45,9 +45,9 @@ describe("ScopeAssessmentSection", () => {
     expect(screen.getByText("About right")).toBeDefined();
     // Low confidence is where "high uncertainty" comes from: one number, one
     // label, no separate flag to disagree with it.
-    expect(screen.getByText(/35%/).textContent).toContain("low");
+    expect(screen.getByText(/35%/u).textContent).toContain("low");
     expect(screen.getByText(view.assessment.rationale)).toBeDefined();
-    expect(screen.queryByText(/earlier version/)).toBeNull();
+    expect(screen.queryByText(/earlier version/u)).toBeNull();
     expect(screen.getByRole("button", { name: "Reassess" })).toBeDefined();
   });
 
@@ -55,7 +55,7 @@ describe("ScopeAssessmentSection", () => {
     server.getScopeAssessment.mockResolvedValue({ ...view, stale: true });
     renderWithQueryClient(<ScopeAssessmentSection projectId="p1" />);
     expect(
-      await screen.findByText(/assessed against an earlier version/i)
+      await screen.findByText(/assessed against an earlier version/iu)
     ).toBeDefined();
     expect(screen.getByText("Too large")).toBeDefined();
     // Nothing re-ran on its own.
@@ -86,6 +86,6 @@ describe("ScopeAssessmentSection", () => {
     fireEvent.click(
       await screen.findByRole("button", { name: "Assess scope" })
     );
-    expect(await screen.findByText(/all 10 scope assessments/)).toBeDefined();
+    expect(await screen.findByText(/all 10 scope assessments/u)).toBeDefined();
   });
 });

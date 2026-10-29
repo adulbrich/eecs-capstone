@@ -588,7 +588,7 @@ export function ColumnMappingEditor({
       {mapped.length > 0 && preview.length > 0 && (
         <div className="overflow-x-auto">
           <table className="w-full text-left text-xs">
-            <caption className="mb-1 text-left text-muted-foreground text-sm">
+            <caption className="text-muted-foreground mb-1 text-left text-sm">
               {wide
                 ? `The first ${preview.length === 1 ? "bid" : `${preview.length} bids`} as converted, one row each`
                 : `The first ${preview.length === 1 ? "row" : `${preview.length} rows`} as converted`}
@@ -597,7 +597,7 @@ export function ColumnMappingEditor({
               <tr>
                 {mapped.map((c) => (
                   <th
-                    className="py-1 pr-3 font-medium font-mono"
+                    className="py-1 pr-3 font-mono font-medium"
                     key={c.name}
                     scope="col"
                   >

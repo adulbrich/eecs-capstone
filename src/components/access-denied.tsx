@@ -17,10 +17,10 @@ const ROLE_PHRASE = {
 export function AccessDeniedPage({ refusal }: { refusal: Refusal }) {
   return (
     <div className="mx-auto max-w-2xl px-4 py-6 md:p-8">
-      <h1 className="font-semibold text-2xl">You do not have access</h1>
-      <p className="mt-3 text-muted-foreground">
+      <h1 className="text-2xl font-semibold">You do not have access</h1>
+      <p className="text-muted-foreground mt-3">
         You are signed in as{" "}
-        <span className="wrap-anywhere font-medium text-foreground">
+        <span className="text-foreground font-medium wrap-anywhere">
           {refusal.email}
         </span>
         . This page needs {ROLE_PHRASE[refusal.requires]}.

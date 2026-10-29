@@ -70,7 +70,7 @@ describe("POST /api/traffic against the database", () => {
       device: "desktop",
       country: null,
     });
-    expect(stored[0].visitorHash).toMatch(/^[A-Za-z0-9_-]{22}$/);
+    expect(stored[0].visitorHash).toMatch(/^[A-Za-z0-9_-]{22}$/u);
   });
 
   it("stores a typed search whose emoji sits on the 100-character cut", async () => {

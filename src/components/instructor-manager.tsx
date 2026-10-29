@@ -79,14 +79,14 @@ export function InstructorManager({ programId, initial, onChanged }: Props) {
 
   return (
     <section className="mt-6">
-      <h2 className="font-medium text-sm">Instructors</h2>
+      <h2 className="text-sm font-medium">Instructors</h2>
       {instructors.length === 0 ? (
-        <p className="mt-2 text-muted-foreground text-sm">None yet.</p>
+        <p className="text-muted-foreground mt-2 text-sm">None yet.</p>
       ) : (
         <ul className="mt-2 space-y-1">
           {instructors.map((i) => (
             <li
-              className="flex items-center justify-between rounded-md border border-border p-2"
+              className="border-border flex items-center justify-between rounded-md border p-2"
               key={i.userId}
             >
               <span>

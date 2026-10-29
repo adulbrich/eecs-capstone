@@ -13,7 +13,7 @@ export function CountBadge({ count }: { count: number }) {
   }
   return (
     <Badge
-      className="bg-primary px-1.5 font-semibold text-primary-foreground"
+      className="bg-primary text-primary-foreground px-1.5 font-semibold"
       variant="status"
     >
       {count}

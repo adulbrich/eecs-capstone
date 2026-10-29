@@ -332,7 +332,7 @@ export function RecommendationPrompt({
   return (
     <>
       {order === "recommended" && canRecommend && (
-        <p className="mt-2 pl-3 text-muted-foreground text-xs">
+        <p className="text-muted-foreground mt-2 pl-3 text-xs">
           Ranked by your interests.{" "}
           <Link className="text-brand-dark underline" to="/profile">
             Edit your interests
@@ -346,7 +346,7 @@ export function RecommendationPrompt({
         write their interests. A member with one gets no prompt.
       */}
       {!(canRecommend || signedIn) && (
-        <p className="mt-2 pl-3 text-muted-foreground text-xs">
+        <p className="text-muted-foreground mt-2 pl-3 text-xs">
           <Link
             className="text-brand-dark underline"
             search={{ redirect: "/projects" }}
@@ -358,7 +358,7 @@ export function RecommendationPrompt({
         </p>
       )}
       {signedIn && !canRecommend && (
-        <p className="mt-2 pl-3 text-muted-foreground text-xs">
+        <p className="text-muted-foreground mt-2 pl-3 text-xs">
           <Link className="text-brand-dark underline" to="/profile">
             Add your interests
           </Link>{" "}
@@ -451,7 +451,7 @@ export function ProjectsFilters({
           group points at it by id for its own accessible name.
         */}
         <legend
-          className="font-medium text-muted-foreground text-xs"
+          className="text-muted-foreground text-xs font-medium"
           id={`${uid}-archive-legend`}
         >
           Show
@@ -471,7 +471,7 @@ export function ProjectsFilters({
           ))}
         </RadioGroup>
         <p
-          className="mt-1 text-muted-foreground text-xs"
+          className="text-muted-foreground mt-1 text-xs"
           id={`${uid}-archive-hint`}
         >
           {ARCHIVE_MODE_HINT}
@@ -479,7 +479,7 @@ export function ProjectsFilters({
       </fieldset>
 
       <fieldset>
-        <legend className="font-medium text-muted-foreground text-xs">
+        <legend className="text-muted-foreground text-xs font-medium">
           {PROJECT_SWITCH_LEGEND}
         </legend>
         <div className="mt-1">
@@ -507,7 +507,7 @@ export function ProjectsFilters({
 
       {grouped.size > 0 && (
         <fieldset>
-          <legend className="font-medium text-muted-foreground text-xs">
+          <legend className="text-muted-foreground text-xs font-medium">
             Categories (matches all selected)
           </legend>
           <div className="mt-1 space-y-2">

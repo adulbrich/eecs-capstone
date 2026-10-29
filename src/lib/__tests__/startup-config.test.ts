@@ -117,7 +117,7 @@ describe("assertProductionConfig", () => {
         ...complete,
         S3_BUCKET: "",
       } as NodeJS.ProcessEnv)
-    ).toThrow(/S3_BUCKET is not set/);
+    ).toThrow(/S3_BUCKET is not set/u);
   });
 });
 
@@ -171,6 +171,6 @@ describe("under the ses transport", () => {
         EMAIL_TRANSPORT: "ses",
         EMAIL_FROM: "noreply@example.test",
       } as NodeJS.ProcessEnv)
-    ).toThrow(/EMAIL_STAFF_INBOX is not set/);
+    ).toThrow(/EMAIL_STAFF_INBOX is not set/u);
   });
 });

@@ -86,7 +86,7 @@ describe("BookmarksButton", () => {
       </>
     );
     await findByText("sentinel");
-    expect(queryByRole("link", { name: /Bookmarks/ })).toBeNull();
+    expect(queryByRole("link", { name: /Bookmarks/u })).toBeNull();
   });
 
   it("links to /my/bookmarks with the count of visible bookmarks", async () => {

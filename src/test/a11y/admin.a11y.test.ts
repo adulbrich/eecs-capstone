@@ -111,7 +111,7 @@ test("@smoke admin inventory list", async ({ page }) => {
   // The searchbox is described by the hint line under the row (#369).
   await expect(
     page.getByRole("searchbox", { name: "Search" })
-  ).toHaveAccessibleDescription(/Quote a "phrase"/);
+  ).toHaveAccessibleDescription(/Quote a "phrase"/u);
   const aside = page.getByRole("complementary", { name: "Filters" });
   await expect(
     aside.getByRole("switch", { name: "Show only retired" })
@@ -146,10 +146,10 @@ test("admin inventory table interactions", async ({ page }) => {
   await waitForSurfaceSettled(page.getByRole("menu"));
   await checkA11y(page);
   await closeMenu(page);
-  await page.getByRole("button", { name: /Name/ }).click();
+  await page.getByRole("button", { name: /Name/u }).click();
   await expect(
-    page.getByRole("columnheader", { name: /Name/ })
-  ).toHaveAttribute("aria-sort", /ascending|descending/);
+    page.getByRole("columnheader", { name: /Name/u })
+  ).toHaveAttribute("aria-sort", /ascending|descending/u);
   await checkA11y(page);
 });
 
@@ -175,7 +175,7 @@ test("project detail (staff panel, scope assessment)", async ({ page }) => {
   // (#462), so wait for an option before scanning. Asserted anyway, so a
   // regression that drops the section fails here rather than passing a scan
   // of a page that no longer has the control on it.
-  await expect(page.getByRole("checkbox", { name: /A11Y-101/ })).toBeChecked();
+  await expect(page.getByRole("checkbox", { name: /A11Y-101/u })).toBeChecked();
   // The Social preview section (#498) is a staff-gated read like the three
   // above and renders a "Loading..." paragraph until it resolves, so scanning
   // before it settles would scan that paragraph instead of the textarea and
@@ -185,7 +185,7 @@ test("project detail (staff panel, scope assessment)", async ({ page }) => {
   // The Similarity section (#631) is one more staff-gated read with its own
   // "Loading..." paragraph; its help text renders only once the read lands.
   await expect(
-    page.getByText(/places this project under Similar projects/)
+    page.getByText(/places this project under Similar projects/u)
   ).toBeVisible();
   await checkA11y(page);
 });
@@ -249,7 +249,7 @@ test("@smoke admin projects list", async ({ page }) => {
   // The searchbox is described by the hint line under the row (#369).
   await expect(
     page.getByRole("searchbox", { name: "Search" })
-  ).toHaveAccessibleDescription(/Quote a "phrase"/);
+  ).toHaveAccessibleDescription(/Quote a "phrase"/u);
   const aside = page.getByRole("complementary", { name: "Filters" });
   for (const name of switches) {
     await expect(aside.getByRole("switch", { name })).toBeVisible();
@@ -278,11 +278,11 @@ test("@smoke admin projects list", async ({ page }) => {
   await sheet
     .getByRole("switch", { name: "are looking for team members" })
     .click();
-  await expect(page).toHaveURL(/acceptingOnly=true/);
+  await expect(page).toHaveURL(/acceptingOnly=true/u);
   await expect(clearAll).toBeVisible();
   await checkA11y(page);
   await clearAll.click();
-  await expect(page).not.toHaveURL(/acceptingOnly/);
+  await expect(page).not.toHaveURL(/acceptingOnly/u);
   await expect(clearAll).toBeHidden();
   await page.keyboard.press("Escape");
   await expect(sheet).toBeHidden();
@@ -298,7 +298,7 @@ test("admin user detail", async ({ page }) => {
   // The LinkedIn address sits beside its label in one paragraph (#364);
   // global-setup gives this user one.
   await expectUnderlinedAtRest(
-    page.getByRole("link", { name: /linkedin\.com\/in\/a11y-owner/ })
+    page.getByRole("link", { name: /linkedin\.com\/in\/a11y-owner/u })
   );
   await checkA11y(page);
 });
@@ -533,7 +533,7 @@ for (const width of [1280, 375]) {
       page.getByRole("cell", { name: "Tide Clock", exact: true })
     ).toBeVisible();
 
-    await page.getByRole("tab", { name: /Bids/ }).click();
+    await page.getByRole("tab", { name: /Bids/u }).click();
     await page.getByLabel("Bids CSV file").setInputFiles({
       name: "bids.csv",
       mimeType: "text/csv",
@@ -565,7 +565,7 @@ for (const width of [1280, 375]) {
     await waitForHydration(page);
     await page.getByLabel("Project titles").fill("Tide Clock\nRobot Arm");
     await page.getByRole("button", { name: "Use these titles" }).click();
-    await page.getByRole("tab", { name: /Bids/ }).click();
+    await page.getByRole("tab", { name: /Bids/u }).click();
     await page.getByLabel("Bids CSV file").setInputFiles({
       name: "form.csv",
       mimeType: "text/csv",
@@ -630,7 +630,7 @@ test("@smoke admin placement, projects and bids loaded", async ({ page }) => {
   ).toBeVisible();
   await checkA11y(page);
 
-  await page.getByRole("tab", { name: /Bids/ }).click();
+  await page.getByRole("tab", { name: /Bids/u }).click();
   await page.getByLabel("Bids CSV file").setInputFiles({
     name: "bids.csv",
     mimeType: "text/csv",
@@ -643,15 +643,15 @@ test("@smoke admin placement, projects and bids loaded", async ({ page }) => {
 
   await page.getByRole("button", { name: "Per project" }).click();
   await expect(
-    page.getByRole("button", { name: /^Pin here: .* to / }).first()
+    page.getByRole("button", { name: /^Pin here: .* to /u }).first()
   ).toBeVisible();
   await checkA11y(page);
   // Who is pinned to each project, and the Pinned only switch (#688).
   await page
-    .getByRole("button", { name: /^Pin here: .* to / })
+    .getByRole("button", { name: /^Pin here: .* to /u })
     .first()
     .click();
-  await expect(page.getByText(/^Pinned: /).first()).toBeVisible();
+  await expect(page.getByText(/^Pinned: /u).first()).toBeVisible();
   await page.getByRole("switch", { name: "Pinned only" }).click();
   await expect(page.getByText("No one pinned").first()).toBeVisible();
   await checkA11y(page);
@@ -659,7 +659,7 @@ test("@smoke admin placement, projects and bids loaded", async ({ page }) => {
   await page.getByRole("button", { name: "Per student" }).click();
 
   // The roster has its own tab (#717).
-  await page.getByRole("tab", { name: /Roster/ }).click();
+  await page.getByRole("tab", { name: /Roster/u }).click();
   await page
     .getByLabel("Roster emails")
     .fill("ada@example.edu\nkim@example.edu");
@@ -669,16 +669,18 @@ test("@smoke admin placement, projects and bids loaded", async ({ page }) => {
 
   // The survey students the roster lacks, removed from placement (#679).
   await page
-    .getByRole("button", { name: /^Remove (this student|these \d+ students)$/ })
+    .getByRole("button", {
+      name: /^Remove (this student|these \d+ students)$/u,
+    })
     .click();
   await expect(
-    page.getByRole("region", { name: /Removed from placement/ })
+    page.getByRole("region", { name: /Removed from placement/u })
   ).toBeVisible();
   await checkA11y(page);
 
-  await page.getByRole("tab", { name: /Bids/ }).click();
+  await page.getByRole("tab", { name: /Bids/u }).click();
   await expect(
-    page.getByRole("rowheader", { name: /not in the survey/ })
+    page.getByRole("rowheader", { name: /not in the survey/u })
   ).toBeVisible();
   await expect(page.getByRole("link", { name: "Roster tab" })).toBeVisible();
   await checkA11y(page);
@@ -696,14 +698,14 @@ test("admin placement, a run on the results board", async ({ page }) => {
     mimeType: "text/csv",
     buffer: Buffer.from(PLACEMENT_PROJECTS_CSV),
   });
-  await page.getByRole("tab", { name: /Bids/ }).click();
+  await page.getByRole("tab", { name: /Bids/u }).click();
   await page.getByLabel("Bids CSV file").setInputFiles({
     name: "bids.csv",
     mimeType: "text/csv",
     buffer: Buffer.from(PLACEMENT_BIDS_CSV),
   });
   // Kim is on the roster and not in the survey, so the card lists them (#714).
-  await page.getByRole("tab", { name: /Roster/ }).click();
+  await page.getByRole("tab", { name: /Roster/u }).click();
   await page
     .getByLabel("Roster emails")
     .fill("ada@example.edu\nben@example.edu\nkim@example.edu");
@@ -716,7 +718,7 @@ test("admin placement, a run on the results board", async ({ page }) => {
     timeout: 20_000,
   });
   await expect(
-    page.getByRole("region", { name: /Not in the survey/ })
+    page.getByRole("region", { name: /Not in the survey/u })
   ).toContainText("kim@example.edu");
   // Scan the primary button hovered: its hover background once failed AA,
   // and a scan at rest cannot see that. Wait out the 180ms fade first, or axe
@@ -747,14 +749,16 @@ test("admin placement, a run on the results board", async ({ page }) => {
   await page.getByRole("option", { name: "Canvas groups" }).click();
   await expect(page.getByRole("listbox")).toHaveCount(0);
   await expect(
-    page.getByText(/Canvas matches each student by their login/)
+    page.getByText(/Canvas matches each student by their login/u)
   ).toBeVisible();
   await checkA11y(page);
 
   // A student's bids open under their row (#687), with Move here on each.
-  const bidsToggle = page.getByRole("button", { name: /, \d+ bids?$/ }).first();
+  const bidsToggle = page
+    .getByRole("button", { name: /, \d+ bids?$/u })
+    .first();
   await bidsToggle.click();
-  await expect(page.getByRole("region", { name: /^Bids of / })).toBeVisible();
+  await expect(page.getByRole("region", { name: /^Bids of /u })).toBeVisible();
   await checkA11y(page);
   // On a phone the bids join the student's card (src/styles.css).
   await page.setViewportSize({ width: 375, height: 812 });
@@ -762,11 +766,11 @@ test("admin placement, a run on the results board", async ({ page }) => {
   await expectNoHorizontalOverflow(page);
   await page.setViewportSize({ width: 1280, height: 720 });
   await bidsToggle.click();
-  await expect(page.getByRole("region", { name: /^Bids of / })).toHaveCount(0);
+  await expect(page.getByRole("region", { name: /^Bids of /u })).toHaveCount(0);
 
   // Move to... is a searchable combobox (#678).
   await page
-    .getByRole("combobox", { name: /^Move / })
+    .getByRole("combobox", { name: /^Move /u })
     .first()
     .click();
   await expect(
@@ -783,7 +787,7 @@ test("admin placement, a run on the results board", async ({ page }) => {
 
   // Remove from placement sits in a row's More menu and asks first (#685).
   await page
-    .getByRole("button", { name: /^More for / })
+    .getByRole("button", { name: /^More for /u })
     .first()
     .click();
   const menu = page.locator('[data-slot="dropdown-menu-content"]');
@@ -800,14 +804,14 @@ test("admin placement, a run on the results board", async ({ page }) => {
   await closeMenu(page);
 
   // Where each student stands after the run (#689).
-  await page.getByRole("tab", { name: /Bids/ }).click();
+  await page.getByRole("tab", { name: /Bids/u }).click();
   await expect(
-    page.getByText(/^(Placed|Pinned to|Unplaced)/).first()
+    page.getByText(/^(Placed|Pinned to|Unplaced)/u).first()
   ).toBeVisible();
   await checkA11y(page);
   // Who the run placed on each project (#693).
   await page.getByRole("button", { name: "Per project" }).click();
-  await expect(page.getByText(/^Placed here, team /).first()).toBeVisible();
+  await expect(page.getByText(/^Placed here, team /u).first()).toBeVisible();
   await checkA11y(page);
 
   await page.getByRole("button", { name: "Analytics" }).click();
@@ -943,9 +947,9 @@ test("sorting a column writes sort and dir into the URL", async ({ page }) => {
   // the assertion is that a real toggle happened, not which one won.
   await expect(
     page.getByRole("columnheader", { name: "Category", exact: true })
-  ).toHaveAttribute("aria-sort", /ascending|descending/);
-  await expect(page).toHaveURL(/[?&]sort=category(&|$)/);
-  await expect(page).toHaveURL(/[?&]dir=(asc|desc)(&|$)/);
+  ).toHaveAttribute("aria-sort", /ascending|descending/u);
+  await expect(page).toHaveURL(/[?&]sort=category(&|$)/u);
+  await expect(page).toHaveURL(/[?&]dir=(asc|desc)(&|$)/u);
 
   const afterRows = await page
     .locator(".admin-table tbody tr")
@@ -960,7 +964,7 @@ test("toggling a column writes cols into the URL, absent by default", async ({
   await waitForHydration(page);
   // A fresh session with no stored preference: the param is genuinely absent,
   // not just not-yet-checked.
-  await expect(page).not.toHaveURL(/[?&]cols=/);
+  await expect(page).not.toHaveURL(/[?&]cols=/u);
 
   await page.getByRole("button", { name: "Columns" }).click();
   await page.getByRole("menuitemcheckbox", { name: "Location" }).click();
@@ -971,7 +975,7 @@ test("toggling a column writes cols into the URL, absent by default", async ({
   // matters here, since the URL update lands after an async navigation.
   // (Commas are URL-encoded as %2C, so a `\b` word-boundary check would break
   // on the trailing "C"; a plain substring match is what actually holds.)
-  await expect(page).toHaveURL(/[?&]cols=[^&]*location/);
+  await expect(page).toHaveURL(/[?&]cols=[^&]*location/u);
   await expect(
     page.getByRole("columnheader", { name: "Location", exact: true })
   ).toHaveCount(0);
@@ -989,7 +993,7 @@ test("toggling a column writes cols into the URL, absent by default", async ({
   await page.getByRole("button", { name: "Columns" }).click();
   await page.getByRole("menuitemcheckbox", { name: "Location" }).click();
   await closeMenu(page);
-  await expect(page).not.toHaveURL(/[?&]cols=/);
+  await expect(page).not.toHaveURL(/[?&]cols=/u);
   await expect(
     page.getByRole("columnheader", { name: "Location", exact: true })
   ).toBeVisible();
@@ -1014,7 +1018,7 @@ test("column layout persists across a reload via the localStorage seed", async (
   await page.goto("/admin/inventory");
   // Polls: the seed effect that reads localStorage and writes `cols` back
   // into the URL runs after hydration, not before this navigation resolves.
-  await expect(page).toHaveURL(/[?&]cols=[^&]*location/);
+  await expect(page).toHaveURL(/[?&]cols=[^&]*location/u);
   await expect(
     page.getByRole("columnheader", { name: "Location", exact: true })
   ).toHaveCount(0);
@@ -1029,7 +1033,7 @@ test("Reset columns restores the default column set", async ({ page }) => {
   await expect(
     page.getByRole("columnheader", { name: "Location", exact: true })
   ).toHaveCount(0);
-  await expect(page).toHaveURL(/[?&]cols=[^&]*location/);
+  await expect(page).toHaveURL(/[?&]cols=[^&]*location/u);
 
   await page.getByRole("button", { name: "Columns" }).click();
   await page.getByRole("menuitem", { name: "Reset columns" }).click();
@@ -1040,7 +1044,7 @@ test("Reset columns restores the default column set", async ({ page }) => {
   // The URL comes back clean too: resetColumns clears the stored preference
   // rather than writing the default set into it, so there is nothing left
   // for useSeedColumnsFromStorage to re-seed from on this same render.
-  await expect(page).not.toHaveURL(/[?&]cols=/);
+  await expect(page).not.toHaveURL(/[?&]cols=/u);
 
   // Durability: a Reset has to survive a bare re-visit rather than being
   // silently undone by the stale preference it was supposed to replace.
@@ -1048,7 +1052,7 @@ test("Reset columns restores the default column set", async ({ page }) => {
   await expect(
     page.getByRole("columnheader", { name: "Location", exact: true })
   ).toBeVisible();
-  await expect(page).not.toHaveURL(/[?&]cols=/);
+  await expect(page).not.toHaveURL(/[?&]cols=/u);
 });
 
 test("admin table restacks into cards below 768px", async ({ page }) => {
@@ -1202,7 +1206,7 @@ test("admin categories table interactions", async ({ page }) => {
   const header = page.getByRole("columnheader", { name: "Name", exact: true });
   const before = await header.getAttribute("aria-sort");
   await page.getByRole("button", { name: "Name", exact: true }).click();
-  await expect(header).toHaveAttribute("aria-sort", /ascending|descending/);
+  await expect(header).toHaveAttribute("aria-sort", /ascending|descending/u);
   expect(await header.getAttribute("aria-sort")).not.toBe(before);
   await checkA11y(page);
 });
@@ -1220,7 +1224,7 @@ test("admin programs table interactions", async ({ page }) => {
   });
   const before = await header.getAttribute("aria-sort");
   await page.getByRole("button", { name: "Course name", exact: true }).click();
-  await expect(header).toHaveAttribute("aria-sort", /ascending|descending/);
+  await expect(header).toHaveAttribute("aria-sort", /ascending|descending/u);
   expect(await header.getAttribute("aria-sort")).not.toBe(before);
   await checkA11y(page);
 });
@@ -1235,7 +1239,7 @@ test("admin users table interactions", async ({ page }) => {
   const header = page.getByRole("columnheader", { exact: true, name: "Email" });
   const before = await header.getAttribute("aria-sort");
   await page.getByRole("button", { name: "Email", exact: true }).click();
-  await expect(header).toHaveAttribute("aria-sort", /ascending|descending/);
+  await expect(header).toHaveAttribute("aria-sort", /ascending|descending/u);
   expect(await header.getAttribute("aria-sort")).not.toBe(before);
   await checkA11y(page);
 });
@@ -1261,7 +1265,7 @@ test("admin users table sort header activates via keyboard", async ({
   await page.keyboard.press("Enter");
   await expect(columnHeader).toHaveAttribute(
     "aria-sort",
-    /ascending|descending/
+    /ascending|descending/u
   );
   expect(await columnHeader.getAttribute("aria-sort")).not.toBe(before);
 });
@@ -1284,10 +1288,10 @@ test("admin users list: sorting a column reorders the rendered rows, not just th
   expect(beforeRows.length).toBeGreaterThan(0);
 
   await page.getByRole("button", { name: "Email", exact: true }).click();
-  await expect(header).toHaveAttribute("aria-sort", /ascending|descending/);
+  await expect(header).toHaveAttribute("aria-sort", /ascending|descending/u);
   expect(await header.getAttribute("aria-sort")).not.toBe(beforeSort);
-  await expect(page).toHaveURL(/[?&]sort=email(&|$)/);
-  await expect(page).toHaveURL(/[?&]dir=(asc|desc)(&|$)/);
+  await expect(page).toHaveURL(/[?&]sort=email(&|$)/u);
+  await expect(page).toHaveURL(/[?&]dir=(asc|desc)(&|$)/u);
 
   // sort/dir are in this route's loaderDeps, so the header click above sent
   // a new request and the loader returned a (possibly) different page,
@@ -1315,15 +1319,15 @@ test("admin users list: sorting from page 2 returns to page 1", async ({
   // \d+) matters here: "Page 2 of 1" would satisfy a bare \d+ pattern too,
   // which is exactly the broken-fixture case this control exists to catch.
   await expect(
-    page.getByText(/^Page 2 of [2-9]\d* \u00b7 \d+ of \d+ results$/)
+    page.getByText(/^Page 2 of [2-9]\d* \u00b7 \d+ of \d+ results$/u)
   ).toBeVisible();
 
   await page.getByRole("button", { name: "Email", exact: true }).click();
 
   await expect(
-    page.getByText(/^Page 1 of \d+ \u00b7 \d+ of \d+ results$/)
+    page.getByText(/^Page 1 of \d+ \u00b7 \d+ of \d+ results$/u)
   ).toBeVisible();
-  await expect(page).not.toHaveURL(/[?&]page=2(&|$)/);
+  await expect(page).not.toHaveURL(/[?&]page=2(&|$)/u);
 });
 
 // /admin/categories and /admin/programs are the first routes on this branch

@@ -65,7 +65,7 @@ export function ProgramMultiSelect({ describedBy, value, onChange }: Props) {
         // div has no role, so the description would never be announced.
         <fieldset
           aria-describedby={describedBy}
-          className="border border-border p-2"
+          className="border-border border p-2"
         >
           {/*
             Named for assistive tech but not drawn: the panel section above

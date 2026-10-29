@@ -72,13 +72,13 @@ export function TitleMatchesPanel({
       {unmatched.length > 0 && (
         <section
           aria-label="Unmatched titles"
-          className="rounded-md border border-destructive/40 px-3 py-2 text-sm"
+          className="border-destructive/40 rounded-md border px-3 py-2 text-sm"
         >
           <div className="flex flex-wrap items-center justify-between gap-2">
             <p className="font-medium">
               {plural(unmatched.length, "title matches", "titles match")} no
               project{" "}
-              <span className="font-normal text-muted-foreground">
+              <span className="text-muted-foreground font-normal">
                 ({plural(leftOut, "bid", "bids")} left out)
               </span>
             </p>

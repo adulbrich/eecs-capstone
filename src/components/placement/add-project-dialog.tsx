@@ -85,7 +85,7 @@ export function AddProjectDialog({
   }
 
   function submit() {
-    const title = draft.title.replace(/\s+/g, " ").trim();
+    const title = draft.title.replace(/\s+/gu, " ").trim();
     if (title === "") {
       setError("Enter a title.");
       return;

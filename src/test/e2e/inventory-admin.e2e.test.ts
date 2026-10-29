@@ -71,7 +71,9 @@ test.describe("inventory item administration", () => {
 
       // The form navigates to the item it just made, so the URL is where the
       // new id comes from.
-      await staff.waitForURL(/\/inventory\/[0-9a-f-]{36}/, { timeout: 15_000 });
+      await staff.waitForURL(/\/inventory\/[0-9a-f-]{36}/u, {
+        timeout: 15_000,
+      });
       const itemUrl = new URL(staff.url()).pathname;
       await expect(
         staff.getByRole("heading", { level: 1, name: itemName })
@@ -86,7 +88,9 @@ test.describe("inventory item administration", () => {
       // itself once the save resolves, so a `goto` here races the in-flight
       // mutation and can abort it: the page then renders the item exactly as it
       // was, and the edit looks like it silently did nothing.
-      await staff.waitForURL(new RegExp(`${itemUrl}$`), { timeout: 15_000 });
+      await staff.waitForURL(new RegExp(`${itemUrl}$`, "u"), {
+        timeout: 15_000,
+      });
       await waitForHydration(staff);
       // Location is one of the four staff-only fields, so the private panel is
       // where it lands rather than the public half of the page.
@@ -240,7 +244,7 @@ test.describe("inventory hard delete gate", () => {
 
       // The panel navigates to the management table once the item is gone,
       // because the page the button was on no longer exists.
-      await staff.waitForURL(/\/admin\/inventory/, { timeout: 15_000 });
+      await staff.waitForURL(/\/admin\/inventory/u, { timeout: 15_000 });
       await staff.goto(
         `/admin/inventory?q=${encodeURIComponent(cleanName)}&retiredOnly=true`
       );

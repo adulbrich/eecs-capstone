@@ -92,7 +92,7 @@ describe("ProjectCard", () => {
     // paragraph's text spans elements and a whole-string matcher would miss it.
     const updated = container.querySelector("time");
     expect(updated?.getAttribute("dateTime")).toBe(base.updatedAt);
-    expect(updated?.closest("p")?.textContent).toMatch(/^Updated /);
+    expect(updated?.closest("p")?.textContent).toMatch(/^Updated /u);
   });
 
   it("joins two programs with a semicolon, in course id order", () => {
@@ -182,7 +182,7 @@ describe("ProjectCard badges", () => {
       <ProjectCard project={{ ...base, studentProposed: true }} />
     );
     expect(getByText("Student proposed")).toBeTruthy();
-    expect(queryByText(/@/)).toBeNull();
+    expect(queryByText(/@/u)).toBeNull();
   });
 
   it("shows the agreement badge when the summary carries the flag", () => {
@@ -198,6 +198,6 @@ describe("ProjectCard badges", () => {
     // name, and the card has no "Mentor:" line to put one in.
     const { queryByText } = render(<ProjectCard project={base} />);
     expect(queryByText("Student proposed")).toBeNull();
-    expect(queryByText(/mentor/i)).toBeNull();
+    expect(queryByText(/mentor/iu)).toBeNull();
   });
 });

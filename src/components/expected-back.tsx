@@ -20,7 +20,7 @@ export function ExpectedBack({
     return null;
   }
   return (
-    <p className="mt-2 text-muted-foreground text-sm">
+    <p className="text-muted-foreground mt-2 text-sm">
       Expected back on <OfficeDate value={dueAt} />.
     </p>
   );

@@ -219,8 +219,8 @@ function ProgramEdit() {
           </BreadcrumbItem>
         </BreadcrumbList>
       </Breadcrumb>
-      <h1 className="mt-2 font-semibold text-2xl">Edit program</h1>
-      <p className="mt-1 text-muted-foreground text-sm">
+      <h1 className="mt-2 text-2xl font-semibold">Edit program</h1>
+      <p className="text-muted-foreground mt-1 text-sm">
         {projectCount} linked project{projectCount === 1 ? "" : "s"}
       </p>
 

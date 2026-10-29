@@ -11,7 +11,7 @@ import {
 function albIdleTimeoutMs(): number {
   const source = readFileSync("infra/ecs.tf", "utf8");
   const block = source.split('resource "aws_lb" "app" {')[1]?.split("\n}")[0];
-  const seconds = /^\s*idle_timeout\s*=\s*(\d+)/m.exec(block ?? "")?.[1];
+  const seconds = /^\s*idle_timeout\s*=\s*(\d+)/mu.exec(block ?? "")?.[1];
   return Number(seconds) * 1000;
 }
 

@@ -39,7 +39,7 @@ export function StatusTimeline({ rows }: { rows: HistoryRow[] }) {
             </span>
           </div>
           {r.comment && (
-            <p className="mt-1 whitespace-pre-wrap text-sm">{r.comment}</p>
+            <p className="mt-1 text-sm whitespace-pre-wrap">{r.comment}</p>
           )}
         </li>
       ))}

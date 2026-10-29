@@ -7,7 +7,7 @@
  * (e.g., GitHub OAuth image, DiceBear identicon); those pass through
  * unchanged.
  */
-const LEADING_SLASHES = /^\/+/;
+const LEADING_SLASHES = /^\/+/u;
 
 const PUBLIC_BASE =
   (typeof import.meta !== "undefined" &&

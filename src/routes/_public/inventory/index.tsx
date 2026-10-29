@@ -242,7 +242,7 @@ function InventoryIndex() {
            buttons drop under the heading, right-aligned, rather than
            pushing the page wider than the viewport (#297). */
         <div className="flex flex-wrap items-center justify-between gap-4">
-          <h1 className="font-semibold text-2xl">Inventory</h1>
+          <h1 className="text-2xl font-semibold">Inventory</h1>
           <div className="ml-auto flex items-center gap-2">
             {/* Same sign-in gate as its sibling: a visitor cannot ask. */}
             {signedIn && (

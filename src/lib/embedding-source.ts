@@ -39,7 +39,7 @@ import { createHash } from "node:crypto";
 export const EMBEDDING_SOURCE_LIMIT = 20_000;
 
 /** A high surrogate with nothing after it: half a character, cut at the limit. */
-const LONE_TRAILING_SURROGATE = /[\uD800-\uDBFF]$/;
+const LONE_TRAILING_SURROGATE = /[\uD800-\uDBFF]$/u;
 
 export interface EmbeddableProject {
   description: string | null;

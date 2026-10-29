@@ -303,12 +303,12 @@ export function StaffProjectPanel({
                       {/* vertical track line (mobile) */}
                       <div
                         aria-hidden
-                        className="ml-3.5 h-4 w-px shrink-0 bg-border md:hidden"
+                        className="bg-border ml-3.5 h-4 w-px shrink-0 md:hidden"
                       />
                       {/* horizontal track line (desktop) */}
                       <div
                         aria-hidden
-                        className="hidden h-px w-5 shrink-0 bg-border md:block"
+                        className="bg-border hidden h-px w-5 shrink-0 md:block"
                       />
                     </>
                   )}
@@ -327,17 +327,17 @@ export function StaffProjectPanel({
           </div>
         </div>
 
-        <div className="mt-2 flex flex-wrap items-center gap-4 text-muted-foreground text-xs">
+        <div className="text-muted-foreground mt-2 flex flex-wrap items-center gap-4 text-xs">
           <span className="flex items-center gap-1.5">
-            <span className="inline-block h-2.5 w-2.5 rounded-full bg-brand" />
+            <span className="bg-brand inline-block h-2.5 w-2.5 rounded-full" />
             Current
           </span>
           <span className="flex items-center gap-1.5">
-            <span className="inline-block h-2.5 w-2.5 rounded-full border-2 border-brand" />
+            <span className="border-brand inline-block h-2.5 w-2.5 rounded-full border-2" />
             Normal flow
           </span>
           <span className="flex items-center gap-1.5">
-            <span className="inline-block h-2.5 w-2.5 rounded-full border border-border border-dashed" />
+            <span className="border-border inline-block h-2.5 w-2.5 rounded-full border border-dashed" />
             Override
           </span>
         </div>
@@ -345,8 +345,8 @@ export function StaffProjectPanel({
           The current status in words, for the reader who does not hover a
           pill. Same record the pill tooltips read.
         */}
-        <p className="mt-2 text-muted-foreground text-xs">
-          <span className="font-medium text-foreground">
+        <p className="text-muted-foreground mt-2 text-xs">
+          <span className="text-foreground font-medium">
             {PROJECT_STATUS_LABEL[currentStatus]}
           </span>
           : {PROJECT_STATUS_DESCRIPTION[currentStatus]}

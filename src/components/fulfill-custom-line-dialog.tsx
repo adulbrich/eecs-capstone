@@ -196,7 +196,7 @@ export function FulfillCustomLineDialog({
             {available.length > 0 && (
               <ul
                 aria-label="Matches"
-                className="divide-y divide-border rounded-md border"
+                className="divide-border divide-y rounded-md border"
               >
                 {available.map((match) => (
                   <li
@@ -218,7 +218,7 @@ export function FulfillCustomLineDialog({
             )}
           </div>
           <div>
-            <p className="font-medium text-sm">Linked ({chosen.length})</p>
+            <p className="text-sm font-medium">Linked ({chosen.length})</p>
             {chosen.length === 0 ? (
               <p className="text-muted-foreground text-sm">
                 Nothing linked yet.

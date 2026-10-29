@@ -231,8 +231,8 @@ function MentorsAdmin() {
           </BreadcrumbItem>
         </BreadcrumbList>
       </Breadcrumb>
-      <h1 className="mt-2 font-semibold text-2xl">Mentors</h1>
-      <p className="mt-1 text-muted-foreground text-sm">
+      <h1 className="mt-2 text-2xl font-semibold">Mentors</h1>
+      <p className="text-muted-foreground mt-1 text-sm">
         Users who have volunteered to mentor a team. Adjust their team capacity
         or remove them.
       </p>

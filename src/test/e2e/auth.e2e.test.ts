@@ -21,7 +21,7 @@ test.describe("@smoke authentication", () => {
     // Landing somewhere other than /sign-in is not proof of a session: an error
     // redirect would satisfy it too. Loading a route behind the auth guard is.
     await page.goto("/my/projects");
-    await expect(page).toHaveURL(/\/my\/projects/);
+    await expect(page).toHaveURL(/\/my\/projects/u);
   });
 
   test("returns to the page that sent it here", async ({ page }) => {
@@ -33,6 +33,6 @@ test.describe("@smoke authentication", () => {
     await waitForHydration(page);
     await enterEmailedCode(page, "user@example.com");
 
-    await expect(page).toHaveURL(/\/my\/projects/, { timeout: 15_000 });
+    await expect(page).toHaveURL(/\/my\/projects/u, { timeout: 15_000 });
   });
 });

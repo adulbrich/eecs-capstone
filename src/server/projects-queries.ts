@@ -25,7 +25,7 @@ const myProjectsSchema = z.object({
   status: z.enum(STATUS_FILTER_VALUES).default("all"),
 });
 
-const DAY = /^\d{4}-\d{2}-\d{2}$/;
+const DAY = /^\d{4}-\d{2}-\d{2}$/u;
 
 const adminListSchema = z
   .object({

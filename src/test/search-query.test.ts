@@ -44,7 +44,7 @@ describe("clampSearchQuery", () => {
     const { query, truncated } = clampSearchQuery(padded);
     expect(truncated).toBe(true);
     expect(query).toBe("e".repeat(SEARCH_QUERY_MAX - 1));
-    expect(query).not.toMatch(/[\uD800-\uDBFF]/);
+    expect(query).not.toMatch(/[\uD800-\uDBFF]/u);
   });
 
   it("keeps a pair that fits whole", () => {

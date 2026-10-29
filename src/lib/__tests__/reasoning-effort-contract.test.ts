@@ -34,9 +34,9 @@ const ENV_EXAMPLE = ".env.example";
 
 /** `variable "bedrock_scope_reasoning_effort" { ... default = "high" }` */
 const TF_EFFORT_VARIABLE =
-  /variable\s+"([a-z0-9_]*reasoning_effort)"\s*\{[^}]*?default\s*=\s*"([^"]*)"/g;
+  /variable\s+"([a-z0-9_]*reasoning_effort)"\s*\{[^}]*?default\s*=\s*"([^"]*)"/gu;
 /** `BEDROCK_SCOPE_REASONING_EFFORT=high` */
-const ENV_EFFORT_KEY = /^([A-Z][A-Z0-9_]*REASONING_EFFORT)=(.*)$/gm;
+const ENV_EFFORT_KEY = /^([A-Z][A-Z0-9_]*REASONING_EFFORT)=(.*)$/gmu;
 
 function matches(file: string, pattern: RegExp): [string, string][] {
   const text = readFileSync(file, "utf8");

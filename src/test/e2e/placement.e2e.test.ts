@@ -48,7 +48,7 @@ async function importFiles(page: Page) {
   await expect(
     page.getByRole("cell", { name: "Tide Clock", exact: true })
   ).toBeVisible();
-  await page.getByRole("tab", { name: /Bids/ }).click();
+  await page.getByRole("tab", { name: /Bids/u }).click();
   await page.getByLabel("Bids CSV file").setInputFiles({
     name: "bids.csv",
     mimeType: "text/csv",
@@ -91,7 +91,7 @@ test.describe("placement workspace", () => {
     await page.reload();
     await waitForHydration(page);
     await expect(page.getByLabel("Min students")).toHaveValue("2");
-    await page.getByRole("tab", { name: /Bids/ }).click();
+    await page.getByRole("tab", { name: /Bids/u }).click();
     await expect(page.getByText("2 students and 3 bids")).toBeVisible();
 
     expect(sent.length).toBeGreaterThan(0);
@@ -136,7 +136,7 @@ test.describe("placement workspace", () => {
     await expect(row).toContainText("Student proposed");
     // Hidden until asked for, and the mentor for a student-proposed project.
     await expect(
-      page.getByRole("columnheader", { name: /Contact/ })
+      page.getByRole("columnheader", { name: /Contact/u })
     ).toHaveCount(0);
     await page.getByRole("button", { name: "Columns" }).click();
     await page.getByRole("menuitemcheckbox", { name: "Contact" }).click();
@@ -166,7 +166,7 @@ test.describe("placement workspace", () => {
     await expect(tide).toContainText("jane@example.com, proposer");
     await expect(tide).not.toContainText("Student proposed");
     await expect(
-      page.getByText(/student_proposed must be true or false/)
+      page.getByText(/student_proposed must be true or false/u)
     ).toBeVisible();
   });
 
@@ -176,7 +176,7 @@ test.describe("placement workspace", () => {
     await page.goto("/admin/placement");
     await waitForHydration(page);
     await importFiles(page);
-    await page.getByRole("tab", { name: /Projects/ }).click();
+    await page.getByRole("tab", { name: /Projects/u }).click();
 
     const addProject = async (title: string) => {
       await page.getByRole("button", { name: "Add project" }).click();
@@ -206,12 +206,12 @@ test.describe("placement workspace", () => {
 
     // A pin set on this page to a project that then goes stays, and the run
     // leaves that student unplaced rather than guessing.
-    await page.getByRole("tab", { name: /Bids/ }).click();
+    await page.getByRole("tab", { name: /Bids/u }).click();
     await page.getByRole("button", { name: "Per project" }).click();
     await page
-      .getByRole("button", { name: /^Pin here: Ada Park to Tide Clock/ })
+      .getByRole("button", { name: /^Pin here: Ada Park to Tide Clock/u })
       .click();
-    await page.getByRole("tab", { name: /Projects/ }).click();
+    await page.getByRole("tab", { name: /Projects/u }).click();
     await page.getByLabel("Min students per team, Robot Arm").fill("1");
     await page.getByRole("tab", { name: "Parameters" }).click();
     await page.getByLabel("Min students per team", { exact: true }).fill("1");
@@ -221,7 +221,7 @@ test.describe("placement workspace", () => {
       timeout: 20_000,
     });
 
-    await page.getByRole("tab", { name: /Projects/ }).click();
+    await page.getByRole("tab", { name: /Projects/u }).click();
     await page.getByRole("button", { name: "More for Tide Clock" }).click();
     await page.getByRole("menuitem", { name: "Remove..." }).click();
     const confirm = page.getByRole("alertdialog", {
@@ -248,7 +248,7 @@ test.describe("placement workspace", () => {
       timeout: 20_000,
     });
     await expect(
-      page.getByRole("row", { name: /Ada Park/ }).first()
+      page.getByRole("row", { name: /Ada Park/u }).first()
     ).toContainText("Pinned to a project with no teams.");
     await expect.poll(() => stored(page)).toContain('"addedByHand":true');
   });
@@ -374,7 +374,7 @@ test.describe("placement workspace", () => {
       mimeType: "text/csv",
       buffer: Buffer.from(PROJECTS_CSV),
     });
-    await page.getByRole("tab", { name: /Bids/ }).click();
+    await page.getByRole("tab", { name: /Bids/u }).click();
     await page.getByLabel("Bids CSV file").setInputFiles({
       name: "survey.csv",
       mimeType: "text/csv",
@@ -433,7 +433,7 @@ test.describe("placement workspace", () => {
     );
     await page.reload();
     await waitForHydration(page);
-    await page.getByRole("tab", { name: /Bids/ }).click();
+    await page.getByRole("tab", { name: /Bids/u }).click();
     await expect(page.getByText("2 students and 3 bids")).toBeVisible();
     await expect(
       page.getByText("Converted from the Qualtrics export survey.csv.")
@@ -461,7 +461,7 @@ test.describe("placement workspace", () => {
     await page.getByLabel("Min students").fill("1");
     // Robot Arm's own minimum is 2, which would leave pinned Ada alone and
     // the re-run infeasible once Ben moves; this test is about the flow.
-    await page.getByRole("tab", { name: /Projects/ }).click();
+    await page.getByRole("tab", { name: /Projects/u }).click();
     await page.getByLabel("Min students per team, Robot Arm").fill("1");
     await page.getByRole("tab", { name: "Results" }).click();
     await page.getByRole("button", { name: "Run placement" }).click();
@@ -470,7 +470,7 @@ test.describe("placement workspace", () => {
     });
     // One team per project: Ada on Tide Clock, pinned Ben on Robot Arm.
     await expect(figures(page).getByText("every team 1")).toBeVisible();
-    await expect(page.getByText(/^Ran at /)).toBeVisible();
+    await expect(page.getByText(/^Ran at /u)).toBeVisible();
     // Every student on Robot Arm is pinned, so it starts folded (#713).
     const robotArm = page.getByRole("button", { name: "Robot Arm" });
     const tideClock = page.getByRole("button", { name: "Tide Clock" });
@@ -503,11 +503,11 @@ test.describe("placement workspace", () => {
     await expect(page.getByText("No project matches.")).toBeVisible();
     await search.fill("clock");
     await page.getByRole("option", { name: "Tide Clock" }).click();
-    await expect(page.getByText(/moved by hand/)).toBeVisible();
+    await expect(page.getByText(/moved by hand/u)).toBeVisible();
     // The figures follow the Move without a run (#701).
     await expect(figures(page).getByText("every team 2")).toBeVisible();
     await page.getByRole("button", { name: "Run placement again" }).click();
-    await expect(page.getByText(/moved by hand/)).toBeHidden({
+    await expect(page.getByText(/moved by hand/u)).toBeHidden({
       timeout: 20_000,
     });
     // A new run starts every project over: Tide Clock is all pinned again.
@@ -526,16 +526,16 @@ test.describe("placement workspace", () => {
     await page.getByRole("combobox", { name: "Download as" }).click();
     await page.getByRole("option", { name: "Canvas groups" }).click();
     await expect(
-      page.getByText(/Canvas matches each student by their login/)
+      page.getByText(/Canvas matches each student by their login/u)
     ).toBeVisible();
     const canvas = page.waitForEvent("download");
     await page.getByRole("button", { name: "Download placement" }).click();
     const download = await canvas;
     expect(download.suggestedFilename()).toMatch(
-      /^placement-\d{4}-\d{2}-\d{2} \(Canvas groups\)\.csv$/
+      /^placement-\d{4}-\d{2}-\d{2} \(Canvas groups\)\.csv$/u
     );
     const groups = (await readFile(await download.path(), "utf-8"))
-      .replace(/^﻿/, "")
+      .replace(/^﻿/u, "")
       .split("\r\n");
     expect(groups[0]).toBe("name,login_id,group_name");
     expect(groups).toContainEqual(
@@ -558,7 +558,7 @@ test.describe("placement workspace", () => {
     // off her first choice once the placement runs again.
     await page.getByRole("tab", { name: "Parameters" }).click();
     await page.getByLabel("Min students").fill("1");
-    await page.getByRole("tab", { name: /Projects/ }).click();
+    await page.getByRole("tab", { name: /Projects/u }).click();
     await page.getByLabel("Min students per team, Robot Arm").fill("1");
     await page.getByRole("tab", { name: "Results" }).click();
     await page.getByRole("button", { name: "Run placement" }).click();
@@ -587,7 +587,7 @@ test.describe("placement workspace", () => {
     await bids
       .getByRole("button", { name: "Move here: Ada Park to Robot Arm" })
       .click();
-    await expect(page.getByText(/moved by hand/)).toBeVisible();
+    await expect(page.getByText(/moved by hand/u)).toBeVisible();
     await expect(
       page.getByRole("button", { name: "Unpin Ada Park" })
     ).toBeVisible();
@@ -596,7 +596,7 @@ test.describe("placement workspace", () => {
     ).toContainText("Placed here");
 
     await page.getByRole("button", { name: "Run placement again" }).click();
-    await expect(page.getByText(/moved by hand/)).toBeHidden({
+    await expect(page.getByText(/moved by hand/u)).toBeHidden({
       timeout: 20_000,
     });
     // Ada and Ben are both pinned to Robot Arm now, which folds it.
@@ -611,7 +611,7 @@ test.describe("placement workspace", () => {
     ).toBeVisible();
     // A project that forms no team offers no Move here, and the open list
     // follows the Projects tab.
-    await page.getByRole("tab", { name: /Projects/ }).click();
+    await page.getByRole("tab", { name: /Projects/u }).click();
     await page.getByLabel("Max teams, Tide Clock").fill("0");
     await page.getByRole("tab", { name: "Results" }).click();
     await expect(tide).toContainText("No teams");
@@ -642,7 +642,7 @@ test.describe("placement workspace", () => {
     await page.getByRole("option", { name: "Tide Clock" }).click();
     // An input change as well, as when a co-instructor lowered a project's
     // max teams and read the old board as the new run (#680).
-    await page.getByRole("tab", { name: /Projects/ }).click();
+    await page.getByRole("tab", { name: /Projects/u }).click();
     await page.getByLabel("Max teams, Tide Clock").fill("1");
     await page.getByRole("tab", { name: "Results" }).click();
     await page.getByRole("button", { name: "Run placement again" }).click();
@@ -657,10 +657,10 @@ test.describe("placement workspace", () => {
       "The board below still shows the last run that worked, not this one."
     );
     await expect(
-      page.getByRole("heading", { name: /^Last run that worked, / })
+      page.getByRole("heading", { name: /^Last run that worked, /u })
     ).toBeVisible();
     await expect(
-      page.getByText(/Run placement again to use them/)
+      page.getByText(/Run placement again to use them/u)
     ).toBeHidden();
     await expect(placedFigure(page, "2 of 2")).toBeVisible();
   });
@@ -703,7 +703,7 @@ test.describe("placement workspace", () => {
       mimeType: "text/csv",
       buffer: Buffer.from(PROJECTS_CSV),
     });
-    await page.getByRole("tab", { name: /Bids/ }).click();
+    await page.getByRole("tab", { name: /Bids/u }).click();
     await page.getByLabel("Bids CSV file").setInputFiles({
       name: "edited.csv",
       mimeType: "text/csv",
@@ -714,7 +714,7 @@ test.describe("placement workspace", () => {
     ).toBeVisible();
     await expect(page.getByText("2 students and 3 bids")).toBeVisible();
     await expect(
-      page.getByText(/The export has no ImportId row/)
+      page.getByText(/The export has no ImportId row/u)
     ).toBeVisible();
 
     await page.getByRole("button", { name: "Remove bids" }).click();
@@ -770,7 +770,7 @@ test.describe("placement workspace", () => {
         .getByRole("button", { name: `Download CSV of ${table}` })
         .click();
       const text = await readFile(await (await download).path(), "utf-8");
-      expect(text.replace(/^\uFEFF/, "").split("\r\n")[0]).toBe(header);
+      expect(text.replace(/^\uFEFF/u, "").split("\r\n")[0]).toBe(header);
     }
     await expect(sheet.getByText("Every student is placed.")).toBeVisible();
     await expect(
@@ -790,7 +790,7 @@ test.describe("placement workspace", () => {
       mimeType: "text/csv",
       buffer: Buffer.from(PROJECTS_CSV),
     });
-    await page.getByRole("tab", { name: /Bids/ }).click();
+    await page.getByRole("tab", { name: /Bids/u }).click();
     await page.getByLabel("Bids CSV file").setInputFiles({
       name: "bids.csv",
       mimeType: "text/csv",
@@ -826,7 +826,7 @@ test.describe("placement workspace", () => {
 
     await page.reload();
     await waitForHydration(page);
-    await page.getByRole("tab", { name: /Bids/ }).click();
+    await page.getByRole("tab", { name: /Bids/u }).click();
     await expect(page.getByText("2 students and 2 bids")).toBeVisible();
 
     await matched
@@ -846,7 +846,7 @@ test.describe("placement workspace", () => {
     await unmatched
       .getByRole("combobox", { name: 'Project for "Moon Base"' })
       .click();
-    await page.getByRole("option", { name: /^Robot Arm/ }).click();
+    await page.getByRole("option", { name: /^Robot Arm/u }).click();
     await unmatched.getByRole("button", { name: 'Match "Moon Base"' }).click();
     await expect(matched).toContainText('"Moon Base" matched to Robot Arm');
     await expect(unmatched).toHaveCount(0);
@@ -860,7 +860,7 @@ test.describe("placement workspace", () => {
     await waitForHydration(page);
     await importFiles(page);
 
-    await page.getByRole("tab", { name: /Roster/ }).click();
+    await page.getByRole("tab", { name: /Roster/u }).click();
     await page.getByLabel("Roster CSV file").setInputFiles({
       name: "roster.csv",
       mimeType: "text/csv",
@@ -868,7 +868,7 @@ test.describe("placement workspace", () => {
         `email,name\nADA@${DOMAIN},Ada Park\nkim@${DOMAIN},Kim Lee\n`
       ),
     });
-    const roster = page.getByRole("region", { name: /Class roster/ });
+    const roster = page.getByRole("region", { name: /Class roster/u });
     await expect(roster).toContainText("2 students from roster.csv");
     await expect(roster).toContainText(
       "1 student on the roster did not answer the survey"
@@ -876,7 +876,7 @@ test.describe("placement workspace", () => {
     // Ben answered the survey but is not on this roster.
     await expect(roster).toContainText(`ben@${DOMAIN}`);
     await expect(page.getByRole("tab", { name: "Roster (2)" })).toBeVisible();
-    await page.getByRole("tab", { name: /Bids/ }).click();
+    await page.getByRole("tab", { name: /Bids/u }).click();
     await expect(
       page.getByText("and 1 more from the roster with no bids")
     ).toBeVisible();
@@ -887,25 +887,25 @@ test.describe("placement workspace", () => {
       )
     ).toBeVisible();
     await expect(
-      page.getByRole("rowheader", { name: /Kim Lee.*not in the survey/ })
+      page.getByRole("rowheader", { name: /Kim Lee.*not in the survey/u })
     ).toBeVisible();
     await expect.poll(() => stored(page)).toContain('"roster"');
 
     await page.getByRole("link", { name: "Roster tab" }).click();
-    await expect(page).toHaveURL(/tab=roster/);
+    await expect(page).toHaveURL(/tab=roster/u);
     await roster.getByRole("button", { name: "Remove roster" }).click();
     await page.getByRole("button", { name: "Remove", exact: true }).click();
     await expect(page.getByRole("tab", { name: "Roster" })).toBeVisible();
-    await page.getByRole("tab", { name: /Bids/ }).click();
+    await page.getByRole("tab", { name: /Bids/u }).click();
     // The panel first: a count of none passes before it renders.
     await expect(
-      page.getByRole("rowheader", { name: /Ada Park/ })
+      page.getByRole("rowheader", { name: /Ada Park/u })
     ).toBeVisible();
-    await expect(page.getByRole("rowheader", { name: /Kim Lee/ })).toHaveCount(
+    await expect(page.getByRole("rowheader", { name: /Kim Lee/u })).toHaveCount(
       0
     );
     await expect(page.getByRole("link", { name: "Roster tab" })).toHaveCount(0);
-    await page.getByRole("tab", { name: /Roster/ }).click();
+    await page.getByRole("tab", { name: /Roster/u }).click();
 
     await page
       .getByLabel("Roster emails")
@@ -916,9 +916,9 @@ test.describe("placement workspace", () => {
       page.getByRole("region", { name: "Problems in the pasted roster" })
     ).toContainText('Line 3: "nobody" is not an email.');
     await expect(roster).not.toContainText("not on the roster");
-    await page.getByRole("tab", { name: /Bids/ }).click();
+    await page.getByRole("tab", { name: /Bids/u }).click();
     await expect(
-      page.getByRole("rowheader", { name: /Kim Lee.*not in the survey/ })
+      page.getByRole("rowheader", { name: /Kim Lee.*not in the survey/u })
     ).toBeVisible();
   });
 
@@ -935,10 +935,10 @@ test.describe("placement workspace", () => {
       .getByLabel("Roster emails")
       .fill(`ada@${DOMAIN}\nKim Lee <kim@${DOMAIN}>`);
     await page.getByRole("button", { name: "Use these emails" }).click();
-    const roster = page.getByRole("region", { name: /Class roster/ });
+    const roster = page.getByRole("region", { name: /Class roster/u });
     await expect(roster).toContainText("2 students from a pasted list");
     await expect(
-      page.getByText(/matched once the projects are loaded/)
+      page.getByText(/matched once the projects are loaded/u)
     ).toBeVisible();
     await expect(roster).toContainText(
       "Load the projects, then the bids, to match the roster against them."
@@ -955,14 +955,14 @@ test.describe("placement workspace", () => {
     await page.goto("/admin/placement");
     await waitForHydration(page);
     await importFiles(page);
-    await page.getByRole("tab", { name: /Roster/ }).click();
+    await page.getByRole("tab", { name: /Roster/u }).click();
     await page
       .getByLabel("Roster emails")
       .fill(`ada@${DOMAIN}\nben@${DOMAIN}\nKim Lee <kim@${DOMAIN}>`);
     await page.getByRole("button", { name: "Use these emails" }).click();
     await page.getByRole("tab", { name: "Parameters" }).click();
     await page.getByLabel("Min students").fill("1");
-    await page.getByRole("tab", { name: /Projects/ }).click();
+    await page.getByRole("tab", { name: /Projects/u }).click();
     await page.getByLabel("Min students per team, Robot Arm").fill("1");
 
     await page.getByRole("tab", { name: "Results" }).click();
@@ -971,18 +971,18 @@ test.describe("placement workspace", () => {
       timeout: 20_000,
     });
     await expect(
-      page.getByRole("row", { name: /Kim Lee.*Not in the survey/ })
+      page.getByRole("row", { name: /Kim Lee.*Not in the survey/u })
     ).toBeVisible();
     // Kim is listed on the card at the top (#714), with the board's actions,
     // and stays there once pinned: a Move from the card pins too.
-    const card = page.getByRole("region", { name: /Not in the survey/ });
+    const card = page.getByRole("region", { name: /Not in the survey/u });
     await expect(card).toContainText("1 student");
-    await expect(card.getByRole("row", { name: /Kim Lee/ })).toContainText(
-      /of \d/
+    await expect(card.getByRole("row", { name: /Kim Lee/u })).toContainText(
+      /of \d/u
     );
     await card.getByRole("button", { name: "Approve Kim Lee here" }).click();
     await expect(
-      page.getByRole("row", { name: /Kim Lee.*Pinned, not in the survey/ })
+      page.getByRole("row", { name: /Kim Lee.*Pinned, not in the survey/u })
     ).toBeVisible();
     await expect(
       card.getByRole("button", { name: "Unpin Kim Lee" })
@@ -991,7 +991,7 @@ test.describe("placement workspace", () => {
     const target = page.getByRole("option").first();
     const targetTitle = (await target.textContent()) ?? "";
     await target.click();
-    await expect(card.getByRole("row", { name: /Kim Lee/ })).toContainText(
+    await expect(card.getByRole("row", { name: /Kim Lee/u })).toContainText(
       `${targetTitle}, team 1, pinned`
     );
     // The board follows the card.
@@ -999,7 +999,7 @@ test.describe("placement workspace", () => {
       page
         .getByRole("rowgroup")
         .filter({ has: page.getByRole("button", { name: targetTitle }) })
-        .getByRole("row", { name: /Kim Lee/ })
+        .getByRole("row", { name: /Kim Lee/u })
     ).toBeVisible();
     await expect(
       card.getByRole("button", { name: "Unpin Kim Lee" })
@@ -1019,13 +1019,14 @@ test.describe("placement workspace", () => {
     const placed = await readFile(await (await placement).path(), "utf-8");
     expect(placed).toMatch(
       new RegExp(
-        `kim@${DOMAIN.replaceAll(".", "\\.")},Kim Lee,[^,]+,\\d,not in the survey`
+        `kim@${DOMAIN.replaceAll(".", "\\.")},Kim Lee,[^,]+,\\d,not in the survey`,
+        "u"
       )
     );
 
     // Removing the roster takes Kim out of the run, so the run goes too
     // rather than leaving Kim's placement to vanish from the board.
-    await page.getByRole("tab", { name: /Roster/ }).click();
+    await page.getByRole("tab", { name: /Roster/u }).click();
     await page.getByRole("button", { name: "Remove roster" }).click();
     await page.getByRole("button", { name: "Remove", exact: true }).click();
     await page.getByRole("tab", { name: "Results" }).click();
@@ -1041,7 +1042,7 @@ test.describe("placement workspace", () => {
     await page.goto("/admin/placement");
     await waitForHydration(page);
     await importFiles(page);
-    await page.getByRole("tab", { name: /Roster/ }).click();
+    await page.getByRole("tab", { name: /Roster/u }).click();
     await page.getByLabel("Roster CSV file").setInputFiles({
       name: "roster.csv",
       mimeType: "text/csv",
@@ -1055,7 +1056,7 @@ test.describe("placement workspace", () => {
         ].join("\n")
       ),
     });
-    const roster = page.getByRole("region", { name: /Class roster/ });
+    const roster = page.getByRole("region", { name: /Class roster/u });
     await expect(roster).toContainText("4 students are pre-approved");
     // The bids file pins Ben to Robot Arm; the roster wins, and says so.
     await expect(
@@ -1063,14 +1064,14 @@ test.describe("placement workspace", () => {
     ).toContainText(
       `ben@${DOMAIN} is pre-approved for Tide Clock, over the bids file's pin to Robot Arm.`
     );
-    await page.getByRole("tab", { name: /Bids/ }).click();
+    await page.getByRole("tab", { name: /Bids/u }).click();
     await expect(
       page.getByRole("rowheader", {
-        name: /Ada Park.*pre-approved for Robot Arm/,
+        name: /Ada Park.*pre-approved for Robot Arm/u,
       })
     ).toBeVisible();
 
-    await page.getByRole("tab", { name: /Projects/ }).click();
+    await page.getByRole("tab", { name: /Projects/u }).click();
     const added = page.getByRole("region", { name: "Added from the roster" });
     await expect(added).toContainText("Sponsor Lab");
     await expect(added).toContainText("Tide Clok");
@@ -1082,7 +1083,7 @@ test.describe("placement workspace", () => {
     await parameters.click();
     await expect(parameters).toHaveAttribute("aria-selected", "true");
     await page.getByLabel("Min students").fill("1");
-    await page.getByRole("tab", { name: /Projects/ }).click();
+    await page.getByRole("tab", { name: /Projects/u }).click();
     await page.getByLabel("Min students per team, Robot Arm").fill("1");
 
     await page.getByRole("tab", { name: "Results" }).click();
@@ -1101,29 +1102,29 @@ test.describe("placement workspace", () => {
         .filter({ has: page.getByRole("button", { name: label }) });
     await expect(
       group("Robot Arm").getByRole("row", {
-        name: /Ada Park.*Pre-approved/,
+        name: /Ada Park.*Pre-approved/u,
       })
     ).toBeVisible();
     await expect(
       group("Sponsor Lab").getByRole("row", {
-        name: /Kim Lee.*Pre-approved/,
+        name: /Kim Lee.*Pre-approved/u,
       })
     ).toBeVisible();
     await expect(
       group("Tide Clock").getByRole("row", {
-        name: /Lou Ma.*Pre-approved/,
+        name: /Lou Ma.*Pre-approved/u,
       })
     ).toBeVisible();
     await expect(
       group("Tide Clock").getByRole("row", {
-        name: /Ben Ito.*Pre-approved/,
+        name: /Ben Ito.*Pre-approved/u,
       })
     ).toBeVisible();
 
     // Unpinning a pre-approved student on the board overrides the roster,
     // and the Bids tab says so rather than dropping the pre-approval quietly.
     await page.getByRole("button", { name: "Unpin Ada Park" }).click();
-    await page.getByRole("tab", { name: /Bids/ }).click();
+    await page.getByRole("tab", { name: /Bids/u }).click();
     await expect(
       page.getByRole("note").filter({
         hasText: "Pre-approved for Robot Arm on the roster, but a pin set",
@@ -1149,9 +1150,9 @@ test.describe("placement workspace", () => {
     await page.goto("/admin/placement");
     await waitForHydration(page);
     await importFiles(page);
-    await page.getByRole("tab", { name: /Roster/ }).click();
+    await page.getByRole("tab", { name: /Roster/u }).click();
     await page.getByLabel("Roster CSV file").setInputFiles(rosterFile);
-    const roster = page.getByRole("region", { name: /Class roster/ });
+    const roster = page.getByRole("region", { name: /Class roster/u });
     await expect(roster).toContainText("No format on this page recognized");
     await roster.getByRole("button", { name: "Map columns" }).click();
 
@@ -1190,17 +1191,17 @@ test.describe("placement workspace", () => {
       page.getByRole("region", { name: "Map the columns of roster.csv" })
     ).toHaveCount(0);
 
-    await page.getByRole("tab", { name: /Bids/ }).click();
+    await page.getByRole("tab", { name: /Bids/u }).click();
     await expect(
       page.getByRole("rowheader", {
-        name: /Ada Park.*pre-approved for Robot Arm/,
+        name: /Ada Park.*pre-approved for Robot Arm/u,
       })
     ).toBeVisible();
     await expect(
       page.getByText("and 1 more from the roster with no bids")
     ).toBeVisible();
 
-    await page.getByRole("tab", { name: /Roster/ }).click();
+    await page.getByRole("tab", { name: /Roster/u }).click();
     const download = page.waitForEvent("download");
     await roster
       .getByRole("button", { name: "Download column mapping" })
@@ -1219,7 +1220,7 @@ test.describe("placement workspace", () => {
       await other.goto("/admin/placement?tab=roster");
       await waitForHydration(other);
       await other.getByLabel("Roster CSV file").setInputFiles(rosterFile);
-      const otherRoster = other.getByRole("region", { name: /Class roster/ });
+      const otherRoster = other.getByRole("region", { name: /Class roster/u });
       await otherRoster.getByRole("button", { name: "Map columns" }).click();
       await other.getByLabel("Column mapping file").setInputFiles({
         name: "roster (column mapping).json",
@@ -1271,7 +1272,7 @@ test.describe("placement workspace", () => {
       mimeType: "text/csv",
       buffer: Buffer.from(PROJECTS_CSV),
     });
-    await page.getByRole("tab", { name: /Bids/ }).click();
+    await page.getByRole("tab", { name: /Bids/u }).click();
     // One row per student, one column per project, the title in brackets:
     // Ben left Tide Clok blank, and "Tide Clok" names no project.
     await page.getByLabel("Bids CSV file").setInputFiles({
@@ -1340,7 +1341,7 @@ test.describe("placement workspace", () => {
     await unmatched.getByRole("button", { name: 'Match "Tide Clok"' }).click();
     await expect(page.getByText("2 students and 3 bids")).toBeVisible();
     await expect(
-      page.getByRole("rowheader", { name: /Ada Park/ })
+      page.getByRole("rowheader", { name: /Ada Park/u })
     ).toBeVisible();
 
     const bidsOf = async () => JSON.parse((await stored(page)) ?? "null")?.bids;
@@ -1369,9 +1370,9 @@ test.describe("placement workspace", () => {
     await waitForHydration(page);
     await importFiles(page);
     await page.getByRole("button", { name: "Per project" }).click();
-    await expect(page).toHaveURL(/view=project/);
+    await expect(page).toHaveURL(/view=project/u);
     // Anchored to the header: another group's row can name the project.
-    const tide = page.getByRole("rowgroup").filter({ hasText: /^Tide Clock/ });
+    const tide = page.getByRole("rowgroup").filter({ hasText: /^Tide Clock/u });
     await expect(tide).toContainText("1 bid, 1 first choice");
     await expect(tide).toContainText("Tides, and");
 
@@ -1381,20 +1382,20 @@ test.describe("placement workspace", () => {
     await expect(
       tide.getByRole("button", { name: "Unpin Ada Park" })
     ).toBeVisible();
-    const robot = page.getByRole("rowgroup").filter({ hasText: /^Robot Arm/ });
+    const robot = page.getByRole("rowgroup").filter({ hasText: /^Robot Arm/u });
     await expect(robot.getByText("Pinned elsewhere")).toBeVisible();
     // Only Tide Clock's own group names it, so a search lands there.
     await expect(robot).not.toContainText("Tide Clock");
 
     // Ben is pinned by the bids file; Ada now by the board.
-    await expect(page.getByText(/2 pinned\./)).toBeVisible();
+    await expect(page.getByText(/2 pinned\./u)).toBeVisible();
     // Each header names who is pinned there and how (#688).
     await expect(tide).toContainText("Pinned: Ada Park (1st)");
     await expect(robot).toContainText("Pinned: Ben Ito (1st)");
 
     // Pinned only leaves each project's pins, and survives a reload.
     await page.getByRole("switch", { name: "Pinned only" }).click();
-    await expect(page).toHaveURL(/pinnedOnly=true/);
+    await expect(page).toHaveURL(/pinnedOnly=true/u);
     await expect(robot.getByText("Pinned elsewhere")).toHaveCount(0);
     await expect(robot.getByText("Ben Ito", { exact: true })).toBeVisible();
     await page.reload();
@@ -1410,10 +1411,10 @@ test.describe("placement workspace", () => {
     // The pin holds through a run, as an Approve on the board would.
     await page.getByRole("tab", { name: "Parameters" }).click();
     await page.getByLabel("Min students").fill("1");
-    await page.getByRole("tab", { name: /Projects/ }).click();
+    await page.getByRole("tab", { name: /Projects/u }).click();
     await page.getByLabel("Min students per team, Robot Arm").fill("1");
     await page.getByRole("tab", { name: "Results" }).click();
-    await expect(page).toHaveURL(/view=project/);
+    await expect(page).toHaveURL(/view=project/u);
     await page.getByRole("button", { name: "Run placement" }).click();
     await expect(figures(page)).toBeVisible({
       timeout: 20_000,
@@ -1425,23 +1426,23 @@ test.describe("placement workspace", () => {
         .filter({ has: page.getByRole("button", { name: "Tide Clock" }) })
         .getByRole("button", { name: "Unpin Ada Park" })
     ).toBeVisible();
-    await page.getByRole("tab", { name: /Bids/ }).click();
+    await page.getByRole("tab", { name: /Bids/u }).click();
     // Who the run placed on each project, and on which team (#693).
     await expect(tide).toContainText(
       "Placed: 1 student, 1 on their first choice"
     );
     await expect(
-      tide.getByRole("row", { name: /Ada Park.*Placed here, team 1/ })
+      tide.getByRole("row", { name: /Ada Park.*Placed here, team 1/u })
     ).toBeVisible();
     await expect(robot).toContainText(
       "Placed: 1 student, 1 on their first choice"
     );
     await expect(
-      robot.getByRole("row", { name: /Ada Park/ })
+      robot.getByRole("row", { name: /Ada Park/u })
     ).not.toContainText("Placed here");
     await page.getByRole("button", { name: "Per student" }).click();
     await expect(
-      page.getByRole("row", { name: /Tide Clock.*pinned/ }).first()
+      page.getByRole("row", { name: /Tide Clock.*pinned/u }).first()
     ).toBeVisible();
     await expect.poll(() => stored(page)).toContain(`"ada@${DOMAIN}":"`);
   });
@@ -1454,11 +1455,11 @@ test.describe("placement workspace", () => {
     await importFiles(page);
     await page.getByRole("tab", { name: "Parameters" }).click();
     await page.getByLabel("Min students").fill("1");
-    await page.getByRole("tab", { name: /Projects/ }).click();
+    await page.getByRole("tab", { name: /Projects/u }).click();
     await page.getByLabel("Min students per team, Robot Arm").fill("1");
-    await page.getByRole("tab", { name: /Bids/ }).click();
+    await page.getByRole("tab", { name: /Bids/u }).click();
     // Anchored to the header, as a per-project group can name her too.
-    const ada = page.getByRole("rowgroup").filter({ hasText: /^Ada Park/ });
+    const ada = page.getByRole("rowgroup").filter({ hasText: /^Ada Park/u });
     await expect(ada).toContainText("No run yet");
 
     await page.getByRole("tab", { name: "Results" }).click();
@@ -1466,13 +1467,13 @@ test.describe("placement workspace", () => {
     await expect(placedFigure(page, "2 of 2")).toBeVisible({
       timeout: 20_000,
     });
-    await page.getByRole("tab", { name: /Bids/ }).click();
+    await page.getByRole("tab", { name: /Bids/u }).click();
     await expect(ada).toContainText("Placed: Tide Clock, team 1 (1st)");
     await expect(
-      ada.getByRole("row", { name: /Tide Clock \(placed\)/ })
+      ada.getByRole("row", { name: /Tide Clock \(placed\)/u })
     ).toBeVisible();
     // Ben's pin comes from the bids file, so only the pin shows.
-    const ben = page.getByRole("rowgroup").filter({ hasText: /^Ben Ito/ });
+    const ben = page.getByRole("rowgroup").filter({ hasText: /^Ben Ito/u });
     await expect(ben).toContainText("Pinned to Robot Arm");
     await expect(ben).not.toContainText("Placed:");
 
@@ -1489,7 +1490,7 @@ test.describe("placement workspace", () => {
     );
     await expect(ada).not.toContainText("Placed:");
     await expect(
-      ada.getByRole("row", { name: /Robot Arm \(pinned\)/ })
+      ada.getByRole("row", { name: /Robot Arm \(pinned\)/u })
     ).toBeVisible();
   });
 
@@ -1499,7 +1500,7 @@ test.describe("placement workspace", () => {
     await page.goto("/admin/placement");
     await waitForHydration(page);
     await importFiles(page);
-    await page.getByRole("tab", { name: /Roster/ }).click();
+    await page.getByRole("tab", { name: /Roster/u }).click();
     await page.getByLabel("Roster CSV file").setInputFiles({
       name: "canvas-groups.csv",
       mimeType: "text/csv",
@@ -1512,7 +1513,7 @@ test.describe("placement workspace", () => {
         ].join("\n")
       ),
     });
-    const roster = page.getByRole("region", { name: /Class roster/ });
+    const roster = page.getByRole("region", { name: /Class roster/u });
     await expect(roster).toContainText(
       "Read as a Canvas roster and groups export"
     );
@@ -1530,7 +1531,7 @@ test.describe("placement workspace", () => {
     await roster.getByLabel("Read as").click();
     await page.getByRole("option", { name: "Canvas roster export" }).click();
     await expect(roster).toContainText("2 students are pre-approved");
-    await page.getByRole("tab", { name: /Projects/ }).click();
+    await page.getByRole("tab", { name: /Projects/u }).click();
     await expect(
       page.getByRole("region", { name: "Added from the roster" })
     ).toContainText("Team 3");
@@ -1540,7 +1541,7 @@ test.describe("placement workspace", () => {
     await expect(parameters).toHaveAttribute("aria-selected", "true");
     await page.getByLabel("Min students").fill("1");
     // The bids file pins Ben alone to Robot Arm, whose own minimum is 2.
-    await page.getByRole("tab", { name: /Projects/ }).click();
+    await page.getByRole("tab", { name: /Projects/u }).click();
     await page.getByLabel("Min students per team, Robot Arm").fill("1");
     await page.getByRole("tab", { name: "Results" }).click();
     await page.getByRole("button", { name: "Run placement" }).click();
@@ -1552,7 +1553,7 @@ test.describe("placement workspace", () => {
       page
         .getByRole("rowgroup")
         .filter({ has: page.getByRole("button", { name: "Team 3" }) })
-        .getByRole("row", { name: /Kim Lee.*Pre-approved/ })
+        .getByRole("row", { name: /Kim Lee.*Pre-approved/u })
     ).toBeVisible();
   });
 
@@ -1564,7 +1565,7 @@ test.describe("placement workspace", () => {
     await importFiles(page);
     // Kim is pre-approved for a project the list lacks, and Ben answered the
     // survey but is not on the roster, as a student who transferred out is.
-    await page.getByRole("tab", { name: /Roster/ }).click();
+    await page.getByRole("tab", { name: /Roster/u }).click();
     await page.getByLabel("Roster CSV file").setInputFiles({
       name: "roster.csv",
       mimeType: "text/csv",
@@ -1572,32 +1573,32 @@ test.describe("placement workspace", () => {
         `email,name,project\nada@${DOMAIN},Ada Park,\nkim@${DOMAIN},Kim Lee,Moon Base\n`
       ),
     });
-    const roster = page.getByRole("region", { name: /Class roster/ });
+    const roster = page.getByRole("region", { name: /Class roster/u });
     await roster.getByRole("button", { name: "Remove this student" }).click();
     const removed = page.getByRole("region", {
-      name: /Removed from placement/,
+      name: /Removed from placement/u,
     });
     await expect(removed).toContainText(`Ben Ito (ben@${DOMAIN})`);
-    await page.getByRole("tab", { name: /Bids/ }).click();
+    await page.getByRole("tab", { name: /Bids/u }).click();
     await expect(page.getByText("Ada Park")).not.toHaveCount(0);
-    await expect(page.getByRole("rowheader", { name: /Ben Ito/ })).toHaveCount(
+    await expect(page.getByRole("rowheader", { name: /Ben Ito/u })).toHaveCount(
       0
     );
 
     // A removed pre-approval takes its roster-added project with it.
-    await page.getByRole("tab", { name: /Projects/ }).click();
+    await page.getByRole("tab", { name: /Projects/u }).click();
     const added = page.getByRole("region", { name: "Added from the roster" });
     await expect(added).toContainText("Moon Base");
-    await page.getByRole("tab", { name: /Bids/ }).click();
+    await page.getByRole("tab", { name: /Bids/u }).click();
     await page
       .getByRole("button", { name: "Remove from placement: Kim Lee" })
       .click();
     await expect(
       page.getByText(
-        /2 students are removed from placement\. See the Roster tab/
+        /2 students are removed from placement\. See the Roster tab/u
       )
     ).toBeVisible();
-    await page.getByRole("tab", { name: /Projects/ }).click();
+    await page.getByRole("tab", { name: /Projects/u }).click();
     // The tab's own table first: a count of none passes before it renders.
     await expect(
       page.getByRole("cell", { name: "Tide Clock", exact: true })
@@ -1636,31 +1637,31 @@ test.describe("placement workspace", () => {
     await expect(page.getByText(`ada@${DOMAIN}`)).toBeVisible();
     dialog = await removeFromBoard();
     await dialog.getByRole("button", { name: "Remove from placement" }).click();
-    await expect(page.getByText(/moved or removed by hand/)).toBeVisible();
+    await expect(page.getByText(/moved or removed by hand/u)).toBeVisible();
     await expect(page.getByText("Ada Park")).toHaveCount(0);
     // The figures drop her without a run (#701).
     await expect(placedFigure(page, "0 of 0")).toBeVisible();
 
     // New bids keep the removals, and with no bids the Roster tab still
     // lists them, named from the roster.
-    await page.getByRole("tab", { name: /Bids/ }).click();
+    await page.getByRole("tab", { name: /Bids/u }).click();
     await page.getByRole("button", { name: "Remove bids" }).click();
     await page.getByRole("button", { name: "Remove", exact: true }).click();
-    await page.getByRole("tab", { name: /Roster/ }).click();
+    await page.getByRole("tab", { name: /Roster/u }).click();
     await expect(removed).toContainText("Kim Lee");
-    await page.getByRole("tab", { name: /Bids/ }).click();
+    await page.getByRole("tab", { name: /Bids/u }).click();
     await page.getByLabel("Bids CSV file").setInputFiles({
       name: "bids.csv",
       mimeType: "text/csv",
       buffer: Buffer.from(BIDS_CSV),
     });
-    await page.getByRole("tab", { name: /Roster/ }).click();
+    await page.getByRole("tab", { name: /Roster/u }).click();
     await expect(removed).toContainText("3 students");
     await removed.getByRole("button", { name: "Restore Ben Ito" }).click();
     await expect(removed).toContainText("2 students");
-    await page.getByRole("tab", { name: /Bids/ }).click();
+    await page.getByRole("tab", { name: /Bids/u }).click();
     await expect(
-      page.getByRole("rowheader", { name: /Ben Ito/ })
+      page.getByRole("rowheader", { name: /Ben Ito/u })
     ).toBeVisible();
   });
 

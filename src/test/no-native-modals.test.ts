@@ -46,7 +46,7 @@ describe("native browser modals", () => {
         // so the `[^.\w]` guard that excludes `someApi.confirm(` must not
         // also exclude these two.
         if (
-          /(^|[^.\w])(?:(?:window|globalThis)\.)?(?:confirm|alert)\s*\(/.test(
+          /(^|[^.\w])(?:(?:window|globalThis)\.)?(?:confirm|alert)\s*\(/u.test(
             line
           )
         ) {

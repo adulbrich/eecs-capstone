@@ -30,7 +30,7 @@ function StatCard({ label, value }: { label: string; value: number }) {
   return (
     <Card className="p-4">
       <p className="text-muted-foreground text-sm">{label}</p>
-      <p className="mt-1 font-semibold text-2xl tabular-nums">{value}</p>
+      <p className="mt-1 text-2xl font-semibold tabular-nums">{value}</p>
     </Card>
   );
 }
@@ -55,7 +55,7 @@ function AlertCardBody({ label, value }: { label: string; value: number }) {
         <ArrowRight className="h-3.5 w-3.5" />
       </p>
       <p
-        className="mt-1 font-semibold text-2xl tabular-nums"
+        className="mt-1 text-2xl font-semibold tabular-nums"
         style={ALERT_TEXT_STYLE}
       >
         {value}
@@ -75,13 +75,13 @@ function NavCard({ to, icon: Icon, label, description }: NavCard) {
   return (
     <Card
       asChild
-      className="flex items-start gap-3 p-4 transition-colors hover:bg-secondary"
+      className="hover:bg-secondary flex items-start gap-3 p-4 transition-colors"
     >
       <Link to={to}>
-        <Icon className="mt-0.5 h-5 w-5 shrink-0 text-muted-foreground" />
+        <Icon className="text-muted-foreground mt-0.5 h-5 w-5 shrink-0" />
         <div>
-          <p className="font-medium text-sm">{label}</p>
-          <p className="mt-0.5 text-muted-foreground text-xs">{description}</p>
+          <p className="text-sm font-medium">{label}</p>
+          <p className="text-muted-foreground mt-0.5 text-xs">{description}</p>
         </div>
       </Link>
     </Card>
@@ -95,14 +95,14 @@ function AdminHome() {
 
   return (
     <div className="mx-auto max-w-2xl px-4 py-6 md:p-8">
-      <h1 className="font-semibold text-2xl">Admin</h1>
+      <h1 className="text-2xl font-semibold">Admin</h1>
 
       {/* A work queue, not a statistic: the two cards turn coloured and link
           into a pre-filtered list when non-zero. The overview counts that
           used to sit above them moved to /admin/analytics, where a date
           range and a program selector make them mean something (#34). */}
       <section className="mt-6">
-        <h2 className="font-medium text-muted-foreground text-xs uppercase tracking-wide">
+        <h2 className="text-muted-foreground text-xs font-medium tracking-wide uppercase">
           Needs attention
         </h2>
         <div className="mt-2 grid gap-3 sm:grid-cols-2">
@@ -141,7 +141,7 @@ function AdminHome() {
       </section>
 
       <section className="mt-8">
-        <h2 className="font-medium text-muted-foreground text-xs uppercase tracking-wide">
+        <h2 className="text-muted-foreground text-xs font-medium tracking-wide uppercase">
           Manage
         </h2>
         <div className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-2">

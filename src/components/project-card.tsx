@@ -56,7 +56,7 @@ function ProjectMeta({ project }: { project: ProjectSummary }) {
         <p className="text-muted-foreground text-xs">{meta.join(" · ")}</p>
       )}
       {project.updatedAt && (
-        <p className="mt-0.5 text-muted-foreground text-xs">
+        <p className="text-muted-foreground mt-0.5 text-xs">
           Updated <LocalTime dateOnly value={project.updatedAt} />
         </p>
       )}
@@ -88,12 +88,12 @@ export function ProjectCard({ project }: { project: ProjectSummary }) {
         to="/projects/$projectId"
       >
         <ImageOrFallback
-          className="aspect-[16/9] w-full bg-muted object-contain md:aspect-[3/2] md:w-40 md:shrink-0 md:rounded-md"
+          className="bg-muted aspect-[16/9] w-full object-contain md:aspect-[3/2] md:w-40 md:shrink-0 md:rounded-md"
           src={src}
         />
         <div className="flex min-w-0 flex-1 flex-col p-4 md:p-0">
           <div className="flex items-start justify-between gap-3">
-            <h3 className="font-semibold leading-tight">{project.title}</h3>
+            <h3 className="leading-tight font-semibold">{project.title}</h3>
             {project.status !== "published" && (
               <StatusBadge status={project.status} />
             )}
@@ -114,7 +114,7 @@ export function ProjectCard({ project }: { project: ProjectSummary }) {
             className="mt-2 self-start"
           />
           {project.excerpt && (
-            <p className="mt-2 line-clamp-3 text-muted-foreground text-sm md:mt-1">
+            <p className="text-muted-foreground mt-2 line-clamp-3 text-sm md:mt-1">
               {project.excerpt}
             </p>
           )}

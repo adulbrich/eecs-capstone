@@ -79,7 +79,7 @@ test.describe("project owner withdraw and delete", () => {
       // The delete handler sets window.location.href rather than navigating
       // through the router, so this is a full page load, not a client
       // transition.
-      await owner.waitForURL(/\/my\/projects/, { timeout: 15_000 });
+      await owner.waitForURL(/\/my\/projects/u, { timeout: 15_000 });
       await expect(owner.getByText(title)).toHaveCount(0);
     } finally {
       await ownerContext.close();

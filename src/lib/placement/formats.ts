@@ -7,7 +7,7 @@ import { toCsv } from "#/lib/csv";
  */
 
 /** A file name's ".csv", if it has one, for naming what is made from it. */
-export const CSV_EXTENSION = /(\.csv)?$/i;
+export const CSV_EXTENSION = /(\.csv)?$/iu;
 
 export interface FormatColumn {
   example: string;

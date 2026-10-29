@@ -402,7 +402,7 @@ describe("Regenerate records a staff attempt", () => {
         { projectId: project.id },
         fakeModel("x")
       )
-    ).rejects.toThrow(/no title, description/);
+    ).rejects.toThrow(/no title, description/u);
 
     expect(await readAttempt(project.id, "social_summary")).toBeNull();
   });

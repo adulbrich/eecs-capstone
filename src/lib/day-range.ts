@@ -16,9 +16,9 @@
 export const OFFICE_TIME_ZONE = "America/Los_Angeles";
 
 const DAY_MS = 86_400_000;
-const DAY = /^(\d{4})-(\d{2})-(\d{2})$/;
+const DAY = /^(\d{4})-(\d{2})-(\d{2})$/u;
 /** A 24-hour `HH:MM`, the value an `<input type="time">` sends. */
-export const TIME_PATTERN = /^([01]\d|2[0-3]):([0-5]\d)$/;
+export const TIME_PATTERN = /^([01]\d|2[0-3]):([0-5]\d)$/u;
 
 const partsFormatter = new Map<string, Intl.DateTimeFormat>();
 

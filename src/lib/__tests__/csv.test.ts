@@ -61,12 +61,12 @@ describe("toCsv", () => {
 
   it("quotes values containing a comma", () => {
     const csv = toCsv(COLUMNS, [row({ name: "Bolt, hex" })]);
-    expect(csv.split("\r\n")[1]).toMatch(/^"Bolt, hex",/);
+    expect(csv.split("\r\n")[1]).toMatch(/^"Bolt, hex",/u);
   });
 
   it("doubles inner quotes and wraps the value", () => {
     const csv = toCsv(COLUMNS, [row({ name: 'The "Big" One' })]);
-    expect(csv.split("\r\n")[1]).toMatch(/^"The ""Big"" One",/);
+    expect(csv.split("\r\n")[1]).toMatch(/^"The ""Big"" One",/u);
   });
 
   it("quotes values containing a newline", () => {

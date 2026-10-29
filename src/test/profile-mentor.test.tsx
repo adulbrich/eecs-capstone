@@ -16,7 +16,7 @@ describe("MentorFields", () => {
       />
     );
     expect(
-      screen.getByRole("switch", { name: /want to mentor/i })
+      screen.getByRole("switch", { name: /want to mentor/iu })
     ).toBeTruthy();
     expect(document.body.textContent).toContain(
       "For professionals and faculty, not students"
@@ -32,7 +32,7 @@ describe("MentorFields", () => {
         wants={false}
       />
     );
-    expect(screen.queryByLabelText(/how many teams/i)).toBeNull();
+    expect(screen.queryByLabelText(/how many teams/iu)).toBeNull();
     rerender(
       <MentorFields
         count={2}
@@ -41,6 +41,6 @@ describe("MentorFields", () => {
         wants
       />
     );
-    expect(screen.getByLabelText(/how many teams/i)).toBeTruthy();
+    expect(screen.getByLabelText(/how many teams/iu)).toBeTruthy();
   });
 });

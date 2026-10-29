@@ -24,8 +24,8 @@ function Card({
   return (
     <Comp
       className={cn(
-        "rounded-lg border border-border bg-card",
-        interactive && "transition-colors hover:border-primary",
+        "border-border bg-card rounded-lg border",
+        interactive && "hover:border-primary transition-colors",
         className
       )}
       data-slot="card"
@@ -47,7 +47,7 @@ function CardHeader({ className, ...props }: React.ComponentProps<"div">) {
 function CardTitle({ className, ...props }: React.ComponentProps<"h3">) {
   return (
     <h3
-      className={cn("font-medium text-sm", className)}
+      className={cn("text-sm font-medium", className)}
       data-slot="card-title"
       {...props}
     />

@@ -146,6 +146,6 @@ describe("BookmarkToggle", () => {
     // A button inside an anchor is invalid HTML and a nested interactive
     // control to axe, which is why the card is no longer an `asChild` link.
     expect(button.closest("a")).toBeNull();
-    expect(screen.getByRole("link", { name: /Rover/ })).toBeTruthy();
+    expect(screen.getByRole("link", { name: /Rover/u })).toBeTruthy();
   });
 });

@@ -154,9 +154,9 @@ const ERROR_BODY_LIMIT = 500;
 /** The signed headers whose values an error body must never carry to a log. */
 const SIGNED_SECRET_HEADERS = ["x-amz-security-token", "authorization"];
 
-const LINE_BREAKS = /[\r\n]+/g;
+const LINE_BREAKS = /[\r\n]+/gu;
 
-const PERCENT_ESCAPE = /%[0-9A-F]{2}/g;
+const PERCENT_ESCAPE = /%[0-9A-F]{2}/gu;
 
 /**
  * Removes this request's own signed values from an error body, in every

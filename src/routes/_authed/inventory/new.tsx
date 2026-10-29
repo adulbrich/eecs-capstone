@@ -34,7 +34,7 @@ function NewInventoryItem() {
   const { description, from, name } = Route.useSearch();
   return (
     <div className="mx-auto max-w-2xl px-4 py-6 md:p-8">
-      <h1 className="font-semibold text-2xl">New inventory item</h1>
+      <h1 className="text-2xl font-semibold">New inventory item</h1>
       <div className="mt-6">
         <InventoryForm
           initial={{ description, name }}

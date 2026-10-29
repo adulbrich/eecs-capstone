@@ -75,8 +75,8 @@ function PlacementPage() {
       </Breadcrumb>
       <div className="mt-2 flex flex-wrap items-start justify-between gap-2">
         <div>
-          <h1 className="font-semibold text-2xl">Placement</h1>
-          <p className="mt-1 max-w-prose text-muted-foreground text-sm">
+          <h1 className="text-2xl font-semibold">Placement</h1>
+          <p className="text-muted-foreground mt-1 max-w-prose text-sm">
             Bids, placements and settings on this page stay in this browser and
             are never sent to the server. Export the workspace to move it to
             another browser; the file holds the students' emails and any project
@@ -123,7 +123,7 @@ function PlacementPage() {
       />
 
       {workspace === null ? (
-        <p className="mt-6 text-muted-foreground text-sm">Loading...</p>
+        <p className="text-muted-foreground mt-6 text-sm">Loading...</p>
       ) : (
         <Tabs
           activationMode="manual"

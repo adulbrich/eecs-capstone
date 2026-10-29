@@ -121,7 +121,7 @@ describe("the bids column mapping editor, reading wide (#736)", () => {
         "Project columns' headers start with"
       ).value
     ).toBe("Rank the projects [");
-    expect(screen.getByText(/^2 project columns:/)).toBeTruthy();
+    expect(screen.getByText(/^2 project columns:/u)).toBeTruthy();
   });
 
   it("shows a column the prefix takes that staff may not have meant", () => {

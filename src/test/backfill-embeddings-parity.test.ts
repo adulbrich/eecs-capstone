@@ -73,8 +73,8 @@ const SCRIPT_FILE = readFileSync("scripts/backfill-embeddings.mjs", "utf8");
  * comment trailing real code. Nothing in the script does that today, and the
  * `://` check is what keeps the unanchored form safe.
  */
-const SCRIPT_CODE = SCRIPT_FILE.replace(/\/\*[\s\S]*?\*\//g, "").replace(
-  /\/\/.*$/gm,
+const SCRIPT_CODE = SCRIPT_FILE.replace(/\/\*[\s\S]*?\*\//gu, "").replace(
+  /\/\/.*$/gmu,
   ""
 );
 
@@ -85,12 +85,12 @@ const SCRIPT_CODE = SCRIPT_FILE.replace(/\/\*[\s\S]*?\*\//g, "").replace(
  * on the same narrow grounds, and checked rather than claimed: the URL and
  * brace guards in the first `describe` run over this file too.
  */
-const SOURCE_CODE = SOURCE_FILE.replace(/\/\*[\s\S]*?\*\//g, "").replace(
-  /\/\/.*$/gm,
+const SOURCE_CODE = SOURCE_FILE.replace(/\/\*[\s\S]*?\*\//gu, "").replace(
+  /\/\/.*$/gmu,
   ""
 );
-const LIMIT_PATTERN = /const EMBEDDING_SOURCE_LIMIT = ([0-9_]+);/;
-const SURROGATE_PATTERN = /const LONE_TRAILING_SURROGATE = (\/.+\/);/;
+const LIMIT_PATTERN = /const EMBEDDING_SOURCE_LIMIT = ([0-9_]+);/u;
+const SURROGATE_PATTERN = /const LONE_TRAILING_SURROGATE = (\/.+\/[a-z]*);/u;
 const EMBEDDINGS_FILE = readFileSync(
   "src/server/_internal/project-embeddings.ts",
   "utf8"
@@ -110,22 +110,23 @@ const EMBEDDINGS_FILE = readFileSync(
  * rather than claims.
  */
 const EMBEDDINGS_CODE = EMBEDDINGS_FILE.replace(
-  /\/\*[\s\S]*?\*\//g,
+  /\/\*[\s\S]*?\*\//gu,
   ""
-).replace(/\/\/.*$/gm, "");
+).replace(/\/\/.*$/gmu, "");
 
 const STATUS_SET_PATTERN =
-  /const EMBEDDABLE_STATUSES: readonly ProjectStatus\[\] = \[([^\]]*)\]/;
-const SQL_STATUS_PATTERN = /WHERE status IN \(([^)]*)\)/;
-const INTERFACE_PATTERN = /export interface EmbeddableProject \{([\s\S]*?)\n\}/;
-const SELECT_SQL_PATTERN = /const SELECT_SQL = `([^`]*)`/;
+  /const EMBEDDABLE_STATUSES: readonly ProjectStatus\[\] = \[([^\]]*)\]/u;
+const SQL_STATUS_PATTERN = /WHERE status IN \(([^)]*)\)/u;
+const INTERFACE_PATTERN =
+  /export interface EmbeddableProject \{([\s\S]*?)\n\}/u;
+const SELECT_SQL_PATTERN = /const SELECT_SQL = `([^`]*)`/u;
 
 /** The quoted words inside a captured `[...]` or `(...)`, in source order. */
 function quotedWords(inner: string | undefined, label: string): string[] {
   if (inner === undefined) {
     throw new Error(`Nothing to read in ${label}`);
   }
-  return [...inner.matchAll(/["']([a-z_]+)["']/g)].map((match) => match[1]);
+  return [...inner.matchAll(/["']([a-z_]+)["']/gu)].map((match) => match[1]);
 }
 
 /**
@@ -142,7 +143,7 @@ function functionBody(source: string, name: string, label: string): string {
   // the newline is what keeps it out of the JSDoc above it, and the `(` is
   // what stops `section` matching a later `sectionHeader`.
   const declaration = source.search(
-    new RegExp(`\\n(?:export )?function ${name}\\s*\\(`)
+    new RegExp(`\\n(?:export )?function ${name}\\s*\\(`, "u")
   );
   if (declaration === -1) {
     throw new Error(`No function named ${name} in ${label}`);
@@ -157,7 +158,7 @@ function functionBody(source: string, name: string, label: string): string {
       if (depth === 0) {
         return source
           .slice(open + 1, i)
-          .replace(/\s+/g, " ")
+          .replace(/\s+/gu, " ")
           .trim();
       }
     }
@@ -188,8 +189,8 @@ describe("reading the three stripped files as code rather than as text", () => {
   ])("lose no brace in %s to the strip", (_label, code) => {
     // The cheap structural check: a strip that ate a run of real code almost
     // certainly takes a brace with it. Not a parser, and not claiming to be.
-    const opens = code.match(/\{/g)?.length ?? 0;
-    const closes = code.match(/\}/g)?.length ?? 0;
+    const opens = code.match(/\{/gu)?.length ?? 0;
+    const closes = code.match(/\}/gu)?.length ?? 0;
     expect(opens).toBe(closes);
     expect(opens).toBeGreaterThan(10);
   });
@@ -236,12 +237,12 @@ describe("reading the three stripped files as code rather than as text", () => {
       // JSDoc and carries no `//` at all, and demanding one would be this file
       // inventing a rule about another file rather than describing one. So the
       // presence check is per-file and the removal check is not.
-      expect(raw).toMatch(/\/\*/);
+      expect(raw).toMatch(/\/\*/u);
       if (hasLineComment) {
-        expect(raw).toMatch(/^[ \t]*\/\//m);
+        expect(raw).toMatch(/^[ \t]*\/\//mu);
       }
-      expect(code).not.toMatch(/\/\*/);
-      expect(code).not.toMatch(/\/\//);
+      expect(code).not.toMatch(/\/\*/u);
+      expect(code).not.toMatch(/\/\//u);
       expect(code).toContain(kept);
     }
   );
@@ -294,8 +295,8 @@ describe("the production backfill's copies of the embedding helpers", () => {
       // so anchoring on `section("Program"` with its argument on the same line
       // would pass the moment Biome broke the line. `section(` plus the label
       // in either order is what a reintroduced section cannot avoid.
-      expect(source).not.toMatch(/section\(\s*"Program"/);
-      expect(source).not.toMatch(/section\(\s*"Categories"/);
+      expect(source).not.toMatch(/section\(\s*"Program"/u);
+      expect(source).not.toMatch(/section\(\s*"Categories"/u);
     }
   });
 
@@ -324,7 +325,7 @@ describe("the production backfill's copies of the embedding helpers", () => {
   it("drop the same half character at the cut", () => {
     const fromSrc = SURROGATE_PATTERN.exec(SOURCE_FILE)?.[1];
     const fromScript = SURROGATE_PATTERN.exec(SCRIPT_FILE)?.[1];
-    expect(fromSrc).toBe("/[\\uD800-\\uDBFF]$/");
+    expect(fromSrc).toBe("/[\\uD800-\\uDBFF]$/u");
     expect(fromScript).toBe(fromSrc);
   });
 
@@ -447,12 +448,12 @@ describe("the production backfill's copies of the embedding helpers", () => {
    */
   it("select the boolean the skip is built from", () => {
     const selectList = (SELECT_SQL_PATTERN.exec(SCRIPT_FILE)?.[1] ?? "").split(
-      /\bfrom\b/i
+      /\bfrom\b/iu
     )[0];
     expect(selectList).toContain("SELECT");
-    expect(selectList).toMatch(/embedding IS NOT NULL\s+AS "hasEmbedding"/);
+    expect(selectList).toMatch(/embedding IS NOT NULL\s+AS "hasEmbedding"/u);
     expect(selectList).toMatch(
-      /embedding_source_hash\s+AS "embeddingSourceHash"/
+      /embedding_source_hash\s+AS "embeddingSourceHash"/u
     );
   });
 
@@ -469,7 +470,9 @@ describe("the production backfill's copies of the embedding helpers", () => {
     const interfaceBody = INTERFACE_PATTERN.exec(SOURCE_FILE)?.[1];
     expect(interfaceBody).toBeDefined();
     const keys = [
-      ...(interfaceBody as string).matchAll(/^\s*(?:readonly )?(\w+)\s*[?:]/gm),
+      ...(interfaceBody as string).matchAll(
+        /^\s*(?:readonly )?(\w+)\s*[?:]/gmu
+      ),
     ].map((match) => match[1]);
     // The exact set, not a floor. A key the regex silently stopped matching,
     // which `readonly` used to do, shrinks the coverage below with nothing to
@@ -495,18 +498,18 @@ describe("the production backfill's copies of the embedding helpers", () => {
     // the query would pass a field named after any of them without it ever
     // being selected.
     const selectList = (SELECT_SQL_PATTERN.exec(SCRIPT_FILE)?.[1] ?? "").split(
-      /\bfrom\b/i
+      /\bfrom\b/iu
     )[0];
     // Guards the split, not the exec. A split that quietly failed to find its
     // delimiter leaves the whole query here, which is the vacuous pass this
     // test exists to avoid.
     expect(selectList).toContain("SELECT");
-    expect(selectList).not.toMatch(/\bwhere\b/i);
+    expect(selectList).not.toMatch(/\bwhere\b/iu);
     for (const key of keys) {
       // Either the column is already camelCase (`title`) or the query aliases
       // it to camelCase (`problem_statement AS "problemStatement"`), so the key
       // appears as a whole word either way.
-      expect(selectList).toMatch(new RegExp(`\\b${key}\\b`));
+      expect(selectList).toMatch(new RegExp(`\\b${key}\\b`, "u"));
     }
   });
 
@@ -532,7 +535,7 @@ describe("the production backfill's copies of the embedding helpers", () => {
     "buildEmbedRequestBody",
   ])("actually call their copy of %s", (name) => {
     const calls = SCRIPT_CODE.match(
-      new RegExp(`(?<!function )\\b${name}\\(`, "g")
+      new RegExp(`(?<!function )\\b${name}\\(`, "gu")
     );
     expect(calls?.length ?? 0).toBeGreaterThan(0);
   });

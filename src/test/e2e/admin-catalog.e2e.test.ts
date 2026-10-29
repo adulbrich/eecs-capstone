@@ -81,7 +81,7 @@ test.describe("admin catalog creates and saves", () => {
       await waitForHydration(staff);
       await staff.getByLabel("Name").fill(renamed);
       await staff.getByRole("button", { name: "Save", exact: true }).click();
-      await staff.waitForURL(/\/admin\/categories\?/, { timeout: 15_000 });
+      await staff.waitForURL(/\/admin\/categories\?/u, { timeout: 15_000 });
 
       await expect(rowFor(staff, renamed)).toBeVisible();
       await expect(rowFor(staff, name)).toHaveCount(0);
@@ -165,7 +165,7 @@ test.describe("admin catalog creates and saves", () => {
 
       await staff.getByLabel("Course name").fill(renamed);
       await staff.getByRole("button", { name: "Save", exact: true }).click();
-      await staff.waitForURL(/\/admin\/programs$/, { timeout: 15_000 });
+      await staff.waitForURL(/\/admin\/programs$/u, { timeout: 15_000 });
 
       await expect(rowFor(staff, renamed)).toBeVisible();
       await expect(rowFor(staff, courseName)).toHaveCount(0);
@@ -254,7 +254,7 @@ test.describe("admin catalog deletes", () => {
       // inherits the race. `onDelete` awaits the server call before it
       // navigates, so arriving at the list is itself proof the row is gone.
       // The rename case above waits on the same shape, for the same reason.
-      await staff.waitForURL(/\/admin\/categories\?/, { timeout: 15_000 });
+      await staff.waitForURL(/\/admin\/categories\?/u, { timeout: 15_000 });
 
       // The table first: an absence read off a page that has not rendered one
       // is true of any page, and `toHaveCount` retries only until its
@@ -308,7 +308,7 @@ test.describe("admin catalog deletes", () => {
       const dialog = staff.getByRole("alertdialog");
       await expect(dialog).toBeVisible();
       await dialog.getByRole("button", { name: "Delete" }).click();
-      await staff.waitForURL(/\/admin\/programs$/, { timeout: 15_000 });
+      await staff.waitForURL(/\/admin\/programs$/u, { timeout: 15_000 });
 
       // The wait above is anchored and does navigate, but the absence below
       // still needs the table to exist before it means anything. Same reason

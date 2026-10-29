@@ -299,7 +299,7 @@ describe("addCommentAs cross-user guard", () => {
         content: "let me in",
         isInternal: false,
       })
-    ).rejects.toThrow(/Forbidden/);
+    ).rejects.toThrow(/Forbidden/u);
 
     const rows = await db
       .select()
@@ -438,7 +438,7 @@ describe("updateCommentAs", () => {
 
     await expect(
       updateCommentAs(admin, { commentId: id, content: "not yours" })
-    ).rejects.toThrow(/Forbidden/);
+    ).rejects.toThrow(/Forbidden/u);
 
     const [row] = await db
       .select()
@@ -460,7 +460,7 @@ describe("updateCommentAs", () => {
 
     await expect(
       updateCommentAs(stranger, { commentId: id, content: "hello" })
-    ).rejects.toThrow(/Forbidden/);
+    ).rejects.toThrow(/Forbidden/u);
   });
 
   it("refuses an edit once the comment has a reply", async () => {
@@ -482,7 +482,7 @@ describe("updateCommentAs", () => {
 
     await expect(
       updateCommentAs(owner, { commentId: id, content: "a different question" })
-    ).rejects.toThrow(/no longer be edited/);
+    ).rejects.toThrow(/no longer be edited/u);
   });
 
   it("locks a comment whose only reply is internal, and says so to the proposer", async () => {
@@ -510,7 +510,7 @@ describe("updateCommentAs", () => {
 
     await expect(
       updateCommentAs(owner, { commentId: id, content: "rewritten" })
-    ).rejects.toThrow(/no longer be edited/);
+    ).rejects.toThrow(/no longer be edited/u);
   });
 
   it("marks the viewer's own rows, and only those", async () => {
@@ -596,7 +596,7 @@ describe("updateCommentAs", () => {
 
     await expect(
       updateCommentAs(owner, { commentId: id, content: "second thoughts" })
-    ).rejects.toThrow(/Forbidden/);
+    ).rejects.toThrow(/Forbidden/u);
 
     const [row] = await db
       .select()
@@ -634,6 +634,6 @@ describe("updateCommentAs", () => {
         commentId: "00000000-0000-0000-0000-000000000000",
         content: "hello",
       })
-    ).rejects.toThrow(/not found/i);
+    ).rejects.toThrow(/not found/iu);
   });
 });

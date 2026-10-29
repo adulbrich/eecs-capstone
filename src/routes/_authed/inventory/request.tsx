@@ -27,10 +27,10 @@ function RequestEquipment() {
   const navigate = useNavigate();
   return (
     <div className="mx-auto max-w-2xl px-4 py-6 md:p-8">
-      <h1 className="font-semibold text-2xl">
+      <h1 className="text-2xl font-semibold">
         Request equipment we do not have
       </h1>
-      <p className="mt-2 text-muted-foreground text-sm">
+      <p className="text-muted-foreground mt-2 text-sm">
         One card per thing. Staff answer each line, tell you what they are
         doing, and reserve the items to you once they exist.
       </p>

@@ -810,7 +810,7 @@ export function pruneTitleMatches(
   return kept.length > 0 ? Object.fromEntries(kept) : undefined;
 }
 
-const ROSTER_KEY = /^roster:\S/;
+const ROSTER_KEY = /^roster:\S/u;
 
 /** Every project key a run names: its placements and its diagnostics. */
 function resultKeys(result: StoredResult): Set<string> {

@@ -55,7 +55,7 @@ function SignIn() {
   return (
     <div className="flex min-h-[calc(100vh-3.5rem)] items-start justify-center px-4 pt-12 pb-20">
       <div className="island-shell w-full max-w-sm rounded-xl p-8">
-        <h1 className="font-semibold text-2xl">Sign in or create an account</h1>
+        <h1 className="text-2xl font-semibold">Sign in or create an account</h1>
         {oauthError && (
           <OAuthErrorBanner code={oauthError} provider={failedProvider} />
         )}
@@ -72,7 +72,7 @@ function SignIn() {
             reading only the form will see. A new tab for the reason the name
             step gives: this notice stays on screen through every step of the
             form, and leaving the tab loses a code in progress. */}
-        <p className="mt-6 text-muted-foreground text-sm">
+        <p className="text-muted-foreground mt-6 text-sm">
           Signing in for the first time creates an account; by doing so you
           agree to the{" "}
           <Link

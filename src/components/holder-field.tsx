@@ -116,7 +116,7 @@ function AccountSearch({ onPick }: { onPick: (email: string) => void }) {
                   value={`${m.name ?? ""} ${m.email}`}
                 >
                   <span className="font-medium">{m.name ?? m.email}</span>
-                  <span className="ml-2 text-muted-foreground text-xs">
+                  <span className="text-muted-foreground ml-2 text-xs">
                     {m.email}
                   </span>
                 </CommandItem>
@@ -210,11 +210,11 @@ export function HolderField({
           <AccountSearch onPick={onEmailChange} />
         </div>
         {account && (
-          <p className="mt-1 text-muted-foreground text-xs">
+          <p className="text-muted-foreground mt-1 text-xs">
             Matches account: {account.name ?? account.email}
           </p>
         )}
-        <p className="mt-1 text-muted-foreground text-xs">
+        <p className="text-muted-foreground mt-1 text-xs">
           A holder with an address receives pickup and due emails there.
         </p>
       </div>
@@ -260,7 +260,7 @@ export function HolderField({
             placeholder="e.g. Lab 204"
             value={label}
           />
-          <p className="mt-1 text-muted-foreground text-xs">
+          <p className="text-muted-foreground mt-1 text-xs">
             Required when the item is not going to a person.
           </p>
         </div>

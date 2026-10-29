@@ -296,9 +296,9 @@ export function ProjectForm({
         role "user", and a student proposer may need to find a mentor outside
         the team (#304 records how mentorship is tracked).
       */}
-      <div className="rounded-md border border-border bg-muted/40 p-3 text-sm">
+      <div className="border-border bg-muted/40 rounded-md border p-3 text-sm">
         <p className="font-medium">Before you propose</p>
-        <p className="mt-1 text-muted-foreground">
+        <p className="text-muted-foreground mt-1">
           A team expects about one hour a week from a project partner or mentor
           once the project is accepted. If you are a student proposing a
           project, you may need to find an external project mentor. Your
@@ -309,7 +309,7 @@ export function ProjectForm({
           lib/proposal-guidance.ts, in neutral voice. Change one and change the
           other, or the page and the AI review start giving different advice.
         */}
-        <p className="mt-2 text-muted-foreground">
+        <p className="text-muted-foreground mt-2">
           Scope the work at roughly what you would hand a single summer intern,
           and keep it off your critical path.
         </p>
@@ -318,7 +318,7 @@ export function ProjectForm({
         <div className="rounded-md border p-3">
           <div className="flex items-center justify-between gap-3">
             <div>
-              <p className="font-medium text-sm">Improve with AI</p>
+              <p className="text-sm font-medium">Improve with AI</p>
               <p className="text-muted-foreground text-xs">
                 Suggests rewrites for the text fields. You review and apply each
                 change.
@@ -342,7 +342,7 @@ export function ProjectForm({
           <output className="block">
             <FieldError message={reviewError} />
             {reviewState === "empty" && (
-              <p className="mt-2 text-muted-foreground text-sm">
+              <p className="text-muted-foreground mt-2 text-sm">
                 No improvements suggested.
               </p>
             )}
@@ -417,6 +417,7 @@ export function ProjectForm({
       <form.Field name="imageUrl">
         {(field: AnyForm) => (
           <div>
+            {/* biome-ignore lint/a11y/noLabelWithoutControl: names the uploader's buttons, not one control; #820 */}
             <Label className="text-base">Image</Label>
             <div className="mt-1">
               <ProjectImageUploader
@@ -429,7 +430,7 @@ export function ProjectForm({
                 }}
               />
             </div>
-            <p className="mt-1 text-muted-foreground text-xs">
+            <p className="text-muted-foreground mt-1 text-xs">
               Cropped to 16:9 and resized to max 1600x900. Saved when you submit
               the form.
             </p>
@@ -481,7 +482,7 @@ export function ProjectForm({
                 This project requires an NDA or IP agreement
               </Label>
             </div>
-            <p className="mt-1 text-muted-foreground text-xs">
+            <p className="text-muted-foreground mt-1 text-xs">
               Students see this before they apply. Unchecking it clears
               Licensing/IP/NDA notes.
             </p>
@@ -521,7 +522,7 @@ export function ProjectForm({
                 This is a sponsored project
               </Label>
             </div>
-            <p className="mt-1 text-muted-foreground text-xs">
+            <p className="text-muted-foreground mt-1 text-xs">
               Organizations with more than 500 employees are asked to consider a
               $2,000 contribution, and smaller ones $500. Sponsorship is not
               required to propose a project.
@@ -544,7 +545,7 @@ export function ProjectForm({
               Teams
             </Label>
             <p
-              className="mt-0.5 text-muted-foreground text-xs"
+              className="text-muted-foreground mt-0.5 text-xs"
               id="teamsSupported-description"
             >
               How many separate teams could work on this project at the same
@@ -698,7 +699,7 @@ function Field({
           </Label>
           {description && (
             <p
-              className="mt-0.5 text-muted-foreground text-xs"
+              className="text-muted-foreground mt-0.5 text-xs"
               id={descriptionId}
             >
               {description}
@@ -714,14 +715,14 @@ function Field({
           />
           <FieldError errors={field.state.meta.errors} />
           {suggestion && (
-            <div className="mt-2 rounded-md border border-primary/30 bg-primary/5 p-2">
-              <p className="font-medium text-primary text-xs">
+            <div className="border-primary/30 bg-primary/5 mt-2 rounded-md border p-2">
+              <p className="text-primary text-xs font-medium">
                 Suggested change
               </p>
-              <p className="mt-1 whitespace-pre-wrap text-sm">
+              <p className="mt-1 text-sm whitespace-pre-wrap">
                 {suggestion.suggestion}
               </p>
-              <p className="mt-1 text-muted-foreground text-xs">
+              <p className="text-muted-foreground mt-1 text-xs">
                 {suggestion.rationale}
               </p>
               <Button

@@ -76,7 +76,7 @@ describe("traffic_events.day", () => {
     );
     expect(migration).toBeDefined();
     const text = readFileSync(join(dir, migration as string), "utf8");
-    const zone = /AT TIME ZONE '([^']+)'/.exec(text)?.[1];
+    const zone = /AT TIME ZONE '([^']+)'/u.exec(text)?.[1];
     expect(zone).toBe(OFFICE_TIME_ZONE);
     const schema = readFileSync(
       join(process.cwd(), "src/db/schema.ts"),

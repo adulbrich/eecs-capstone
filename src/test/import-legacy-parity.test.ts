@@ -38,8 +38,8 @@ import { PROJECT_STATUSES } from "#/lib/vocabularies";
  */
 const IMAGES_SOURCE = readFileSync("scripts/import-legacy-images.ts", "utf8");
 const IMPORT_SOURCE = readFileSync("scripts/import-legacy.mjs", "utf8");
-const NAMESPACE_PATTERN = /const NAMESPACE = "([0-9a-f-]{36})";/;
-const KEY_MAP_PATTERN = /const IMAGE_KEYS_NAME = "([^"]+)";/;
+const NAMESPACE_PATTERN = /const NAMESPACE = "([0-9a-f-]{36})";/u;
+const KEY_MAP_PATTERN = /const IMAGE_KEYS_NAME = "([^"]+)";/u;
 
 /**
  * Everything between `function uuidv5(...) {` and the closing brace, with
@@ -61,7 +61,7 @@ function uuidv5Body(source: string, label: string): string {
       if (depth === 0) {
         return source
           .slice(open + 1, i)
-          .replace(/\s+/g, " ")
+          .replace(/\s+/gu, " ")
           .trim();
       }
     }
@@ -172,12 +172,12 @@ describe("the legacy import's two scripts", () => {
  * expects a database.
  */
 describe("the importer's status guard", () => {
-  const IMPORTABLE_PATTERN = /const IMPORTABLE_STATUSES = \[([^\]]*)\]/;
+  const IMPORTABLE_PATTERN = /const IMPORTABLE_STATUSES = \[([^\]]*)\]/u;
 
   function importableStatuses(): string[] {
     const body = IMPORTABLE_PATTERN.exec(IMPORT_SOURCE)?.[1];
     expect(body).toBeDefined();
-    return [...(body as string).matchAll(/"([^"]+)"/g)].map(
+    return [...(body as string).matchAll(/"([^"]+)"/gu)].map(
       (match) => match[1]
     );
   }

@@ -689,7 +689,7 @@ function Contact({ project }: { project: WorkspaceProject }) {
     return "-";
   }
   return (
-    <div className="wrap-anywhere md:min-w-48 md:max-w-xs md:whitespace-normal">
+    <div className="wrap-anywhere md:max-w-xs md:min-w-48 md:whitespace-normal">
       <div>{contact.name || contact.email}</div>
       <div className="text-muted-foreground text-xs">
         {contact.name && contact.email ? `${contact.email}, ` : ""}

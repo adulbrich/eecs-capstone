@@ -270,7 +270,7 @@ function ProjectsList() {
            under the heading, right-aligned, rather than pushing the page
            wider than the viewport (#280). */
         <div className="flex flex-wrap items-center justify-between gap-4">
-          <h1 className="font-semibold text-2xl">Projects</h1>
+          <h1 className="text-2xl font-semibold">Projects</h1>
           <div className="ml-auto flex items-center gap-2">
             {/* The same sign-in gate as BookmarksButton beside it and the
                 request button on /inventory: /projects/new is behind _authed,

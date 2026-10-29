@@ -16,7 +16,7 @@ const SRC = join(process.cwd(), "src");
 const ENTRY = join(SRC, "routes/api/traffic.ts");
 /** `import` and `export ... from`, so a re-export like `schema.ts`'s is walked. */
 const IMPORT =
-  /^\s*(?:import|export)\s+(?:type\s+)?(?:[^"';]*?\sfrom\s+)?["']([^"']+)["']/gm;
+  /^\s*(?:import|export)\s+(?:type\s+)?(?:[^"';]*?\sfrom\s+)?["']([^"']+)["']/gmu;
 
 function resolveLocal(from: string, specifier: string): string | null {
   let base: string;
@@ -33,7 +33,7 @@ function resolveLocal(from: string, specifier: string): string | null {
     `${base}.tsx`,
     join(base, "index.ts"),
   ]) {
-    if (existsSync(candidate) && candidate.match(/\.tsx?$/)) {
+    if (existsSync(candidate) && /\.tsx?$/u.test(candidate)) {
       return candidate;
     }
   }
@@ -122,7 +122,7 @@ describe("the traffic_events table", () => {
       ].sort()
     );
     for (const name of columns) {
-      expect(name).not.toMatch(/user|email|^ip$|_ip|address|agent|session/);
+      expect(name).not.toMatch(/user|email|^ip$|_ip|address|agent|session/u);
     }
   });
 });
@@ -136,7 +136,7 @@ describe("the traffic_visits rollup", () => {
     );
     for (const name of columns) {
       expect(name).not.toMatch(
-        /hash|visitor|user|email|^ip$|_ip|address|agent|session/
+        /hash|visitor|user|email|^ip$|_ip|address|agent|session/u
       );
     }
   });

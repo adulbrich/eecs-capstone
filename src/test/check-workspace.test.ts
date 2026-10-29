@@ -82,7 +82,7 @@ function listed(dir: string, command: string) {
     encoding: "utf8",
     env,
   }).stdout;
-  return out.replace(/\n$/, "").split("\n").sort();
+  return out.replace(/\n$/u, "").split("\n").sort();
 }
 
 function branchesIn(dir: string) {
@@ -166,7 +166,7 @@ describe("check-workspace", () => {
     expect(listed(dir, review)).toEqual([...names].sort());
     // Force, because a squash merge leaves the branch "not fully merged" and
     // plain -d refuses it.
-    expect(remove).toMatch(/^git branch -D /);
+    expect(remove).toMatch(/^git branch -D /u);
     expect(spawnSync("sh", ["-c", remove], { cwd: dir, env }).status).toBe(0);
     expect(branchesIn(dir)).toEqual(["main", "wip/never-pushed"]);
   }, 60_000);

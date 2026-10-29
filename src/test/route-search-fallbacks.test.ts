@@ -27,7 +27,7 @@ function routeFiles(dir: string): string[] {
     if (entry.isDirectory()) {
       return routeFiles(path);
     }
-    return /\.tsx?$/.test(entry.name) ? [path] : [];
+    return /\.tsx?$/u.test(entry.name) ? [path] : [];
   });
 }
 

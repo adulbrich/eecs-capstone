@@ -45,7 +45,7 @@ export function SearchHint({
   const note = query === undefined ? null : searchQueryNote(query);
   return (
     <p
-      className="-mt-1 basis-full pl-3 text-muted-foreground text-xs md:order-last"
+      className="text-muted-foreground -mt-1 basis-full pl-3 text-xs md:order-last"
       id={id}
     >
       Searches {fields}. Quote a "phrase", or put - before a word to exclude it.

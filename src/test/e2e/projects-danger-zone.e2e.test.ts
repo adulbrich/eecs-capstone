@@ -98,7 +98,7 @@ test.describe("project danger zone", () => {
       const dialog = staff.getByRole("alertdialog");
       await expect(dialog).toBeVisible();
       await dialog.getByRole("button", { name: "Hard delete" }).click();
-      await staff.waitForURL(/\/admin\/projects/, { timeout: 15_000 });
+      await staff.waitForURL(/\/admin\/projects/u, { timeout: 15_000 });
 
       // Gone, not hidden: the detail route has nothing to render.
       await staff.goto(`/projects/${projectId}`);

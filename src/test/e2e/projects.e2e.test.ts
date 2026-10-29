@@ -31,7 +31,7 @@ test.describe("@smoke project lifecycle", () => {
       await owner.getByLabel("Title").fill(title);
       await owner.getByRole("button", { name: "Create draft" }).click();
 
-      await owner.waitForURL(/\/projects\/[0-9a-f-]{36}/, { timeout: 15_000 });
+      await owner.waitForURL(/\/projects\/[0-9a-f-]{36}/u, { timeout: 15_000 });
       const projectUrl = new URL(owner.url()).pathname;
 
       await waitForHydration(owner);

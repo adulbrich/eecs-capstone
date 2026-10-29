@@ -45,7 +45,7 @@ function EditProject() {
   const projectId = project.id;
   return (
     <div className="mx-auto max-w-2xl px-4 py-6 md:p-8">
-      <h1 className="font-semibold text-2xl">Edit project</h1>
+      <h1 className="text-2xl font-semibold">Edit project</h1>
       <div className="mt-6">
         <ProjectForm
           enableAiReview

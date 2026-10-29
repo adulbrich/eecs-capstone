@@ -137,13 +137,13 @@ function Profile() {
 
   return (
     <div className="mx-auto max-w-md px-4 py-6 md:p-8">
-      <h1 className="font-semibold text-2xl">Profile</h1>
-      <p className="mt-2 text-muted-foreground text-sm">
+      <h1 className="text-2xl font-semibold">Profile</h1>
+      <p className="text-muted-foreground mt-2 text-sm">
         {user.email} ({user.role ?? "user"})
       </p>
 
       <div className="mt-6">
-        <h2 className="font-medium text-sm">Avatar</h2>
+        <h2 className="text-sm font-medium">Avatar</h2>
         <div className="mt-2">
           <AvatarUploader
             currentKey={(user.image as string | null) ?? null}
@@ -201,10 +201,10 @@ function Profile() {
         <SavedNote message={profileSaved} />
       </form>
 
-      <h2 className="mt-8 border-border border-t pt-8 font-semibold text-lg">
+      <h2 className="border-border mt-8 border-t pt-8 text-lg font-semibold">
         Your interests
       </h2>
-      <p className="mt-1 text-muted-foreground text-sm">
+      <p className="text-muted-foreground mt-1 text-sm">
         Describe what you would like to work on, in your own words. Only you can
         see this. It is used to sort projects by how well they match you.
       </p>
@@ -224,7 +224,7 @@ function Profile() {
           rows={5}
           value={interests}
         />
-        <p className="mt-1 text-muted-foreground text-xs" id="interests-count">
+        <p className="text-muted-foreground mt-1 text-xs" id="interests-count">
           {interests.length} / 2000
         </p>
         <Button className="mt-2" disabled={savingInterests.busy} type="submit">
@@ -237,7 +237,7 @@ function Profile() {
           in the app.
         */}
         {interestsResult && (
-          <output className="mt-2 block text-muted-foreground text-sm">
+          <output className="text-muted-foreground mt-2 block text-sm">
             {interestsResult === "saved" ? (
               <>
                 Saved. <RecommendedProjectsLink />
@@ -250,7 +250,7 @@ function Profile() {
         <FieldError message={savingInterests.error} />
       </form>
 
-      <div className="mt-8 border-border border-t pt-8">
+      <div className="border-border mt-8 border-t pt-8">
         <Button
           className="w-full"
           disabled={signingOut.busy}
@@ -260,16 +260,16 @@ function Profile() {
         >
           {signingOut.busy ? "Signing out..." : "Sign out"}
         </Button>
-        <p className="mt-3 text-center text-muted-foreground text-sm">
+        <p className="text-muted-foreground mt-3 text-center text-sm">
           <Link className="text-brand-dark underline" to="/privacy">
             Privacy policy
           </Link>
         </p>
       </div>
 
-      <div className="mt-8 border-destructive/30 border-t pt-8">
-        <h2 className="font-semibold text-destructive text-lg">Danger zone</h2>
-        <p className="mt-1 text-muted-foreground text-sm">
+      <div className="border-destructive/30 mt-8 border-t pt-8">
+        <h2 className="text-destructive text-lg font-semibold">Danger zone</h2>
+        <p className="text-muted-foreground mt-1 text-sm">
           Closing your account is immediate and cannot be undone. The{" "}
           <Link className="text-brand-dark underline" to="/privacy">
             privacy policy

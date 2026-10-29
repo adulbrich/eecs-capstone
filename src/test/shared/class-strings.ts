@@ -45,10 +45,10 @@ export interface ClassString {
   unconditional: string;
 }
 
-const CLASS_ATTRIBUTE = /className=(?:"([^"]*)"|\{)/g;
-const STRING_LITERAL = /["'`]([^"'`]*)["'`]/g;
+const CLASS_ATTRIBUTE = /className=(?:"([^"]*)"|\{)/gu;
+const STRING_LITERAL = /["'`]([^"'`]*)["'`]/gu;
 /** A segment that is nothing but a quoted string, so nothing gates it. */
-const BARE_LITERAL = /^\s*(["'`])([^"'`]*)\1\s*$/;
+const BARE_LITERAL = /^\s*(["'`])([^"'`]*)\1\s*$/u;
 
 /**
  * From the `{` after `className=`, the expression up to its matching `}`.
@@ -92,7 +92,7 @@ function expressionAt(
 
 /** The comma-separated arguments of a call, split at depth zero. */
 function topLevelSegments(expression: string): string[] {
-  const inner = /^\s*[\w.]*\(([\s\S]*)\)\s*$/.exec(expression);
+  const inner = /^\s*[\w.]*\(([\s\S]*)\)\s*$/u.exec(expression);
   const body = inner ? inner[1] : expression;
   const segments: string[] = [];
   let depth = 0;

@@ -71,7 +71,7 @@ export function LineSheet({
           {events.length > 0 && (
             <section aria-labelledby="line-sheet-timeline-heading">
               <h3
-                className="mb-2 font-medium text-sm"
+                className="mb-2 text-sm font-medium"
                 id="line-sheet-timeline-heading"
               >
                 History

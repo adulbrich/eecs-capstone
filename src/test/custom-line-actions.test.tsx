@@ -77,7 +77,7 @@ describe("CustomLineActions", () => {
     ).toBeDefined();
     expect(screen.getByRole("button", { name: "Fulfil" })).toBeDefined();
     expect(screen.getByRole("button", { name: "Reject" })).toBeDefined();
-    expect(screen.queryByRole("button", { name: /Approve/ })).toBeNull();
+    expect(screen.queryByRole("button", { name: /Approve/u })).toBeNull();
   });
 
   it("turns the first button into Update note once sourcing, prefilled", async () => {
@@ -546,7 +546,7 @@ describe("FulfillCustomLineDialog", () => {
           key: "Escape",
         });
       } else {
-        fireEvent.click(screen.getByRole("button", { name: /close/i }));
+        fireEvent.click(screen.getByRole("button", { name: /close/iu }));
       }
       expect(screen.getByRole("dialog")).toBeTruthy();
 

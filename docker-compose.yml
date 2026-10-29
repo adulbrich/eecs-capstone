@@ -24,8 +24,8 @@ services:
       # S3_ENDPOINT and VITE_STORAGE_PUBLIC_BASE in `.env.local` in sync:
       # another project's S3 on 9000 accepts the same default credentials, so a
       # mismatch uploads into the wrong bucket instead of failing.
-      - "${STORAGE_PORT:-9000}:9000"           # S3 API
-      - "${STORAGE_CONSOLE_PORT:-9001}:9001"   # Console/UI (if available)
+      - "${STORAGE_PORT:-9000}:9000" # S3 API
+      - "${STORAGE_CONSOLE_PORT:-9001}:9001" # Console/UI (if available)
     environment:
       - RUSTFS_ACCESS_KEY=rustfsadmin
       - RUSTFS_SECRET_KEY=rustfsadmin

@@ -206,7 +206,7 @@ describe("the bookmarks table", () => {
       "Teams supported",
       "Saved on",
     ]);
-    expect(screen.queryByRole("button", { name: /Columns/ })).toBeNull();
+    expect(screen.queryByRole("button", { name: /Columns/u })).toBeNull();
   });
 
   it("shows nothing about mentorship", () => {
@@ -219,7 +219,7 @@ describe("the bookmarks table", () => {
     if (!two) {
       throw new Error("no row");
     }
-    expect(within(two).queryByText(/mentor/i)).toBeNull();
+    expect(within(two).queryByText(/mentor/iu)).toBeNull();
   });
 
   it("bounds the Title cell and clamps the title, keeping the full text on the link", () => {
@@ -282,7 +282,7 @@ describe("the bookmarks table", () => {
       screen.getByRole("link", { name: "Two" }).closest("td")
     );
     expect(
-      screen.queryByRole("button", { name: /^Remove .* from bookmarks$/ })
+      screen.queryByRole("button", { name: /^Remove .* from bookmarks$/u })
     ).toBeNull();
   });
 
@@ -293,7 +293,7 @@ describe("the bookmarks table", () => {
     renderTable();
     const toggle = () =>
       within(rowFor("Two")).getByRole("button", {
-        name: /^(Bookmark|Remove bookmark)$/,
+        name: /^(Bookmark|Remove bookmark)$/u,
       });
     await waitFor(() =>
       expect(toggle().getAttribute("aria-label")).toBe("Remove bookmark")
@@ -327,7 +327,7 @@ describe("the bookmarks table", () => {
     renderTable();
     const toggle = () =>
       within(rowFor("Two")).getByRole("button", {
-        name: /^(Bookmark|Remove bookmark)$/,
+        name: /^(Bookmark|Remove bookmark)$/u,
       });
     await waitFor(() =>
       expect(toggle().getAttribute("aria-label")).toBe("Remove bookmark")

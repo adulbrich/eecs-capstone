@@ -13,7 +13,7 @@ describe("ExpectedBack", () => {
     render(<ExpectedBack dueAt={DUE} status="checked_out" />);
     // The office's day on the first render, with no effect to wait for (#805).
     expect(
-      screen.getByText(/Expected back on/).textContent?.replace(/\s+/g, " ")
+      screen.getByText(/Expected back on/u).textContent?.replace(/\s+/gu, " ")
     ).toBe("Expected back on Mar 1, 2026.");
     // A `<time datetime>` rather than prose, the shape every other date on
     // the site renders through.
@@ -30,8 +30,8 @@ describe("ExpectedBack", () => {
         status="reserved"
       />
     );
-    expect(screen.getByText(/Expected back on/)).toBeDefined();
-    expect(document.body.textContent).not.toMatch(/overdue/i);
+    expect(screen.getByText(/Expected back on/u)).toBeDefined();
+    expect(document.body.textContent).not.toMatch(/overdue/iu);
   });
 
   it("renders nothing for an available item, even with a stale date", () => {

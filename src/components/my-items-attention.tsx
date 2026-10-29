@@ -26,7 +26,7 @@ export function NeedsAttention({
   const summary = attentionSummary(entries, now);
   if (!needsAttention(summary)) {
     return (
-      <p className="mt-4 text-muted-foreground text-sm">
+      <p className="text-muted-foreground mt-4 text-sm">
         Nothing needs your attention right now.
       </p>
     );
@@ -61,7 +61,7 @@ export function NeedsAttention({
       }}
     >
       <h2
-        className="font-medium text-sm"
+        className="text-sm font-medium"
         id="needs-attention-heading"
         style={{ color: `var(--status-${tone})` }}
       >

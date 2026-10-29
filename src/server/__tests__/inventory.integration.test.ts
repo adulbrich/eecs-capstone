@@ -176,7 +176,7 @@ describe("transitionItem", () => {
         requestItemId: line.id,
         holderId: student.id,
       })
-    ).rejects.toThrow(/no longer open/);
+    ).rejects.toThrow(/no longer open/u);
     const [after] = await db
       .select()
       .from(inventoryItems)
@@ -198,7 +198,7 @@ describe("transitionItem", () => {
         requestItemId: line.id,
         holderId: student.id,
       })
-    ).rejects.toThrow(/different item/);
+    ).rejects.toThrow(/different item/u);
   });
 
   it("refuses a request line that does not exist", async () => {
@@ -212,7 +212,7 @@ describe("transitionItem", () => {
         requestItemId: "00000000-0000-0000-0000-000000000000",
         holderId: student.id,
       })
-    ).rejects.toThrow(/Request line not found/);
+    ).rejects.toThrow(/Request line not found/u);
   });
 
   it("reserved transition updates line to approved + sets pickupBy + notifies", async () => {
@@ -374,7 +374,7 @@ describe("transitionItem", () => {
         requestItemId: line2.id,
         holderId: student.id,
       })
-    ).rejects.toThrow(/Cannot move item to requested/);
+    ).rejects.toThrow(/Cannot move item to requested/u);
   });
 });
 
@@ -647,20 +647,20 @@ describe("catalog CRUD", () => {
       imageUrl: null,
     };
     await expect(createInventoryItemAs(student, blank)).rejects.toThrow(
-      /Forbidden/
+      /Forbidden/u
     );
     await expect(
       updateInventoryItemAs(student, {
         id: "00000000-0000-0000-0000-000000000000",
         ...blank,
       })
-    ).rejects.toThrow(/Forbidden/);
+    ).rejects.toThrow(/Forbidden/u);
     await expect(
       hardDeleteInventoryItemAs(student, {
         id: "00000000-0000-0000-0000-000000000000",
         confirmName: "X",
       })
-    ).rejects.toThrow(/Forbidden/);
+    ).rejects.toThrow(/Forbidden/u);
   });
 
   it("update writes one edit-log row with diffed fields", async () => {
@@ -923,7 +923,7 @@ describe("catalog CRUD", () => {
     });
     await expect(
       hardDeleteInventoryItemAs(admin, { id: item.id, confirmName: "Scope" })
-    ).rejects.toThrow(/available or retired/);
+    ).rejects.toThrow(/available or retired/u);
   });
 
   it("hard-delete refuses when name confirmation does not match", async () => {
@@ -933,7 +933,7 @@ describe("catalog CRUD", () => {
     await transitionItem(admin, { itemId: item.id, nextStatus: "retired" });
     await expect(
       hardDeleteInventoryItemAs(admin, { id: item.id, confirmName: "Wrong" })
-    ).rejects.toThrow(/confirmation/);
+    ).rejects.toThrow(/confirmation/u);
   });
 
   it("hard-delete succeeds when retired and unused", async () => {
@@ -959,7 +959,7 @@ describe("catalog CRUD", () => {
     await transitionItem(admin, { itemId: item.id, nextStatus: "retired" });
     await expect(
       hardDeleteInventoryItemAs(admin, { id: item.id, confirmName: "Cabled" })
-    ).rejects.toThrow(/historical/i);
+    ).rejects.toThrow(/historical/iu);
   });
 });
 
@@ -1245,7 +1245,7 @@ describe("cart", () => {
       nextStatus: "maintenance",
     });
     await expect(addToCartAs(student, { itemId: item.id })).rejects.toThrow(
-      /available/
+      /available/u
     );
   });
 
@@ -1345,7 +1345,7 @@ describe("request lifecycle", () => {
         requestItemId: line.id,
         reviewComment: "",
       })
-    ).rejects.toThrow(/required/);
+    ).rejects.toThrow(/required/u);
     await rejectRequestItemAs(admin, {
       requestItemId: line.id,
       reviewComment: "Reserved for class",
@@ -1525,7 +1525,7 @@ describe("request lifecycle", () => {
         requestItemId: lineB.id,
         note: null,
       })
-    ).rejects.toThrow(/checkout/);
+    ).rejects.toThrow(/checkout/u);
   });
 
   it("refuses a cancel from a student who does not own the line", async () => {
@@ -1550,7 +1550,7 @@ describe("request lifecycle", () => {
         requestItemId: line.id,
         note: "not mine",
       })
-    ).rejects.toThrow(/Only the requester can cancel/);
+    ).rejects.toThrow(/Only the requester can cancel/u);
 
     const [untouched] = await db
       .select()
@@ -1843,8 +1843,8 @@ describe("approveRequestLinesAs", () => {
     const outcomes = results.map((r) => r.status).sort();
     expect(outcomes).toEqual(["fulfilled", "rejected"]);
     const failure = results.find((r) => r.status === "rejected");
-    expect(String(failure?.reason)).not.toMatch(/deadlock/i);
-    expect(String(failure?.reason)).toMatch(/no longer pending/);
+    expect(String(failure?.reason)).not.toMatch(/deadlock/iu);
+    expect(String(failure?.reason)).toMatch(/no longer pending/u);
     for (const line of lines) {
       expect((await lineStatus(line.id)).status).toBe("approved");
     }
@@ -1913,7 +1913,7 @@ describe("defense in depth: impl re-checks role on every staff write", () => {
         notes: null,
         imageUrl: null,
       })
-    ).rejects.toThrow(/Forbidden/);
+    ).rejects.toThrow(/Forbidden/u);
   });
 
   it("transitionItem throws Forbidden for a non-staff viewer", async () => {
@@ -1921,7 +1921,7 @@ describe("defense in depth: impl re-checks role on every staff write", () => {
     const item = await makeItem();
     await expect(
       transitionItem(student, { itemId: item.id, nextStatus: "retired" })
-    ).rejects.toThrow(/Forbidden/);
+    ).rejects.toThrow(/Forbidden/u);
   });
 
   it("approveRequestItemAs and rejectRequestItemAs throw Forbidden for a non-staff viewer", async () => {
@@ -1935,13 +1935,13 @@ describe("defense in depth: impl re-checks role on every staff write", () => {
       .where(eq(inventoryRequestItems.itemId, item.id));
     await expect(
       approveRequestItemAs(student, { requestItemId: line.id, pickupBy: null })
-    ).rejects.toThrow(/Forbidden/);
+    ).rejects.toThrow(/Forbidden/u);
     await expect(
       rejectRequestItemAs(student, {
         requestItemId: line.id,
         reviewComment: "no",
       })
-    ).rejects.toThrow(/Forbidden/);
+    ).rejects.toThrow(/Forbidden/u);
   });
 });
 
@@ -3453,7 +3453,7 @@ describe("transitionItem authority and line outcome", () => {
       .where(eq(notifications.userId, student.id));
     expect(rows).toHaveLength(1);
     expect(rows[0].type).toBe("inventory_request_rejected");
-    expect(rows[0].title).toMatch(/Request denied/);
+    expect(rows[0].title).toMatch(/Request denied/u);
     expect(rows[0].message).toBe("Out of scope for this term");
   });
 
@@ -3527,7 +3527,7 @@ describe("transitionItem authority and line outcome", () => {
         lineDecision: { outcome: "rejected", requestItemId: line.id },
         comment: "Changed my mind",
       })
-    ).rejects.toThrow(/Only pending lines can be rejected/);
+    ).rejects.toThrow(/Only pending lines can be rejected/u);
   });
 
   it("refuses a decision naming a line the item is not holding", async () => {
@@ -3539,7 +3539,7 @@ describe("transitionItem authority and line outcome", () => {
         nextStatus: "available",
         lineDecision: { outcome: "cancelled", requestItemId: other.line.id },
       })
-    ).rejects.toThrow(/not the one the item is holding/);
+    ).rejects.toThrow(/not the one the item is holding/u);
     // The stranger's line is untouched.
     const [untouched] = await db
       .select()
@@ -3908,10 +3908,10 @@ describe("listInventoryItemEditLogAs", () => {
         { id: student.id, role: student.role },
         { itemId: item.id }
       )
-    ).rejects.toThrow(/Forbidden/);
+    ).rejects.toThrow(/Forbidden/u);
     await expect(
       listInventoryItemEditLogAs(null, { itemId: item.id })
-    ).rejects.toThrow(/Forbidden/);
+    ).rejects.toThrow(/Forbidden/u);
   });
 
   it("scopes to the item asked for", async () => {
@@ -4217,7 +4217,9 @@ describe("inventory emails", () => {
 
     expect(send).toHaveBeenCalledOnce();
     expect(send.mock.calls[0]?.[0]).toBe("walkin@example.com");
-    expect(send.mock.calls[0]?.[1].subject).toMatch(/Due (Sep 30|Oct 1), 2026/);
+    expect(send.mock.calls[0]?.[1].subject).toMatch(
+      /Due (Sep 30|Oct 1), 2026/u
+    );
     const rows = await db.select().from(notifications);
     expect(rows.some((r) => r.type === "inventory_item_checked_out")).toBe(
       false

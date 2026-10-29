@@ -31,7 +31,7 @@ export interface OnidProfile {
   [key: string]: unknown;
 }
 
-const DISCOVERY_SUFFIX = /\/\.well-known\/openid-configuration\/?$/;
+const DISCOVERY_SUFFIX = /\/\.well-known\/openid-configuration\/?$/u;
 
 /**
  * The issuer a token must carry, derived from the discovery URL we were
@@ -46,7 +46,7 @@ export function issuerFromDiscoveryUrl(discoveryUrl: string): string {
   return discoveryUrl.trim().replace(DISCOVERY_SUFFIX, "");
 }
 
-const ISSUER_VERSION_SUFFIX = /\/v2\.0$/;
+const ISSUER_VERSION_SUFFIX = /\/v2\.0$/u;
 
 /**
  * The authorize and token endpoints, derived from the discovery URL the same

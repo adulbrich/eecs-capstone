@@ -96,8 +96,8 @@ export function CommentThread({
 
 function CommentHeader({ comment }: { comment: Comment }) {
   return (
-    <div className="flex items-center gap-2 text-muted-foreground text-xs">
-      <span className="font-medium text-foreground">
+    <div className="text-muted-foreground flex items-center gap-2 text-xs">
+      <span className="text-foreground font-medium">
         {comment.authorName ?? UNKNOWN_AUTHOR}
       </span>
       <span>
@@ -110,7 +110,7 @@ function CommentHeader({ comment }: { comment: Comment }) {
       )}
       {comment.isInternal && (
         <span
-          className="rounded px-1.5 py-0.5 font-medium text-xs"
+          className="rounded px-1.5 py-0.5 text-xs font-medium"
           style={{
             background: "var(--status-warning-bg)",
             color: "var(--status-warning)",
@@ -173,7 +173,7 @@ function CommentBody({
   if (!editing) {
     return (
       <>
-        <p className="mt-1 whitespace-pre-wrap text-sm">{comment.content}</p>
+        <p className="mt-1 text-sm whitespace-pre-wrap">{comment.content}</p>
         {comment.isMine && !comment.hasReply && (
           <Button
             className="mt-1"
@@ -515,7 +515,7 @@ function ReplyForm({
       {viewerIsStaff && (
         <div>
           <div className="flex flex-wrap gap-x-4 gap-y-2">
-            <Label className="font-normal text-xs">
+            <Label className="text-xs font-normal">
               <Checkbox
                 checked={isInternal}
                 disabled={parentIsInternal || busy}
@@ -528,7 +528,7 @@ function ReplyForm({
             </Label>
             {/* Same shape as the new-comment form: disabled, not gone (#399). */}
             {offersSkip && (
-              <Label className="font-normal text-xs">
+              <Label className="text-xs font-normal">
                 <Checkbox
                   checked={sendEmail && !isInternal}
                   disabled={busy || isInternal}
@@ -539,7 +539,7 @@ function ReplyForm({
             )}
           </div>
           {parentIsInternal && (
-            <p className="mt-1 text-muted-foreground text-xs">
+            <p className="text-muted-foreground mt-1 text-xs">
               Replies to an internal comment are always internal.
             </p>
           )}

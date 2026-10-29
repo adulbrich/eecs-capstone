@@ -28,16 +28,16 @@ import {
   repoRoot,
 } from "./lib.mjs";
 
-const HEREDOC = /<<-?\s*(["']?)([A-Za-z_][A-Za-z0-9_]*)\1\n([\s\S]*?)\n\2\b/;
+const HEREDOC = /<<-?\s*(["']?)([A-Za-z_][A-Za-z0-9_]*)\1\n([\s\S]*?)\n\2\b/u;
 const CAT_HEREDOC =
-  /(?:-m|--message)(?:=|\s+)"?\$\(\s*cat\s*<<-?\s*["']?[A-Za-z_]/;
-const QUOTED = /"(?:[^"\\]|\\.)*"|'[^']*'/g;
+  /(?:-m|--message)(?:=|\s+)"?\$\(\s*cat\s*<<-?\s*["']?[A-Za-z_]/u;
+const QUOTED = /"(?:[^"\\]|\\.)*"|'[^']*'/gu;
 const MESSAGE_FLAG =
-  /(?:^|\s)(?:-m|--message)(?:=|\s+)(?:"((?:[^"\\]|\\.)*)"|'([^']*)')/g;
-const SEGMENT = /\s*(?:&&|\|\||;|\|)\s*|\n/;
-const SHORT_CLUSTER = /^-[A-Za-z]+$/;
-const WHITESPACE = /\s+/;
-const MAIN_REF = /(?:^|[:+])(?:refs\/heads\/)?main$/;
+  /(?:^|\s)(?:-m|--message)(?:=|\s+)(?:"((?:[^"\\]|\\.)*)"|'([^']*)')/gu;
+const SEGMENT = /\s*(?:&&|\|\||;|\|)\s*|\n/u;
+const SHORT_CLUSTER = /^-[A-Za-z]+$/u;
+const WHITESPACE = /\s+/u;
+const MAIN_REF = /(?:^|[:+])(?:refs\/heads\/)?main$/u;
 /** Global options that take a separate argument. */
 const GLOBAL_WITH_ARG = new Set([
   "-C",
@@ -52,7 +52,7 @@ const input = readInput();
 const command = input.tool_input?.command ?? "";
 const cwd = input.cwd ?? process.cwd();
 
-if (!/\bgit\b/.test(command)) {
+if (!/\bgit\b/u.test(command)) {
   process.exit(0);
 }
 

@@ -42,15 +42,15 @@ describe("ProjectForm NDA/IP agreement", () => {
 
     expect(screen.queryByLabelText("Licensing / IP / NDA Notes")).toBeNull();
 
-    fireEvent.click(screen.getByLabelText(/requires an NDA or IP agreement/i));
+    fireEvent.click(screen.getByLabelText(/requires an NDA or IP agreement/iu));
 
     // The hint names the field it clears, rather than "the restrictions
     // below", which matched no label on the page.
     expect(
-      screen.getByText(/Unchecking it clears Licensing\/IP\/NDA notes\./)
+      screen.getByText(/Unchecking it clears Licensing\/IP\/NDA notes\./u)
     ).toBeTruthy();
     // The revealed field says what to put in it, like every other field.
-    expect(screen.getByText(/Briefly explain the restrictions/i)).toBeTruthy();
+    expect(screen.getByText(/Briefly explain the restrictions/iu)).toBeTruthy();
 
     expect(screen.getByLabelText("Licensing / IP / NDA Notes")).toBeTruthy();
   });
@@ -73,18 +73,18 @@ describe("ProjectForm team is full", () => {
     renderForm();
 
     expect(
-      screen.queryByLabelText(/students can apply to join this project/i)
+      screen.queryByLabelText(/students can apply to join this project/iu)
     ).toBeNull();
-    expect(screen.queryByLabelText(/team is full/i)).toBeNull();
+    expect(screen.queryByLabelText(/team is full/iu)).toBeNull();
     expect(
-      screen.queryByText(/uncheck once you have the team you need/i)
+      screen.queryByText(/uncheck once you have the team you need/iu)
     ).toBeNull();
     // The NDA helper stays, and so does the rule it is here for: the form
     // names the act students take, never bidding (CONTEXT.md **Team is full**).
     expect(
-      screen.getByText(/students see this before they apply/i)
+      screen.getByText(/students see this before they apply/iu)
     ).toBeTruthy();
-    expect(screen.queryByText(/\bbid/i)).toBeNull();
+    expect(screen.queryByText(/\bbid/iu)).toBeNull();
   });
 });
 
@@ -97,7 +97,7 @@ describe("ProjectForm sponsorship", () => {
 
     expect(
       (
-        screen.getByLabelText(/this is a sponsored project/i) as HTMLElement
+        screen.getByLabelText(/this is a sponsored project/iu) as HTMLElement
       ).getAttribute("data-state")
     ).toBe("checked");
   });
@@ -111,17 +111,17 @@ describe("ProjectForm commitment notice", () => {
     // external mentor or the instructor's guidance (#304), so the notice has
     // to name both cases. Role cannot distinguish them: a student and an
     // industry partner are both role "user".
-    expect(screen.getByText(/one hour a week/i)).toBeTruthy();
+    expect(screen.getByText(/one hour a week/iu)).toBeTruthy();
     // Specific, not /student/i: the NDA checkbox hint also says "Students",
     // and matching that would pass without the mentor sentence existing.
     expect(
-      screen.getByText(/if you are a student proposing a project/i)
+      screen.getByText(/if you are a student proposing a project/iu)
     ).toBeTruthy();
     expect(
-      screen.getByText(/may need to find an external project mentor/i)
+      screen.getByText(/may need to find an external project mentor/iu)
     ).toBeTruthy();
     expect(
-      screen.getByText(/your instructor will provide guidance/i)
+      screen.getByText(/your instructor will provide guidance/iu)
     ).toBeTruthy();
   });
 });

@@ -28,13 +28,13 @@ export interface ImportIssue {
  * How a bid names its project, and how a CSV project is keyed: case, runs of
  * spaces and trailing punctuation ("system:") do not tell two titles apart.
  */
-const TRAILING_PUNCTUATION = /[\s.,:;!?]+$/;
+const TRAILING_PUNCTUATION = /[\s.,:;!?]+$/u;
 
 export function normalizeTitle(title: string): string {
   return title
     .normalize("NFC")
     .trim()
-    .replace(/\s+/g, " ")
+    .replace(/\s+/gu, " ")
     .replace(TRAILING_PUNCTUATION, "")
     .toLowerCase();
 }
@@ -47,8 +47,8 @@ export type Row = Record<string, string | undefined>;
  * its case and every column read by its lowercase name would come back
  * empty (#735).
  */
-export const LEADING_BLANK_LINES = /^\uFEFF?(?:[ \t]*(?:\r\n|\r|\n))*/;
-const LINE_BREAKS = /\r\n|\r|\n/g;
+export const LEADING_BLANK_LINES = /^\uFEFF?(?:[ \t]*(?:\r\n|\r|\n))*/u;
+const LINE_BREAKS = /\r\n|\r|\n/gu;
 
 /**
  * The file's rows keyed by lowercase header. `firstRecordRow` is the row of
@@ -202,7 +202,7 @@ export function parseProjectsCsv(text: string): {
     }
     const error = (message: string) =>
       issues.push({ level: "error", row, message });
-    const title = cell(raw, "title").replace(/\s+/g, " ");
+    const title = cell(raw, "title").replace(/\s+/gu, " ");
     if (title === "") {
       error("The row has no title.");
       return;
@@ -259,7 +259,7 @@ export function pastedLines(text: string): { line: number; text: string }[] {
     .filter((l) => l.text !== "");
 }
 
-const LINE_BREAK = /\r\n|\r|\n/;
+const LINE_BREAK = /\r\n|\r|\n/u;
 
 /**
  * A pasted column of project titles, one per line (#664): the projects a CSV
@@ -274,7 +274,7 @@ export function parseProjectTitles(text: string): {
   const issues: ImportIssue[] = [];
   const firstLine = new Map<string, number>();
   for (const { line, text: raw } of pastedLines(text)) {
-    const title = raw.replace(/\s+/g, " ");
+    const title = raw.replace(/\s+/gu, " ");
     const key = normalizeTitle(title);
     if (key === "") {
       issues.push({

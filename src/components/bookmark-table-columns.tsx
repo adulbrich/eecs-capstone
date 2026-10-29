@@ -33,7 +33,7 @@ export const BOOKMARK_TABLE_COLUMNS = defineAdminColumns<BookmarkRow>()([
   {
     accessorFn: (row) => row.title,
     cell: ({ row }) => (
-      <div className="flex items-center gap-2 md:min-w-xs md:max-w-md">
+      <div className="flex items-center gap-2 md:max-w-md md:min-w-xs">
         <ImageOrFallback
           className="aspect-[3/2] w-16 shrink-0 rounded object-cover"
           src={projectImageSrc(row.original.imageUrl)}

@@ -40,7 +40,7 @@ const { projectId, bookmarkProjectIds, draftProjectId } = JSON.parse(
  * function, rather than passing on a read it never saw.
  */
 function isInitialBookmarkRead(response: Response): boolean {
-  const encoded = /\/_serverFn\/([^/?]+)/.exec(response.url())?.[1];
+  const encoded = /\/_serverFn\/([^/?]+)/u.exec(response.url())?.[1];
   if (!encoded) {
     return false;
   }
@@ -78,9 +78,9 @@ test("projects list, signed in, with bookmark controls", async ({ page }) => {
   await page.goto("/projects");
   await waitForHydration(page);
   await expect(
-    page.getByRole("button", { name: /^(Bookmark|Remove bookmark)$/ }).first()
+    page.getByRole("button", { name: /^(Bookmark|Remove bookmark)$/u }).first()
   ).toBeVisible();
-  await expect(page.getByRole("link", { name: /^Bookmarks/ })).toBeVisible();
+  await expect(page.getByRole("link", { name: /^Bookmarks/u })).toBeVisible();
   const propose = page.getByRole("link", { name: "Propose project" });
   await expect(propose).toHaveAttribute("href", "/projects/new");
   await checkA11y(page);
@@ -89,7 +89,7 @@ test("projects list, signed in, with bookmark controls", async ({ page }) => {
   // the page wider than the viewport (#280).
   await page.setViewportSize({ width: 375, height: 812 });
   await expect(propose).toBeVisible();
-  await expect(page.getByRole("link", { name: /^Bookmarks/ })).toBeVisible();
+  await expect(page.getByRole("link", { name: /^Bookmarks/u })).toBeVisible();
   await expectNoHorizontalOverflow(page);
   await checkA11y(page);
 
@@ -121,7 +121,7 @@ test("@smoke an outline Button and an outline asChild Link read the same", async
   await page.goto(`/projects/${projectId}`);
   await waitForHydration(page);
   const button = page.getByRole("button", {
-    name: /^(Bookmark|Remove bookmark)$/,
+    name: /^(Bookmark|Remove bookmark)$/u,
   });
   // Scoped to the header's action row, because the page carries three Edit
   // links: this one, a full-width copy below the image for phone widths, and
@@ -232,7 +232,7 @@ test("projects table, signed in, with bookmark controls", async ({ page }) => {
   await page.goto("/projects?view=table");
   await waitForHydration(page);
   await expect(
-    page.getByRole("button", { name: /^(Bookmark|Remove bookmark)$/ }).first()
+    page.getByRole("button", { name: /^(Bookmark|Remove bookmark)$/u }).first()
   ).toBeVisible();
   await checkA11y(page);
 });
@@ -243,9 +243,9 @@ test("inventory table, signed in, with borrow list controls", async ({
   await page.goto("/inventory?view=table");
   await waitForHydration(page);
   await expect(
-    page.getByRole("button", { name: /^(Borrow|In borrow list)$/ }).first()
+    page.getByRole("button", { name: /^(Borrow|In borrow list)$/u }).first()
   ).toBeVisible();
-  await expect(page.getByRole("link", { name: /^Borrow list/ })).toBeVisible();
+  await expect(page.getByRole("link", { name: /^Borrow list/u })).toBeVisible();
   await checkA11y(page);
 
   // At a phone width the table restacks into cards that fit (#300), and
@@ -258,7 +258,7 @@ test("inventory table, signed in, with borrow list controls", async ({
   await expect(
     page.getByRole("link", { name: "Request something else" })
   ).toBeVisible();
-  await expect(page.getByRole("link", { name: /^Borrow list/ })).toBeVisible();
+  await expect(page.getByRole("link", { name: /^Borrow list/u })).toBeVisible();
   await expectNoHorizontalOverflow(page);
   await checkA11y(page);
 });
@@ -337,7 +337,7 @@ test("@smoke my items, each filter", async ({ page }) => {
   // measured. The seed leaves this user short of that, so this wait proves the
   // badge is present, not that its colours pass.
   await expect(
-    page.getByRole("button", { name: "Notifications" }).getByText(/^\d+\+?$/)
+    page.getByRole("button", { name: "Notifications" }).getByText(/^\d+\+?$/u)
   ).toBeVisible();
 
   // One grouped table under a filter, since 2026-09-09. Each filter renders
@@ -365,7 +365,7 @@ test("my items opens by saying what needs attention", async ({ page }) => {
   // Borrow list tab shows the assembled request rather than the empty state.
   const region = page.getByRole("region", { name: "Needs your attention" });
   await expect(region).toBeVisible();
-  const below = region.getByRole("link", { name: /below/ });
+  const below = region.getByRole("link", { name: /below/u });
   await expect(below).toBeVisible();
   // The one link in the callout is body copy under a list (#364).
   await expectUnderlinedAtRest(below);
@@ -374,7 +374,7 @@ test("my items opens by saying what needs attention", async ({ page }) => {
   await expect(page.getByText("Not submitted yet")).toBeVisible();
   await page.getByRole("button", { name: "Submit" }).click();
   await waitForSurfaceSettled(
-    page.getByRole("dialog", { name: /as one request/ })
+    page.getByRole("dialog", { name: /as one request/u })
   );
   await expect(page.getByLabel("Note for staff (optional)")).toBeVisible();
   await checkA11y(page);
@@ -427,7 +427,7 @@ test("delete confirmation dialog", async ({ page }) => {
   await waitForHydration(page);
 
   await page
-    .getByRole("button", { name: /Delete/ })
+    .getByRole("button", { name: /Delete/u })
     .first()
     .click();
   const dialog = page.getByRole("alertdialog");

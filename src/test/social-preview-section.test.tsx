@@ -149,7 +149,7 @@ describe("SocialPreviewSection button states", () => {
     await renderWith(AUTOMATIC);
     type("x".repeat(400));
     expect(saveButton().hasAttribute("disabled")).toBe(true);
-    expect(screen.getByText(/at most 300 characters/)).toBeDefined();
+    expect(screen.getByText(/at most 300 characters/u)).toBeDefined();
     expect(server.saveSocialSummary).not.toHaveBeenCalled();
   });
 
@@ -162,7 +162,7 @@ describe("SocialPreviewSection button states", () => {
     type("\u{1F600}".repeat(151));
     expect(screen.getByText("151 / 300")).toBeDefined();
     expect(saveButton().hasAttribute("disabled")).toBe(false);
-    expect(screen.queryByText(/at most 300 characters/)).toBeNull();
+    expect(screen.queryByText(/at most 300 characters/u)).toBeNull();
   });
 
   it("still refuses 301 code points of emoji", async () => {
@@ -235,7 +235,7 @@ describe("SocialPreviewSection actions", () => {
 
     await waitFor(() => expect(textarea().value).toBe(AUTOMATIC.summary));
     expect(regenerateButton().hasAttribute("disabled")).toBe(true);
-    expect(screen.queryByText(/changed while the rewrite/)).toBeNull();
+    expect(screen.queryByText(/changed while the rewrite/u)).toBeNull();
   });
 
   it("says so when the rewrite lost a race, and shows what is stored", async () => {
@@ -247,7 +247,7 @@ describe("SocialPreviewSection actions", () => {
     fireEvent.click(regenerateButton());
 
     const notice = await screen.findByText(
-      /changed while the rewrite was running/
+      /changed while the rewrite was running/u
     );
     // Announced, not merely printed: a reader who cannot see the textarea
     // change is otherwise told nothing about text they did not ask for.
@@ -266,7 +266,7 @@ describe("SocialPreviewSection actions", () => {
     type("Wording Bob typed.");
     fireEvent.click(saveButton());
 
-    const notice = await screen.findByText(/so yours was not saved/);
+    const notice = await screen.findByText(/so yours was not saved/u);
     expect(notice.getAttribute("role")).toBe("alert");
     expect(notice.textContent).toContain(`"${SAVE_LOST.summary}"`);
     expect(textarea().value).toBe("Wording Bob typed.");
@@ -288,7 +288,7 @@ describe("SocialPreviewSection actions", () => {
       })
     );
     await waitFor(() =>
-      expect(screen.queryByText(/so yours was not saved/)).toBeNull()
+      expect(screen.queryByText(/so yours was not saved/u)).toBeNull()
     );
   });
 
@@ -306,7 +306,7 @@ describe("SocialPreviewSection actions", () => {
     await waitFor(() =>
       expect(regenerateButton().hasAttribute("disabled")).toBe(false)
     );
-    expect(screen.queryByText(/so yours was not saved/)).toBeNull();
+    expect(screen.queryByText(/so yours was not saved/u)).toBeNull();
     expect(saveButton().hasAttribute("disabled")).toBe(true);
   });
 
@@ -318,7 +318,7 @@ describe("SocialPreviewSection actions", () => {
     );
     fireEvent.click(regenerateButton());
 
-    expect(await screen.findByText(/used all 20/)).toBeDefined();
+    expect(await screen.findByText(/used all 20/u)).toBeDefined();
     expect(textarea().value).toBe(MANUAL.summary);
   });
 
@@ -332,7 +332,9 @@ describe("SocialPreviewSection actions", () => {
     renderWithQueryClient(<SocialPreviewSection projectId="p1" />);
     await screen.findByLabelText("Social summary");
 
-    expect(screen.getByText(/Could not load the stored summary/)).toBeDefined();
+    expect(
+      screen.getByText(/Could not load the stored summary/u)
+    ).toBeDefined();
     expect(saveButton().hasAttribute("disabled")).toBe(true);
     expect(regenerateButton().hasAttribute("disabled")).toBe(true);
     expect(textarea().disabled).toBe(true);
@@ -351,7 +353,7 @@ describe("SocialPreviewSection actions", () => {
     expect(textarea().disabled).toBe(false);
     expect(regenerateButton().hasAttribute("disabled")).toBe(false);
     expect(screen.queryByRole("button", { name: "Try again" })).toBeNull();
-    expect(screen.queryByText(/Could not load the stored summary/)).toBeNull();
+    expect(screen.queryByText(/Could not load the stored summary/u)).toBeNull();
   });
 });
 
@@ -367,7 +369,7 @@ describe("SocialPreviewSection last rewrite", () => {
     expect(
       screen.getByText("No automatic attempt on record yet.")
     ).toBeDefined();
-    expect(screen.queryByText(/failed/)).toBeNull();
+    expect(screen.queryByText(/failed/u)).toBeNull();
   });
 
   it("says the automatic path is off rather than that it has not run yet", async () => {
@@ -375,9 +377,9 @@ describe("SocialPreviewSection last rewrite", () => {
     // "not yet" would be a promise nothing keeps.
     await renderWith({ ...NONE, automaticEnabled: false });
     expect(
-      screen.getByText(/Automatic summaries are switched off/)
+      screen.getByText(/Automatic summaries are switched off/u)
     ).toBeDefined();
-    expect(screen.queryByText(/No automatic attempt/)).toBeNull();
+    expect(screen.queryByText(/No automatic attempt/u)).toBeNull();
   });
 
   it("says when one will run on a project that is not published yet", async () => {
@@ -397,9 +399,9 @@ describe("SocialPreviewSection last rewrite", () => {
       },
     });
     expect(
-      screen.getByText(/The last rewrite failed automatically/)
+      screen.getByText(/The last rewrite failed automatically/u)
     ).toBeDefined();
-    expect(screen.getByText(/previews use the start/)).toBeDefined();
+    expect(screen.getByText(/previews use the start/u)).toBeDefined();
     expect(
       screen.queryByText("No automatic attempt on record yet.")
     ).toBeNull();
@@ -417,7 +419,7 @@ describe("SocialPreviewSection last rewrite", () => {
         trigger: "automatic",
       },
     });
-    expect(screen.getByText(/the last one written/)).toBeDefined();
+    expect(screen.getByText(/the last one written/u)).toBeDefined();
     expect(regenerateButton().hasAttribute("disabled")).toBe(false);
   });
 
@@ -427,7 +429,7 @@ describe("SocialPreviewSection last rewrite", () => {
       summaryAttempt: { at: FAILED_AT, outcome: "failed", trigger: "staff" },
     });
     expect(
-      screen.getByText(/The last rewrite failed from Regenerate/)
+      screen.getByText(/The last rewrite failed from Regenerate/u)
     ).toBeDefined();
   });
 
@@ -441,7 +443,7 @@ describe("SocialPreviewSection last rewrite", () => {
       },
     });
     expect(
-      screen.getByText(/was dropped because the project changed/)
+      screen.getByText(/was dropped because the project changed/u)
     ).toBeDefined();
     expect(regenerateButton().hasAttribute("disabled")).toBe(true);
   });
@@ -455,8 +457,8 @@ describe("SocialPreviewSection last rewrite", () => {
         trigger: "automatic",
       },
     });
-    expect(screen.queryByText(/last rewrite/)).toBeNull();
-    expect(screen.queryByText(/No automatic attempt/)).toBeNull();
+    expect(screen.queryByText(/last rewrite/u)).toBeNull();
+    expect(screen.queryByText(/No automatic attempt/u)).toBeNull();
   });
 
   it("hides the automatic status on a summary staff wrote", async () => {
@@ -470,6 +472,6 @@ describe("SocialPreviewSection last rewrite", () => {
         trigger: "automatic",
       },
     });
-    expect(screen.queryByText(/last rewrite/)).toBeNull();
+    expect(screen.queryByText(/last rewrite/u)).toBeNull();
   });
 });

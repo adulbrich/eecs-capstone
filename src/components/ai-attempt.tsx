@@ -21,7 +21,7 @@ export function triggerPhrase(
  */
 export function AttemptFailed({ children }: { children: ReactNode }) {
   return (
-    <p className="rounded-md border border-destructive/30 bg-destructive/5 p-2 text-sm">
+    <p className="border-destructive/30 bg-destructive/5 rounded-md border p-2 text-sm">
       {children}
     </p>
   );

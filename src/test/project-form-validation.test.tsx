@@ -57,7 +57,7 @@ describe("ProjectForm validation", () => {
     const form = renderForm();
 
     // Absent first, so a string that was always on the page cannot pass this.
-    expect(screen.queryByText(/Must be a valid email/)).toBeNull();
+    expect(screen.queryByText(/Must be a valid email/u)).toBeNull();
 
     fireEvent.change(screen.getByLabelText("Title"), {
       target: { value: "A project" },
@@ -68,7 +68,7 @@ describe("ProjectForm validation", () => {
     fireEvent.submit(form);
 
     await waitFor(() =>
-      expect(screen.getByText(/Must be a valid email/)).toBeTruthy()
+      expect(screen.getByText(/Must be a valid email/u)).toBeTruthy()
     );
   });
 
@@ -77,11 +77,11 @@ describe("ProjectForm validation", () => {
     // its messages have to survive the trip as Standard Schema issues.
     const form = renderForm();
 
-    expect(screen.queryByText(/Title is required/)).toBeNull();
+    expect(screen.queryByText(/Title is required/u)).toBeNull();
     fireEvent.submit(form);
 
     await waitFor(() =>
-      expect(screen.getByText(/Title is required/)).toBeTruthy()
+      expect(screen.getByText(/Title is required/u)).toBeTruthy()
     );
   });
 
@@ -89,7 +89,7 @@ describe("ProjectForm validation", () => {
     // #776: zod's `.url()` accepted links separated by a space, and the page
     // rendered them as one broken link.
     const form = renderForm();
-    const message = /Enter one link. Put any others in the description./;
+    const message = /Enter one link. Put any others in the description./u;
 
     expect(screen.queryByText(message)).toBeNull();
 

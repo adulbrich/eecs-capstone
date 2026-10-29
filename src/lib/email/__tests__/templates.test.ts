@@ -26,7 +26,7 @@ describe("signInCodeEmail", () => {
     expect(email.subject).toBe("Your sign-in code");
     expect(email.text).toContain("Your sign-in code is 123456.");
     // A link here would be a magic link, which is what ADR-0047 declined.
-    expect(email.text).not.toMatch(/https?:\/\//);
+    expect(email.text).not.toMatch(/https?:\/\//u);
     expect(email.html).not.toContain("<a ");
   });
 });

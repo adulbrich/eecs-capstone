@@ -61,7 +61,7 @@ afterEach(() => {
 });
 
 function submit() {
-  fireEvent.click(screen.getByRole("button", { name: /save|create/i }));
+  fireEvent.click(screen.getByRole("button", { name: /save|create/iu }));
 }
 
 function fillTitle(value = "A project") {
@@ -96,7 +96,7 @@ describe("ProjectForm create", () => {
 
     render(<ProjectForm showNotes submitLabel="Create draft" />);
     fillTitle();
-    fireEvent.click(screen.getByRole("button", { name: /pick image/i }));
+    fireEvent.click(screen.getByRole("button", { name: /pick image/iu }));
     submit();
 
     await waitFor(() => expect(updateMock).toHaveBeenCalledTimes(1));
@@ -115,11 +115,11 @@ describe("ProjectForm create", () => {
 
     render(<ProjectForm showNotes submitLabel="Create draft" />);
     fillTitle();
-    fireEvent.click(screen.getByRole("button", { name: /pick image/i }));
+    fireEvent.click(screen.getByRole("button", { name: /pick image/iu }));
     submit();
 
     await waitFor(() =>
-      expect(screen.getByText(/Unsupported image type/)).toBeTruthy()
+      expect(screen.getByText(/Unsupported image type/u)).toBeTruthy()
     );
     expect(updateMock).not.toHaveBeenCalled();
   });
@@ -158,11 +158,11 @@ describe("ProjectForm edit", () => {
         submitLabel="Save"
       />
     );
-    fireEvent.click(screen.getByRole("button", { name: /pick image/i }));
+    fireEvent.click(screen.getByRole("button", { name: /pick image/iu }));
     submit();
 
     await waitFor(() =>
-      expect(screen.getByText(/Unsupported image type/)).toBeTruthy()
+      expect(screen.getByText(/Unsupported image type/u)).toBeTruthy()
     );
     expect(uploadMock).toHaveBeenCalledTimes(1);
     expect(updateMock).not.toHaveBeenCalled();
@@ -180,7 +180,7 @@ describe("ProjectForm edit", () => {
         submitLabel="Save"
       />
     );
-    fireEvent.click(screen.getByRole("button", { name: /pick image/i }));
+    fireEvent.click(screen.getByRole("button", { name: /pick image/iu }));
     submit();
 
     await waitFor(() => expect(updateMock).toHaveBeenCalledTimes(1));
@@ -216,7 +216,7 @@ describe("ProjectForm onSaved", () => {
     fillTitle();
     submit();
 
-    await waitFor(() => expect(screen.getByText(/Save failed/)).toBeTruthy());
+    await waitFor(() => expect(screen.getByText(/Save failed/u)).toBeTruthy());
     expect(onSaved).not.toHaveBeenCalled();
   });
 });

@@ -96,7 +96,7 @@ function AccountSearch({ onPick }: { onPick: (email: string) => void }) {
               value={m.email}
             >
               <span className="font-medium">{m.name}</span>
-              <span className="ml-2 text-muted-foreground text-xs">
+              <span className="text-muted-foreground ml-2 text-xs">
                 {m.email}
               </span>
             </CommandItem>

@@ -108,7 +108,7 @@ describe("uploadInventoryImageAs", () => {
     );
     const { key } = await uploadInventoryImageAs(staff, form);
 
-    expect(key).toMatch(new RegExp(`^inventory/${item.id}/.+\\.webp$`));
+    expect(key).toMatch(new RegExp(`^inventory/${item.id}/.+\\.webp$`, "u"));
     expect(await objectExists(key)).toBe(true);
     const [row] = await db
       .select()
@@ -127,7 +127,7 @@ describe("uploadInventoryImageAs", () => {
     );
     await expect(
       uploadInventoryImageAs({ id: "nobody", role: "user" }, form)
-    ).rejects.toThrow(/Forbidden|staff/i);
+    ).rejects.toThrow(/Forbidden|staff/iu);
   });
 });
 

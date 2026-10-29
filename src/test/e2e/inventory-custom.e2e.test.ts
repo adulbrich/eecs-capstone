@@ -48,7 +48,7 @@ test.describe("custom line rejection", () => {
       await expect(
         sheet.getByRole("heading", { name, exact: true })
       ).toBeVisible();
-      await expect(sheet.getByText(/^Requested by/)).toBeVisible();
+      await expect(sheet.getByText(/^Requested by/u)).toBeVisible();
       await staff.keyboard.press("Escape");
       await expect(sheet).toBeHidden();
 

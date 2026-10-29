@@ -87,7 +87,7 @@ describe("holdFromInput", () => {
   it("throws when a hold is on an address and a thing at once", () => {
     expect(() =>
       holdFromInput({ email: "a@b.test", label: "Cart 3" }, NO_ACCOUNT)
-    ).toThrow(/not both/i);
+    ).toThrow(/not both/iu);
   });
 
   it("throws when a hold is on an account and a thing at once", () => {
@@ -99,7 +99,7 @@ describe("holdFromInput", () => {
         { label: "Cart 3" },
         { accountId: "u-1", accountName: null }
       )
-    ).toThrow(/not both/i);
+    ).toThrow(/not both/iu);
   });
 
   it("does not trim a whitespace-only label into no hold at all", () => {

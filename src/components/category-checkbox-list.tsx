@@ -40,7 +40,7 @@ export function CategoryCheckboxList({
 
   return (
     <fieldset>
-      <legend className="font-medium text-muted-foreground text-xs">
+      <legend className="text-muted-foreground text-xs font-medium">
         Categories (matches all selected)
       </legend>
       <div className="mt-1 space-y-1">

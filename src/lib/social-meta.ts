@@ -62,10 +62,10 @@ export const NOINDEX = { content: "noindex, follow", name: "robots" } as const;
  */
 export const SOCIAL_CARD_ALT = `${brand.institutionName} ${brand.programName}, School of Electrical Engineering and Computer Science`;
 
-const TRAILING_PUNCTUATION = /[\s,;:.!?-]+$/;
+const TRAILING_PUNCTUATION = /[\s,;:.!?-]+$/u;
 
 /** A high surrogate with no low surrogate after it, at the end of a string. */
-const LONE_TRAILING_SURROGATE = /[\uD800-\uDBFF]$/;
+const LONE_TRAILING_SURROGATE = /[\uD800-\uDBFF]$/u;
 
 /**
  * Drops a half-character left by slicing on code units.

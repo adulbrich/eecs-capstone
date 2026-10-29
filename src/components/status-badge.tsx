@@ -34,7 +34,7 @@ export function StatusBadge({ status }: { status: string }) {
   // a value the enum does not have; the cast only picks the map's row type.
   const { fg, bg } = STATUS_STYLES[status as ProjectStatus] ?? FALLBACK;
   const label =
-    PROJECT_STATUS_LABEL[status as ProjectStatus] ?? status.replace(/_/g, " ");
+    PROJECT_STATUS_LABEL[status as ProjectStatus] ?? status.replace(/_/gu, " ");
   // The one-line meaning as a native tooltip, the way the staff stepper's
   // pills carry theirs: a hover on the badge answers "what does approved
   // mean for me" without a block of copy on the page (#303).

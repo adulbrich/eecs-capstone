@@ -191,7 +191,7 @@ describe("the staff inventory table", () => {
   it("names the holder and links the request line behind a held item", () => {
     renderTable();
     const row = within(rowFor("Oscilloscope"));
-    expect(row.getByText(/Sam Rivera/)).toBeTruthy();
+    expect(row.getByText(/Sam Rivera/u)).toBeTruthy();
     expect(
       row.getByRole("link", { name: "View request" }).getAttribute("href")
     ).toBe("/admin/inventory/requests");

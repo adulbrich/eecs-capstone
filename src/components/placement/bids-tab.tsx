@@ -200,7 +200,7 @@ export function BidsTab({
           />
         )}
       </div>
-      <p className="mt-2 text-muted-foreground text-sm">
+      <p className="text-muted-foreground mt-2 text-sm">
         {view === "project"
           ? 'Pin here does what Approve does on the Results tab: every run keeps the student on that project until you unpin them, over any pin from the bids file or the roster. Unpin frees them from all of these. A pin changes the next run; the Results tab shows the last run until then. Each project lists who is pinned there and how, and after a run how many the run placed there, each marked Placed here with their team, including anyone placed outside their bids; "(before your changes)" means the projects, parameters or bids changed since. A student pinned since the run shows their pin, not where the run put them, and leaves that count. On a row marked Pinned elsewhere, Pin here moves their pin to this project; the header of the other project lists who is pinned there. Pinned only shows the pinned students alone.'
           : "Pinned rows show every pin in effect: the bids file's, the roster's, and those set here or on the Results tab, which win over the other two. Each student says where they stand: a pinned student stays on their pin in every run, so only the pin shows; anyone else shows where the last run placed them, marked in their rows."}{" "}
@@ -369,7 +369,7 @@ const COLUMNS = defineAdminColumns<Row>()([
   {
     accessorFn: (row) => row.comment || undefined,
     cell: ({ row }) => (
-      <div className="whitespace-pre-line md:min-w-xs md:max-w-xl">
+      <div className="whitespace-pre-line md:max-w-xl md:min-w-xs">
         {row.original.comment || "-"}
       </div>
     ),
@@ -393,11 +393,11 @@ function StudentHeader({
     <div className="wrap-anywhere">
       <span className="font-medium">{first.name || first.email}</span>
       {first.name && (
-        <span className="ml-2 font-normal text-muted-foreground text-xs">
+        <span className="text-muted-foreground ml-2 text-xs font-normal">
           {first.email}
         </span>
       )}
-      <span className="ml-2 font-normal text-muted-foreground text-xs">
+      <span className="text-muted-foreground ml-2 text-xs font-normal">
         {first.rosterOnly
           ? "on the roster, not in the survey"
           : `${bids} ${bids === 1 ? "bid" : "bids"}`}
@@ -410,13 +410,13 @@ function StudentHeader({
         />
       </span>
       {first.preApprovedFor && (
-        <span className="ml-2 font-normal text-xs">
+        <span className="ml-2 text-xs font-normal">
           pre-approved for {first.preApprovedFor}
         </span>
       )}
-      <p className="font-normal text-sm">{first.standing}</p>
+      <p className="text-sm font-normal">{first.standing}</p>
       {first.preApprovalOverridden && (
-        <p className="font-normal text-sm" role="note" style={WARNING_STYLE}>
+        <p className="text-sm font-normal" role="note" style={WARNING_STYLE}>
           Pre-approved for {first.preApprovalOverridden} on the roster, but a
           pin set on the Results tab or here replaces it. Unpin leaves them
           free; a pin to {first.preApprovalOverridden} puts them back there.
@@ -424,7 +424,7 @@ function StudentHeader({
       )}
       {first.avoid && (
         <p
-          className="flex items-start gap-1 font-normal text-sm"
+          className="flex items-start gap-1 text-sm font-normal"
           role="note"
           style={{ color: "var(--status-warning)" }}
         >

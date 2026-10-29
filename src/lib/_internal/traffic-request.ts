@@ -32,7 +32,7 @@ const MAX_ARRAY = 20;
  * a lone surrogate as U+FFFD and the insert succeeds.
  */
 const LONE_SURROGATE =
-  /[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/;
+  /[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/u;
 
 const searchString = z
   .string()
@@ -129,7 +129,7 @@ export function viewerAddress(
   });
 }
 
-const COUNTRY = /^[A-Z]{2}$/;
+const COUNTRY = /^[A-Z]{2}$/u;
 
 /**
  * `CloudFront-Viewer-Country`, only when it is exactly two capital letters.

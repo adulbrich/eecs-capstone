@@ -61,6 +61,6 @@ describe("InventoryCard", () => {
       <InventoryCard item={item} signedIn={false} />
     );
     expect(container.firstElementChild?.tagName).not.toBe("A");
-    expect(getByRole("link", { name: /Oscilloscope/ })).toBeTruthy();
+    expect(getByRole("link", { name: /Oscilloscope/u })).toBeTruthy();
   });
 });

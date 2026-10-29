@@ -27,7 +27,7 @@ export function SiteHeader() {
 
   return (
     <header
-      className="border-[var(--line)] border-b"
+      className="border-b border-[var(--line)]"
       style={{ background: "var(--header-bg)", backdropFilter: "blur(8px)" }}
     >
       {/* Desktop nav */}
@@ -134,8 +134,8 @@ function MobileMenu({
         className="w-72 p-0"
         side="left"
       >
-        <SheetHeader className="flex flex-row items-center justify-between border-border border-b px-4 py-3">
-          <SheetTitle className="font-semibold text-base">
+        <SheetHeader className="border-border flex flex-row items-center justify-between border-b px-4 py-3">
+          <SheetTitle className="text-base font-semibold">
             Navigation
           </SheetTitle>
           <SheetClose asChild>
@@ -278,18 +278,18 @@ function SignedInMobile({
             src={resolvedImage}
           />
         ) : (
-          <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full bg-(--surface-sunken) font-medium text-sm">
+          <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full bg-(--surface-sunken) text-sm font-medium">
             {(user.name ?? user.email).charAt(0).toUpperCase()}
           </div>
         )}
         <div className="min-w-0">
           {user.name && (
-            <p className="truncate font-medium text-sm">{user.name}</p>
+            <p className="truncate text-sm font-medium">{user.name}</p>
           )}
-          <p className="truncate text-muted-foreground text-xs">{user.email}</p>
+          <p className="text-muted-foreground truncate text-xs">{user.email}</p>
         </div>
       </Link>
-      <div className="-mx-4 flex flex-col gap-0 border-border border-t py-2">
+      <div className="border-border -mx-4 flex flex-col gap-0 border-t py-2">
         <NavItem onClick={onClose} to="/my/projects">
           My Projects
         </NavItem>

@@ -250,7 +250,7 @@ function CategoriesAdmin() {
         </BreadcrumbList>
       </Breadcrumb>
       <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
-        <h1 className="font-semibold text-2xl">Categories</h1>
+        <h1 className="text-2xl font-semibold">Categories</h1>
         <Dialog onOpenChange={setOpen} open={open}>
           <DialogTrigger asChild>
             <Button size="sm" type="button">

@@ -236,7 +236,7 @@ function RequestGroupHeader({
       <p className="flex flex-wrap items-center gap-2">
         <span>
           {personName(first.requester)}
-          <span className="font-normal text-muted-foreground">
+          <span className="text-muted-foreground font-normal">
             {" "}
             requested {count} {count === 1 ? "line" : "lines"} on{" "}
             <LocalTime value={first.requestedAt} />
@@ -245,7 +245,7 @@ function RequestGroupHeader({
         {KIND[first.kind].badge}
       </p>
       {first.note && (
-        <p className="whitespace-pre-wrap font-normal text-muted-foreground text-xs">
+        <p className="text-muted-foreground text-xs font-normal whitespace-pre-wrap">
           {first.note}
         </p>
       )}
@@ -304,7 +304,7 @@ function buildColumns(
             {ctx.row.original.requester.name ??
               ctx.row.original.requester.email}
           </p>
-          <p className="truncate text-muted-foreground text-xs">
+          <p className="text-muted-foreground truncate text-xs">
             {ctx.row.original.requester.email}
           </p>
         </Link>
@@ -430,7 +430,7 @@ function AdminRequestQueue() {
           </BreadcrumbItem>
         </BreadcrumbList>
       </Breadcrumb>
-      <h1 className="mt-2 font-semibold text-2xl">Inventory requests</h1>
+      <h1 className="mt-2 text-2xl font-semibold">Inventory requests</h1>
 
       <AdminDataTable
         caption="Inventory requests"
@@ -649,7 +649,7 @@ function customFields(row: CustomRow): LineSheetField[] {
       label: "Link",
       value: row.line.link ? (
         <a
-          className="break-all text-brand-dark underline"
+          className="text-brand-dark break-all underline"
           href={row.line.link}
           rel="noreferrer"
           target="_blank"

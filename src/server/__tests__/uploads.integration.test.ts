@@ -97,7 +97,9 @@ describe("uploadProjectImageAs", () => {
     form.append("file", fakeFile("sample.jpg", fixture));
 
     const result = await uploadProjectImageAs(viewer, form);
-    expect(result.key).toMatch(new RegExp(`^projects/${projectId}/.+\\.webp$`));
+    expect(result.key).toMatch(
+      new RegExp(`^projects/${projectId}/.+\\.webp$`, "u")
+    );
 
     const client = s3Client();
     const head = await client.send(
@@ -135,7 +137,7 @@ describe("uploadProjectImageAs", () => {
       new File([Buffer.from("not an image")], "x.txt", { type: "text/plain" })
     );
     await expect(uploadProjectImageAs(viewer, form)).rejects.toThrow(
-      /Unsupported image type/
+      /Unsupported image type/u
     );
 
     const [row] = await db
@@ -187,7 +189,7 @@ describe("uploadProjectImageAs cross-user guard", () => {
 
     await expect(
       uploadProjectImageAs({ id: stranger.id, role: stranger.role }, form)
-    ).rejects.toThrow(/Forbidden/);
+    ).rejects.toThrow(/Forbidden/u);
 
     // `uploadProjectImageAs` only selects the row; it has written none since
     // #88.
@@ -222,7 +224,7 @@ describe("uploadAvatarAs", () => {
     form.append("file", fakeFile("sample.jpg", fixture));
 
     const result = await uploadAvatarAs(viewer, form);
-    expect(result.key).toMatch(new RegExp(`^avatars/${u.id}/.+\\.webp$`));
+    expect(result.key).toMatch(new RegExp(`^avatars/${u.id}/.+\\.webp$`, "u"));
 
     const client = s3Client();
     const head = await client.send(
@@ -246,7 +248,7 @@ describe("uploadAvatarAs", () => {
     );
     await expect(
       uploadAvatarAs({ id: u.id, role: u.role, image: null }, form)
-    ).rejects.toThrow(/Unsupported image type/);
+    ).rejects.toThrow(/Unsupported image type/u);
   });
 });
 

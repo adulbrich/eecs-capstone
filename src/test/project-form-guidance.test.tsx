@@ -43,7 +43,7 @@ function renderForm() {
  */
 function describedText(label: string) {
   const control = screen.getByLabelText(label);
-  const ids = (control.getAttribute("aria-describedby") ?? "").split(/\s+/);
+  const ids = (control.getAttribute("aria-describedby") ?? "").split(/\s+/u);
   return ids
     .filter(Boolean)
     .map((id) => document.getElementById(id)?.textContent ?? "")
@@ -58,7 +58,7 @@ describe("ProjectForm field guidance", () => {
     // The note used to be one sentence floating above both fields, which read
     // as page copy rather than as guidance attached to an input.
     expect(
-      screen.queryByText(/Contact details below are shown publicly/)
+      screen.queryByText(/Contact details below are shown publicly/u)
     ).toBeNull();
     expect(describedText("Contact Name")).toBe(
       "Optional. Leave blank to keep private."

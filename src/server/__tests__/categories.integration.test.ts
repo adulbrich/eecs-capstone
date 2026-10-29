@@ -176,7 +176,7 @@ describe("categories", () => {
       // deliberately violates CategoryInput to prove the runtime assertion
       // catches what the type system also forbids at the call site.
       createCategoryAs(admin, { domain: "project", name: "Nope", type: null })
-    ).rejects.toThrow(/requires a type/);
+    ).rejects.toThrow(/requires a type/u);
   });
 
   it("rejects a type on an inventory category rather than stripping it", async () => {
@@ -190,7 +190,7 @@ describe("categories", () => {
         name: "Nope",
         type: "technology",
       })
-    ).rejects.toThrow(/cannot have a type/);
+    ).rejects.toThrow(/cannot have a type/u);
   });
 
   it("derives types from project categories only", async () => {
@@ -230,7 +230,7 @@ describe("categories", () => {
         name: "React",
         type: null,
       })
-    ).rejects.toThrow(/domain cannot be changed/);
+    ).rejects.toThrow(/domain cannot be changed/u);
 
     const [row] = await db
       .select()
@@ -372,7 +372,7 @@ describe("listProjectCategoriesAs", () => {
       expect(seen.categories).toEqual([
         {
           id: categoryId,
-          name: expect.stringMatching(/^Robotics /),
+          name: expect.stringMatching(/^Robotics /u),
           type: "technology",
         },
       ]);

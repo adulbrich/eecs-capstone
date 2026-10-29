@@ -145,8 +145,8 @@ export function CategoryMultiSelect({ domain, value, onChange }: Props) {
       )}
       {domain === "project" &&
         [...grouped.entries()].map(([type, items]) => (
-          <fieldset className="border border-border p-2" key={type}>
-            <legend className="px-1 font-medium text-muted-foreground text-xs">
+          <fieldset className="border-border border p-2" key={type}>
+            <legend className="text-muted-foreground px-1 text-xs font-medium">
               {type}
             </legend>
             <div className="flex flex-wrap gap-2">

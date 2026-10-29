@@ -13,7 +13,7 @@ const HTML_ESCAPES: Record<string, string> = {
 };
 
 // Top-level so it is compiled once rather than per call.
-const HTML_UNSAFE = /[&<>"']/g;
+const HTML_UNSAFE = /[&<>"']/gu;
 
 /**
  * Escapes a value for interpolation into the HTML body. One regex pass over a
@@ -140,7 +140,7 @@ export function projectApprovedEmail(input: {
 
 // Takes a CRLF blank line whole, counts a line of only whitespace (a no-break
 // space included) as blank, and leaves the next paragraph's indent alone.
-const BLANK_LINE = /\r?\n(?:[^\S\r\n]*\r?\n)+/;
+const BLANK_LINE = /\r?\n(?:[^\S\r\n]*\r?\n)+/u;
 
 /**
  * A bell row, mailed. The inventory notices already say the one thing the

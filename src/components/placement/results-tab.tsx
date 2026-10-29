@@ -346,7 +346,7 @@ function Figures({
           value={
             <>
               {placed}{" "}
-              <span className="font-normal text-base text-muted-foreground">
+              <span className="text-muted-foreground text-base font-normal">
                 of {total}
               </span>
             </>
@@ -396,8 +396,8 @@ function Figure({
   return (
     <Card className="p-4">
       <dt className="text-muted-foreground text-sm">{label}</dt>
-      <dd className="mt-1 font-semibold text-2xl tabular-nums">{value}</dd>
-      {hint && <dd className="mt-0.5 text-muted-foreground text-xs">{hint}</dd>}
+      <dd className="mt-1 text-2xl font-semibold tabular-nums">{value}</dd>
+      {hint && <dd className="text-muted-foreground mt-0.5 text-xs">{hint}</dd>}
     </Card>
   );
 }
@@ -540,7 +540,7 @@ function Board({
             />
             {/* Under the name, past the chevron in front of it. */}
             {row.original.name && (
-              <div className="pl-5 text-muted-foreground text-xs">
+              <div className="text-muted-foreground pl-5 text-xs">
                 {row.original.email}
               </div>
             )}
@@ -584,7 +584,7 @@ function Board({
       {
         accessorFn: (row) => row.comment || undefined,
         cell: ({ row }) => (
-          <div className="whitespace-pre-line md:min-w-xs md:max-w-md">
+          <div className="whitespace-pre-line md:max-w-md md:min-w-xs">
             {row.original.projectKey === null
               ? unplacedReason(row.original.unplacedReason)
               : row.original.comment || "-"}
@@ -652,7 +652,7 @@ function Board({
         {/* Empty after a failed re-run of a clean placement: the heading
             above carries the time, and nothing else needs saying. */}
         {notes.length > 0 && <RunReport lines={notes} />}
-        <p className="mt-2 text-muted-foreground text-sm">
+        <p className="text-muted-foreground mt-2 text-sm">
           Approve pins a student to the project they are on for every later run,
           over any pin from the bids file or the roster; Pin here on the Bids
           tab does the same. Move puts the student on another project now and
@@ -745,7 +745,7 @@ function GroupHeader({ rows }: { rows: BoardRow[] }) {
   return (
     <span className="flex flex-wrap items-center gap-x-2 gap-y-1">
       {rows[0].groupLabel}
-      <span className="font-normal text-muted-foreground text-xs">
+      <span className="text-muted-foreground text-xs font-normal">
         {rows[0].projectKey === null
           ? count
           : `${teams} ${teams === 1 ? "team" : "teams"}, ${count}${allPinned ? "" : `, ${pinned} pinned`}`}
@@ -863,14 +863,14 @@ function Unsurveyed({
             <Chevron aria-hidden="true" />
             Not in the survey
           </Button>{" "}
-          <span className="font-normal text-muted-foreground text-sm">
+          <span className="text-muted-foreground text-sm font-normal">
             {unsurveyed.length}{" "}
             {unsurveyed.length === 1 ? "student" : "students"}
           </span>
         </h2>
         {open && (
           <div id={bodyId}>
-            <p className="mt-1 text-muted-foreground text-sm">
+            <p className="text-muted-foreground mt-1 text-sm">
               On the roster with no bids and no pre-approval, so the run placed
               them where a team needed people. The count is how many on their
               team answered the survey; one or none is marked, since that team
@@ -972,7 +972,7 @@ function BidsToggle({
       aria-label={`${who}, ${count} ${count === 1 ? "bid" : "bids"}`}
       // Wraps as the text it replaced did: a long name, or an email standing
       // in for one, stays inside a 375px card.
-      className="wrap-anywhere items-start whitespace-normal text-left font-normal"
+      className="items-start text-left font-normal wrap-anywhere whitespace-normal"
       onClick={() => toggle(email)}
       size="bare"
       type="button"
@@ -1023,12 +1023,12 @@ function BidsDetail({
               className="flex flex-wrap items-start gap-x-3 gap-y-1 py-1.5 md:flex-nowrap"
               key={o.projectKey}
             >
-              <span className="w-10 shrink-0 text-muted-foreground">
+              <span className="text-muted-foreground w-10 shrink-0">
                 {ordinal(o.priority)}
               </span>
               <div className="min-w-0 flex-1 basis-40">
                 <div className="font-medium">{o.title}</div>
-                <div className="whitespace-pre-line text-muted-foreground">
+                <div className="text-muted-foreground whitespace-pre-line">
                   {o.comment || "No comment."}
                 </div>
               </div>

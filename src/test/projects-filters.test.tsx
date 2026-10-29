@@ -162,7 +162,7 @@ describe("the switch labels and the active count", () => {
       acceptingOnly: "Turn off to also show projects whose team is full.",
     });
     for (const text of Object.values(PROJECT_SWITCH_HINT)) {
-      expect(text).not.toMatch(/applicant/i);
+      expect(text).not.toMatch(/applicant/iu);
     }
   });
 });
@@ -204,7 +204,7 @@ describe("ProjectsFilters archive mode and hints", () => {
         ?.textContent
     ).toBe(ARCHIVE_MODE_HINT);
     // No Archived switch under the legend any more.
-    expect(screen.queryByRole("switch", { name: /archived/i })).toBeNull();
+    expect(screen.queryByRole("switch", { name: /archived/iu })).toBeNull();
     // The radio's fieldset comes before the switches' fieldset.
     const [first, second] = Array.from(document.querySelectorAll("fieldset"));
     expect(first?.contains(group)).toBe(true);
@@ -275,12 +275,12 @@ describe("ProjectsFilters archive mode and hints", () => {
 describe("the effective order the loader resolved", () => {
   it("shows the interests line when it resolved to recommended", () => {
     renderPrompt({ canRecommend: true, signedIn: true }, "recommended");
-    expect(screen.getByText(/Ranked by your interests/)).toBeTruthy();
+    expect(screen.getByText(/Ranked by your interests/u)).toBeTruthy();
   });
 
   it("shows no line when it resolved to relevance", () => {
     renderPrompt({ canRecommend: true, signedIn: true }, "relevance");
-    expect(screen.queryByText(/Ranked by your interests/)).toBeNull();
+    expect(screen.queryByText(/Ranked by your interests/u)).toBeNull();
   });
 });
 

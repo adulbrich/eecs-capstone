@@ -43,12 +43,12 @@ describe("limitVerdict", () => {
     // one would be the eleventh.
     expect(
       limitVerdict(counts(10, 20), LIMITS, AI_FEATURE_NOUN.review)
-    ).toMatch(/for this hour/);
+    ).toMatch(/for this hour/u);
   });
 
   it("blocks on the daily limit even when the hour has room", () => {
     expect(limitVerdict(counts(0, 40), LIMITS, AI_FEATURE_NOUN.review)).toMatch(
-      /for today/
+      /for today/u
     );
   });
 

@@ -68,8 +68,8 @@ export function BanForm({
       "permanent"
     );
     return (
-      <section className="mt-4 rounded-md border-2 border-destructive/30 bg-destructive/5 p-3">
-        <h2 className="font-medium text-sm">Banned</h2>
+      <section className="border-destructive/30 bg-destructive/5 mt-4 rounded-md border-2 p-3">
+        <h2 className="text-sm font-medium">Banned</h2>
         <p className="mt-1 text-sm">
           <span className="text-muted-foreground">Reason: </span>
           {banReason ?? "(none)"}
@@ -95,7 +95,7 @@ export function BanForm({
 
   return (
     <section className="mt-4">
-      <h2 className="font-medium text-sm">Ban this user</h2>
+      <h2 className="text-sm font-medium">Ban this user</h2>
       <div className="mt-2 space-y-2">
         <div>
           <Label htmlFor="ban-reason">Reason</Label>

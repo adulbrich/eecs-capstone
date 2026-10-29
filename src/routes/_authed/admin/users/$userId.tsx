@@ -66,24 +66,24 @@ function UserDetail() {
           </BreadcrumbItem>
         </BreadcrumbList>
       </Breadcrumb>
-      <h1 className="mt-2 font-semibold text-2xl">{user.name ?? user.email}</h1>
-      <p className="mt-1 text-muted-foreground text-sm">{user.email}</p>
+      <h1 className="mt-2 text-2xl font-semibold">{user.name ?? user.email}</h1>
+      <p className="text-muted-foreground mt-1 text-sm">{user.email}</p>
       {isSelf && (
-        <p className="mt-1 text-muted-foreground text-xs">
+        <p className="text-muted-foreground mt-1 text-xs">
           This is you. Role and ban controls are disabled.
         </p>
       )}
 
       <section className="mt-6 grid grid-cols-3 gap-3 text-sm">
-        <div className="rounded-md border border-border p-3">
+        <div className="border-border rounded-md border p-3">
           <p className="text-muted-foreground text-xs">Role</p>
           <p className="mt-1 font-medium">{user.role}</p>
         </div>
-        <div className="rounded-md border border-border p-3">
+        <div className="border-border rounded-md border p-3">
           <p className="text-muted-foreground text-xs">Projects</p>
           <p className="mt-1 font-medium">{projectCount}</p>
         </div>
-        <div className="rounded-md border border-border p-3">
+        <div className="border-border rounded-md border p-3">
           <p className="text-muted-foreground text-xs">Bookmarks</p>
           <p className="mt-1 font-medium">{bookmarkCount}</p>
         </div>
@@ -132,7 +132,7 @@ function UserDetail() {
       )}
 
       <section className="mt-8">
-        <h2 className="font-medium text-sm">AI usage</h2>
+        <h2 className="text-sm font-medium">AI usage</h2>
         {/*
           All time, the same window the AI calls column on /admin/users
           counts, and no cost in dollars: no per-model price exists in this
@@ -140,7 +140,7 @@ function UserDetail() {
           feature names come from the limiter's own vocabulary, so this page
           cannot drift from what a refusal tells the person.
         */}
-        <p className="mt-2 text-muted-foreground text-xs">
+        <p className="text-muted-foreground mt-2 text-xs">
           All time. The hourly and daily limits are shown to the person when a
           call is refused.
         </p>
@@ -189,9 +189,9 @@ function UserDetail() {
       </section>
 
       <section className="mt-8">
-        <h2 className="font-medium text-sm">Recent projects</h2>
+        <h2 className="text-sm font-medium">Recent projects</h2>
         {recentProjects.length === 0 ? (
-          <p className="mt-2 text-muted-foreground text-sm">None.</p>
+          <p className="text-muted-foreground mt-2 text-sm">None.</p>
         ) : (
           <ul className="mt-2 space-y-1">
             {recentProjects.map((p) => (

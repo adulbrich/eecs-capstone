@@ -88,9 +88,9 @@ function Figure({
   return (
     <Card className="p-4">
       <p className="text-muted-foreground text-sm">{label}</p>
-      <p className="mt-1 font-semibold text-2xl tabular-nums">{value}</p>
-      <p className="mt-0.5 text-muted-foreground text-xs">{hint}</p>
-      {note && <p className="mt-2 text-muted-foreground text-xs">{note}</p>}
+      <p className="mt-1 text-2xl font-semibold tabular-nums">{value}</p>
+      <p className="text-muted-foreground mt-0.5 text-xs">{hint}</p>
+      {note && <p className="text-muted-foreground mt-2 text-xs">{note}</p>}
     </Card>
   );
 }
@@ -104,7 +104,7 @@ function SectionHeading({
 }) {
   return (
     <div className="mt-8 flex flex-wrap items-baseline justify-between gap-2">
-      <h2 className="font-medium text-muted-foreground text-xs uppercase tracking-wide">
+      <h2 className="text-muted-foreground text-xs font-medium tracking-wide uppercase">
         {children}
       </h2>
       {note && <p className="text-muted-foreground text-xs">{note}</p>}
@@ -123,14 +123,14 @@ function PageLabel({
   // Bounded and clamped like any free-text title cell, so the counts stay
   // on screen beside a long title or a long pathname.
   return (
-    <div className="md:min-w-xs md:max-w-md" title={title ?? pathname}>
+    <div className="md:max-w-md md:min-w-xs" title={title ?? pathname}>
       {title && (
         <span className="block min-w-0 md:line-clamp-2 md:whitespace-normal">
           {title}
         </span>
       )}
       <span
-        className={`block min-w-0 break-all font-mono text-xs md:whitespace-normal ${title ? "text-muted-foreground md:line-clamp-1" : ""}`}
+        className={`block min-w-0 font-mono text-xs break-all md:whitespace-normal ${title ? "text-muted-foreground md:line-clamp-1" : ""}`}
       >
         {pathname}
       </span>
@@ -146,9 +146,9 @@ const PROJECT_COLUMNS = defineAdminColumns<ProjectRow>()([
     // column is bounded and clamped"), so a long title cannot push the
     // counts off the table.
     cell: ({ row }) => (
-      <div className="flex md:min-w-xs md:max-w-md">
+      <div className="flex md:max-w-md md:min-w-xs">
         <Link
-          className="min-w-0 text-brand-dark underline md:line-clamp-2 md:whitespace-normal"
+          className="text-brand-dark min-w-0 underline md:line-clamp-2 md:whitespace-normal"
           params={{ projectId: row.original.id }}
           title={row.original.title}
           to="/projects/$projectId"
@@ -354,8 +354,8 @@ function TrafficPage() {
           </BreadcrumbItem>
         </BreadcrumbList>
       </Breadcrumb>
-      <h1 className="mt-2 font-semibold text-2xl">Traffic</h1>
-      <p className="mt-1 text-muted-foreground text-sm">
+      <h1 className="mt-2 text-2xl font-semibold">Traffic</h1>
+      <p className="text-muted-foreground mt-1 text-sm">
         What readers do on the public pages: the home page, the project and
         inventory listings and pages, and the privacy page. Counted without
         cookies, so a visitor is a browser on one day, never an account. Pages
@@ -523,7 +523,7 @@ function TrafficPage() {
             )}
             storageKey="traffic-devices"
           />
-          <p className="mt-2 text-muted-foreground text-xs">
+          <p className="text-muted-foreground mt-2 text-xs">
             Tablets undercount: an iPad reads as a Mac.
           </p>
         </div>

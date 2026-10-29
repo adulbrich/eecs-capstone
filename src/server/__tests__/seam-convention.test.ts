@@ -105,7 +105,7 @@ function pairWrappersToSeams() {
       file,
       readFileSync(join(INTERNAL_DIR, file), "utf8")
     );
-    const seams = new Set(names.filter((name) => /(?:As|Impl)$/.test(name)));
+    const seams = new Set(names.filter((name) => /(?:As|Impl)$/u.test(name)));
 
     for (const wrapper of names.filter((name) =>
       name.endsWith(WRAPPER_SUFFIX)

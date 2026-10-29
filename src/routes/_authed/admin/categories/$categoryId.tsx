@@ -177,7 +177,7 @@ function CategoryEdit() {
           </BreadcrumbItem>
         </BreadcrumbList>
       </Breadcrumb>
-      <h1 className="mt-2 font-semibold text-2xl">Edit category</h1>
+      <h1 className="mt-2 text-2xl font-semibold">Edit category</h1>
       <CategoryForm
         category={category}
         key={`${category.name}|${category.type ?? ""}`}

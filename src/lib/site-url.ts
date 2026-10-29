@@ -18,9 +18,9 @@
  * so an unset variable in development produces working tags rather than
  * relative ones a scraper would drop.
  */
-const LEADING_SLASHES = /^\/+/;
-const TRAILING_SLASHES = /\/+$/;
-const ABSOLUTE = /^https?:\/\//i;
+const LEADING_SLASHES = /^\/+/u;
+const TRAILING_SLASHES = /\/+$/u;
+const ABSOLUTE = /^https?:\/\//iu;
 
 const CONFIGURED =
   typeof import.meta === "undefined"

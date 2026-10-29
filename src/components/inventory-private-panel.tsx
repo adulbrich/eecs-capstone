@@ -63,7 +63,7 @@ export function InventoryPrivatePanel({
           tell "no notes" from "notes exist and I cannot see them". */}
       <PanelSection title="Notes">
         {item.notes ? (
-          <p className="whitespace-pre-wrap text-sm">{item.notes}</p>
+          <p className="text-sm whitespace-pre-wrap">{item.notes}</p>
         ) : (
           <p className="text-muted-foreground text-sm">No notes.</p>
         )}

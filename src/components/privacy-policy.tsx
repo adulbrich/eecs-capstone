@@ -10,7 +10,7 @@ import { SupportEmailLink } from "./support-email-link";
 export function PrivacyPolicy() {
   return (
     <article className="space-y-4">
-      <h1 className="font-semibold text-2xl">Privacy</h1>
+      <h1 className="text-2xl font-semibold">Privacy</h1>
       <p>
         The {brand.institutionName} {brand.programName} application collects the
         information you give it in order to run the capstone program: to publish

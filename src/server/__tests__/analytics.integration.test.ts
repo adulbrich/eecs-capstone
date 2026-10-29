@@ -346,7 +346,7 @@ describe("who sees the user figures", () => {
     const plain = await makeUser(`an-p-${Date.now()}@x.com`, "user");
     await expect(
       getAnalyticsAs(plain, { ...RANGE, programId: null })
-    ).rejects.toThrow(/Forbidden/);
+    ).rejects.toThrow(/Forbidden/u);
   });
 });
 
