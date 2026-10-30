@@ -692,8 +692,9 @@ describe("SocialPreviewSection waiting for a refresh", () => {
   it("drops a poll still in flight at the cap rather than letting it land", async () => {
     // Landing after the unlock, it would move the stored summary under a box
     // that still shows the old one, and Save would offer to put it back.
-    await startWait(BEFORE_PUBLISH);
-    server.getSocialSummary.mockResolvedValue(PENDING);
+    const stale: SocialSummaryView = { ...AUTOMATIC, current: false };
+    await startWait(stale);
+    server.getSocialSummary.mockResolvedValue(stale);
     await advance(100_000);
     let land: (view: SocialSummaryView) => void = () => undefined;
     server.getSocialSummary.mockReturnValue(
@@ -710,7 +711,7 @@ describe("SocialPreviewSection waiting for a refresh", () => {
     ).toBeDefined();
     land(ARRIVED);
     await advance(0);
-    expect(textarea().value).toBe("");
+    expect(textarea().value).toBe(AUTOMATIC.summary);
     expect(saveButton().hasAttribute("disabled")).toBe(true);
     expect(polls()).toBe(sent);
   });
@@ -748,6 +749,25 @@ describe("SocialPreviewSection waiting for a refresh", () => {
     await advance(2000);
     expectLocked(false);
     expect(textarea().value).toBe(MANUAL.summary);
+  });
+
+  it("ends when a poll shows nothing will write", async () => {
+    // A restore racing a transition out of the published statuses, then the
+    // switch going off mid-wait: either way no summary is coming.
+    await startWait(BEFORE_PUBLISH);
+    server.getSocialSummary.mockResolvedValue(BEFORE_PUBLISH);
+    await advance(2000);
+    expectLocked(false);
+  });
+
+  it("ends when a poll shows automatic summaries were switched off", async () => {
+    await startWait(BEFORE_PUBLISH);
+    server.getSocialSummary.mockResolvedValue({
+      ...PENDING,
+      automaticEnabled: false,
+    });
+    await advance(2000);
+    expectLocked(false);
   });
 
   it("starts no wait when automatic summaries are off", async () => {
