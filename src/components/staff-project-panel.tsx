@@ -199,7 +199,7 @@ export function StaffProjectPanel({
     }
     const target = pending;
     return run(async () => {
-      const startedAt = Date.now();
+      const sentAt = Date.now();
       const data = {
         id: project.id,
         status: target.target,
@@ -212,15 +212,16 @@ export function StaffProjectPanel({
         // The server already declines to mail a proposer it cannot resolve.
         sendEmail,
       };
-      const { refreshing } = target.force
+      const { refreshStartedAt } = target.force
         ? await forceSetProjectStatus({ data })
         : await performTransition({ data });
       await onChanged();
       closeModal();
-      if (refreshing) {
+      if (refreshStartedAt) {
         setSummaryRefresh({
           cause: target.target === "published" ? "published" : "changed",
-          startedAt,
+          refreshStartedAt,
+          sentAt,
         });
       }
     });
@@ -235,11 +236,13 @@ export function StaffProjectPanel({
       await onChanged();
       return;
     }
-    const startedAt = Date.now();
-    const { refreshing } = await restoreProject({ data: { id: project.id } });
+    const sentAt = Date.now();
+    const { refreshStartedAt } = await restoreProject({
+      data: { id: project.id },
+    });
     await onChanged();
-    if (refreshing) {
-      setSummaryRefresh({ cause: "changed", startedAt });
+    if (refreshStartedAt) {
+      setSummaryRefresh({ cause: "changed", refreshStartedAt, sentAt });
     }
   }
 

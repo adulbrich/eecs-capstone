@@ -1576,7 +1576,7 @@ describe("StaffProjectPanel tells the Social preview section to wait", () => {
     performTransition.mockResolvedValueOnce({
       id: PROJECT_ID,
       status: "published",
-      refreshing: true,
+      refreshStartedAt: new Date(),
     });
     const onChanged = vi.fn(() => Promise.resolve());
     await confirmMove("approved", "Published", onChanged);
@@ -1595,7 +1595,7 @@ describe("StaffProjectPanel tells the Social preview section to wait", () => {
     performTransition.mockResolvedValueOnce({
       id: PROJECT_ID,
       status: "published",
-      refreshing: false,
+      refreshStartedAt: null,
     });
     await confirmMove("approved", "Published");
 
@@ -1609,7 +1609,7 @@ describe("StaffProjectPanel tells the Social preview section to wait", () => {
     performTransition.mockResolvedValueOnce({
       id: PROJECT_ID,
       status: "archived",
-      refreshing: true,
+      refreshStartedAt: new Date(),
     });
     await confirmMove("published", "Archived");
 
@@ -1620,7 +1620,10 @@ describe("StaffProjectPanel tells the Social preview section to wait", () => {
 
   it("after a restore, which says the project changed", async () => {
     getSocialSummary.mockResolvedValueOnce({ ...UNWRITTEN, refreshable: true });
-    restoreProject.mockResolvedValueOnce({ id: PROJECT_ID, refreshing: true });
+    restoreProject.mockResolvedValueOnce({
+      id: PROJECT_ID,
+      refreshStartedAt: new Date(),
+    });
     renderWithQueryClient(
       <StaffProjectPanel
         onChanged={() => Promise.resolve()}

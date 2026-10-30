@@ -13,7 +13,9 @@ import { aiReviewUsage, projects, user } from "#/db/schema";
 import type { ResponsesFn } from "#/lib/_internal/bedrock-mantle";
 import { auth } from "#/lib/auth";
 import { SOCIAL_SUMMARY_MAX_LENGTH } from "#/lib/social-summary";
+import { settleProjectRefreshes } from "../_internal/project-refresh";
 import { refreshSocialSummary } from "../_internal/project-social-summary";
+import { performTransitionAs } from "../_internal/projects";
 import {
   getSocialSummaryAs,
   regenerateSocialSummaryAs,
@@ -247,6 +249,35 @@ describe("the view's current", () => {
       await refreshSocialSummary(project.id, fakeModel("Never written."))
     ).toBe("skipped");
     expect(await currentOf(project.id)).toBe(true);
+  });
+
+  it("records a failed publish refresh no earlier than the time the publish reports", async () => {
+    // The panel ends its wait on a failure at or after `refreshStartedAt`, so
+    // the attempt this refresh records must not be stamped before it.
+    const staff = await makeUser("admin");
+    const project = await makeProject({ status: "approved" });
+
+    const { refreshStartedAt } = await performTransitionAs(
+      staff,
+      project.id,
+      "published",
+      undefined,
+      {
+        embed: () => Promise.resolve(Array.from({ length: 1024 }, () => 0)),
+        sendEmail: false,
+        summarize: failing,
+      }
+    );
+    await settleProjectRefreshes();
+
+    const { summaryAttempt } = await getSocialSummaryAs(staff, {
+      projectId: project.id,
+    });
+    expect(summaryAttempt?.outcome).toBe("failed");
+    expect(refreshStartedAt).toBeInstanceOf(Date);
+    expect(summaryAttempt?.at.getTime()).toBeGreaterThanOrEqual(
+      refreshStartedAt?.getTime() ?? Number.POSITIVE_INFINITY
+    );
   });
 
   it("comes back on what Regenerate and Save return, as a read would compute it", async () => {

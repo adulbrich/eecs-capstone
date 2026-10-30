@@ -534,13 +534,17 @@ async function startWait(
       "Date",
     ],
   });
-  view.rerender(
-    <SocialPreviewSection
-      projectId="p1"
-      refresh={{ cause, startedAt: Date.now() }}
-    />
-  );
-  return view;
+  const refresh = refreshNow(cause);
+  view.rerender(<SocialPreviewSection projectId="p1" refresh={refresh} />);
+  /** Renders the section again with nothing new, as a parent's render does. */
+  const renderAgain = () =>
+    view.rerender(<SocialPreviewSection projectId="p1" refresh={refresh} />);
+  return { view, renderAgain };
+}
+
+/** A refresh the server started now, by the faked clock both sides share. */
+function refreshNow(cause: SummaryRefresh["cause"]): SummaryRefresh {
+  return { cause, refreshStartedAt: new Date(), sentAt: Date.now() };
 }
 
 async function advance(ms: number) {
@@ -628,29 +632,21 @@ describe("SocialPreviewSection waiting for a refresh", () => {
     expectLocked(false);
   });
 
-  it("ends on a failure newer than the one on screen, and shows the failure", async () => {
-    const oldFailure: SocialSummaryView = {
+  it("ends on a failure since the refresh started, and shows it", async () => {
+    const failedAt = (at: Date): SocialSummaryView => ({
       ...NONE,
-      summaryAttempt: {
-        at: FAILED_AT,
-        outcome: "failed",
-        trigger: "automatic",
-      },
-    };
-    await startWait(oldFailure);
-    // The failure staff already saw is not news, so it does not end the wait.
-    server.getSocialSummary.mockResolvedValue(oldFailure);
+      summaryAttempt: { at, outcome: "failed", trigger: "automatic" },
+    });
+    await startWait(failedAt(FAILED_AT));
+    // Not the failure staff already saw, nor one recorded after the page
+    // loaded and before the action: neither is this refresh's.
+    server.getSocialSummary.mockResolvedValue(
+      failedAt(new Date(Date.now() - 1000))
+    );
     await advance(2000);
     expectLocked(true);
 
-    server.getSocialSummary.mockResolvedValue({
-      ...NONE,
-      summaryAttempt: {
-        at: new Date(FAILED_AT.getTime() + 60_000),
-        outcome: "failed",
-        trigger: "automatic",
-      },
-    });
+    server.getSocialSummary.mockResolvedValue(failedAt(new Date()));
     await advance(2000);
     expectLocked(false);
     expect(
@@ -662,9 +658,11 @@ describe("SocialPreviewSection waiting for a refresh", () => {
     expect(polls()).toBe(2);
   });
 
-  it("polls every 2 s to 20 s, then every 10 s, and gives up at 120 s", async () => {
-    await startWait(BEFORE_PUBLISH);
-    server.getSocialSummary.mockResolvedValue(PENDING);
+  it("polls every 2 s to 20 s, then every 10 s, and gives up on the poll at 120 s", async () => {
+    // A stale automatic summary, so Regenerate is off until the wait gives up.
+    const stale: SocialSummaryView = { ...AUTOMATIC, current: false };
+    await startWait(stale);
+    server.getSocialSummary.mockResolvedValue(stale);
 
     await advance(20_000);
     expect(polls()).toBe(10);
@@ -679,27 +677,60 @@ describe("SocialPreviewSection waiting for a refresh", () => {
     await advance(9999);
     expectLocked(true);
     await advance(1);
+    expect(polls()).toBe(20);
     expectLocked(false);
     expect(
       screen.getByText(/has not arrived after two minutes/u)
     ).toBeDefined();
+    expect(textarea().value).toBe(AUTOMATIC.summary);
     // The sentence offers Regenerate, so it is on.
     expect(regenerateButton().hasAttribute("disabled")).toBe(false);
 
     await advance(120_000);
-    expect(polls()).toBe(19);
+    expect(polls()).toBe(20);
+  });
+
+  it("does not give up in a hidden tab, and decides on the first poll back", async () => {
+    const { renderAgain } = await startWait(BEFORE_PUBLISH);
+    server.getSocialSummary.mockResolvedValue(PENDING);
+    focusManager.setFocused(false);
+    await advance(130_000);
+    expect(polls()).toBe(0);
+    expectLocked(true);
+
+    // Coming back refetches the panel's edit log, whose render reaches this
+    // section and works the schedule out again, now past the cap.
+    renderAgain();
+    server.getSocialSummary.mockResolvedValue(ARRIVED);
+    focusManager.setFocused(true);
+    await advance(2000);
+    expect(polls()).toBe(1);
+    expectLocked(false);
+    expect(textarea().value).toBe(ARRIVED.summary);
+    expect(screen.queryByText(/has not arrived/u)).toBeNull();
+  });
+
+  it("gives up on the first poll back from a hidden tab when nothing came", async () => {
+    await startWait(BEFORE_PUBLISH);
+    server.getSocialSummary.mockResolvedValue(PENDING);
+    focusManager.setFocused(false);
+    await advance(130_000);
+    focusManager.setFocused(true);
+    await advance(2000);
+
+    expect(polls()).toBe(1);
+    expect(
+      screen.getByText(/has not arrived after two minutes/u)
+    ).toBeDefined();
   });
 
   it("starts over when a second action lands during the wait", async () => {
     // Archived a minute after publishing: the cap runs from the archive.
-    const view = await startWait(BEFORE_PUBLISH);
+    const { view } = await startWait(BEFORE_PUBLISH);
     server.getSocialSummary.mockResolvedValue(PENDING);
     await advance(60_000);
     view.rerender(
-      <SocialPreviewSection
-        projectId="p1"
-        refresh={{ cause: "changed", startedAt: Date.now() }}
-      />
+      <SocialPreviewSection projectId="p1" refresh={refreshNow("changed")} />
     );
     expect(waitingNote()?.textContent).toContain(
       "now that the project changed"
@@ -711,53 +742,6 @@ describe("SocialPreviewSection waiting for a refresh", () => {
     expect(
       screen.getByText(/has not arrived after two minutes/u)
     ).toBeDefined();
-  });
-
-  it("does not say the summary is missing when the last poll brought it just before the cap", async () => {
-    // TanStack writes the cache at once and tells the section a tick later,
-    // so a poll can land and the cap fire before the section has rendered it.
-    // Holding the notifications stages that gap.
-    const stale: SocialSummaryView = { ...AUTOMATIC, current: false };
-    await startWait(stale);
-    server.getSocialSummary.mockResolvedValue(stale);
-    await advance(100_000);
-    server.getSocialSummary.mockResolvedValue(ARRIVED);
-    notifyManager.setScheduler(() => undefined);
-    await advance(20_000);
-
-    expectLocked(false);
-    expect(screen.queryByText(/has not arrived/u)).toBeNull();
-    expect(textarea().value).toBe(ARRIVED.summary);
-  });
-
-  it("drops a poll still in flight at the cap rather than letting it land", async () => {
-    // Landing after the unlock, it would move the stored summary under a box
-    // that still shows the old one, and Save would offer to put it back.
-    const stale: SocialSummaryView = { ...AUTOMATIC, current: false };
-    await startWait(stale);
-    server.getSocialSummary.mockResolvedValue(stale);
-    await advance(100_000);
-    let land: (view: SocialSummaryView) => void = () => undefined;
-    server.getSocialSummary.mockReturnValue(
-      new Promise<SocialSummaryView>((resolve) => {
-        land = resolve;
-      })
-    );
-    await advance(10_000);
-    const sent = polls();
-
-    await advance(10_000);
-    expect(
-      screen.getByText(/has not arrived after two minutes/u)
-    ).toBeDefined();
-    // An untouched automatic summary would leave Regenerate off; the sentence
-    // offers it, so it is on.
-    expect(regenerateButton().hasAttribute("disabled")).toBe(false);
-    land(ARRIVED);
-    await advance(0);
-    expect(textarea().value).toBe(AUTOMATIC.summary);
-    expect(saveButton().hasAttribute("disabled")).toBe(true);
-    expect(polls()).toBe(sent);
   });
 
   it("ends on a poll that fails, keeping what last loaded", async () => {
@@ -780,14 +764,6 @@ describe("SocialPreviewSection waiting for a refresh", () => {
 
     await advance(30_000);
     expect(polls()).toBe(2);
-  });
-
-  it("pauses while the tab is hidden", async () => {
-    await startWait(BEFORE_PUBLISH);
-    server.getSocialSummary.mockResolvedValue(PENDING);
-    focusManager.setFocused(false);
-    await advance(10_000);
-    expect(polls()).toBe(0);
   });
 
   it("ends when a poll shows a colleague saved by hand, with their wording in the box", async () => {

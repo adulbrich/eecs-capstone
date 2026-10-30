@@ -1,5 +1,5 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import {
   SOCIAL_SUMMARY_MAX_LENGTH,
   SOCIAL_SUMMARY_TOO_LONG_MESSAGE,
@@ -38,9 +38,16 @@ const POLL_FAILED =
 
 /**
  * The poll schedule while a refresh is awaited (#616): every two seconds for
- * the first twenty, where most summaries land, then every ten, and no poll at
- * or past the cap, which is the cap's to end. The cap clears the worst case
- * the model timeouts allow, about 90 s, so at most 19 requests.
+ * the first twenty, where most summaries land, then every ten, the last at the
+ * cap: twenty requests. The cap is one refresh's worst case, about 90 s, with
+ * room; one queued behind another can land after the unlock, where Save's and
+ * Regenerate's compare-and-swaps cover it.
+ *
+ * The cap ends the wait on the poll it schedules, not on a timer, so a tab
+ * hidden through it, where polling pauses, does not give up unseen: its first
+ * poll back decides. The cost is that a request that hangs holds the lock
+ * until the browser or the load balancer ends it; one that fails unlocks at
+ * once.
  */
 const FAST_POLL_MS = 2000;
 const FAST_FOR_MS = 20_000;
@@ -48,21 +55,17 @@ const SLOW_POLL_MS = 10_000;
 const WAIT_CAP_MS = 120_000;
 
 /**
- * A background refresh the panel saw start: when the action was sent, and
- * whether it published the project, which the waiting note names.
+ * A background refresh the panel saw start. `sentAt` is when the action was
+ * sent, by this tab's clock, which the polls and the cap run from.
+ * `refreshStartedAt` is when the server started the refresh, by its clock,
+ * which the attempt times it records are on, so a failure recorded since is
+ * this refresh's, or one already running when the action landed. `cause`
+ * names the action in the waiting note.
  */
 export interface SummaryRefresh {
   cause: "published" | "changed";
-  startedAt: number;
-}
-
-interface RefreshWait extends SummaryRefresh {
-  /**
-   * When the failed attempt already on screen ran, if one is, so only a newer
-   * failure ends the wait. Compared with this rather than with `startedAt`,
-   * which is this tab's clock and not the server's.
-   */
-  failureOnScreen: number | null;
+  refreshStartedAt: Date;
+  sentAt: number;
 }
 
 /**
@@ -71,29 +74,30 @@ interface RefreshWait extends SummaryRefresh {
  */
 type WaitEnd = "gave-up" | "unreachable";
 
-function nextPoll(wait: RefreshWait): number | false {
-  const elapsed = Date.now() - wait.startedAt;
+function nextPoll(wait: SummaryRefresh): number {
+  const elapsed = Date.now() - wait.sentAt;
+  if (elapsed >= WAIT_CAP_MS) {
+    // Only a tab that was hidden at the cap gets here: poll soon after it
+    // comes back.
+    return FAST_POLL_MS;
+  }
   const step = elapsed < FAST_FOR_MS ? FAST_POLL_MS : SLOW_POLL_MS;
-  return step < WAIT_CAP_MS - elapsed ? step : false;
-}
-
-function failureTime(view: SocialSummaryView): number | null {
-  const attempt = view.summaryAttempt;
-  return attempt?.outcome === "failed" ? attempt.at.getTime() : null;
+  return Math.max(1, Math.min(step, WAIT_CAP_MS - elapsed));
 }
 
 /**
  * Whether a view read after the action ends the wait. `current` covers a
  * write, and a republish whose refresh found nothing to do and so moved
- * neither the time nor the attempt. A newer failure shows its own note. The
- * last three mean nothing will write: a colleague saved by hand, the project
- * left the statuses the refresh writes for, or the switch went off.
+ * neither the time nor the attempt. A failure since the refresh started shows
+ * its own note. The last three mean nothing will write: a colleague saved by
+ * hand, the project left the statuses the refresh writes for, or the switch
+ * went off.
  */
-function endsWait(view: SocialSummaryView, wait: RefreshWait): boolean {
-  const failed = failureTime(view);
+function endsWait(view: SocialSummaryView, wait: SummaryRefresh): boolean {
+  const attempt = view.summaryAttempt;
   return (
     view.current ||
-    (failed !== null && failed !== wait.failureOnScreen) ||
+    (attempt?.outcome === "failed" && attempt.at >= wait.refreshStartedAt) ||
     view.isManual ||
     !view.refreshable ||
     !view.automaticEnabled
@@ -116,7 +120,7 @@ function SummaryStatus({
   ended,
 }: {
   view: SocialSummaryView | null;
-  wait: RefreshWait | null;
+  wait: SummaryRefresh | null;
   ended: WaitEnd | null;
 }) {
   if (ended === "unreachable") {
@@ -149,8 +153,7 @@ function SummaryStatus({
  * if the write lands first, quoting what was written.
  */
 function useSummaryDraft(projectId: string, refresh: SummaryRefresh | null) {
-  const queryClient = useQueryClient();
-  const [wait, setWait] = useState<RefreshWait | null>(null);
+  const [wait, setWait] = useState<SummaryRefresh | null>(null);
   const query = useQuery({
     queryKey: staffProjectKeys.socialSummary(projectId),
     queryFn: () => staffRead(() => getSocialSummary({ data: { projectId } })),
@@ -181,11 +184,11 @@ function useSummaryDraft(projectId: string, refresh: SummaryRefresh | null) {
   // Both during render, as `useSeedOnArrival` seeds, so no frame shows an
   // unlocked box beside the summary the wait is about to replace. The view on
   // screen when the action was sent decides whether to wait: it is the one
-  // staff saw, and its failure, if any, is not news.
+  // staff saw.
   if (refresh !== seenRefresh) {
     setSeenRefresh(refresh);
     if (refresh && loaded?.automaticEnabled && !loaded.isManual && !edited) {
-      setWait({ ...refresh, failureOnScreen: failureTime(loaded) });
+      setWait(refresh);
       setEnded(null);
     }
   }
@@ -193,40 +196,15 @@ function useSummaryDraft(projectId: string, refresh: SummaryRefresh | null) {
     // A failed poll ends it on the last view that loaded, so the box never
     // stays locked on an error. The section's load failure stays off, since
     // the data survives a refetch error.
-    if (query.isError && query.errorUpdatedAt > wait.startedAt) {
+    const polled = query.dataUpdatedAt > wait.sentAt;
+    if (query.isError && query.errorUpdatedAt > wait.sentAt) {
       settle(loaded, "unreachable");
-    } else if (query.dataUpdatedAt > wait.startedAt && endsWait(loaded, wait)) {
+    } else if (polled && endsWait(loaded, wait)) {
       settle(loaded, null);
+    } else if (polled && query.dataUpdatedAt >= wait.sentAt + WAIT_CAP_MS) {
+      settle(loaded, "gave-up");
     }
   }
-
-  useEffect(() => {
-    if (!wait) {
-      return;
-    }
-    const queryKey = staffProjectKeys.socialSummary(projectId);
-    const timer = setTimeout(
-      () => {
-        // A poll still in flight is dropped rather than left to land: it
-        // could move the stored summary under an unlocked box, and the next
-        // Save's `expected` would carry wording staff never saw.
-        void queryClient.cancelQueries({ queryKey });
-        // A poll that landed just before the cap is in the cache before the
-        // section has rendered it, and may be the summary itself.
-        const state = queryClient.getQueryState<SocialSummaryView>(queryKey);
-        const last = state?.data;
-        const arrived =
-          !!last &&
-          state.dataUpdatedAt > wait.startedAt &&
-          endsWait(last, wait);
-        setWait(null);
-        setEnded(arrived ? null : "gave-up");
-        setDraft(last?.summary ?? "");
-      },
-      wait.startedAt + WAIT_CAP_MS - Date.now()
-    );
-    return () => clearTimeout(timer);
-  }, [wait, projectId, queryClient]);
 
   return { query, draft, setDraft, edited, wait, ended, setEnded };
 }

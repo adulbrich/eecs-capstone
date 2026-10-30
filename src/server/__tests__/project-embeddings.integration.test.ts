@@ -256,17 +256,17 @@ describe("embedding triggers", () => {
     const move = (status: "submitted" | "approved" | "published") =>
       performTransitionAs(admin, id, status, undefined, { embed });
 
-    expect((await move("submitted")).refreshing).toBe(false);
+    expect((await move("submitted")).refreshStartedAt).toBeNull();
     await softDeleteProjectAs(admin, id);
-    expect((await restoreProjectAs(admin, id, { embed })).refreshing).toBe(
-      false
-    );
+    expect(
+      (await restoreProjectAs(admin, id, { embed })).refreshStartedAt
+    ).toBeNull();
     await move("approved");
-    expect((await move("published")).refreshing).toBe(true);
+    expect((await move("published")).refreshStartedAt).toBeInstanceOf(Date);
     await softDeleteProjectAs(admin, id);
-    expect((await restoreProjectAs(admin, id, { embed })).refreshing).toBe(
-      true
-    );
+    expect(
+      (await restoreProjectAs(admin, id, { embed })).refreshStartedAt
+    ).toBeInstanceOf(Date);
     await settleProjectRefreshes();
   });
 

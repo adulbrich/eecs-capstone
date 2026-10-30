@@ -653,13 +653,15 @@ function assertStaffReturnToDraftHasComment(
 }
 
 /**
- * What a transition answers. `refreshing` says it started the background
- * refresh of the embedding and social summary, so the staff panel can wait
- * for the summary without a client copy of `isEmbeddableStatus` (#616).
+ * What a transition answers. `refreshStartedAt` is when it started the
+ * background refresh of the embedding and social summary, or null when it
+ * started none, so the staff panel can wait for the summary without a client
+ * copy of `isEmbeddableStatus` (#616). Server time, because the panel
+ * compares it with the attempt times this server records.
  */
 export interface TransitionResult {
   id: string;
-  refreshing: boolean;
+  refreshStartedAt: Date | null;
   status: ProjectStatus;
 }
 
@@ -729,8 +731,8 @@ async function commitTransition(
   // text, so the refresh returns "unchanged" and the vector the project had
   // while published stays put. The one case it does work is a project that
   // failed to embed at publish time, which archiving now retries.
-  const refreshing = isEmbeddableStatus(target);
-  if (refreshing) {
+  const refreshStartedAt = isEmbeddableStatus(target) ? new Date() : null;
+  if (refreshStartedAt) {
     refreshProjectInBackground(project.id, {
       embed: opts?.embed,
       summarize: opts?.summarize,
@@ -756,7 +758,7 @@ async function commitTransition(
     opts?.send
   );
 
-  return { id: project.id, status: target, refreshing };
+  return { id: project.id, status: target, refreshStartedAt };
 }
 
 export async function performTransitionAs(
@@ -823,7 +825,7 @@ export async function restoreProjectAs(
   viewer: AuthUser,
   id: string,
   deps?: RefreshDeps
-): Promise<{ id: string; refreshing: boolean }> {
+): Promise<{ id: string; refreshStartedAt: Date | null }> {
   assertStaff(viewer);
   const project = await loadProjectOr404(id);
   if (!project.deletedAt) {
@@ -846,11 +848,20 @@ export async function restoreProjectAs(
   // Ungated, because a transition racing the restore makes the status read
   // above stale; the refresh checks the status itself, and usually finds both
   // hashes current. The row's own id, not the input's, keys the queue.
+  const refreshStartedAt = new Date();
   refreshProjectInBackground(project.id, deps);
-  // The panel's hint, read from the same possibly stale status: a restore to
-  // a status the refresh skips should not show a summary on its way. If the
-  // race makes it wrong, the panel's poll reads `refreshable` and settles.
-  return { id, refreshing: isEmbeddableStatus(project.status) };
+  // The panel's hint, as `TransitionResult` has it, read from the same
+  // possibly stale status: a restore to a status the refresh skips should not
+  // show a summary on its way. A racing transition can make it wrong either
+  // way. Said wrongly, the panel's first poll reads `refreshable` and stops;
+  // left unsaid, the summary lands under an unlocked box, where Save's
+  // compare-and-swap (#583) covers anything typed.
+  return {
+    id,
+    refreshStartedAt: isEmbeddableStatus(project.status)
+      ? refreshStartedAt
+      : null,
+  };
 }
 
 export async function hardDeleteProjectAs(
