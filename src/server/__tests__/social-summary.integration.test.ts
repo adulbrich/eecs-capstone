@@ -1,10 +1,19 @@
 import { eq } from "drizzle-orm";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import {
+  afterAll,
+  afterEach,
+  beforeAll,
+  describe,
+  expect,
+  it,
+  vi,
+} from "vitest";
 import { db } from "#/db";
 import { aiReviewUsage, projects, user } from "#/db/schema";
 import type { ResponsesFn } from "#/lib/_internal/bedrock-mantle";
 import { auth } from "#/lib/auth";
 import { SOCIAL_SUMMARY_MAX_LENGTH } from "#/lib/social-summary";
+import { refreshSocialSummary } from "../_internal/project-social-summary";
 import {
   getSocialSummaryAs,
   regenerateSocialSummaryAs,
@@ -151,10 +160,118 @@ describe("the staff summary endpoints are staff only", () => {
       summary: "Stored wording.",
       updatedAt: null,
       isManual: false,
+      current: false,
       automaticEnabled: false,
       refreshable: true,
       summaryAttempt: null,
     });
+  });
+});
+
+/**
+ * `current` is what the panel's wait ends on after a publish (#616), so it
+ * has to mean exactly what makes `refreshSocialSummary` return "unchanged":
+ * a view that disagreed would leave the box locked for two minutes, or unlock
+ * it before the write. Each case below reads both on the same row.
+ */
+describe("the view's current", () => {
+  beforeAll(() => {
+    process.env.BEDROCK_SOCIAL_SUMMARY_ENABLED = "true";
+  });
+  afterAll(() => {
+    process.env.BEDROCK_SOCIAL_SUMMARY_ENABLED = "false";
+  });
+
+  async function currentOf(id: string) {
+    const staff = await makeUser("admin");
+    return (await getSocialSummaryAs(staff, { projectId: id })).current;
+  }
+
+  it("is false until a refresh writes, and true after", async () => {
+    const project = await makeProject();
+    expect(await currentOf(project.id)).toBe(false);
+
+    expect(await refreshSocialSummary(project.id, fakeModel("A rover."))).toBe(
+      "updated"
+    );
+    expect(await currentOf(project.id)).toBe(true);
+  });
+
+  it("stays true across a refresh that finds nothing to write", async () => {
+    // A republish or an archive: the refresh moves neither the time nor the
+    // attempt record, so `current` is the only sign it has run.
+    const project = await makeProject();
+    await refreshSocialSummary(project.id, fakeModel("A rover."));
+
+    const model = fakeModel("Never written.");
+    expect(await refreshSocialSummary(project.id, model)).toBe("unchanged");
+    expect(model).not.toHaveBeenCalled();
+    expect(await currentOf(project.id)).toBe(true);
+  });
+
+  it("is false once the text moves under the stored summary", async () => {
+    const project = await makeProject();
+    await refreshSocialSummary(project.id, fakeModel("A rover."));
+    await db
+      .update(projects)
+      .set({ description: "A rover that now also flies." })
+      .where(eq(projects.id, project.id));
+
+    expect(await currentOf(project.id)).toBe(false);
+    expect(
+      await refreshSocialSummary(project.id, fakeModel("A flying rover."))
+    ).toBe("updated");
+    expect(await currentOf(project.id)).toBe(true);
+  });
+
+  it("is false beside a current hash with no summary, as the writer reads it", async () => {
+    // An interrupted write: the hash matches and the summary is missing, which
+    // the writer refuses to call unchanged.
+    const project = await makeProject();
+    await refreshSocialSummary(project.id, fakeModel("A rover."));
+    await db
+      .update(projects)
+      .set({ socialSummary: null })
+      .where(eq(projects.id, project.id));
+
+    expect(await currentOf(project.id)).toBe(false);
+    expect(
+      await refreshSocialSummary(project.id, fakeModel("A rover again."))
+    ).toBe("updated");
+  });
+
+  it("is true for a project with no text to write from", async () => {
+    const project = await makeProject({ title: "   ", description: null });
+
+    expect(
+      await refreshSocialSummary(project.id, fakeModel("Never written."))
+    ).toBe("skipped");
+    expect(await currentOf(project.id)).toBe(true);
+  });
+
+  it("comes back on what Regenerate and Save return, as a read would compute it", async () => {
+    const staff = await makeUser("admin");
+    const project = await makeProject();
+
+    const regenerated = await regenerateSocialSummaryAs(
+      staff,
+      { projectId: project.id },
+      fakeModel("Written by Regenerate.")
+    );
+    expect(regenerated.current).toBe(true);
+
+    // A save leaves the hash alone, and the text it was taken from has not
+    // moved, so nothing is left for the refresh to write.
+    const saved = await saveSocialSummaryAs(staff, {
+      projectId: project.id,
+      expected: { summary: "Written by Regenerate.", isManual: false },
+      summary: "Wording staff chose.",
+    });
+    const { outcome: _, ...savedView } = saved;
+    expect(savedView).toEqual(
+      await getSocialSummaryAs(staff, { projectId: project.id })
+    );
+    expect(saved.current).toBe(true);
   });
 });
 

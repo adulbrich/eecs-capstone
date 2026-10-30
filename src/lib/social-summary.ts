@@ -93,9 +93,17 @@ export type SocialSummaryResult = z.infer<typeof socialSummarySchema>;
  * project's status is one the automatic refresh writes for at all, and
  * `automaticEnabled` whether the kill switch lets it, since a switched-off
  * refresh skips every project without recording anything.
+ *
+ * `current` says the automatic refresh has nothing left to write: the stored
+ * summary was written from the project's text as it is now, under the model
+ * in use, or there is no text to write from. Never shown, so it does not
+ * bring back the `stale` left out above: the section reads it only to know
+ * when a refresh it saw start has landed (#616). Derived on each read from the
+ * hash `refreshSocialSummary` compares, never stored.
  */
 export interface SocialSummaryView {
   automaticEnabled: boolean;
+  current: boolean;
   isManual: boolean;
   refreshable: boolean;
   summary: string | null;

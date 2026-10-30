@@ -1,5 +1,5 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   SOCIAL_SUMMARY_MAX_LENGTH,
   SOCIAL_SUMMARY_TOO_LONG_MESSAGE,
@@ -29,6 +29,189 @@ const LOAD_FAILED =
 
 const RACE_LOST =
   "The project or its summary changed while the rewrite was running, so the rewrite was thrown away. The box shows what is stored now.";
+
+const GAVE_UP =
+  "The summary has not arrived after two minutes. Reload the page to check again, or Regenerate with AI.";
+
+const POLL_FAILED =
+  "Could not check whether the summary has arrived. Reload the page to check again, or Regenerate with AI.";
+
+/**
+ * The poll schedule while a refresh is awaited (#616): every two seconds for
+ * the first twenty, where most summaries land, then every ten, and no poll at
+ * or past the cap, which is the cap's to end. The cap clears the worst case
+ * the model timeouts allow, about 90 s, so at most 19 requests.
+ */
+const FAST_POLL_MS = 2000;
+const FAST_FOR_MS = 20_000;
+const SLOW_POLL_MS = 10_000;
+const WAIT_CAP_MS = 120_000;
+
+/**
+ * A background refresh the panel saw start: when the action was sent, and
+ * whether it published the project, which the waiting note names.
+ */
+export interface SummaryRefresh {
+  cause: "published" | "changed";
+  startedAt: number;
+}
+
+interface Wait extends SummaryRefresh {
+  /**
+   * The failed attempt already on screen, if any, so only a newer one ends the
+   * wait. Compared with this rather than with `startedAt`, which is this
+   * tab's clock and not the server's.
+   */
+  failedAt: number | null;
+}
+
+function nextPoll(wait: Wait): number | false {
+  const elapsed = Date.now() - wait.startedAt;
+  const step = elapsed < FAST_FOR_MS ? FAST_POLL_MS : SLOW_POLL_MS;
+  return step < WAIT_CAP_MS - elapsed ? step : false;
+}
+
+function failedAt(view: SocialSummaryView): number | null {
+  const attempt = view.summaryAttempt;
+  return attempt?.outcome === "failed" ? attempt.at.getTime() : null;
+}
+
+/**
+ * Whether a view read after the action ends the wait. `current` covers a
+ * write, and a republish whose refresh found nothing to do and so moved
+ * neither the time nor the attempt. A newer failure shows its own note. The
+ * last three mean nothing will write: a colleague saved by hand, the project
+ * left the statuses the refresh writes for, or the switch went off.
+ */
+function settles(view: SocialSummaryView, wait: Wait): boolean {
+  const failed = failedAt(view);
+  return (
+    view.current ||
+    (failed !== null && failed !== wait.failedAt) ||
+    view.isManual ||
+    !view.refreshable ||
+    !view.automaticEnabled
+  );
+}
+
+/**
+ * The line under the box: the wait's own while it runs and after it gives up
+ * (#616), the last attempt's otherwise. The wait's is an `output`, so it is
+ * announced politely, since the action that started it was in a dialog
+ * elsewhere on the panel; one element across both, so the give-up sentence is
+ * announced as a change.
+ */
+function SummaryStatus({
+  view,
+  wait,
+  note,
+}: {
+  view: SocialSummaryView | null;
+  wait: Wait | null;
+  note: string | null;
+}) {
+  if (!(wait || note)) {
+    return view && <SummaryAttemptStatus view={view} />;
+  }
+  const cause =
+    wait?.cause === "published"
+      ? "the project is published"
+      : "the project changed";
+  return (
+    <output className="text-muted-foreground block text-xs">
+      {wait
+        ? `Writing the summary now that ${cause}. The box unlocks when it arrives.`
+        : note}
+    </output>
+  );
+}
+
+/**
+ * The stored view, the draft staff edit over it, and the wait for a refresh
+ * the panel saw start, which holds the draft while it runs (#616).
+ *
+ * The wait locks the box and both buttons, polls, and fills the box from the
+ * first poll that settles it. Locked, because the write lands between polls
+ * and nothing typed may race it or be replaced by it. No wait starts over an
+ * edit: the typed wording stays, and Save's `expected` check (#583) refuses it
+ * if the write lands first, quoting what was written.
+ */
+function useSummaryDraft(projectId: string, refresh: SummaryRefresh | null) {
+  const queryClient = useQueryClient();
+  const [wait, setWait] = useState<Wait | null>(null);
+  const query = useQuery({
+    queryKey: staffProjectKeys.socialSummary(projectId),
+    queryFn: () => staffRead(() => getSocialSummary({ data: { projectId } })),
+    ...DRAFT_QUERY_OPTIONS,
+    // The one exception to "never refetches on its own", and only while the
+    // box is locked, so nothing being typed is under it. TanStack's default
+    // `refetchIntervalInBackground: false` pauses it in a hidden tab.
+    refetchInterval: () => (wait ? nextPoll(wait) : false),
+  });
+  const [draft, setDraft] = useState("");
+  useSeedOnArrival(projectId, query.data, (first) =>
+    setDraft(first.summary ?? "")
+  );
+  // What the wait ended on when it ended without a summary.
+  const [waitNote, setWaitNote] = useState<string | null>(null);
+  const [seenRefresh, setSeenRefresh] = useState<SummaryRefresh | null>(null);
+  const loaded = query.data;
+  // Edited means "differs from what is stored", not "has been typed in": a
+  // round trip back to the original text leaves nothing to save.
+  const edited = draft.trim() !== (loaded?.summary ?? "").trim();
+
+  /** Ends the wait with the stored summary in the box, which was locked. */
+  function settle(view: SocialSummaryView, note: string | null) {
+    setWait(null);
+    setWaitNote(note);
+    setDraft(view.summary ?? "");
+  }
+
+  // Both during render, as `useSeedOnArrival` seeds, so no frame shows an
+  // unlocked box beside the summary the wait is about to replace. The view on
+  // screen when the action was sent decides whether to wait: it is the one
+  // staff saw, and its failure, if any, is not news.
+  if (refresh !== seenRefresh) {
+    setSeenRefresh(refresh);
+    if (refresh && loaded?.automaticEnabled && !loaded.isManual && !edited) {
+      setWait({ ...refresh, failedAt: failedAt(loaded) });
+      setWaitNote(null);
+    }
+  }
+  if (wait && loaded) {
+    // A failed poll ends it on the last view that loaded, so the box never
+    // stays locked on an error. The section's load failure stays off, since
+    // the data survives a refetch error.
+    if (query.isError && query.errorUpdatedAt > wait.startedAt) {
+      settle(loaded, POLL_FAILED);
+    } else if (query.dataUpdatedAt > wait.startedAt && settles(loaded, wait)) {
+      settle(loaded, null);
+    }
+  }
+
+  useEffect(() => {
+    if (!wait) {
+      return;
+    }
+    const queryKey = staffProjectKeys.socialSummary(projectId);
+    const timer = setTimeout(
+      () => {
+        // A poll still in flight is dropped rather than left to land: it
+        // could move the stored summary under an unlocked box, and the next
+        // Save's `expected` would carry wording staff never saw.
+        void queryClient.cancelQueries({ queryKey });
+        const last = queryClient.getQueryData<SocialSummaryView>(queryKey);
+        setWait(null);
+        setWaitNote(GAVE_UP);
+        setDraft(last?.summary ?? "");
+      },
+      wait.startedAt + WAIT_CAP_MS - Date.now()
+    );
+    return () => clearTimeout(timer);
+  }, [wait, projectId, queryClient]);
+
+  return { query, draft, setDraft, edited, wait, waitNote, setWaitNote };
+}
 
 /**
  * The stored wording goes last, quoted, so a summary with or without a closing
@@ -128,18 +311,17 @@ function SummaryAttemptStatus({ view }: { view: SocialSummaryView }) {
  * Read through a query keyed on the project, so one project's wording is
  * never shown over another's, however late it answers.
  */
-export function SocialPreviewSection({ projectId }: { projectId: string }) {
+export function SocialPreviewSection({
+  projectId,
+  refresh = null,
+}: {
+  projectId: string;
+  refresh?: SummaryRefresh | null;
+}) {
   const queryClient = useQueryClient();
   const queryKey = staffProjectKeys.socialSummary(projectId);
-  const query = useQuery({
-    queryKey,
-    queryFn: () => staffRead(() => getSocialSummary({ data: { projectId } })),
-    ...DRAFT_QUERY_OPTIONS,
-  });
-  const [draft, setDraft] = useState("");
-  useSeedOnArrival(projectId, query.data, (first) =>
-    setDraft(first.summary ?? "")
-  );
+  const { query, draft, setDraft, edited, wait, waitNote, setWaitNote } =
+    useSummaryDraft(projectId, refresh);
   const [notice, setNotice] = useState<string | null>(null);
   // A second activation in the same tick would spend a second model call;
   // `use-action.ts` says why the hook's ref is what stops it (#443).
@@ -151,6 +333,7 @@ export function SocialPreviewSection({ projectId }: { projectId: string }) {
   // staff wrote by hand. A transient error on a read must not offer a write.
   const failed = query.data === undefined && query.isError && !query.isFetching;
   const loaded = query.data ?? null;
+  const waiting = wait !== null;
 
   /** Stores what a write answered and sets the box from it. */
   function show(next: SocialSummaryView) {
@@ -162,11 +345,7 @@ export function SocialPreviewSection({ projectId }: { projectId: string }) {
     setNotice(null);
     void query.refetch();
   }
-  const stored = loaded?.summary ?? "";
   const trimmed = draft.trim();
-  // Edited means "differs from what is stored", not "has been typed in": a
-  // round trip back to the original text leaves nothing to save.
-  const edited = trimmed !== stored.trim();
   // The cap counted the way the schema and the server count it (#565).
   // `trimmed.length` counts UTF-16 code units, so 151 emoji showed here as 302
   // over a cap the server would have accepted.
@@ -174,8 +353,10 @@ export function SocialPreviewSection({ projectId }: { projectId: string }) {
   const tooLong = length > SOCIAL_SUMMARY_MAX_LENGTH;
   const canSave = !!loaded && edited && length > 0 && !tooLong;
   // `loaded` is null while the load is in flight and after it failed, so
-  // neither state offers either button.
-  const regenerateAllowed = !!loaded && canRegenerate(loaded);
+  // neither state offers either button. A wait that ended without a summary
+  // offers Regenerate whoever wrote what is stored, since its note does.
+  const regenerateAllowed =
+    !!loaded && (canRegenerate(loaded) || waitNote !== null);
 
   function save() {
     if (!loaded) {
@@ -183,6 +364,7 @@ export function SocialPreviewSection({ projectId }: { projectId: string }) {
     }
     return run(async () => {
       setNotice(null);
+      setWaitNote(null);
       const next = await saveSocialSummary({
         data: {
           projectId,
@@ -214,6 +396,7 @@ export function SocialPreviewSection({ projectId }: { projectId: string }) {
   function regenerate() {
     return run(async () => {
       setNotice(null);
+      setWaitNote(null);
       const next = await regenerateSocialSummary({ data: { projectId } });
       show(next);
       // The server refused to overwrite a row that moved under it. Said out
@@ -242,11 +425,12 @@ export function SocialPreviewSection({ projectId }: { projectId: string }) {
         handlers set the draft from what comes back, so an edit typed during
         the wait was replaced by the server's text with nothing to say it had
         happened. Locking the field is honest about the wait; silently keeping
-        the edit and discarding the response would not be.
+        the edit and discarding the response would not be. The same holds
+        while a refresh the panel started is awaited.
       */}
       <Textarea
         aria-label="Social summary"
-        disabled={busy || failed}
+        disabled={busy || failed || waiting}
         onChange={(e) => setDraft(e.target.value)}
         placeholder={
           loaded?.summary === null
@@ -268,7 +452,7 @@ export function SocialPreviewSection({ projectId }: { projectId: string }) {
           )}
         </p>
       </div>
-      {loaded && <SummaryAttemptStatus view={loaded} />}
+      <SummaryStatus note={waitNote} view={loaded} wait={wait} />
       {tooLong && <FieldError message={SOCIAL_SUMMARY_TOO_LONG_MESSAGE} />}
       {failed && <FieldError message={LOAD_FAILED} />}
       <FieldError message={error} />
@@ -284,7 +468,7 @@ export function SocialPreviewSection({ projectId }: { projectId: string }) {
       <FieldError message={notice} />
       <div className="flex flex-wrap gap-2">
         <Button
-          disabled={busy || !canSave}
+          disabled={busy || waiting || !canSave}
           onClick={() => void save()}
           size="sm"
           type="button"
@@ -293,7 +477,7 @@ export function SocialPreviewSection({ projectId }: { projectId: string }) {
           {busy ? "Working..." : "Save"}
         </Button>
         <Button
-          disabled={busy || !regenerateAllowed}
+          disabled={busy || waiting || !regenerateAllowed}
           onClick={() => void regenerate()}
           size="sm"
           type="button"

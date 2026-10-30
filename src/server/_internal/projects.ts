@@ -653,6 +653,17 @@ function assertStaffReturnToDraftHasComment(
 }
 
 /**
+ * What a transition answers. `refreshing` says it started the background
+ * refresh of the embedding and social summary, so the staff panel can wait
+ * for the summary without a client copy of `isEmbeddableStatus` (#616).
+ */
+export interface TransitionResult {
+  id: string;
+  refreshing: boolean;
+  status: ProjectStatus;
+}
+
+/**
  * Everything a status transition does once someone is allowed to make it.
  *
  * The two public transitions differ only in who may act and which targets are
@@ -671,7 +682,7 @@ async function commitTransition(
   target: ProjectStatus,
   comment: string | null,
   opts?: TransitionOptions
-): Promise<{ id: string; status: ProjectStatus }> {
+): Promise<TransitionResult> {
   assertChangesRequestedHasComment(target, comment);
 
   await db.transaction(async (tx) => {
@@ -718,7 +729,8 @@ async function commitTransition(
   // text, so the refresh returns "unchanged" and the vector the project had
   // while published stays put. The one case it does work is a project that
   // failed to embed at publish time, which archiving now retries.
-  if (isEmbeddableStatus(target)) {
+  const refreshing = isEmbeddableStatus(target);
+  if (refreshing) {
     refreshProjectInBackground(project.id, {
       embed: opts?.embed,
       summarize: opts?.summarize,
@@ -744,7 +756,7 @@ async function commitTransition(
     opts?.send
   );
 
-  return { id: project.id, status: target };
+  return { id: project.id, status: target, refreshing };
 }
 
 export async function performTransitionAs(
@@ -753,7 +765,7 @@ export async function performTransitionAs(
   target: ProjectStatus,
   comment?: string,
   opts?: TransitionOptions
-): Promise<{ id: string; status: ProjectStatus }> {
+): Promise<TransitionResult> {
   const project = await loadProjectOr404(id);
   if (!isStaff(viewer) && project.proposerId !== viewer.id) {
     throw new Error("Forbidden");
@@ -811,7 +823,7 @@ export async function restoreProjectAs(
   viewer: AuthUser,
   id: string,
   deps?: RefreshDeps
-): Promise<{ id: string }> {
+): Promise<{ id: string; refreshing: boolean }> {
   assertStaff(viewer);
   const project = await loadProjectOr404(id);
   if (!project.deletedAt) {
@@ -835,7 +847,10 @@ export async function restoreProjectAs(
   // above stale; the refresh checks the status itself, and usually finds both
   // hashes current. The row's own id, not the input's, keys the queue.
   refreshProjectInBackground(project.id, deps);
-  return { id };
+  // The panel's hint, read from the same possibly stale status: a restore to
+  // a status the refresh skips should not show a summary on its way. If the
+  // race makes it wrong, the panel's poll reads `refreshable` and settles.
+  return { id, refreshing: isEmbeddableStatus(project.status) };
 }
 
 export async function hardDeleteProjectAs(
@@ -888,7 +903,7 @@ export async function forceTransitionAs(
   target: ProjectStatus,
   comment?: string,
   opts?: TransitionOptions
-): Promise<{ id: string; status: ProjectStatus }> {
+): Promise<TransitionResult> {
   assertStaff(viewer);
   const project = await loadProjectOr404(id);
   if (project.status === target) {
