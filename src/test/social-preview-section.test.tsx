@@ -713,6 +713,23 @@ describe("SocialPreviewSection waiting for a refresh", () => {
     ).toBeDefined();
   });
 
+  it("does not say the summary is missing when the last poll brought it just before the cap", async () => {
+    // TanStack writes the cache at once and tells the section a tick later,
+    // so a poll can land and the cap fire before the section has rendered it.
+    // Holding the notifications stages that gap.
+    const stale: SocialSummaryView = { ...AUTOMATIC, current: false };
+    await startWait(stale);
+    server.getSocialSummary.mockResolvedValue(stale);
+    await advance(100_000);
+    server.getSocialSummary.mockResolvedValue(ARRIVED);
+    notifyManager.setScheduler(() => undefined);
+    await advance(20_000);
+
+    expectLocked(false);
+    expect(screen.queryByText(/has not arrived/u)).toBeNull();
+    expect(textarea().value).toBe(ARRIVED.summary);
+  });
+
   it("drops a poll still in flight at the cap rather than letting it land", async () => {
     // Landing after the unlock, it would move the stored summary under a box
     // that still shows the old one, and Save would offer to put it back.
@@ -733,6 +750,9 @@ describe("SocialPreviewSection waiting for a refresh", () => {
     expect(
       screen.getByText(/has not arrived after two minutes/u)
     ).toBeDefined();
+    // An untouched automatic summary would leave Regenerate off; the sentence
+    // offers it, so it is on.
+    expect(regenerateButton().hasAttribute("disabled")).toBe(false);
     land(ARRIVED);
     await advance(0);
     expect(textarea().value).toBe(AUTOMATIC.summary);
@@ -748,9 +768,12 @@ describe("SocialPreviewSection waiting for a refresh", () => {
     await advance(2000);
 
     expectLocked(false);
+    // A read that failed, so an error, as the section's load failure is.
     expect(
-      screen.getByText(/Could not check whether the summary has arrived/u)
-    ).toBeDefined();
+      screen
+        .getByText(/Could not check whether the summary has arrived/u)
+        .getAttribute("role")
+    ).toBe("alert");
     // The data survived the failed refetch, so this is not a failed load.
     expect(screen.queryByText(/Could not load the stored summary/u)).toBeNull();
     expect(regenerateButton().hasAttribute("disabled")).toBe(false);

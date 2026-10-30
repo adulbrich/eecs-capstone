@@ -56,22 +56,28 @@ export interface SummaryRefresh {
   startedAt: number;
 }
 
-interface Wait extends SummaryRefresh {
+interface RefreshWait extends SummaryRefresh {
   /**
-   * The failed attempt already on screen, if any, so only a newer one ends the
-   * wait. Compared with this rather than with `startedAt`, which is this
-   * tab's clock and not the server's.
+   * When the failed attempt already on screen ran, if one is, so only a newer
+   * failure ends the wait. Compared with this rather than with `startedAt`,
+   * which is this tab's clock and not the server's.
    */
-  failedAt: number | null;
+  failureOnScreen: number | null;
 }
 
-function nextPoll(wait: Wait): number | false {
+/**
+ * How a wait ended without a summary: at the cap, or on a poll that failed.
+ * Either way the stored summary is as staff last saw it.
+ */
+type WaitEnd = "gave-up" | "unreachable";
+
+function nextPoll(wait: RefreshWait): number | false {
   const elapsed = Date.now() - wait.startedAt;
   const step = elapsed < FAST_FOR_MS ? FAST_POLL_MS : SLOW_POLL_MS;
   return step < WAIT_CAP_MS - elapsed ? step : false;
 }
 
-function failedAt(view: SocialSummaryView): number | null {
+function failureTime(view: SocialSummaryView): number | null {
   const attempt = view.summaryAttempt;
   return attempt?.outcome === "failed" ? attempt.at.getTime() : null;
 }
@@ -83,11 +89,11 @@ function failedAt(view: SocialSummaryView): number | null {
  * last three mean nothing will write: a colleague saved by hand, the project
  * left the statuses the refresh writes for, or the switch went off.
  */
-function settles(view: SocialSummaryView, wait: Wait): boolean {
-  const failed = failedAt(view);
+function endsWait(view: SocialSummaryView, wait: RefreshWait): boolean {
+  const failed = failureTime(view);
   return (
     view.current ||
-    (failed !== null && failed !== wait.failedAt) ||
+    (failed !== null && failed !== wait.failureOnScreen) ||
     view.isManual ||
     !view.refreshable ||
     !view.automaticEnabled
@@ -99,18 +105,24 @@ function settles(view: SocialSummaryView, wait: Wait): boolean {
  * (#616), the last attempt's otherwise. The wait's is an `output`, so it is
  * announced politely, since the action that started it was in a dialog
  * elsewhere on the panel; one element across both, so the give-up sentence is
- * announced as a change.
+ * announced as a change. Not a `FieldError`: neither line reports something
+ * that failed, the way `AttemptFailed` is a state rather than an error. A
+ * failed poll is one, so the section reports it through `FieldError` and this
+ * line says nothing.
  */
 function SummaryStatus({
   view,
   wait,
-  note,
+  ended,
 }: {
   view: SocialSummaryView | null;
-  wait: Wait | null;
-  note: string | null;
+  wait: RefreshWait | null;
+  ended: WaitEnd | null;
 }) {
-  if (!(wait || note)) {
+  if (ended === "unreachable") {
+    return null;
+  }
+  if (!(wait || ended)) {
     return view && <SummaryAttemptStatus view={view} />;
   }
   const cause =
@@ -121,7 +133,7 @@ function SummaryStatus({
     <output className="text-muted-foreground block text-xs">
       {wait
         ? `Writing the summary now that ${cause}. The box unlocks when it arrives.`
-        : note}
+        : GAVE_UP}
     </output>
   );
 }
@@ -138,7 +150,7 @@ function SummaryStatus({
  */
 function useSummaryDraft(projectId: string, refresh: SummaryRefresh | null) {
   const queryClient = useQueryClient();
-  const [wait, setWait] = useState<Wait | null>(null);
+  const [wait, setWait] = useState<RefreshWait | null>(null);
   const query = useQuery({
     queryKey: staffProjectKeys.socialSummary(projectId),
     queryFn: () => staffRead(() => getSocialSummary({ data: { projectId } })),
@@ -152,8 +164,7 @@ function useSummaryDraft(projectId: string, refresh: SummaryRefresh | null) {
   useSeedOnArrival(projectId, query.data, (first) =>
     setDraft(first.summary ?? "")
   );
-  // What the wait ended on when it ended without a summary.
-  const [waitNote, setWaitNote] = useState<string | null>(null);
+  const [ended, setEnded] = useState<WaitEnd | null>(null);
   const [seenRefresh, setSeenRefresh] = useState<SummaryRefresh | null>(null);
   const loaded = query.data;
   // Edited means "differs from what is stored", not "has been typed in": a
@@ -161,9 +172,9 @@ function useSummaryDraft(projectId: string, refresh: SummaryRefresh | null) {
   const edited = draft.trim() !== (loaded?.summary ?? "").trim();
 
   /** Ends the wait with the stored summary in the box, which was locked. */
-  function settle(view: SocialSummaryView, note: string | null) {
+  function settle(view: SocialSummaryView, end: WaitEnd | null) {
     setWait(null);
-    setWaitNote(note);
+    setEnded(end);
     setDraft(view.summary ?? "");
   }
 
@@ -174,8 +185,8 @@ function useSummaryDraft(projectId: string, refresh: SummaryRefresh | null) {
   if (refresh !== seenRefresh) {
     setSeenRefresh(refresh);
     if (refresh && loaded?.automaticEnabled && !loaded.isManual && !edited) {
-      setWait({ ...refresh, failedAt: failedAt(loaded) });
-      setWaitNote(null);
+      setWait({ ...refresh, failureOnScreen: failureTime(loaded) });
+      setEnded(null);
     }
   }
   if (wait && loaded) {
@@ -183,8 +194,8 @@ function useSummaryDraft(projectId: string, refresh: SummaryRefresh | null) {
     // stays locked on an error. The section's load failure stays off, since
     // the data survives a refetch error.
     if (query.isError && query.errorUpdatedAt > wait.startedAt) {
-      settle(loaded, POLL_FAILED);
-    } else if (query.dataUpdatedAt > wait.startedAt && settles(loaded, wait)) {
+      settle(loaded, "unreachable");
+    } else if (query.dataUpdatedAt > wait.startedAt && endsWait(loaded, wait)) {
       settle(loaded, null);
     }
   }
@@ -200,9 +211,16 @@ function useSummaryDraft(projectId: string, refresh: SummaryRefresh | null) {
         // could move the stored summary under an unlocked box, and the next
         // Save's `expected` would carry wording staff never saw.
         void queryClient.cancelQueries({ queryKey });
-        const last = queryClient.getQueryData<SocialSummaryView>(queryKey);
+        // A poll that landed just before the cap is in the cache before the
+        // section has rendered it, and may be the summary itself.
+        const state = queryClient.getQueryState<SocialSummaryView>(queryKey);
+        const last = state?.data;
+        const arrived =
+          !!last &&
+          state.dataUpdatedAt > wait.startedAt &&
+          endsWait(last, wait);
         setWait(null);
-        setWaitNote(GAVE_UP);
+        setEnded(arrived ? null : "gave-up");
         setDraft(last?.summary ?? "");
       },
       wait.startedAt + WAIT_CAP_MS - Date.now()
@@ -210,7 +228,7 @@ function useSummaryDraft(projectId: string, refresh: SummaryRefresh | null) {
     return () => clearTimeout(timer);
   }, [wait, projectId, queryClient]);
 
-  return { query, draft, setDraft, edited, wait, waitNote, setWaitNote };
+  return { query, draft, setDraft, edited, wait, ended, setEnded };
 }
 
 /**
@@ -230,13 +248,18 @@ function saveLost(stored: string | null): string {
  * all, and when the last rewrite failed. The second and third are the
  * Bedrock outage: without them the panel would show an empty box, or a
  * summary of older text beside a failure (#631), with two dead buttons and no
- * way out.
+ * way out. Also after a wait that ended without a summary (#616), whose
+ * sentence offers it; its compare-and-swap covers a write landing late.
  */
-function canRegenerate(view: SocialSummaryView): boolean {
+function canRegenerate(
+  view: SocialSummaryView,
+  ended: WaitEnd | null
+): boolean {
   return (
     view.isManual ||
     view.summary === null ||
-    view.summaryAttempt?.outcome === "failed"
+    view.summaryAttempt?.outcome === "failed" ||
+    ended !== null
   );
 }
 
@@ -320,7 +343,7 @@ export function SocialPreviewSection({
 }) {
   const queryClient = useQueryClient();
   const queryKey = staffProjectKeys.socialSummary(projectId);
-  const { query, draft, setDraft, edited, wait, waitNote, setWaitNote } =
+  const { query, draft, setDraft, edited, wait, ended, setEnded } =
     useSummaryDraft(projectId, refresh);
   const [notice, setNotice] = useState<string | null>(null);
   // A second activation in the same tick would spend a second model call;
@@ -353,10 +376,8 @@ export function SocialPreviewSection({
   const tooLong = length > SOCIAL_SUMMARY_MAX_LENGTH;
   const canSave = !!loaded && edited && length > 0 && !tooLong;
   // `loaded` is null while the load is in flight and after it failed, so
-  // neither state offers either button. A wait that ended without a summary
-  // offers Regenerate whoever wrote what is stored, since its note does.
-  const regenerateAllowed =
-    !!loaded && (canRegenerate(loaded) || waitNote !== null);
+  // neither state offers either button.
+  const regenerateAllowed = !!loaded && canRegenerate(loaded, ended);
 
   function save() {
     if (!loaded) {
@@ -364,7 +385,7 @@ export function SocialPreviewSection({
     }
     return run(async () => {
       setNotice(null);
-      setWaitNote(null);
+      setEnded(null);
       const next = await saveSocialSummary({
         data: {
           projectId,
@@ -396,7 +417,7 @@ export function SocialPreviewSection({
   function regenerate() {
     return run(async () => {
       setNotice(null);
-      setWaitNote(null);
+      setEnded(null);
       const next = await regenerateSocialSummary({ data: { projectId } });
       show(next);
       // The server refused to overwrite a row that moved under it. Said out
@@ -452,9 +473,10 @@ export function SocialPreviewSection({
           )}
         </p>
       </div>
-      <SummaryStatus note={waitNote} view={loaded} wait={wait} />
+      <SummaryStatus ended={ended} view={loaded} wait={wait} />
       {tooLong && <FieldError message={SOCIAL_SUMMARY_TOO_LONG_MESSAGE} />}
       {failed && <FieldError message={LOAD_FAILED} />}
+      {ended === "unreachable" && <FieldError message={POLL_FAILED} />}
       <FieldError message={error} />
       {/*
         A FieldError rather than a SavedNote or a paragraph of its own, per

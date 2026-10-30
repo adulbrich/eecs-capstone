@@ -1554,16 +1554,20 @@ describe("StaffProjectPanel tells the Social preview section to wait", () => {
     updatedAt: null,
   };
 
-  async function confirmPublish(onChanged: () => Promise<void>) {
+  async function confirmMove(
+    from: string,
+    to: string,
+    onChanged: () => Promise<void> = () => Promise.resolve()
+  ) {
     renderWithQueryClient(
       <StaffProjectPanel
         onChanged={onChanged}
-        project={project("approved")}
+        project={project(from)}
         viewerIsOwner={false}
       />
     );
     await screen.findByLabelText("Social summary");
-    fireEvent.click(screen.getByTitle(/^Move to Published\./u));
+    fireEvent.click(screen.getByTitle(new RegExp(`^Move to ${to}\\.`, "u")));
     fireEvent.click(await screen.findByRole("button", { name: "Confirm" }));
   }
 
@@ -1575,7 +1579,7 @@ describe("StaffProjectPanel tells the Social preview section to wait", () => {
       refreshing: true,
     });
     const onChanged = vi.fn(() => Promise.resolve());
-    await confirmPublish(onChanged);
+    await confirmMove("approved", "Published", onChanged);
 
     expect(
       await screen.findByText(/now that the project is published/u)
@@ -1593,11 +1597,25 @@ describe("StaffProjectPanel tells the Social preview section to wait", () => {
       status: "published",
       refreshing: false,
     });
-    await confirmPublish(() => Promise.resolve());
+    await confirmMove("approved", "Published");
 
     await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
     expect(performTransition).toHaveBeenCalledTimes(1);
     expect(screen.queryByText(/Writing the summary/u)).toBeNull();
+  });
+
+  it("after an archive, which says the project changed", async () => {
+    getSocialSummary.mockResolvedValueOnce({ ...UNWRITTEN, refreshable: true });
+    performTransition.mockResolvedValueOnce({
+      id: PROJECT_ID,
+      status: "archived",
+      refreshing: true,
+    });
+    await confirmMove("published", "Archived");
+
+    expect(
+      await screen.findByText(/now that the project changed/u)
+    ).toBeTruthy();
   });
 
   it("after a restore, which says the project changed", async () => {
