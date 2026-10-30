@@ -540,6 +540,7 @@ async function startWait(
       refresh={{ cause, startedAt: Date.now() }}
     />
   );
+  return view;
 }
 
 async function advance(ms: number) {
@@ -687,6 +688,29 @@ describe("SocialPreviewSection waiting for a refresh", () => {
 
     await advance(120_000);
     expect(polls()).toBe(19);
+  });
+
+  it("starts over when a second action lands during the wait", async () => {
+    // Archived a minute after publishing: the cap runs from the archive.
+    const view = await startWait(BEFORE_PUBLISH);
+    server.getSocialSummary.mockResolvedValue(PENDING);
+    await advance(60_000);
+    view.rerender(
+      <SocialPreviewSection
+        projectId="p1"
+        refresh={{ cause: "changed", startedAt: Date.now() }}
+      />
+    );
+    expect(waitingNote()?.textContent).toContain(
+      "now that the project changed"
+    );
+
+    await advance(110_000);
+    expectLocked(true);
+    await advance(10_000);
+    expect(
+      screen.getByText(/has not arrived after two minutes/u)
+    ).toBeDefined();
   });
 
   it("drops a poll still in flight at the cap rather than letting it land", async () => {
