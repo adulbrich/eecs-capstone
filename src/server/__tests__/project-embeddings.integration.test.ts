@@ -9,6 +9,8 @@ import {
   createProjectAs,
   forceTransitionAs,
   performTransitionAs,
+  restoreProjectAs,
+  softDeleteProjectAs,
   updateProjectAs,
   updateProjectProgramsAs,
 } from "#/server/_internal/projects";
@@ -243,6 +245,29 @@ describe("embedding triggers", () => {
 
     expect(embed).toHaveBeenCalledTimes(1);
     expect((await readRow(id)).embedding?.length).toBe(1024);
+  });
+
+  it("tells the caller which transitions and restores started a refresh", async () => {
+    // The staff panel waits for the social summary on this answer (#616), so
+    // it has to match the gate above rather than spell it again.
+    const admin = await makeAdmin(`rf-${Date.now()}@x.com`);
+    const { id } = await createProjectAs(admin, baseProject("Told"));
+    const embed = vi.fn().mockResolvedValue(VECTOR);
+    const move = (status: "submitted" | "approved" | "published") =>
+      performTransitionAs(admin, id, status, undefined, { embed });
+
+    expect((await move("submitted")).refreshStartedAt).toBeNull();
+    await softDeleteProjectAs(admin, id);
+    expect(
+      (await restoreProjectAs(admin, id, { embed })).refreshStartedAt
+    ).toBeNull();
+    await move("approved");
+    expect((await move("published")).refreshStartedAt).toBeInstanceOf(Date);
+    await softDeleteProjectAs(admin, id);
+    expect(
+      (await restoreProjectAs(admin, id, { embed })).refreshStartedAt
+    ).toBeInstanceOf(Date);
+    await settleProjectRefreshes();
   });
 
   it("embeds when the force path publishes", async () => {

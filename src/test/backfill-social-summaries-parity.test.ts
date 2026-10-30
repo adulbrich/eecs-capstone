@@ -359,8 +359,14 @@ describe("the social summary backfill script", () => {
     expect(normalize(SCRIPT)).toContain(
       "if (project.socialSummarySourceHash === hash && project.hasSummary)"
     );
-    expect(normalize(WRITER)).toContain(
-      "if (project.socialSummarySourceHash === hash && project.socialSummary)"
+    // The writer's rule is `writtenFrom`, which the staff view's `current`
+    // shares (#616), so the pin is on its body and on the writer calling it.
+    const writer = normalize(WRITER);
+    expect(writer).toContain(
+      "return project.socialSummarySourceHash === hash && !!project.socialSummary;"
+    );
+    expect(writer).toContain(
+      'if (writtenFrom(project, hash)) { return "unchanged"; }'
     );
   });
 

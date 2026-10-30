@@ -35,7 +35,10 @@ import { Panel, PanelHeader, PanelNote, PanelSection } from "./panel";
 import { ScopeAssessmentSection } from "./scope-assessment-section";
 import { EMAIL_SKIP_HINT, SendEmailCheckbox } from "./send-email-checkbox";
 import { SimilaritySection } from "./similarity-section";
-import { SocialPreviewSection } from "./social-preview-section";
+import {
+  SocialPreviewSection,
+  type SummaryRefresh,
+} from "./social-preview-section";
 import { StaffCategoriesSection } from "./staff-categories-section";
 import { StaffMentorshipSection } from "./staff-mentorship-section";
 import { StaffProgramSection } from "./staff-program-section";
@@ -138,6 +141,13 @@ export function StaffProjectPanel({
   });
   const [sendEmail, setSendEmail] = useState(true);
   const [deleteEmail, setDeleteEmail] = useState(true);
+  // A publish, archive or restore starts the summary's background refresh
+  // and answers before it lands (ADR-0053). `onChanged` reruns the loader,
+  // which does not reach the Social preview section's query, so the section
+  // is told to wait for it instead (#616).
+  const [summaryRefresh, setSummaryRefresh] = useState<SummaryRefresh | null>(
+    null
+  );
   // Undefined until loaded: the Proposer section keeps Save disabled until
   // then. It seeds that section's draft, so it never refetches on its own.
   const proposerQuery = useQuery({
@@ -189,6 +199,7 @@ export function StaffProjectPanel({
     }
     const target = pending;
     return run(async () => {
+      const sentAt = Date.now();
       const data = {
         id: project.id,
         status: target.target,
@@ -201,13 +212,18 @@ export function StaffProjectPanel({
         // The server already declines to mail a proposer it cannot resolve.
         sendEmail,
       };
-      if (target.force) {
-        await forceSetProjectStatus({ data });
-      } else {
-        await performTransition({ data });
-      }
+      const { refreshStartedAt } = target.force
+        ? await forceSetProjectStatus({ data })
+        : await performTransition({ data });
       await onChanged();
       closeModal();
+      if (refreshStartedAt) {
+        setSummaryRefresh({
+          cause: target.target === "published" ? "published" : "changed",
+          refreshStartedAt,
+          sentAt,
+        });
+      }
     });
   }
 
@@ -217,10 +233,17 @@ export function StaffProjectPanel({
   async function runDelete(action: "softDelete" | "restore") {
     if (action === "softDelete") {
       await softDeleteProject({ data: { id: project.id } });
-    } else {
-      await restoreProject({ data: { id: project.id } });
+      await onChanged();
+      return;
     }
+    const sentAt = Date.now();
+    const { refreshStartedAt } = await restoreProject({
+      data: { id: project.id },
+    });
     await onChanged();
+    if (refreshStartedAt) {
+      setSummaryRefresh({ cause: "changed", refreshStartedAt, sentAt });
+    }
   }
 
   async function runHardDelete() {
@@ -457,7 +480,7 @@ export function StaffProjectPanel({
           the page's og:description, but who wrote it and when is not, so it is
           loaded by a staff-gated read rather than from the project payload. */}
       <PanelSection title="Social preview">
-        <SocialPreviewSection projectId={project.id} />
+        <SocialPreviewSection projectId={project.id} refresh={summaryRefresh} />
       </PanelSection>
 
       {/* Only staff, for the same reason: whether the embedding is stored
