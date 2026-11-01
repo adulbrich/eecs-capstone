@@ -43,6 +43,38 @@ export const SUMMARY_GUARD_COLUMNS = [
   "socialSummary",
 ] as const;
 
+type StoredSummary = SocialSummarySourceProject &
+  Pick<
+    typeof projects.$inferSelect,
+    "socialSummary" | "socialSummarySourceHash"
+  >;
+
+/**
+ * Whether the stored summary was written from the text `hash` covers. The
+ * second half matters for the same reason it does on the embedding: a row
+ * carrying a current hash and a null summary is an interrupted write, and
+ * without it every later sweep reads the hash as current and moves on.
+ */
+function writtenFrom(project: StoredSummary, hash: string): boolean {
+  return project.socialSummarySourceHash === hash && !!project.socialSummary;
+}
+
+/**
+ * Whether the automatic refresh has anything left to write for this text:
+ * `refreshSocialSummary` returns "unchanged" on exactly this test, and the
+ * staff view reports it as `current`, which is what the Social preview
+ * section waits for after a publish (#616). One predicate, so the view and the
+ * writer cannot disagree about it. True for a project with no source text,
+ * since nothing will ever be written for one.
+ *
+ * Says nothing about who wrote the summary: a manual row's hash is whatever
+ * the model last saw, so callers that care read `socialSummaryIsManual`.
+ */
+export function socialSummaryIsCurrent(project: StoredSummary): boolean {
+  const source = buildSocialSummarySource(project);
+  return !source || writtenFrom(project, socialSummaryHash(source, MODEL_ID));
+}
+
 /**
  * The single writer of a project's social summary.
  *
@@ -127,10 +159,7 @@ async function writeSocialSummary(
       return "skipped";
     }
     const hash = socialSummaryHash(source, MODEL_ID);
-    // The second half matters for the same reason it does on the embedding: a
-    // row carrying a current hash and a null summary is an interrupted write,
-    // and without it every later sweep reads the hash as current and moves on.
-    if (project.socialSummarySourceHash === hash && project.socialSummary) {
+    if (writtenFrom(project, hash)) {
       return "unchanged";
     }
 

@@ -102,17 +102,21 @@ vi.mock("#/server/scope-assessment", () => ({
   getScopeAssessment: vi.fn(() => Promise.resolve(null)),
 }));
 
-vi.mock("#/server/social-summary", () => ({
+const { getSocialSummary } = vi.hoisted(() => ({
   getSocialSummary: vi.fn(() =>
     Promise.resolve({
       isManual: false,
       automaticEnabled: false,
+      current: false,
       refreshable: false,
       summary: null,
       summaryAttempt: null,
       updatedAt: null,
     })
   ),
+}));
+vi.mock("#/server/social-summary", () => ({
+  getSocialSummary,
   regenerateSocialSummary: vi.fn(),
   saveSocialSummary: vi.fn(),
 }));
@@ -1531,5 +1535,111 @@ describe("StaffProjectPanel refetches after a save", () => {
 
     await waitFor(() => expect(getProposerForEdit).toHaveBeenCalledTimes(2));
     await waitFor(() => expect(listProjectEditLog).toHaveBeenCalledTimes(2));
+  });
+});
+
+/**
+ * The panel's half of #616: the action's answer says whether it started the
+ * summary refresh, and only then is the Social preview section told to wait.
+ * `social-preview-section.test.tsx` covers the wait itself.
+ */
+describe("StaffProjectPanel tells the Social preview section to wait", () => {
+  const UNWRITTEN = {
+    isManual: false,
+    automaticEnabled: true,
+    current: false,
+    refreshable: false,
+    summary: null,
+    summaryAttempt: null,
+    updatedAt: null,
+  };
+
+  async function confirmMove(
+    from: string,
+    to: string,
+    onChanged: () => Promise<void> = () => Promise.resolve()
+  ) {
+    renderWithQueryClient(
+      <StaffProjectPanel
+        onChanged={onChanged}
+        project={project(from)}
+        viewerIsOwner={false}
+      />
+    );
+    await screen.findByLabelText("Social summary");
+    fireEvent.click(screen.getByTitle(new RegExp(`^Move to ${to}\\.`, "u")));
+    fireEvent.click(await screen.findByRole("button", { name: "Confirm" }));
+  }
+
+  it("after a publish, without reloading anything else", async () => {
+    getSocialSummary.mockResolvedValueOnce(UNWRITTEN);
+    performTransition.mockResolvedValueOnce({
+      id: PROJECT_ID,
+      status: "published",
+      refreshStartedAt: new Date(),
+    });
+    const onChanged = vi.fn(() => Promise.resolve());
+    await confirmMove("approved", "Published", onChanged);
+
+    expect(
+      await screen.findByText(/now that the project is published/u)
+    ).toBeTruthy();
+    expect(
+      (screen.getByLabelText("Social summary") as HTMLTextAreaElement).disabled
+    ).toBe(true);
+    expect(onChanged).toHaveBeenCalledTimes(1);
+  });
+
+  it("not after a transition that started no refresh", async () => {
+    getSocialSummary.mockResolvedValueOnce(UNWRITTEN);
+    performTransition.mockResolvedValueOnce({
+      id: PROJECT_ID,
+      status: "published",
+      refreshStartedAt: null,
+    });
+    await confirmMove("approved", "Published");
+
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+    expect(performTransition).toHaveBeenCalledTimes(1);
+    expect(screen.queryByText(/Writing the summary/u)).toBeNull();
+  });
+
+  it("after an archive, which says the project changed", async () => {
+    getSocialSummary.mockResolvedValueOnce({ ...UNWRITTEN, refreshable: true });
+    performTransition.mockResolvedValueOnce({
+      id: PROJECT_ID,
+      status: "archived",
+      refreshStartedAt: new Date(),
+    });
+    await confirmMove("published", "Archived");
+
+    expect(
+      await screen.findByText(/now that the project changed/u)
+    ).toBeTruthy();
+  });
+
+  it("after a restore, which says the project changed", async () => {
+    getSocialSummary.mockResolvedValueOnce({ ...UNWRITTEN, refreshable: true });
+    restoreProject.mockResolvedValueOnce({
+      id: PROJECT_ID,
+      refreshStartedAt: new Date(),
+    });
+    renderWithQueryClient(
+      <StaffProjectPanel
+        onChanged={() => Promise.resolve()}
+        project={{ ...project("published"), deletedAt: new Date() }}
+        viewerIsOwner={false}
+      />
+    );
+    await screen.findByLabelText("Social summary");
+    fireEvent.click(screen.getByRole("button", { name: "Restore" }));
+    const confirm = await screen.findByRole("alertdialog", {
+      name: "Restore this project?",
+    });
+    fireEvent.click(within(confirm).getByRole("button", { name: "Restore" }));
+
+    expect(
+      await screen.findByText(/now that the project changed/u)
+    ).toBeTruthy();
   });
 });

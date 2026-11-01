@@ -27,7 +27,10 @@ import type {
 import { assertWithinLimit, recordReviewUsage } from "./ai-review-usage";
 import { readAiRefresh, recordAiRefresh } from "./project-ai-refreshes";
 import { isRefreshable, rowStillReads } from "./project-embeddings";
-import { SUMMARY_GUARD_COLUMNS } from "./project-social-summary";
+import {
+  SUMMARY_GUARD_COLUMNS,
+  socialSummaryIsCurrent,
+} from "./project-social-summary";
 import {
   buildSocialSummaryConfig,
   runSocialSummary,
@@ -54,27 +57,23 @@ async function loadProject(projectId: string) {
 type ProjectRow = typeof projects.$inferSelect;
 
 /**
- * The last-attempt half of the view (#631). `summaryStoredAt` is passed
- * rather than read off the row, because Save and Regenerate return the time
- * they just wrote, which the row they loaded beforehand does not carry yet.
+ * The view of a row. Save and Regenerate pass the row they loaded with their
+ * own write spread over it, so what they return is computed the way a later
+ * read computes it, `current` and the last attempt (#631) included, without
+ * reading the row again.
  */
-async function aiStatus(project: ProjectRow, summaryStoredAt: Date | null) {
-  return {
-    summaryAttempt: currentAttempt(
-      await readAiRefresh(project.id, "social_summary"),
-      summaryStoredAt
-    ),
-    refreshable: isRefreshable(project),
-    automaticEnabled: socialSummariesEnabled(),
-  };
-}
-
 async function toView(project: ProjectRow): Promise<SocialSummaryView> {
   return {
     summary: project.socialSummary,
     updatedAt: project.socialSummaryUpdatedAt,
     isManual: project.socialSummaryIsManual,
-    ...(await aiStatus(project, project.socialSummaryUpdatedAt)),
+    current: socialSummaryIsCurrent(project),
+    summaryAttempt: currentAttempt(
+      await readAiRefresh(project.id, "social_summary"),
+      project.socialSummaryUpdatedAt
+    ),
+    refreshable: isRefreshable(project),
+    automaticEnabled: socialSummariesEnabled(),
   };
 }
 
@@ -144,16 +143,15 @@ export async function saveSocialSummaryAs(
       parsed.error.issues[0]?.message ?? SOCIAL_SUMMARY_TOO_LONG_MESSAGE
     );
   }
-  const summary = parsed.data;
   const { expected } = data;
-  const updatedAt = new Date();
+  const write = {
+    socialSummary: parsed.data,
+    socialSummaryIsManual: true,
+    socialSummaryUpdatedAt: new Date(),
+  };
   const written = await db
     .update(projects)
-    .set({
-      socialSummary: summary,
-      socialSummaryIsManual: true,
-      socialSummaryUpdatedAt: updatedAt,
-    })
+    .set(write)
     .where(
       and(
         eq(projects.id, project.id),
@@ -172,13 +170,7 @@ export async function saveSocialSummaryAs(
       outcome: "changed",
     };
   }
-  return {
-    summary,
-    updatedAt,
-    isManual: true,
-    outcome: "saved",
-    ...(await aiStatus(project, updatedAt)),
-  };
+  return { ...(await toView({ ...project, ...write })), outcome: "saved" };
 }
 
 export async function saveSocialSummaryForCurrentUser(
@@ -291,15 +283,15 @@ export async function regenerateSocialSummaryAs(
     );
     throw new Error(run.error ?? "Social summary failed");
   }
-  const updatedAt = new Date();
+  const write = {
+    socialSummary: run.result,
+    socialSummarySourceHash: socialSummaryHash(source, MODEL_ID),
+    socialSummaryIsManual: false,
+    socialSummaryUpdatedAt: new Date(),
+  };
   const written = await db
     .update(projects)
-    .set({
-      socialSummary: run.result,
-      socialSummarySourceHash: socialSummaryHash(source, MODEL_ID),
-      socialSummaryIsManual: false,
-      socialSummaryUpdatedAt: updatedAt,
-    })
+    .set(write)
     .where(
       and(
         rowStillReads(project, SUMMARY_GUARD_COLUMNS),
@@ -323,13 +315,7 @@ export async function regenerateSocialSummaryAs(
       outcome: "changed",
     };
   }
-  return {
-    summary: run.result,
-    updatedAt,
-    isManual: false,
-    outcome: "rewritten",
-    ...(await aiStatus(project, updatedAt)),
-  };
+  return { ...(await toView({ ...project, ...write })), outcome: "rewritten" };
 }
 
 export async function regenerateSocialSummaryForCurrentUser(
