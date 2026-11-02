@@ -12,8 +12,8 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 vi.mock("@tanstack/react-router", () => ({
   useRouter: () => ({ invalidate: vi.fn() }),
 }));
-// A marker rather than null, so the group-name test can tell the legend sits
-// over the checkboxes and not beside them.
+// A marker rather than null, so the group-name test can tell the checkboxes
+// sit inside the named group and not beside it.
 vi.mock("#/components/category-multi-select", () => ({
   CategoryMultiSelect: () => <p>category checkboxes</p>,
 }));
