@@ -94,13 +94,18 @@ describe("buildSocialSummarySource", () => {
     ).toBe(`<Title>\n${title}\n</Title>\n\n<Description>\nA\n</Description>`);
   });
 
+  it("cuts a title of emoji on a whole character rather than dropping it", () => {
+    // The title is first, so its room is always the limit less its own 17
+    // and never one: an odd cut there loses half a pair, not the field.
+    const source = buildSocialSummarySource(
+      project({ title: EMOJI.repeat(SOCIAL_SUMMARY_SOURCE_LIMIT) })
+    );
+    expect(source.startsWith(`<Title>\n${EMOJI}`)).toBe(true);
+    expect(source).not.toMatch(EMPTY_TAG);
+    expect(BROKEN_PAIR.test(source)).toBe(false);
+  });
+
   it.each([
-    // The title is first, so its room is always the limit less its own tags
-    // and never one; a run of emoji there is the case below.
-    {
-      field: "title",
-      fields: { title: EMOJI.repeat(SOCIAL_SUMMARY_SOURCE_LIMIT) },
-    },
     // 12,000 less the title's 17 and the description's 2 + 29 leaves 1.
     {
       field: "description",
@@ -115,12 +120,15 @@ describe("buildSocialSummarySource", () => {
         problemStatement: EMOJI,
       },
     },
-  ])("never writes an empty $field tag on a cut emoji", ({ fields }) => {
-    const source = buildSocialSummarySource(project(fields));
-    expect(source.length).toBeLessThanOrEqual(SOCIAL_SUMMARY_SOURCE_LIMIT);
-    expect(source).not.toMatch(EMPTY_TAG);
-    expect(BROKEN_PAIR.test(source)).toBe(false);
-  });
+  ])(
+    "never writes an empty $field tag when its one unit of room is half an emoji",
+    ({ fields }) => {
+      const source = buildSocialSummarySource(project(fields));
+      expect(source.length).toBeLessThanOrEqual(SOCIAL_SUMMARY_SOURCE_LIMIT);
+      expect(source).not.toMatch(EMPTY_TAG);
+      expect(BROKEN_PAIR.test(source)).toBe(false);
+    }
+  );
 
   it("leaves a source under the limit exactly as it was", () => {
     const small = project({});
