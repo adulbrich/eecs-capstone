@@ -325,7 +325,7 @@ Its `message` includes the parameters, and a session lookup's parameter is the s
 
 ### Run the tests on the Node in `.nvmrc`, not whatever is on PATH
 
-Another major fails about 65 jsdom tests that have nothing to do with your change. `scripts/nvmrc-node.sh` says why and is what the `pre-push` hooks run through; check `node --version` inside the same invocation before trusting a strange red.
+CI runs the `.nvmrc` Node, and another major has failed about 65 jsdom tests that had nothing to do with the change. `scripts/nvmrc-node.sh` says why and is what the `pre-push` hooks run through; check `node --version` inside the same invocation before trusting a strange red.
 
 ### A test that spawns git under a hook must drop `GIT_DIR` first
 

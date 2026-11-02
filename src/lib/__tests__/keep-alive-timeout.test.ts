@@ -44,7 +44,7 @@ describe("the keep-alive timeout", () => {
   });
 
   it("beats Node's own default, which is what production ran", () => {
-    // Node 24 defaults this to 5000, read off a bare server rather than
+    // Node 24 and 26 default this to 5000, read off a bare server rather than
     // written down, so a future Node that fixes it upstream makes the
     // assertion trivially true instead of wrong.
     const bare = http.createServer();

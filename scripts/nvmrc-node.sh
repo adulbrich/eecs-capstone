@@ -2,11 +2,11 @@
 # Run a command on the Node that .nvmrc names, or refuse with the reason.
 #
 # lefthook runs hooks under `sh`, which has no shell function, so a lazy-loaded
-# nvm never fires and `node` is whatever is first on PATH, a Homebrew Node two
-# majors ahead on the machine this was written on. On that Node the jsdom
-# environment comes up without localStorage and about 65 unit tests fail in
-# files that have nothing to do with the change. `package.json` engines admits
-# that Node, so nothing warns, and anything else that bypasses shell functions
+# nvm never fires and `node` is whatever is first on PATH, often a Homebrew Node
+# on a different major from CI's. One such Node once brought the jsdom
+# environment up without localStorage and failed about 65 unit tests in files
+# the change never touched. `package.json` engines admits any newer Node, so
+# nothing warns, and anything else that bypasses shell functions
 # (`env FOO=bar npx vitest`) lands on it too. A pre-push that fails that way
 # teaches everyone to skip it, so this wrapper does the version switch itself
 # and, when it cannot, fails on the version rather than on the tests.
