@@ -63,6 +63,9 @@ const LONE_TRAILING_SURROGATE = /[\uD800-\uDBFF]$/u;
  * A field that cannot fit at all ends the loop rather than being written
  * empty, because the fields are in descending order of usefulness and a
  * `<Problem statement></Problem statement>` says nothing the model can use.
+ * A field with one unit of room and an emoji first is the same case reached
+ * late: the cut keeps only the high surrogate, the strip empties it, and the
+ * room check has already passed, so the body is checked again (#831).
  *
  * The seven is the punctuation around a value: `<`, `>`, a newline, a newline,
  * `<`, `/`, `>`. The label itself is counted twice, once per tag.
@@ -87,6 +90,9 @@ export function buildSocialSummarySource(
       value.length > room
         ? value.slice(0, room).replace(LONE_TRAILING_SURROGATE, "")
         : value;
+    if (!body) {
+      break;
+    }
     parts.push(`<${label}>\n${body}\n</${label}>`);
     remaining -= separator + wrapper + body.length;
   }

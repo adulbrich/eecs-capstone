@@ -11,6 +11,9 @@ const EMOJI = "\u{1F600}";
 const BROKEN_PAIR =
   /[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/u;
 
+/** A field written with nothing between its tags. */
+const EMPTY_TAG = /<([^>/]+)>\n\n<\/\1>/u;
+
 function project(
   over: Partial<Parameters<typeof buildSocialSummarySource>[0]>
 ) {
@@ -73,6 +76,61 @@ describe("buildSocialSummarySource", () => {
     );
     expect(source).not.toContain("<Problem statement>");
   });
+
+  it("drops a field whose one unit of room is half an emoji", () => {
+    // The defect (#831): a title of 11,951 leaves the description a room of
+    // one, the slice keeps only the high surrogate, the strip empties it, and
+    // the old check had already passed, so `<Description>\n\n</Description>`
+    // went into the prompt and the hash.
+    const title = "x".repeat(11_951);
+    const source = buildSocialSummarySource(
+      project({ title, description: `${EMOJI} rover` })
+    );
+    expect(source).not.toContain("<Description>");
+    expect(source).toBe(`<Title>\n${title}\n</Title>`);
+
+    expect(
+      buildSocialSummarySource(project({ title, description: "A rover" }))
+    ).toBe(`<Title>\n${title}\n</Title>\n\n<Description>\nA\n</Description>`);
+  });
+
+  it("cuts a title of emoji on a whole character rather than dropping it", () => {
+    // The title is first, so its room is always the limit less its own 17
+    // and never one: an odd cut there loses half a pair, not the field.
+    const source = buildSocialSummarySource(
+      project({ title: EMOJI.repeat(SOCIAL_SUMMARY_SOURCE_LIMIT) })
+    );
+    expect(source.length).toBeLessThanOrEqual(SOCIAL_SUMMARY_SOURCE_LIMIT);
+    expect(source.startsWith(`<Title>\n${EMOJI}`)).toBe(true);
+    expect(source.endsWith("</Title>")).toBe(true);
+    expect(source).not.toMatch(EMPTY_TAG);
+    expect(BROKEN_PAIR.test(source)).toBe(false);
+  });
+
+  it.each([
+    // 12,000 less the title's 17 and the description's 2 + 29 leaves 1.
+    {
+      field: "description",
+      fields: { title: "x".repeat(11_951), description: EMOJI },
+    },
+    // 12,000 less the title's 17 and the problem statement's 2 + 41 leaves 1.
+    {
+      field: "problem statement",
+      fields: {
+        title: "x".repeat(11_939),
+        description: null,
+        problemStatement: EMOJI,
+      },
+    },
+  ])(
+    "never writes an empty $field tag when its one unit of room is half an emoji",
+    ({ fields }) => {
+      const source = buildSocialSummarySource(project(fields));
+      expect(source.length).toBeLessThanOrEqual(SOCIAL_SUMMARY_SOURCE_LIMIT);
+      expect(source).not.toMatch(EMPTY_TAG);
+      expect(BROKEN_PAIR.test(source)).toBe(false);
+    }
+  );
 
   it("leaves a source under the limit exactly as it was", () => {
     const small = project({});
