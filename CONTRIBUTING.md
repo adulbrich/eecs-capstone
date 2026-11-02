@@ -31,10 +31,12 @@ claim it        fix/ feat/ ...                                           review 
 3. **Commit, by name.** Stage paths, never `git add -A`. The subject is Conventional
    Commits with a lowercase imperative: `fix(projects): stop the proposer field
    lying about pending changes`. `AGENTS.md` has the full rule and the reason.
-4. **Push and open a pull request.** The template asks for the closing issue, what
-   changed, what ran locally, screenshots when a page changed (desktop and
-   375px, or the opt-out line with a reason), the review passes, and the docs
-   touched.
+4. **Push and open a pull request.** Above the template's `---` line goes the
+   `main` commit body: the closing issue, what changed and why, and
+   `Assisted-by: Claude Code` when an agent helped. Below it go what ran locally,
+   screenshots when a page changed (desktop and 375px, or the opt-out line with a
+   reason), the review passes, and the docs touched. When you merge, delete from
+   `---` down in the merge dialog.
 5. **Run the review loop.** `mattpocock-skills:code-review` and, on any PR that
    changes behaviour, `correctness-review` beside it, until a pass raises nothing
    unanswered, then merge. No approving review is required by GitHub, so this loop

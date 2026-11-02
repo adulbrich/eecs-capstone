@@ -46,8 +46,10 @@ A tool enforces the first five, so a refusal names the rule you hit.
   required checks go green. Pre-commit hook, `guard-git.mjs`, branch ruleset.
 - **Commit body:** a sentence or two on why, or none. Use a HEREDOC for more than one
   line. Long bodies before 2026-08-09 are history, not the pattern.
-- **Keep the `Co-Authored-By` trailer** the harness supplies. Never pin a model
-  version in these docs.
+- **The PR body above its `---` line is the `main` commit body**, LLVM-style: a
+  squash merge takes the PR title and body, and the merger deletes from `---` down.
+  End that part with `Assisted-by: Claude Code`. No `Co-Authored-By` trailer, on a
+  commit or a PR. Never pin a model version in these docs.
 - **Review loop on every PR, Dependabot's included.** GitHub requires no approving
   review, and green CI is not one, so this is the review. Run `mattpocock-skills:code-review` (conformance) and,
   on a PR that changes behaviour, `correctness-review` (what breaks) beside it. Repeat

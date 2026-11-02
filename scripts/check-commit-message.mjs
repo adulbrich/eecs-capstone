@@ -5,8 +5,9 @@
  *
  * One implementation, three callers. lefthook runs it at `commit-msg`, CI runs
  * it over every commit a pull request adds (`--range`) and over the PR title
- * and body (`pr-text.yml` says why), and the Claude Code `git` hook runs it on
- * the text of a `git commit` before the commit exists.
+ * and body, which a squash merge turns into the `main` commit (`pr-text.yml`),
+ * and the Claude Code `git` hook runs it on the text of a `git commit` before
+ * the commit exists.
  *
  * The session-link rule is the hard one: the repo is public and mirrors to
  * GitLab, so a link that lands on a remote costs a history rewrite against a
@@ -82,7 +83,7 @@ export function checkCommitMessage(message) {
 
   if (message.includes(SESSION_LINK)) {
     problems.push(
-      `contains a ${SESSION_LINK} link; drop it, keep the Co-Authored-By trailer`
+      `contains a ${SESSION_LINK} link; drop it, keep the Assisted-by trailer`
     );
   }
 
