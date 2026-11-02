@@ -3,12 +3,11 @@
 #
 # lefthook runs hooks under `sh`, which has no shell function, so a lazy-loaded
 # nvm never fires and `node` is whatever is first on PATH, often a Homebrew Node
-# on another major from the one CI runs. On Node 24 with an older Vitest, a
-# Homebrew Node two majors ahead brought the jsdom environment up without
-# localStorage and failed about 65 unit tests in files the change never
-# touched. `package.json` engines admits any newer Node, so nothing warns, and
-# anything else that bypasses shell functions (`env FOO=bar npx vitest`) lands
-# on it too. A pre-push that fails that way
+# on a different major from CI's. One such Node once brought the jsdom
+# environment up without localStorage and failed about 65 unit tests in files
+# the change never touched. `package.json` engines admits any newer Node, so
+# nothing warns, and anything else that bypasses shell functions
+# (`env FOO=bar npx vitest`) lands on it too. A pre-push that fails that way
 # teaches everyone to skip it, so this wrapper does the version switch itself
 # and, when it cannot, fails on the version rather than on the tests.
 #
