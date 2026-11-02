@@ -31,15 +31,19 @@ claim it        fix/ feat/ ...                                           review 
 3. **Commit, by name.** Stage paths, never `git add -A`. The subject is Conventional
    Commits with a lowercase imperative: `fix(projects): stop the proposer field
    lying about pending changes`. `AGENTS.md` has the full rule and the reason.
-4. **Push and open a pull request.** The template asks for the closing issue, what
-   changed, what ran locally, screenshots when a page changed (desktop and
-   375px, or the opt-out line with a reason), the review passes, and the docs
-   touched.
+4. **Push and open a pull request.** Above the template's `---` line goes the
+   `main` commit body: the closing issue, what changed and why, and
+   `Assisted-by: Claude Code` when an agent helped. Below it go what ran locally,
+   screenshots when a page changed (desktop and 375px, or the opt-out line with a
+   reason), the review passes, and the docs touched.
 5. **Run the review loop.** `mattpocock-skills:code-review` and, on any PR that
    changes behaviour, `correctness-review` beside it, until a pass raises nothing
    unanswered, then merge. No approving review is required by GitHub, so this loop
    is the review. Record the pass count for each in the PR. `AGENTS.md` says what
-   exempts a PR from the correctness pass.
+   exempts a PR from the correctness pass. Squash, and in the merge dialog delete
+   the body from `---` down; from the CLI, pass the part above it with
+   `gh pr merge --squash --body-file`. Cut a Dependabot body to its first line.
+   Never auto-merge: it skips the cut and lands the whole body on `main`.
 6. **Clean up after the merge.** Three things outlive the branch, and each one
    has since cost somebody a debugging session:
    - **The worktree**, if the work had one: `git worktree remove <path>`. A
@@ -74,7 +78,7 @@ first column is what stops you locally; the last is what stops the merge.
 
 | Rule | Local (lefthook) | Claude Code hook | CI |
 | --- | --- | --- | --- |
-| Conventional subject; no emdash, emoji or session link in the message | `commit-msg` | `guard-git.mjs` reads the `-m` text first | `verify` walks the PR's commits; `pr-text` checks the title and body |
+| Conventional subject; no emdash, emoji, session link or old Claude Code footer in the message | `commit-msg` | `guard-git.mjs` reads the `-m` text first | `verify` walks the PR's commits; `pr-text` checks the title and body |
 | No emdash or emoji in tracked prose and code | `pre-commit`, staged files | `after-edit.mjs` on the edited file | `verify`: `npm run check:prose` |
 | A quirk at most 1000 bytes and a UI convention at most 2000, code blocks and table rows not counted; an ADR at most 1300 after its title | `pre-commit`, staged files | | `verify`: `npm run check:doc-size` |
 | No session link in PR or issue text | (never sees it) | `guard-gh.mjs` refuses the command | `pr-text`, for the PR title and body; issue text has no CI gate |

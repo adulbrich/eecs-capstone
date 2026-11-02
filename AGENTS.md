@@ -29,7 +29,7 @@ A tool enforces the first five, so a refusal names the rule you hit.
 - **No emdash and no emoji** in commits, comments, string literals, docs or chat.
   `scripts/check-prose.mjs` (commit, CI) and `after-edit.mjs` (every edit). Not
   enforced, and the same violation: `--` as a sentence dash. Hyphenated compounds are
-  fine; emojis only when the user asks; the harness footer on a PR body is exempt.
+  fine; emojis only when the user asks.
 - **Conventional Commits, lowercase imperative subject, area in parens:**
   `fix(projects): stop the proposer field lying about pending changes`. Types: `feat`,
   `fix`, `docs`, `test`, `refactor`, `style`, `perf`, `build`, `ci`, `chore`; `!`
@@ -46,8 +46,11 @@ A tool enforces the first five, so a refusal names the rule you hit.
   required checks go green. Pre-commit hook, `guard-git.mjs`, branch ruleset.
 - **Commit body:** a sentence or two on why, or none. Use a HEREDOC for more than one
   line. Long bodies before 2026-08-09 are history, not the pattern.
-- **Keep the `Co-Authored-By` trailer** the harness supplies. Never pin a model
-  version in these docs.
+- **The PR body above its `---` line is the `main` commit body**, LLVM-style: a
+  squash merge takes the PR title and body, and the merger deletes from `---` down.
+  End that part with `Assisted-by: Claude Code`. No `Co-Authored-By` trailer and no
+  `Generated with Claude Code` footer, whatever the harness supplies. Never pin a
+  model version in these docs.
 - **Review loop on every PR, Dependabot's included.** GitHub requires no approving
   review, and green CI is not one, so this is the review. Run `mattpocock-skills:code-review` (conformance) and,
   on a PR that changes behaviour, `correctness-review` (what breaks) beside it. Repeat

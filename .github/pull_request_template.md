@@ -1,8 +1,15 @@
 Closes #
 
-<!-- What changed and why, from the reader's side. Two to five bullets. -->
-
 -
+
+Assisted-by: Claude Code
+
+---
+
+<!-- Everything above the line is the `main` commit body: what changed and why,
+     from the reader's side, in two to five bullets, and the Assisted-by trailer
+     when an agent helped (delete it otherwise). Keep comments out of it. The
+     merger deletes from the line down in the squash dialog. -->
 
 ## Ran locally
 

@@ -297,7 +297,7 @@ describe("guard-gh", () => {
     }
   });
 
-  it("passes a clean PR with the harness footer, on its own line or inline", () => {
+  it("denies the old harness footer, on its own line or inline", () => {
     const heredoc = [
       'gh pr create --title "fix(x): y" --body "$(cat <<\'EOF\'',
       "Closes #1.",
@@ -306,13 +306,56 @@ describe("guard-gh", () => {
       "EOF",
       ')"',
     ].join("\n");
-    expect(bash("guard-gh", heredoc).status).toBe(0);
+    expect(bash("guard-gh", heredoc).status).toBe(2);
     expect(
       bash(
         "guard-gh",
         'gh pr create --title "fix(x): y" --body "Closes #1. \u{1F916} Generated with [Claude Code](https://claude.com/claude-code)"'
       ).status
+    ).toBe(2);
+  });
+
+  it("names Assisted-by when the old footer comes without its emoji", () => {
+    const result = bash(
+      "guard-gh",
+      'gh pr create --title "fix(x): y" --body "Closes #1. Generated with [Claude Code](https://claude.com/claude-code)"'
+    );
+    expect(result.status).toBe(2);
+    expect(result.stderr).toContain("Assisted-by: Claude Code");
+  });
+
+  it("checks the text of a body file, on a merge as on a create", () => {
+    const dir = mkdtempSync(join(tmpdir(), "body-file-"));
+    temp.push(dir);
+    const dirty = join(dir, "dirty.md");
+    const clean = join(dir, "clean.md");
+    writeFileSync(dirty, "Closes #1\n\none \u2014 two\n");
+    writeFileSync(clean, "Closes #1\n\nAssisted-by: Claude Code\n");
+    const merge = bash(
+      "guard-gh",
+      `gh pr merge 5 --squash --subject "fix(x): y" --body-file ${dirty}`
+    );
+    expect(merge.status).toBe(2);
+    expect(merge.stderr).toContain("the body file: line 3 has an emdash");
+    expect(
+      bash("guard-gh", `gh pr create --title "fix(x): y" -F ${dirty}`).status
+    ).toBe(2);
+    expect(
+      bash(
+        "guard-gh",
+        `gh pr merge 5 --squash --subject "fix(x): y" --body-file ${clean}`
+      ).status
     ).toBe(0);
+  });
+
+  it("still refuses the command text when the body file is a directory", () => {
+    const dir = mkdtempSync(join(tmpdir(), "body-dir-"));
+    temp.push(dir);
+    const result = bash(
+      "guard-gh",
+      `gh pr create --title "fix(x): y" --body "a \u2014 b" --body-file ${dir}`
+    );
+    expect(result.status).toBe(2);
   });
 });
 

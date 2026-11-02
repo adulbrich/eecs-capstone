@@ -1,6 +1,8 @@
 # A squash merge takes the pull request title as the `main` subject and the
-# body as its message, so both get the checks a commit gets at `commit-msg`:
-# Conventional subject, no emdash, no emoji, no claude.ai/code/session link.
+# body as its message (repo setting since 2026-11-02; the merger deletes from
+# the template's `---` line down). So both get the checks a commit gets at
+# `commit-msg`. The title gets the Conventional subject check, and title and
+# body get the prose checks: no emdash, no emoji, no claude.ai/code/session link.
 #
 # Its own workflow rather than a job in ci.yml because it has to re-run when
 # the title or body is edited, and `edited` on ci.yml would re-run the

@@ -109,6 +109,14 @@ describe("check-commit-message", () => {
     expect(result.stderr.split("\n")[0]).toContain("claude.ai/code/session");
   });
 
+  it("names Assisted-by as the fix for the old footer", () => {
+    const result = commit(
+      "fix(x): y\n\n\u{1F916} Generated with [Claude Code](https://claude.com/claude-code)\n"
+    );
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain("Assisted-by: Claude Code");
+  });
+
   it("rejects an emdash or an emoji in the body", () => {
     expect(commit("fix(x): y\n\nbecause \u2014 reasons\n").status).toBe(1);
     expect(commit("fix(x): y \u2705\n").status).toBe(1);
@@ -279,12 +287,12 @@ describe("check-prose", () => {
     ).toBe(0);
   });
 
-  it("does not count the harness footer on a PR body", () => {
+  it("counts the old harness footer on a PR body, since Assisted-by replaces it", () => {
     expect(
       prose(
         "Closes #1.\n\n\u{1F916} Generated with [Claude Code](https://claude.com/claude-code)\n"
       ).status
-    ).toBe(0);
+    ).toBe(1);
   });
 
   it("checks the named files and skips paths outside the rule", () => {
