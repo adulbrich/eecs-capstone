@@ -12,7 +12,7 @@
  * (#342) only warns: a `--body-file` may not exist yet in every flow, and
  * `pr-text` is the gate that refuses.
  */
-import { existsSync, readFileSync } from "node:fs";
+import { readFileSync } from "node:fs";
 import { isAbsolute, join } from "node:path";
 import {
   changedFiles,
@@ -35,6 +35,7 @@ const BODY_FLAG =
   /(?:^|\s)(?:-b|--body)(?:=|\s+)(?:"((?:[^"\\]|\\.)*)"|'([^']*)')/u;
 const BODY_FILE_FLAG =
   /(?:^|\s)(?:-F|--body-file)(?:=|\s+)(?:"([^"]+)"|'([^']+)'|(\S+))/u;
+const OLD_FOOTER = "Generated with [Claude Code]";
 
 /**
  * The PR body a `gh pr create` or `gh pr edit` would send, from `--body` or
@@ -51,7 +52,8 @@ function prBody(text, dir) {
 
 /**
  * The text of the `--body-file` (or `-F`) a command names, or null when it
- * names none or the file does not exist yet.
+ * names none or the file cannot be read yet. A throw here would exit 1, which
+ * lets the command through, so an unreadable path is null instead.
  */
 function bodyFileText(text, dir) {
   const file = BODY_FILE_FLAG.exec(text);
@@ -60,10 +62,12 @@ function bodyFileText(text, dir) {
   }
   const given = file[1] ?? file[2] ?? file[3];
   const path = isAbsolute(given) ? given : join(dir, given);
-  return existsSync(path) ? readFileSync(path, "utf8") : null;
+  try {
+    return readFileSync(path, "utf8");
+  } catch {
+    return null;
+  }
 }
-
-const OLD_FOOTER = "Generated with [Claude Code]";
 
 /**
  * What `text` breaks of the rules all published text shares: the session

@@ -347,6 +347,16 @@ describe("guard-gh", () => {
       ).status
     ).toBe(0);
   });
+
+  it("still refuses the command text when the body file is a directory", () => {
+    const dir = mkdtempSync(join(tmpdir(), "body-dir-"));
+    temp.push(dir);
+    const result = bash(
+      "guard-gh",
+      `gh pr create --title "fix(x): y" --body "a \u2014 b" --body-file ${dir}`
+    );
+    expect(result.status).toBe(2);
+  });
 });
 
 describe("guard-gh screenshots warning", () => {
