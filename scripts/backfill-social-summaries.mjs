@@ -100,6 +100,8 @@ const LONE_TRAILING_SURROGATE = /[\uD800-\uDBFF]$/u;
  *
  * The budget is spent field by field so a cut always lands inside a value and
  * never inside a tag, and never between the halves of a surrogate pair (#566).
+ * A field whose cut leaves nothing ends the loop, so no tag is written empty
+ * (#831).
  */
 function buildSocialSummarySource(project) {
   const parts = [];
@@ -119,6 +121,9 @@ function buildSocialSummarySource(project) {
       value.length > room
         ? value.slice(0, room).replace(LONE_TRAILING_SURROGATE, "")
         : value;
+    if (!body) {
+      break;
+    }
     parts.push(`<${label}>\n${body}\n</${label}>`);
     remaining -= separator + wrapper + body.length;
   }
