@@ -83,7 +83,7 @@ export function checkCommitMessage(message) {
 
   if (message.includes(SESSION_LINK)) {
     problems.push(
-      `contains a ${SESSION_LINK} link; drop it, keep the Assisted-by trailer`
+      `contains a ${SESSION_LINK} link; drop it`
     );
   }
 

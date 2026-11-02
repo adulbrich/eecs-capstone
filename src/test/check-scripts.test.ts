@@ -279,12 +279,12 @@ describe("check-prose", () => {
     ).toBe(0);
   });
 
-  it("does not count the harness footer on a PR body", () => {
+  it("counts the old harness footer on a PR body, since Assisted-by replaces it", () => {
     expect(
       prose(
         "Closes #1.\n\n\u{1F916} Generated with [Claude Code](https://claude.com/claude-code)\n"
       ).status
-    ).toBe(0);
+    ).toBe(1);
   });
 
   it("checks the named files and skips paths outside the rule", () => {

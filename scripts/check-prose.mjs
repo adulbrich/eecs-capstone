@@ -78,19 +78,13 @@ const EXCLUDED_PREFIXES = [
 const EXCLUDED_FILES = new Set(["package-lock.json"]);
 
 /**
- * The one line the harness appends to every PR body and nothing here can
- * change. Stripped before checking so the footer is not what fails the PR.
- */
-const HARNESS_FOOTER = /\u{1F916} Generated with \[Claude Code\]\([^)]*\)/gu;
-
-/**
  * Every hit in `text`, as `{ line, kind, snippet }`. `kind` is `emdash` or
  * `emoji`. Exported for the commit-message check, which adds its own rules on
  * top; the CLI below is the same function with a report.
  */
 export function findProseViolations(text) {
   const violations = [];
-  const lines = text.replaceAll(HARNESS_FOOTER, "").split("\n");
+  const lines = text.split("\n");
   for (const [index, line] of lines.entries()) {
     if (line.includes(EMDASH)) {
       violations.push({ line: index + 1, kind: "emdash", snippet: line.trim() });

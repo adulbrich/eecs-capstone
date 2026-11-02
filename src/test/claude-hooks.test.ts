@@ -297,7 +297,7 @@ describe("guard-gh", () => {
     }
   });
 
-  it("passes a clean PR with the harness footer, on its own line or inline", () => {
+  it("denies the old harness footer, on its own line or inline", () => {
     const heredoc = [
       'gh pr create --title "fix(x): y" --body "$(cat <<\'EOF\'',
       "Closes #1.",
@@ -306,13 +306,13 @@ describe("guard-gh", () => {
       "EOF",
       ')"',
     ].join("\n");
-    expect(bash("guard-gh", heredoc).status).toBe(0);
+    expect(bash("guard-gh", heredoc).status).toBe(2);
     expect(
       bash(
         "guard-gh",
         'gh pr create --title "fix(x): y" --body "Closes #1. \u{1F916} Generated with [Claude Code](https://claude.com/claude-code)"'
       ).status
-    ).toBe(0);
+    ).toBe(2);
   });
 });
 

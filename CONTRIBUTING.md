@@ -35,13 +35,14 @@ claim it        fix/ feat/ ...                                           review 
    `main` commit body: the closing issue, what changed and why, and
    `Assisted-by: Claude Code` when an agent helped. Below it go what ran locally,
    screenshots when a page changed (desktop and 375px, or the opt-out line with a
-   reason), the review passes, and the docs touched. When you merge, delete from
-   `---` down in the merge dialog.
+   reason), the review passes, and the docs touched.
 5. **Run the review loop.** `mattpocock-skills:code-review` and, on any PR that
    changes behaviour, `correctness-review` beside it, until a pass raises nothing
    unanswered, then merge. No approving review is required by GitHub, so this loop
    is the review. Record the pass count for each in the PR. `AGENTS.md` says what
-   exempts a PR from the correctness pass.
+   exempts a PR from the correctness pass. Squash, and in the merge dialog delete
+   the body from `---` down; from the CLI, pass the part above it with
+   `gh pr merge --squash --body-file`. Cut a Dependabot body to its first line.
 6. **Clean up after the merge.** Three things outlive the branch, and each one
    has since cost somebody a debugging session:
    - **The worktree**, if the work had one: `git worktree remove <path>`. A
