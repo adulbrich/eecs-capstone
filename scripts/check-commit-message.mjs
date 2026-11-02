@@ -88,7 +88,7 @@ export function checkCommitMessage(message) {
   }
   if (message.includes(OLD_FOOTER)) {
     problems.push(
-      `contains the "${OLD_FOOTER}" footer; replace it with an "Assisted-by: Claude Code" trailer above the --- line`
+      `contains the "${OLD_FOOTER}" footer; replace it with an "Assisted-by: Claude Code" trailer`
     );
   }
 
@@ -110,7 +110,7 @@ export function checkCommitMessage(message) {
 }
 
 const RULE =
-  "Commit rule: type(scope): lowercase imperative subject, no emdash, no emoji, no session link. See AGENTS.md.\n";
+  "Commit rule: type(scope): lowercase imperative subject, no emdash, no emoji, no session link, no old Claude Code footer. See AGENTS.md.\n";
 
 function report(label, problems) {
   for (const problem of problems) {
