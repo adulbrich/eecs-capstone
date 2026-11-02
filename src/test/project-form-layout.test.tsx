@@ -18,9 +18,11 @@ import { ProjectForm } from "#/components/project-form";
 installResizeObserver();
 afterEach(cleanup);
 
+// Legends too: a field with no single control is named by a fieldset legend
+// rather than a label (#820), and still takes its place in the order.
 function labelsInOrder(): string[] {
   return Array.from(
-    document.querySelectorAll<HTMLLabelElement>("form label")
+    document.querySelectorAll<HTMLElement>("form label, form legend")
   ).map((label) => label.textContent?.trim() ?? "");
 }
 

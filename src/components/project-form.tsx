@@ -416,9 +416,12 @@ export function ProjectForm({
       <Divider />
       <form.Field name="imageUrl">
         {(field: AnyForm) => (
-          <div>
-            {/* biome-ignore lint/a11y/noLabelWithoutControl: names the uploader's buttons, not one control; #820 */}
-            <Label className="text-base">Image</Label>
+          // A fieldset, not a `Label`: the uploader is buttons and a file
+          // input, with no single control a label could point at (#820).
+          <fieldset>
+            <legend className="text-base leading-none font-medium">
+              Image
+            </legend>
             <div className="mt-1">
               <ProjectImageUploader
                 currentKey={(field.state.value as string) || null}
@@ -435,7 +438,7 @@ export function ProjectForm({
               the form.
             </p>
             <FieldError errors={field.state.meta.errors} />
-          </div>
+          </fieldset>
         )}
       </form.Field>
       <Field

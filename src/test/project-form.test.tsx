@@ -5,6 +5,7 @@ import {
   render,
   screen,
   waitFor,
+  within,
 } from "@testing-library/react";
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 
@@ -67,6 +68,19 @@ function submit() {
 function fillTitle(value = "A project") {
   fireEvent.change(screen.getByLabelText("Title"), { target: { value } });
 }
+
+describe("ProjectForm group names", () => {
+  // A `<label>` with no control named nothing: the uploader's buttons were
+  // announced without the text above them (#820).
+  it("names the image group after its legend", () => {
+    render(<ProjectForm showNotes submitLabel="Create draft" />);
+
+    const group = screen.getByRole("group", { name: "Image" });
+    expect(
+      within(group).getByRole("button", { name: "pick image" })
+    ).toBeTruthy();
+  });
+});
 
 describe("ProjectForm create", () => {
   it("sends null, not an empty string, for blank notes, and no program at all", async () => {
