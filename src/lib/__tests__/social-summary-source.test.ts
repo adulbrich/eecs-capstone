@@ -77,7 +77,7 @@ describe("buildSocialSummarySource", () => {
     expect(source).not.toContain("<Problem statement>");
   });
 
-  it("drops a field whose one character of room is half an emoji", () => {
+  it("drops a field whose one unit of room is half an emoji", () => {
     // The defect (#831): a title of 11,951 leaves the description a room of
     // one, the slice keeps only the high surrogate, the strip empties it, and
     // the old check had already passed, so `<Description>\n\n</Description>`
@@ -100,7 +100,9 @@ describe("buildSocialSummarySource", () => {
     const source = buildSocialSummarySource(
       project({ title: EMOJI.repeat(SOCIAL_SUMMARY_SOURCE_LIMIT) })
     );
+    expect(source.length).toBeLessThanOrEqual(SOCIAL_SUMMARY_SOURCE_LIMIT);
     expect(source.startsWith(`<Title>\n${EMOJI}`)).toBe(true);
+    expect(source.endsWith("</Title>")).toBe(true);
     expect(source).not.toMatch(EMPTY_TAG);
     expect(BROKEN_PAIR.test(source)).toBe(false);
   });
