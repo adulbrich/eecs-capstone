@@ -7,7 +7,7 @@
 # linux binaries (avoids Alpine/musl issues).
 
 # ---- build stage: install all deps and produce .output/ ----
-FROM node:24.22.1-bookworm-slim AS build
+FROM node:24.22.2-bookworm-slim AS build
 WORKDIR /app
 
 COPY package.json package-lock.json ./
@@ -28,7 +28,7 @@ RUN npm run build
 RUN node scripts/check-asset-manifest.mjs
 
 # ---- runtime stage: production deps + built server + migrations ----
-FROM node:24.22.1-bookworm-slim AS runtime
+FROM node:24.22.2-bookworm-slim AS runtime
 WORKDIR /app
 ENV NODE_ENV=production
 ENV PORT=3000
