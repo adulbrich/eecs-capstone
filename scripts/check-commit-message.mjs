@@ -4,8 +4,8 @@
  * and never a `claude.ai/code/session` link.
  *
  * One implementation, three callers. lefthook runs it at `commit-msg`, CI runs
- * it over every commit a pull request adds (`--range`) and over the PR title
- * and body, which a squash merge turns into the `main` subject and body, and
+ * it over every commit a pull request adds (`--range`) and over the PR title,
+ * which a squash merge turns into the `main` subject, and the PR body, and
  * the Claude Code `git` hook runs it on the text of a `git commit` before the
  * commit exists.
  *
