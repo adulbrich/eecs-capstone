@@ -42,14 +42,49 @@ const BODY_FILE_FLAG =
  * title alone, a body typed into the editor).
  */
 function prBody(text, dir) {
-  const file = BODY_FILE_FLAG.exec(text);
-  if (file) {
-    const given = file[1] ?? file[2] ?? file[3];
-    const path = isAbsolute(given) ? given : join(dir, given);
-    return existsSync(path) ? readFileSync(path, "utf8") : null;
+  if (BODY_FILE_FLAG.test(text)) {
+    return bodyFileText(text, dir);
   }
   const inline = BODY_FLAG.exec(text);
   return inline ? (inline[1] ?? inline[2]) : null;
+}
+
+/**
+ * The text of the `--body-file` (or `-F`) a command names, or null when it
+ * names none or the file does not exist yet.
+ */
+function bodyFileText(text, dir) {
+  const file = BODY_FILE_FLAG.exec(text);
+  if (!file) {
+    return null;
+  }
+  const given = file[1] ?? file[2] ?? file[3];
+  const path = isAbsolute(given) ? given : join(dir, given);
+  return existsSync(path) ? readFileSync(path, "utf8") : null;
+}
+
+const OLD_FOOTER = "Generated with [Claude Code]";
+
+/**
+ * What `text` breaks of the rules all published text shares: the session
+ * link, the old Claude Code footer, an emdash or an emoji.
+ */
+function textProblems(text, where) {
+  const found = [];
+  if (text.includes("claude.ai/code/session")) {
+    found.push(
+      `${where}contains a claude.ai/code/session link; never publish one (AGENTS.md)`
+    );
+  }
+  if (text.includes(OLD_FOOTER)) {
+    found.push(
+      `${where}contains the "${OLD_FOOTER}" footer; replace it with an "Assisted-by: Claude Code" trailer (AGENTS.md)`
+    );
+  }
+  for (const { line, kind, snippet } of findProseViolations(text)) {
+    found.push(`${where}line ${line} has an ${kind}: ${snippet}`);
+  }
+  return found;
 }
 
 const input = readInput();
@@ -62,16 +97,13 @@ if (!(PUBLISHES.test(command) || API_WITH_BODY.test(command))) {
 
 const { checkCommitMessage, checkPrScreenshots, findProseViolations } =
   await loadRuleScripts(repoRoot(cwd));
-const problems = [];
+const problems = textProblems(command, "");
 
-if (command.includes("claude.ai/code/session")) {
-  problems.push(
-    "contains a claude.ai/code/session link; never publish one (AGENTS.md)"
-  );
-}
-
-for (const { line, kind, snippet } of findProseViolations(command)) {
-  problems.push(`line ${line} has an ${kind}: ${snippet}`);
+// A body file is published text too: read it, since the command line only
+// names it. A file not written yet is pr-text's to refuse.
+const bodyFile = PUBLISHES.test(command) ? bodyFileText(command, cwd) : null;
+if (bodyFile) {
+  problems.push(...textProblems(bodyFile, "the body file: "));
 }
 
 const title = TITLED.test(command) ? TITLE_FLAG.exec(command) : null;
