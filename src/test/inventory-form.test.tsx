@@ -5,14 +5,17 @@ import {
   render,
   screen,
   waitFor,
+  within,
 } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("@tanstack/react-router", () => ({
   useRouter: () => ({ invalidate: vi.fn() }),
 }));
+// A marker rather than null, so the group-name test can tell the checkboxes
+// sit inside the named group and not beside it.
 vi.mock("#/components/category-multi-select", () => ({
-  CategoryMultiSelect: () => null,
+  CategoryMultiSelect: () => <p>category checkboxes</p>,
 }));
 // Renders a button rather than null, because a pending image is the only way
 // to reach the upload-then-save ordering the tests below are about.
@@ -68,6 +71,26 @@ describe("InventoryForm validation", () => {
     await waitFor(() =>
       expect(screen.getByText(/Name is required/u)).toBeTruthy()
     );
+  });
+});
+
+describe("InventoryForm group names", () => {
+  // A `<label>` with no control named nothing: the checkboxes and the
+  // uploader's buttons were announced without the text above them (#820).
+  it("names the categories group after its legend", () => {
+    render(<InventoryForm />);
+
+    const group = screen.getByRole("group", { name: "Categories" });
+    expect(within(group).getByText("category checkboxes")).toBeTruthy();
+  });
+
+  it("names the image group after its legend", () => {
+    render(<InventoryForm />);
+
+    const group = screen.getByRole("group", { name: "Image" });
+    expect(
+      within(group).getByRole("button", { name: "pick image" })
+    ).toBeTruthy();
   });
 });
 

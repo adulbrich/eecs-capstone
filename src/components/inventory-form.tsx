@@ -165,23 +165,27 @@ export function InventoryForm({
       />
       <form.Field name="categoryIds">
         {(field: AnyForm) => (
-          <div className="flex flex-col gap-2">
-            {/* biome-ignore lint/a11y/noLabelWithoutControl: names a checkbox group, not one control; #820 */}
-            <Label className="text-base">Categories</Label>
+          // A fieldset, not a `Label`: the checkboxes and the create row have
+          // no single control a label could point at (#820).
+          <fieldset>
+            <legend className="mb-2 text-base leading-none font-medium">
+              Categories
+            </legend>
             <CategoryMultiSelect
               domain="inventory"
               onChange={(ids) => field.handleChange(ids)}
               value={field.state.value as string[]}
             />
             <FieldError errors={field.state.meta.errors} />
-          </div>
+          </fieldset>
         )}
       </form.Field>
       <form.Field name="imageUrl">
         {(field: AnyForm) => (
-          <div>
-            {/* biome-ignore lint/a11y/noLabelWithoutControl: names the uploader's buttons, not one control; #820 */}
-            <Label className="text-base">Image</Label>
+          <fieldset>
+            <legend className="text-base leading-none font-medium">
+              Image
+            </legend>
             <div className="mt-1">
               <InventoryImageUploader
                 currentKey={(field.state.value as string) || null}
@@ -198,7 +202,7 @@ export function InventoryForm({
               the form.
             </p>
             <FieldError errors={field.state.meta.errors} />
-          </div>
+          </fieldset>
         )}
       </form.Field>
       {/* These four never reach the public item page, and the split matches

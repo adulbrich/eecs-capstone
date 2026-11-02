@@ -247,8 +247,9 @@ slots and the error under them.
 ### Title Case on the two long forms
 
 **On the project and inventory forms, field labels are Title Case; nothing else
-is.** "Problem Statement", "Contact Email", "Private Notes". A checkbox label is a
-sentence and stays one. Headings, table headers, legends, badges, buttons and the
+is.** "Problem Statement", "Contact Email", "Private Notes". A legend standing in
+for a field label counts as one. A checkbox label is a sentence and stays one.
+Headings, table headers, other legends, badges, buttons and the
 labels in dialogs, panels and the profile page stay sentence case, so a label reads
 as the name of a box and a heading as a line of prose. Where a form label and a
 page heading name the same field, the two are sibling constants pinned to the same
@@ -260,7 +261,9 @@ words by a unit test, since a case transform would lowercase "IP" and "NDA":
 **The project and inventory forms set their labels at `text-base`** through their
 local `Field` helpers and the raw `Label` uses beside them, and space their fields
 at `space-y-6`, because a long form needs scanning. The shared `Label` stays at
-`text-sm`. The project form is split into three groups by a hairline `hr` (the
+`text-sm`. A field with no single control (Categories, Image) is a `fieldset`
+whose `legend` copies that label style, since a `label` there names nothing
+(#820). The project form is split into three groups by a hairline `hr` (the
 project, how to reach the proposer, the terms), with no group headings.
 
 `inventory-form.tsx` and `project-form.tsx` each have their own local `Field`, a
