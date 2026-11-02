@@ -59,6 +59,8 @@ const EXEMPT_SUBJECT =
   /^(?:Merge |Revert |fixup! |squash! |(?:chore|build)\(deps(?:-dev)?\): Bump )/;
 
 const SESSION_LINK = "claude.ai/code/session";
+/** The PR footer the harness appends by default; Assisted-by replaced it. */
+const OLD_FOOTER = "Generated with [Claude Code]";
 const SCISSORS = /^# -{8,} >8 -{8,}$/m;
 
 /**
@@ -82,8 +84,11 @@ export function checkCommitMessage(message) {
   const problems = [];
 
   if (message.includes(SESSION_LINK)) {
+    problems.push(`contains a ${SESSION_LINK} link; drop it`);
+  }
+  if (message.includes(OLD_FOOTER)) {
     problems.push(
-      `contains a ${SESSION_LINK} link; drop it`
+      `contains the "${OLD_FOOTER}" footer; replace it with an "Assisted-by: Claude Code" trailer above the --- line`
     );
   }
 

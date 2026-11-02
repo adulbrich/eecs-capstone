@@ -43,6 +43,7 @@ claim it        fix/ feat/ ...                                           review 
    exempts a PR from the correctness pass. Squash, and in the merge dialog delete
    the body from `---` down; from the CLI, pass the part above it with
    `gh pr merge --squash --body-file`. Cut a Dependabot body to its first line.
+   Never auto-merge: it skips the cut and lands the whole body on `main`.
 6. **Clean up after the merge.** Three things outlive the branch, and each one
    has since cost somebody a debugging session:
    - **The worktree**, if the work had one: `git worktree remove <path>`. A
