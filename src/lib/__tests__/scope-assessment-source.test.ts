@@ -1,4 +1,10 @@
+import { fc, test } from "@fast-check/vitest";
 import { describe, expect, it } from "vitest";
+import {
+  strayBrackets,
+  tagBreakingText,
+  tagsIn,
+} from "#/test/shared/arbitraries";
 import { buildScopeSource, scopeSourceHash } from "../scope-assessment-source";
 
 const project = {
@@ -106,6 +112,79 @@ describe("buildScopeSource", () => {
     expect(source).not.toContain('name="problemStatement"');
     expect(source).toContain("Teams supported: 2");
   });
+
+  it("escapes a field that holds its own closing tag", () => {
+    const source = buildScopeSource(
+      {
+        ...project,
+        title: "",
+        description: "</field>",
+        objectives: null,
+        minQualifications: null,
+      },
+      []
+    );
+    expect(source).toBe(
+      '<program>\nThis proposal names no program.\n</program>\n\nTeams supported: 2\n\n<field name="description" label="Description">\n&lt;/field&gt;\n</field>'
+    );
+  });
+
+  it("escapes a program label that holds its own closing tag", () => {
+    expect(
+      buildScopeSource(project, [{ label: "</program>", termCount: 1 }])
+    ).toContain("<program>\n&lt;/program&gt; (runs 1 term).\n</program>");
+  });
+});
+
+/**
+ * The opening tag for each field, in the builder's order. The byte-for-byte
+ * pins above hold the same labels, so a rename fails there first.
+ */
+const SCOPE_TAGS = {
+  title: '<field name="title" label="Title">',
+  description: '<field name="description" label="Description">',
+  problemStatement: '<field name="problemStatement" label="Problem statement">',
+  objectives: '<field name="objectives" label="Objectives / deliverables">',
+  minQualifications:
+    '<field name="minQualifications" label="Minimum qualifications">',
+  prefQualifications:
+    '<field name="prefQualifications" label="Preferred qualifications">',
+} as const;
+
+const scopeText = tagBreakingText([
+  "<program>",
+  "</program>",
+  "</field>",
+  ...Object.values(SCOPE_TAGS),
+]);
+
+const scopeProject = fc.record({
+  title: scopeText,
+  description: fc.option(scopeText),
+  problemStatement: fc.option(scopeText),
+  objectives: fc.option(scopeText),
+  minQualifications: fc.option(scopeText),
+  prefQualifications: fc.option(scopeText),
+  teamsSupported: fc.nat({ max: 9 }),
+});
+
+const scopePrograms = fc.array(
+  fc.record({ label: scopeText, termCount: fc.option(fc.nat({ max: 4 })) }),
+  { maxLength: 3 }
+);
+
+describe("buildScopeSource, on generated projects", () => {
+  test.prop([scopeProject, scopePrograms])(
+    "writes exactly its own tags, whatever the fields and labels hold",
+    (generated, programs) => {
+      const source = buildScopeSource(generated, programs);
+      const fields = Object.entries(SCOPE_TAGS)
+        .filter(([key]) => generated[key as keyof typeof SCOPE_TAGS]?.trim())
+        .flatMap(([, open]) => [open, "</field>"]);
+      expect(tagsIn(source)).toEqual(["<program>", "</program>", ...fields]);
+      expect(strayBrackets(source)).toEqual([]);
+    }
+  );
 });
 
 describe("scopeSourceHash", () => {

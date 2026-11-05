@@ -1,4 +1,5 @@
 import { createHash } from "node:crypto";
+import { escapeAngleBrackets } from "./angle-brackets";
 
 /**
  * The text a scope assessment is computed from, and its hash. Server-imported
@@ -41,7 +42,7 @@ function programPhrase(program: ScopeSourceProgram): string {
     program.termCount === null
       ? "term count not set"
       : `runs ${program.termCount} ${program.termCount === 1 ? "term" : "terms"}`;
-  return `${program.label} (${terms})`;
+  return `${escapeAngleBrackets(program.label)} (${terms})`;
 }
 
 /**
@@ -76,6 +77,9 @@ function programLine(programs: ScopeSourceProgram[]): string {
  * The program line is part of the source on purpose: changing a program's
  * term count, or moving the project, is a reason the verdict may no longer
  * hold, so it changes the hash and the stored assessment reads as stale.
+ *
+ * Every value is escaped, the program labels staff type included, so no text
+ * can close the `<field>` or `<program>` it sits in (#841).
  */
 export function buildScopeSource(
   project: ScopeSourceProject,
@@ -88,7 +92,9 @@ export function buildScopeSource(
     if (!value) {
       continue;
     }
-    parts.push(`<field name="${field}" label="${label}">\n${value}\n</field>`);
+    parts.push(
+      `<field name="${field}" label="${label}">\n${escapeAngleBrackets(value)}\n</field>`
+    );
   }
   return parts.join("\n\n");
 }

@@ -64,6 +64,55 @@ export function trickyText(
 }
 
 /**
+ * Tricky text with the pieces of a tag mixed in: a bare bracket, an entity
+ * already written out, and the tags a prompt builder writes, so a value can
+ * try to close the tag it sits in or open one of its own (#841).
+ *
+ * Kept apart from `trickyText` rather than added to its units, so the
+ * properties that never meet a tag keep the distribution they were tuned on.
+ */
+export function tagBreakingText(
+  tags: readonly string[],
+  constraints: Omit<fc.StringConstraints, "unit"> = {}
+): fc.Arbitrary<string> {
+  return fc.string({
+    ...constraints,
+    unit: fc.oneof(
+      { arbitrary: trickyUnit, weight: 3 },
+      {
+        arbitrary: fc.constantFrom(
+          "<",
+          ">",
+          "</",
+          "&lt;",
+          "&gt;",
+          "&",
+          ...tags
+        ),
+        weight: 2,
+      }
+    ),
+  });
+}
+
+const TAG_SPAN = /<[^<>]*>/gu;
+const BRACKET = /[<>]/gu;
+
+/**
+ * Every `<...>` span in a prompt, in order. A tag the builder wrote is one
+ * span; a value that slipped one in adds another, and a stray bracket with no
+ * partner is caught by `strayBrackets`.
+ */
+export function tagsIn(text: string): string[] {
+  return text.match(TAG_SPAN) ?? [];
+}
+
+/** The brackets left once every span `tagsIn` finds is removed. */
+export function strayBrackets(text: string): string[] {
+  return text.replace(TAG_SPAN, "").match(BRACKET) ?? [];
+}
+
+/**
  * Tricky text that crosses `limit` code units, so a cut there lands among
  * surrogate pairs and whitespace rather than before any of them.
  *

@@ -276,6 +276,18 @@ describe("the social summary backfill script", () => {
     );
   });
 
+  it("escapes the same angle brackets before it measures a field", () => {
+    // The builder pin above checks the call; this checks what it calls. A
+    // copy that escaped one bracket fewer would send text the app never
+    // produces beside a hash the app reads as current.
+    assertComparable("function escapeAngleBrackets(");
+    same(
+      "function escapeAngleBrackets(",
+      readFileSync("src/lib/angle-brackets.ts", "utf8"),
+      "export function escapeAngleBrackets("
+    );
+  });
+
   it("counts the summary cap in code points, as the app does", () => {
     // `summary.length` counts UTF-16 code units, so the script rejected at 302
     // what the app accepted at 151 and failed those rows on every run (#565).

@@ -7,6 +7,9 @@ import {
 } from "#/lib/social-summary-source";
 import {
   isWellFormed,
+  strayBrackets,
+  tagBreakingText,
+  tagsIn,
   trickyText,
   trickyTextAcross,
 } from "#/test/shared/arbitraries";
@@ -169,6 +172,29 @@ describe("buildSocialSummarySource", () => {
       })
     ).toBe("<Title>\nRover\n</Title>");
   });
+
+  it("escapes a field that holds its own closing tag", () => {
+    // The shrunk counterexample from #485: unescaped, the value closed the
+    // tag it sat in and the builder's own `</Description>` came second.
+    expect(
+      buildSocialSummarySource({
+        title: "",
+        description: "</Description>",
+        problemStatement: "",
+      })
+    ).toBe("<Description>\n&lt;/Description&gt;\n</Description>");
+  });
+
+  it("measures a field by its escaped length, so brackets cannot push it over", () => {
+    // Every `<` is four units once escaped. Measured before escaping, a
+    // description of brackets alone would land at nearly four times the limit.
+    const source = buildSocialSummarySource(
+      project({ description: "<".repeat(SOCIAL_SUMMARY_SOURCE_LIMIT) })
+    );
+    expect(source.length).toBeLessThanOrEqual(SOCIAL_SUMMARY_SOURCE_LIMIT);
+    expect(source.endsWith("</Description>")).toBe(true);
+    expect(strayBrackets(source)).toEqual([]);
+  });
 });
 
 /**
@@ -196,6 +222,35 @@ function titleLeaving(room: number): string {
   );
 }
 
+const SUMMARY_LABELS = {
+  title: "Title",
+  description: "Description",
+  problemStatement: "Problem statement",
+} as const;
+
+const SUMMARY_TAGS = Object.values(SUMMARY_LABELS).flatMap((label) => [
+  `<${label}>`,
+  `</${label}>`,
+]);
+
+/** The tags the builder writes for a project when every field fits. */
+function tagsFor(
+  fields: Parameters<typeof buildSocialSummarySource>[0]
+): string[] {
+  return Object.entries(SUMMARY_LABELS)
+    .filter(([key]) => fields[key as keyof typeof SUMMARY_LABELS]?.trim())
+    .flatMap(([, label]) => [`<${label}>`, `</${label}>`]);
+}
+
+/**
+ * Field text that sometimes carries a tag, so a cut can land inside an
+ * escaped bracket as well as inside an emoji.
+ */
+const summaryText = fc.oneof(
+  trickyText({ size: "medium" }),
+  tagBreakingText(SUMMARY_TAGS, { size: "medium" })
+);
+
 /**
  * Short fields, a title that leaves the description a few units of room, or a
  * title cut itself. The constant 1 is weighted in because one unit of room
@@ -208,19 +263,38 @@ const summaryProject = fc.record({
     fc
       .oneof(fc.constant(1), fc.integer({ max: 40, min: -2 }))
       .map(titleLeaving),
-    trickyTextAcross(SOCIAL_SUMMARY_SOURCE_LIMIT - TITLE_TAGS)
+    trickyTextAcross(SOCIAL_SUMMARY_SOURCE_LIMIT - TITLE_TAGS),
+    tagBreakingText(SUMMARY_TAGS)
   ),
-  description: fc.option(trickyText({ size: "medium" })),
-  problemStatement: fc.option(trickyText({ size: "medium" })),
+  description: fc.option(summaryText),
+  problemStatement: fc.option(summaryText),
 });
 
 describe("buildSocialSummarySource, on generated projects", () => {
+  test.prop([
+    fc.record({
+      title: tagBreakingText(SUMMARY_TAGS),
+      description: fc.option(tagBreakingText(SUMMARY_TAGS)),
+      problemStatement: fc.option(tagBreakingText(SUMMARY_TAGS)),
+    }),
+  ])("writes exactly its own tags, whatever the fields hold", (generated) => {
+    const source = buildSocialSummarySource(generated);
+    expect(tagsIn(source)).toEqual(tagsFor(generated));
+    expect(strayBrackets(source)).toEqual([]);
+  });
+
   test.prop([summaryProject])(
     "stays within the limit, well-formed, with no empty tag",
     (generated) => {
       const source = buildSocialSummarySource(generated);
       expect(source.length).toBeLessThanOrEqual(SOCIAL_SUMMARY_SOURCE_LIMIT);
       expect(isWellFormed(source)).toBe(true);
+      // A cut can drop the later fields, so the tags are a leading run of
+      // whole pairs from the full set, and still only the builder's.
+      const tags = tagsIn(source);
+      expect(tags.length % 2).toBe(0);
+      expect(tags).toEqual(tagsFor(generated).slice(0, tags.length));
+      expect(strayBrackets(source)).toEqual([]);
       expect(source).not.toMatch(EMPTY_TAG);
     }
   );
