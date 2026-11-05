@@ -145,6 +145,21 @@ describe("buildSocialSummarySource", () => {
     );
   });
 
+  // `sliceWellFormed` strips a trailing high surrogate even when it cuts
+  // nothing, so calling it on a value that fits would change this source, and
+  // the hash over it, on main's malformed input. The generated properties
+  // never draw a lone half, so this example is what pins the length test.
+  it("leaves a value that fits untouched, even one ending on half a pair", () => {
+    const lone = "\u{D83D}";
+    expect(
+      buildSocialSummarySource({
+        description: null,
+        problemStatement: null,
+        title: `abc${lone}`,
+      })
+    ).toBe(`<Title>\nabc${lone}\n</Title>`);
+  });
+
   it("trims each field before wrapping it", () => {
     expect(
       buildSocialSummarySource({
