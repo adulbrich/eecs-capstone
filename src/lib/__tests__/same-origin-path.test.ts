@@ -90,8 +90,11 @@ describe("sameOriginPath", () => {
     expect(sameOriginPath("/a/../projects")).toBe("/projects");
   });
 
-  // More runs than the default: a value that gets past both checks takes four
-  // or five pieces in a particular order, and the spike in #485 ran 20,000.
+  // More runs than the default, because this is the one security property
+  // here. The known bypasses are the examples above, and removing the second
+  // check fails within ten runs; what the property is for is the bypass nobody
+  // has listed yet, an ordering of four or five pieces that a hundred runs
+  // sample thinly. 20,000 is what the spike in #485 ran.
   test.prop([redirectValue], { numRuns: 20_000 })(
     "returns nothing, or a path with one leading slash that stays on the origin it is resolved against, and keeps what it returns",
     (value) => {

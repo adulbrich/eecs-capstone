@@ -53,7 +53,9 @@ describe.each(BUDGETS)("descriptionExcerpt at %i", (max) => {
     expect(excerpt).not.toContain("](");
     expect(excerpt).not.toContain("*");
   });
+});
 
+describe("descriptionExcerpt, on generated text and budgets", () => {
   test.prop([
     fc.option(trickyText({ size: "medium" })),
     fc.integer({ max: 120, min: -5 }),

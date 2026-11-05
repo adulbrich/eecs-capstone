@@ -16,8 +16,20 @@ import {
 const pad = (value: number) => String(value).padStart(2, "0");
 
 /**
- * Any day from 2007, when the current US rule began, or one of the first
- * fifteen days of March or November, which hold every DST change since.
+ * The Sunday the clocks change in `year`, under the US rule since 2007: the
+ * second in March, or the first in November.
+ */
+function changeSunday(year: number, month: 3 | 11): string {
+  const firstWeekday = new Date(Date.UTC(year, month - 1, 1)).getUTCDay();
+  const firstSunday = 1 + ((7 - firstWeekday) % 7);
+  const date = month === 3 ? firstSunday + 7 : firstSunday;
+  return `${year}-${pad(month)}-${pad(date)}`;
+}
+
+/**
+ * Any day from 2007, or a change Sunday or a day either side of one. The
+ * second branch is not optional: a wrong offset shows only on the change day
+ * itself, and a uniform day lands on one about one run in two hundred.
  */
 const officeDay = fc.oneof(
   fc
@@ -26,16 +38,20 @@ const officeDay = fc.oneof(
   fc
     .tuple(
       fc.integer({ max: 2099, min: 2007 }),
-      fc.constantFrom(3, 11),
-      fc.integer({ max: 15, min: 1 })
+      fc.constantFrom<3 | 11>(3, 11),
+      fc.integer({ max: 1, min: -1 })
     )
-    .map(([year, month, day]) => `${year}-${pad(month)}-${pad(day)}`)
+    .map(([year, month, delta]) => shiftDay(changeSunday(year, month), delta))
 );
 
-/** An `HH:MM`, weighted toward the hours a DST change moves. */
+/**
+ * An `HH:MM`, weighted toward the small hours: a change moves the offset at
+ * 2:00, and a time from then until about 9:00 is where a guessed offset can
+ * still be the old one.
+ */
 const wallTime = fc
   .tuple(
-    fc.oneof(fc.integer({ max: 23, min: 0 }), fc.constantFrom(1, 2, 3)),
+    fc.oneof(fc.integer({ max: 23, min: 0 }), fc.integer({ max: 9, min: 0 })),
     fc.integer({ max: 59, min: 0 })
   )
   .map(([hour, minute]) => `${pad(hour)}:${pad(minute)}`);
@@ -47,11 +63,9 @@ const officeClock = new Intl.DateTimeFormat("en-US", {
   timeZone: OFFICE_TIME_ZONE,
 });
 
-/** The second Sunday in March, when 2:00 to 2:59 does not happen. */
+/** The spring change Sunday, when 2:00 to 2:59 does not happen. */
 function isSpringChange(day: string): boolean {
-  const [year, month, date] = day.split("-").map(Number);
-  const weekday = new Date(Date.UTC(year, month - 1, date)).getUTCDay();
-  return month === 3 && weekday === 0 && date >= 8 && date <= 14;
+  return day === changeSunday(Number(day.slice(0, 4)), 3);
 }
 
 // Pacific is UTC-8 in winter and UTC-7 in summer, so office midnight is
