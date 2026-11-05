@@ -170,7 +170,7 @@ function readCsv(text: string): string[][] {
 const FORMULA_LEAD = /^[=+\-@\t\r]/u;
 
 /** Tricky text, or tricky text behind a formula lead-in or a guard-like `'`. */
-const cell = fc.oneof(
+const cellText = fc.oneof(
   trickyText(),
   fc
     .tuple(fc.constantFrom("=", "+", "-", "@", "\t", "\r", "'"), trickyText())
@@ -178,17 +178,17 @@ const cell = fc.oneof(
 );
 
 /** A header row and up to five rows of the same width. */
-const table = fc.integer({ max: 5, min: 1 }).chain((width) =>
+const sameWidthTable = fc.integer({ max: 5, min: 1 }).chain((width) =>
   fc.tuple(
-    fc.array(cell, { maxLength: width, minLength: width }),
-    fc.array(fc.array(cell, { maxLength: width, minLength: width }), {
+    fc.array(cellText, { maxLength: width, minLength: width }),
+    fc.array(fc.array(cellText, { maxLength: width, minLength: width }), {
       maxLength: 5,
     })
   )
 );
 
 describe("toCsv, on generated tables", () => {
-  test.prop([table])(
+  test.prop([sameWidthTable])(
     "reads back through RFC 4180 and unguardCell to every cell, with no formula lead left live",
     ([headers, rows]) => {
       const columns: CsvColumn<string[]>[] = headers.map((header, i) => ({

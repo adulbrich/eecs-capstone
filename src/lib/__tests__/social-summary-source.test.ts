@@ -157,16 +157,27 @@ describe("buildSocialSummarySource", () => {
 });
 
 /**
- * A title of filler sized to leave the description `room` code units: the
- * builder charges the title's value and its two tags first, then the
- * separator and the description's two tags. The arithmetic is the builder's
- * own, from its comment on the seven.
+ * What the builder spends around its values, measured from its own output
+ * rather than restated, so a change to the tags moves these with it and the
+ * generator below keeps reaching the cut.
  */
+const TITLE_TAGS =
+  buildSocialSummarySource({
+    description: null,
+    problemStatement: null,
+    title: "a",
+  }).length - 1;
+const TITLE_AND_DESCRIPTION_TAGS =
+  buildSocialSummarySource({
+    description: "a",
+    problemStatement: null,
+    title: "a",
+  }).length - 2;
+
+/** A title of filler sized to leave the description `room` code units. */
 function titleLeaving(room: number): string {
-  const titleCost = "Title".length * 2 + 7;
-  const descriptionCost = 2 + "Description".length * 2 + 7;
   return "a".repeat(
-    SOCIAL_SUMMARY_SOURCE_LIMIT - titleCost - descriptionCost - room
+    SOCIAL_SUMMARY_SOURCE_LIMIT - TITLE_AND_DESCRIPTION_TAGS - room
   );
 }
 
@@ -182,7 +193,7 @@ const summaryProject = fc.record({
     fc
       .oneof(fc.constant(1), fc.integer({ max: 40, min: -2 }))
       .map(titleLeaving),
-    trickyTextAcross(SOCIAL_SUMMARY_SOURCE_LIMIT - "Title".length * 2 - 7)
+    trickyTextAcross(SOCIAL_SUMMARY_SOURCE_LIMIT - TITLE_TAGS)
   ),
   description: fc.option(trickyText({ size: "medium" })),
   problemStatement: fc.option(trickyText({ size: "medium" })),

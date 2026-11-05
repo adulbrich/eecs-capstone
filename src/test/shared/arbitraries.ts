@@ -20,22 +20,31 @@ const ASTRAL = [
   // and a family three people joined by zero-width joiners.
   "\u{1F1FA}\u{1F1F8}",
   "\u{1F44D}\u{1F3FD}",
-  "\u{1F468}‍\u{1F469}‍\u{1F467}",
-  "\u{1F3F3}️‍\u{1F308}",
+  "\u{1F468}\u{200D}\u{1F469}\u{200D}\u{1F467}",
+  "\u{1F3F3}\u{FE0F}\u{200D}\u{1F308}",
   // Astral letters, which no emoji filter would catch.
   "\u{1D400}",
   "\u{10437}",
   "\u{2070E}",
 ];
 
-const WHITESPACE = [" ", "  ", "\t", "\n", "\n\n", "\r\n", " ", "　"];
+const WHITESPACE = [
+  " ",
+  "  ",
+  "\t",
+  "\n",
+  "\n\n",
+  "\r\n",
+  "\u{A0}",
+  "\u{3000}",
+];
 
 const MARKDOWN = ["#", "*", "_", "`", "[", "]", "(", ")", "!", ">", "~", "|"];
 
 /** What a spreadsheet reads as the start of a formula, and the CSV quoting. */
 const CSV = ["=", "+", "-", "@", "\t", "\r", "'", '"', ","];
 
-const PLAIN = ["a", "Z", "word", ".", ":", "é", "é"];
+const PLAIN = ["a", "Z", "word", ".", ":", "e\u{301}", "\u{E9}"];
 
 const trickyUnit = fc.oneof(
   { arbitrary: fc.constantFrom(...ASTRAL), weight: 4 },
@@ -62,6 +71,10 @@ export function trickyText(
  * and 20,000 code units, and generating that much one unit at a time is slow
  * and finds nothing a short run does not; what matters is what sits at the
  * cut.
+ *
+ * The filler stops 1 to 24 code units short of `limit`, and the tail is 12 to
+ * 24 units, each at least one code unit, so the cut lands anywhere from the
+ * tail's first unit to just past its end, where nothing is cut at all.
  */
 export function trickyTextAcross(limit: number): fc.Arbitrary<string> {
   return fc
