@@ -50,6 +50,7 @@ import { describe, expect, it } from "vitest";
  * since importing the `.mjs` would run it and it expects a database.
  */
 const SOURCE_FILE = readFileSync("src/lib/embedding-source.ts", "utf8");
+const WELL_FORMED_CUT_FILE = readFileSync("src/lib/well-formed-cut.ts", "utf8");
 const BEDROCK_FILE = readFileSync("src/lib/_internal/bedrock-embed.ts", "utf8");
 const SCRIPT_FILE = readFileSync("scripts/backfill-embeddings.mjs", "utf8");
 
@@ -323,10 +324,16 @@ describe("the production backfill's copies of the embedding helpers", () => {
   });
 
   it("drop the same half character at the cut", () => {
-    const fromSrc = SURROGATE_PATTERN.exec(SOURCE_FILE)?.[1];
+    const fromSrc = SURROGATE_PATTERN.exec(WELL_FORMED_CUT_FILE)?.[1];
     const fromScript = SURROGATE_PATTERN.exec(SCRIPT_FILE)?.[1];
     expect(fromSrc).toBe("/[\\uD800-\\uDBFF]$/u");
     expect(fromScript).toBe(fromSrc);
+    const [bodyFromSrc, bodyFromScript] = bothBodies(
+      "sliceWellFormed",
+      WELL_FORMED_CUT_FILE,
+      "well-formed-cut.ts"
+    );
+    expect(bodyFromScript).toBe(bodyFromSrc);
   });
 
   it("hash the source the same way", () => {
@@ -523,10 +530,10 @@ describe("the production backfill's copies of the embedding helpers", () => {
    * where somebody writes `embeddingHash(source, modelId, dimensions)` in
    * prose and satisfies this check with no call anywhere.
    *
-   * `section` is deliberately absent. Its only calls are inside
-   * `buildProjectEmbeddingSource`, whose body is pinned byte for byte, so the
-   * assertion could not fail independently of that pin: it would be the
-   * vacuous pass this test is here to stop.
+   * `section` and `sliceWellFormed` are deliberately absent. Their only calls
+   * are inside `buildProjectEmbeddingSource`, whose body is pinned byte for
+   * byte, so the assertion could not fail independently of that pin: it would
+   * be the vacuous pass this test is here to stop.
    */
   it.each([
     "buildProjectEmbeddingSource",

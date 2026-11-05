@@ -73,6 +73,7 @@ import { describe, expect, it } from "vitest";
  */
 const SCRIPT = readFileSync("scripts/backfill-social-summaries.mjs", "utf8");
 const SOURCE = readFileSync("src/lib/social-summary-source.ts", "utf8");
+const WELL_FORMED_CUT = readFileSync("src/lib/well-formed-cut.ts", "utf8");
 const SUMMARY = readFileSync("src/lib/social-summary.ts", "utf8");
 const CORE = readFileSync(
   "src/server/_internal/social-summary-core.ts",
@@ -264,8 +265,14 @@ describe("the social summary backfill script", () => {
     expect(SCRIPT).toContain(
       "const LONE_TRAILING_SURROGATE = /[\\uD800-\\uDBFF]$/u;"
     );
-    expect(SOURCE).toContain(
+    expect(WELL_FORMED_CUT).toContain(
       "const LONE_TRAILING_SURROGATE = /[\\uD800-\\uDBFF]$/u;"
+    );
+    assertComparable("function sliceWellFormed(");
+    same(
+      "function sliceWellFormed(",
+      WELL_FORMED_CUT,
+      "export function sliceWellFormed("
     );
   });
 

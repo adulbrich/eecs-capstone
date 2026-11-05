@@ -1,9 +1,11 @@
+import { fc, test } from "@fast-check/vitest";
 import { describe, expect, it } from "vitest";
 import {
   descriptionExcerpt,
   LISTING_EXCERPT_LENGTH,
   SIMILAR_PROJECT_EXCERPT_LENGTH,
 } from "#/lib/description-excerpt";
+import { isWellFormed, trickyText } from "#/test/shared/arbitraries";
 
 /**
  * Plain words up to just short of `budget` in the raw string, then a link and
@@ -50,5 +52,16 @@ describe.each(BUDGETS)("descriptionExcerpt at %i", (max) => {
     expect(excerpt).not.toContain("[");
     expect(excerpt).not.toContain("](");
     expect(excerpt).not.toContain("*");
+  });
+
+  test.prop([
+    fc.option(trickyText({ size: "medium" })),
+    fc.integer({ max: 120, min: -5 }),
+  ])("is null, or within the budget and well-formed", (description, budget) => {
+    const excerpt = descriptionExcerpt(description, budget);
+    if (excerpt !== null) {
+      expect(excerpt.length).toBeLessThanOrEqual(budget);
+      expect(isWellFormed(excerpt)).toBe(true);
+    }
   });
 });

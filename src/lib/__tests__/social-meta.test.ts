@@ -1,3 +1,4 @@
+import { fc, test } from "@fast-check/vitest";
 import { describe, expect, it } from "vitest";
 import {
   SITE_DESCRIPTION,
@@ -5,6 +6,7 @@ import {
   socialDescription,
   truncateOnWordBoundary,
 } from "#/lib/social-meta";
+import { isWellFormed, trickyText } from "#/test/shared/arbitraries";
 
 const ELLIPSIS = "...";
 
@@ -229,4 +231,23 @@ describe("socialDescription", () => {
       ).toBe(SITE_DESCRIPTION);
     }
   });
+});
+
+describe("truncateOnWordBoundary, on generated text", () => {
+  test.prop([
+    trickyText({ size: "medium" }),
+    fc.oneof(fc.integer({ max: 80, min: -5 }), fc.integer()),
+  ])(
+    "stays within the budget, well-formed, and a prefix of its input apart from the ellipsis",
+    (text, max) => {
+      const cut = truncateOnWordBoundary(text, max);
+      expect(cut.length).toBeLessThanOrEqual(Math.max(max, 0));
+      expect(isWellFormed(cut)).toBe(true);
+      const kept =
+        text.startsWith(cut) || !cut.endsWith(ELLIPSIS)
+          ? cut
+          : cut.slice(0, -ELLIPSIS.length);
+      expect(text.startsWith(kept)).toBe(true);
+    }
+  );
 });

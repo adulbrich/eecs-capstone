@@ -88,8 +88,16 @@ const SUMMARY_FIELDS = [
   ["problemStatement", "Problem statement"],
 ];
 
-/** MUST match `LONE_TRAILING_SURROGATE` in `src/lib/social-summary-source.ts`. */
+/** MUST match `LONE_TRAILING_SURROGATE` in `src/lib/well-formed-cut.ts`. */
 const LONE_TRAILING_SURROGATE = /[\uD800-\uDBFF]$/u;
+
+/**
+ * MUST match `sliceWellFormed` in `src/lib/well-formed-cut.ts`: the first
+ * `end` code units, less half an emoji the cut split.
+ */
+function sliceWellFormed(text, end) {
+  return text.slice(0, end).replace(LONE_TRAILING_SURROGATE, "");
+}
 
 /**
  * MUST match `buildSocialSummarySource` in `src/lib/social-summary-source.ts`.
@@ -117,10 +125,7 @@ function buildSocialSummarySource(project) {
     if (room < 1) {
       break;
     }
-    const body =
-      value.length > room
-        ? value.slice(0, room).replace(LONE_TRAILING_SURROGATE, "")
-        : value;
+    const body = value.length > room ? sliceWellFormed(value, room) : value;
     if (!body) {
       break;
     }

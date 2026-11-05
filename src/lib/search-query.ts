@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { sliceWellFormed } from "./well-formed-cut";
 
 /**
  * The longest search string any listing runs. One number for all eight of
@@ -21,6 +22,12 @@ export const SEARCH_QUERY_MAX = 200;
  * `.max()` it replaces counted, so the cap covers the same strings it always
  * did.
  *
+ * Then trim the end again, because the cut can land just after a space, and
+ * a query ending in one is not what a second pass through here returns (#840).
+ * `sliceWellFormed` drops the half of an emoji the cut split: the driver turns
+ * a lone half into a replacement character, so the query the reader is told
+ * about would end in a glyph they never typed.
+ *
  * The UI derives its note from this function rather than from a flag on the
  * response, because truncation is a fact about the string alone. Contrast
  * `order` on the search result, which the server has to report because it
@@ -34,28 +41,10 @@ export function clampSearchQuery(raw: string): {
   if (trimmed.length <= SEARCH_QUERY_MAX) {
     return { query: trimmed, truncated: false };
   }
-  // A cut that lands between the two halves of a surrogate pair, which is
-  // what an emoji is, would send a lone half to Postgres; the driver turns
-  // that into a replacement character, so the query the reader is told about
-  // would end in a glyph they never typed. Drop the orphaned half instead.
-  const splitsPair =
-    isHighSurrogate(trimmed.charCodeAt(SEARCH_QUERY_MAX - 1)) &&
-    isLowSurrogate(trimmed.charCodeAt(SEARCH_QUERY_MAX));
   return {
-    query: trimmed.slice(
-      0,
-      splitsPair ? SEARCH_QUERY_MAX - 1 : SEARCH_QUERY_MAX
-    ),
+    query: sliceWellFormed(trimmed, SEARCH_QUERY_MAX).trimEnd(),
     truncated: true,
   };
-}
-
-function isHighSurrogate(code: number): boolean {
-  return code >= 0xd8_00 && code <= 0xdb_ff;
-}
-
-function isLowSurrogate(code: number): boolean {
-  return code >= 0xdc_00 && code <= 0xdf_ff;
 }
 
 /**

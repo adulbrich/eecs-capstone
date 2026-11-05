@@ -1,9 +1,15 @@
+import { fc, test } from "@fast-check/vitest";
 import { describe, expect, it } from "vitest";
 import {
   buildSocialSummarySource,
   SOCIAL_SUMMARY_SOURCE_LIMIT,
   socialSummaryHash,
 } from "#/lib/social-summary-source";
+import {
+  isWellFormed,
+  trickyText,
+  trickyTextAcross,
+} from "#/test/shared/arbitraries";
 
 const EMOJI = "\u{1F600}";
 
@@ -148,6 +154,50 @@ describe("buildSocialSummarySource", () => {
       })
     ).toBe("<Title>\nRover\n</Title>");
   });
+});
+
+/**
+ * A title of filler sized to leave the description `room` code units: the
+ * builder charges the title's value and its two tags first, then the
+ * separator and the description's two tags. The arithmetic is the builder's
+ * own, from its comment on the seven.
+ */
+function titleLeaving(room: number): string {
+  const titleCost = "Title".length * 2 + 7;
+  const descriptionCost = 2 + "Description".length * 2 + 7;
+  return "a".repeat(
+    SOCIAL_SUMMARY_SOURCE_LIMIT - titleCost - descriptionCost - room
+  );
+}
+
+/**
+ * Short fields, a title that leaves the description a few units of room, or a
+ * title cut itself. The constant 1 is weighted in because one unit of room
+ * with an emoji first is the only way to reach the empty-body check (#831),
+ * and random sizes would almost never land on it.
+ */
+const summaryProject = fc.record({
+  title: fc.oneof(
+    trickyText(),
+    fc
+      .oneof(fc.constant(1), fc.integer({ max: 40, min: -2 }))
+      .map(titleLeaving),
+    trickyTextAcross(SOCIAL_SUMMARY_SOURCE_LIMIT - "Title".length * 2 - 7)
+  ),
+  description: fc.option(trickyText({ size: "medium" })),
+  problemStatement: fc.option(trickyText({ size: "medium" })),
+});
+
+describe("buildSocialSummarySource, on generated projects", () => {
+  test.prop([summaryProject])(
+    "stays within the limit, well-formed, with no empty tag",
+    (generated) => {
+      const source = buildSocialSummarySource(generated);
+      expect(source.length).toBeLessThanOrEqual(SOCIAL_SUMMARY_SOURCE_LIMIT);
+      expect(isWellFormed(source)).toBe(true);
+      expect(source).not.toMatch(EMPTY_TAG);
+    }
+  );
 });
 
 describe("socialSummaryHash", () => {
