@@ -829,7 +829,7 @@ Parse `arguments` before Zod. The item can sit at the top of `output` or inside 
 
 ### A value inside a prompt tag has its angle brackets escaped
 
-`buildSocialSummarySource`, `buildScopeSource` and `buildUserMessage` pass every value they wrap through `escapeAngleBrackets` (`src/lib/angle-brackets.ts`), so a field holding `</field>` cannot close its own tag (#841). A new builder does the same, with a property like the ones beside these. `&` stays as it is. The source hashes cover the escaped text, so widening the escape marks stale every project whose text holds the new character. Each system prompt says the brackets arrive as `&lt;` and `&gt;` and asks for plain ones back, since a review suggestion goes straight into the form.
+`buildSocialSummarySource`, `buildScopeSource` and `buildUserMessage` pass every value they wrap through `escapeAngleBrackets` (`src/lib/angle-brackets.ts`), so a field holding `</field>` cannot close its own tag (#841). A new builder does the same, with a property on `tagsIn` and `strayBrackets` from `src/test/shared/arbitraries.ts`. `&` stays as it is. The source hashes cover the escaped text, so widening the escape marks stale every project whose text holds the new character. Each system prompt says the brackets arrive as `&lt;` and `&gt;` and asks for plain ones back, since a review suggestion goes straight into the form.
 
 ## Site traffic
 

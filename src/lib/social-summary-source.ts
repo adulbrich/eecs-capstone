@@ -72,9 +72,9 @@ export const SOCIAL_SUMMARY_SOURCE_LIMIT = 12_000;
  *
  * The value is escaped before its room is measured, because the escaped text
  * is what is sent and what the hash covers, and a `<` escaped after the cut
- * would push the source past the limit by three units a bracket (#841). The cut can then
- * land inside an entity and leave `&l` at the end of a value, which reads as
- * noise rather than as a tag.
+ * would push the source past the limit by three units a bracket (#841). The
+ * cut can then land inside an entity and leave `&l` at the end of a value,
+ * which reads as noise rather than as a tag.
  */
 export function buildSocialSummarySource(
   project: SocialSummarySourceProject

@@ -37,6 +37,9 @@ import { describe, expect, it } from "vitest";
  *   exactly why it needs pinning: half the catalog ends up summarised in one
  *   voice and half in another, with nothing stored to say which is which and
  *   nothing that would ever recompute them.
+ * - The angle-bracket escape drifts. A copy that escapes one bracket fewer
+ *   sends text the app never produces, beside a hash the app reads as current,
+ *   and a field can close its own tag again in the script's prompts alone.
  * - The kill switch drifts. An operator who turned the feature off gets a
  *   sweep that spends a catalog of model calls anyway and writes summaries the
  *   app would never have generated. Silent, expensive, and the opposite of
