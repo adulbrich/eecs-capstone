@@ -15,6 +15,7 @@
  */
 import { brand } from "./brand";
 import { stripMarkdown } from "./strip-markdown";
+import { sliceWellFormed } from "./well-formed-cut";
 
 /**
  * Meta descriptions are cut somewhere near this by every consumer, and the
@@ -64,23 +65,6 @@ export const SOCIAL_CARD_ALT = `${brand.institutionName} ${brand.programName}, S
 
 const TRAILING_PUNCTUATION = /[\s,;:.!?-]+$/u;
 
-/** A high surrogate with no low surrogate after it, at the end of a string. */
-const LONE_TRAILING_SURROGATE = /[\uD800-\uDBFF]$/u;
-
-/**
- * Drops a half-character left by slicing on code units.
- *
- * `String.prototype.slice` counts UTF-16 code units, and anything outside the
- * basic plane, an emoji above all, is two of them. Cutting between the pair
- * leaves a lone high surrogate, which is not a character at all: encoded to
- * UTF-8 for the page it becomes a replacement glyph in a tag the whole
- * internet can see. Only the hard-cut fallback can produce this, since a
- * cut that retreats to a space lands between characters by construction.
- */
-function dropLoneSurrogate(text: string): string {
-  return text.replace(LONE_TRAILING_SURROGATE, "");
-}
-
 /**
  * Three ASCII dots, not U+2026. `button-conventions.test.ts` bans the real
  * ellipsis character anywhere in `src`, and the rule is worth keeping here
@@ -124,7 +108,7 @@ export function truncateOnWordBoundary(
     return text;
   }
   if (max < ELLIPSIS.length) {
-    return dropLoneSurrogate(text.slice(0, Math.max(max, 0)));
+    return sliceWellFormed(text, Math.max(max, 0));
   }
   const room = max - ELLIPSIS.length;
   const cut = text.slice(0, room);
@@ -134,16 +118,15 @@ export function truncateOnWordBoundary(
   const boundary = text[room] === " " ? cut.length : cut.lastIndexOf(" ");
   // A `lastIndexOf` miss returns -1, which fails this test too, so the
   // no-space case the fallback always covered still lands on the hard cut.
-  const body =
-    boundary >= room * MIN_WORD_BOUNDARY_FRACTION
-      ? cut.slice(0, boundary)
-      : cut;
-  const trimmed = dropLoneSurrogate(body);
+  // Only that hard cut can split an emoji: a retreat to a space lands between
+  // characters by construction.
+  const end = boundary >= room * MIN_WORD_BOUNDARY_FRACTION ? boundary : room;
+  const body = sliceWellFormed(text, end);
   // Stripping the trailing punctuation off a body that is nothing but
   // punctuation would leave a bare ellipsis, which says less than the fragment
   // it replaced. Keep the fragment in that case.
-  const stripped = trimmed.replace(TRAILING_PUNCTUATION, "");
-  return `${stripped || trimmed}${ELLIPSIS}`;
+  const stripped = body.replace(TRAILING_PUNCTUATION, "");
+  return `${stripped || body}${ELLIPSIS}`;
 }
 
 /** The fields `socialDescription` reads, named structurally. */

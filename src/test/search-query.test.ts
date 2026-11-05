@@ -1,3 +1,4 @@
+import { fc, test } from "@fast-check/vitest";
 import { describe, expect, it } from "vitest";
 import {
   clampSearchQuery,
@@ -5,6 +6,11 @@ import {
   searchQuerySchema,
 } from "#/lib/search-query";
 import { searchInputSchema } from "#/server/search";
+import {
+  isWellFormed,
+  trickyText,
+  trickyTextAcross,
+} from "#/test/shared/arbitraries";
 
 const LONG = "a".repeat(500);
 
@@ -58,6 +64,40 @@ describe("clampSearchQuery", () => {
   it("reads an empty box as an empty query", () => {
     expect(clampSearchQuery("   ")).toEqual({ query: "", truncated: false });
   });
+
+  it("does not end on a space the cut landed after", () => {
+    const padded = `${"f".repeat(SEARCH_QUERY_MAX - 1)} tail`;
+    expect(clampSearchQuery(padded)).toEqual({
+      query: "f".repeat(SEARCH_QUERY_MAX - 1),
+      truncated: true,
+    });
+  });
+
+  /**
+   * Short queries, and queries that cross the cap inside tricky text, either
+   * one with whitespace around it for the first trim to take.
+   */
+  const rawQuery = fc
+    .tuple(
+      trickyText({ maxLength: 3 }),
+      fc.oneof(
+        trickyText({ size: "medium" }),
+        trickyTextAcross(SEARCH_QUERY_MAX)
+      ),
+      trickyText({ maxLength: 3 })
+    )
+    .map((parts) => parts.join(""));
+
+  test.prop([rawQuery])(
+    "stays within the cap, well-formed, says it cut exactly when the trimmed input is longer, and is idempotent",
+    (raw) => {
+      const { query, truncated } = clampSearchQuery(raw);
+      expect(query.length).toBeLessThanOrEqual(SEARCH_QUERY_MAX);
+      expect(isWellFormed(query)).toBe(true);
+      expect(truncated).toBe(raw.trim().length > SEARCH_QUERY_MAX);
+      expect(clampSearchQuery(query)).toEqual({ query, truncated: false });
+    }
+  );
 });
 
 describe("searchQuerySchema", () => {

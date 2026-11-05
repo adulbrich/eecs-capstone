@@ -1,9 +1,15 @@
+import { fc, test } from "@fast-check/vitest";
 import { describe, expect, it } from "vitest";
 import {
   buildSocialSummarySource,
   SOCIAL_SUMMARY_SOURCE_LIMIT,
   socialSummaryHash,
 } from "#/lib/social-summary-source";
+import {
+  isWellFormed,
+  trickyText,
+  trickyTextAcross,
+} from "#/test/shared/arbitraries";
 
 const EMOJI = "\u{1F600}";
 
@@ -139,6 +145,21 @@ describe("buildSocialSummarySource", () => {
     );
   });
 
+  // `sliceWellFormed` strips a trailing high surrogate even when it cuts
+  // nothing, so calling it on a value that fits would change this source, and
+  // the hash over it, on main's malformed input. The generated properties
+  // never draw a lone half, so this example is what pins the length test.
+  it("leaves a value that fits untouched, even one ending on half a pair", () => {
+    const lone = "\u{D83D}";
+    expect(
+      buildSocialSummarySource({
+        description: null,
+        problemStatement: null,
+        title: `abc${lone}`,
+      })
+    ).toBe(`<Title>\nabc${lone}\n</Title>`);
+  });
+
   it("trims each field before wrapping it", () => {
     expect(
       buildSocialSummarySource({
@@ -148,6 +169,61 @@ describe("buildSocialSummarySource", () => {
       })
     ).toBe("<Title>\nRover\n</Title>");
   });
+});
+
+/**
+ * What the builder spends around its values, measured from its own output
+ * rather than restated, so a change to the tags moves these with it and the
+ * generator below keeps reaching the cut.
+ */
+const TITLE_TAGS =
+  buildSocialSummarySource({
+    description: null,
+    problemStatement: null,
+    title: "a",
+  }).length - 1;
+const TITLE_AND_DESCRIPTION_TAGS =
+  buildSocialSummarySource({
+    description: "a",
+    problemStatement: null,
+    title: "a",
+  }).length - 2;
+
+/** A title of filler sized to leave the description `room` code units. */
+function titleLeaving(room: number): string {
+  return "a".repeat(
+    SOCIAL_SUMMARY_SOURCE_LIMIT - TITLE_AND_DESCRIPTION_TAGS - room
+  );
+}
+
+/**
+ * Short fields, a title that leaves the description a few units of room, or a
+ * title cut itself. The constant 1 is weighted in because one unit of room
+ * with an emoji first is the only way to reach the empty-body check (#831),
+ * and random sizes would almost never land on it.
+ */
+const summaryProject = fc.record({
+  title: fc.oneof(
+    trickyText(),
+    fc
+      .oneof(fc.constant(1), fc.integer({ max: 40, min: -2 }))
+      .map(titleLeaving),
+    trickyTextAcross(SOCIAL_SUMMARY_SOURCE_LIMIT - TITLE_TAGS)
+  ),
+  description: fc.option(trickyText({ size: "medium" })),
+  problemStatement: fc.option(trickyText({ size: "medium" })),
+});
+
+describe("buildSocialSummarySource, on generated projects", () => {
+  test.prop([summaryProject])(
+    "stays within the limit, well-formed, with no empty tag",
+    (generated) => {
+      const source = buildSocialSummarySource(generated);
+      expect(source.length).toBeLessThanOrEqual(SOCIAL_SUMMARY_SOURCE_LIMIT);
+      expect(isWellFormed(source)).toBe(true);
+      expect(source).not.toMatch(EMPTY_TAG);
+    }
+  );
 });
 
 describe("socialSummaryHash", () => {

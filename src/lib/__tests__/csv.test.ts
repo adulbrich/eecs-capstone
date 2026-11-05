@@ -1,5 +1,7 @@
+import { fc, test } from "@fast-check/vitest";
 import { describe, expect, it } from "vitest";
 import { type CsvColumn, toCsv, unguardCell } from "#/lib/csv";
+import { trickyText } from "#/test/shared/arbitraries";
 
 interface Row {
   active: boolean;
@@ -111,4 +113,96 @@ describe("toCsv", () => {
     );
     expect(csv.split("\r\n")[1]).toBe("Widget");
   });
+});
+
+/**
+ * One field of RFC 4180 text from `start`: its value and where it ended.
+ * Strict where the RFC is, so a quoting slip in `toCsv` throws rather than
+ * reading back as some other cell: a quote opens a field only at its start,
+ * and an unquoted field may hold no quote, CR or LF.
+ */
+function readField(text: string, start: number): [string, number] {
+  let i = start;
+  let value = "";
+  if (text[i] === '"') {
+    i++;
+    while (!(text[i] === '"' && text[i + 1] !== '"')) {
+      if (i >= text.length) {
+        throw new Error("a quoted field never closes");
+      }
+      value += text[i] === '"' ? '"' : (text[i] as string);
+      i += text[i] === '"' ? 2 : 1;
+    }
+    return [value, i + 1];
+  }
+  while (i < text.length && text[i] !== "," && text[i] !== "\r") {
+    if (text[i] === '"' || text[i] === "\n") {
+      throw new Error(`an unquoted ${JSON.stringify(text[i])} at ${i}`);
+    }
+    value += text[i];
+    i++;
+  }
+  return [value, i];
+}
+
+/** RFC 4180 text as records, each field ending at a comma, CRLF or the end. */
+function readCsv(text: string): string[][] {
+  const records: string[][] = [[]];
+  let i = 0;
+  for (;;) {
+    const [value, end] = readField(text, i);
+    records.at(-1)?.push(value);
+    if (end >= text.length) {
+      return records;
+    }
+    if (text[end] === ",") {
+      i = end + 1;
+    } else if (text.startsWith("\r\n", end)) {
+      records.push([]);
+      i = end + 2;
+    } else {
+      throw new Error(`${JSON.stringify(text[end])} after a field at ${end}`);
+    }
+  }
+}
+
+/** A spreadsheet's formula lead-ins, which a cell must never start with. */
+const FORMULA_LEAD = /^[=+\-@\t\r]/u;
+
+/** Tricky text, or tricky text behind a formula lead-in or a guard-like `'`. */
+const cellText = fc.oneof(
+  trickyText(),
+  fc
+    .tuple(fc.constantFrom("=", "+", "-", "@", "\t", "\r", "'"), trickyText())
+    .map(([lead, rest]) => lead + rest)
+);
+
+/** A header row and up to five rows of the same width. */
+const sameWidthTable = fc.integer({ max: 5, min: 1 }).chain((width) =>
+  fc.tuple(
+    fc.array(cellText, { maxLength: width, minLength: width }),
+    fc.array(fc.array(cellText, { maxLength: width, minLength: width }), {
+      maxLength: 5,
+    })
+  )
+);
+
+describe("toCsv, on generated tables", () => {
+  test.prop([sameWidthTable])(
+    "reads back through RFC 4180 and unguardCell to every cell, with no formula lead left live",
+    ([headers, rows]) => {
+      const columns: CsvColumn<string[]>[] = headers.map((header, i) => ({
+        header,
+        value: (record) => record[i],
+      }));
+      const parsed = readCsv(toCsv(columns, rows));
+      expect(parsed.map((record) => record.map(unguardCell))).toEqual([
+        headers,
+        ...rows,
+      ]);
+      for (const field of parsed.flat()) {
+        expect(field).not.toMatch(FORMULA_LEAD);
+      }
+    }
+  );
 });

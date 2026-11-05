@@ -1,3 +1,4 @@
+import { fc, test } from "@fast-check/vitest";
 import { describe, expect, it } from "vitest";
 import {
   dayEnd,
@@ -8,8 +9,64 @@ import {
   lastDeadlineDay,
   localDay,
   localInstant,
+  OFFICE_TIME_ZONE,
   shiftDay,
 } from "#/lib/day-range";
+
+const pad = (value: number) => String(value).padStart(2, "0");
+
+/**
+ * The Sunday the clocks change in `year`, under the US rule since 2007: the
+ * second in March, or the first in November.
+ */
+function changeSunday(year: number, month: 3 | 11): string {
+  const firstWeekday = new Date(Date.UTC(year, month - 1, 1)).getUTCDay();
+  const firstSunday = 1 + ((7 - firstWeekday) % 7);
+  const date = month === 3 ? firstSunday + 7 : firstSunday;
+  return `${year}-${pad(month)}-${pad(date)}`;
+}
+
+/**
+ * Any day from 2007, or a change Sunday or a day either side of one. The
+ * second branch is not optional: a wrong offset shows only on the change day
+ * itself, and a uniform day lands on one about one run in two hundred.
+ */
+const officeDay = fc.oneof(
+  fc
+    .integer({ max: 34_000, min: 0 })
+    .map((offset) => shiftDay("2007-01-01", offset)),
+  fc
+    .tuple(
+      fc.integer({ max: 2099, min: 2007 }),
+      fc.constantFrom<3 | 11>(3, 11),
+      fc.integer({ max: 1, min: -1 })
+    )
+    .map(([year, month, delta]) => shiftDay(changeSunday(year, month), delta))
+);
+
+/**
+ * An `HH:MM`, weighted toward the small hours: a change moves the offset at
+ * 2:00, and a time from then until about 9:00 is where a guessed offset can
+ * still be the old one.
+ */
+const wallTime = fc
+  .tuple(
+    fc.oneof(fc.integer({ max: 23, min: 0 }), fc.integer({ max: 9, min: 0 })),
+    fc.integer({ max: 59, min: 0 })
+  )
+  .map(([hour, minute]) => `${pad(hour)}:${pad(minute)}`);
+
+const officeClock = new Intl.DateTimeFormat("en-US", {
+  hour: "2-digit",
+  hourCycle: "h23",
+  minute: "2-digit",
+  timeZone: OFFICE_TIME_ZONE,
+});
+
+/** The spring change Sunday, when 2:00 to 2:59 does not happen. */
+function isSpringChange(day: string): boolean {
+  return day === changeSunday(Number(day.slice(0, 4)), 3);
+}
 
 // Pacific is UTC-8 in winter and UTC-7 in summer, so office midnight is
 // 08:00Z or 07:00Z. The DST days are the ones a naive offset gets wrong.
@@ -167,4 +224,45 @@ describe("localDay", () => {
     expect(localDay(dayStart("2026-03-09"))).toBe("2026-03-09");
     expect(localDay(dayStart("2026-11-01"))).toBe("2026-11-01");
   });
+});
+
+describe("the day helpers, on generated days", () => {
+  test.prop([officeDay])(
+    "start and end the day they are given, and leave no gap before the next",
+    (day) => {
+      expect(localDay(dayStart(day))).toBe(day);
+      expect(localDay(dayEnd(day))).toBe(day);
+      expect(dayEnd(day).getTime() + 1).toBe(
+        dayStart(shiftDay(day, 1)).getTime()
+      );
+    }
+  );
+
+  test.prop([officeDay, fc.integer({ max: 400, min: -400 })])(
+    "shift there and back to the same day",
+    (day, delta) => {
+      expect(shiftDay(shiftDay(day, delta), -delta)).toBe(day);
+    }
+  );
+
+  test.prop([officeDay, fc.integer({ max: 400, min: 0 })])(
+    "count both ends of a span",
+    (day, delta) => {
+      expect(daysInclusive(day, shiftDay(day, delta))).toBe(delta + 1);
+    }
+  );
+
+  // The spring change skips 2:00 to 2:59, and `localInstant` documents that
+  // such a time lands an hour earlier on the old offset; asserted, not excluded.
+  test.prop([officeDay, wallTime])(
+    "read back on the office clock as the day and time they were given",
+    (day, time) => {
+      const instant = localInstant(day, time);
+      const [hour, minute] = time.split(":");
+      const expected =
+        hour === "02" && isSpringChange(day) ? `01:${minute}` : time;
+      expect(localDay(instant)).toBe(day);
+      expect(officeClock.format(instant)).toBe(expected);
+    }
+  );
 });

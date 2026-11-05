@@ -1,4 +1,5 @@
 import { createHash } from "node:crypto";
+import { sliceWellFormed } from "./well-formed-cut";
 
 /**
  * The text a social summary is written from, and its hash. Server-imported
@@ -42,13 +43,6 @@ const SUMMARY_FIELDS = [
 export const SOCIAL_SUMMARY_SOURCE_LIMIT = 12_000;
 
 /**
- * A high surrogate with no low surrogate after it, at the end of a string.
- * `social-meta.ts` carries its own copy for its own cut; this one is pinned
- * against the backfill script's, so the two cannot drift.
- */
-const LONE_TRAILING_SURROGATE = /[\uD800-\uDBFF]$/u;
-
-/**
  * The budget is spent field by field rather than by slicing the joined string,
  * which is what put the cut inside the closing tag (#566).
  *
@@ -69,6 +63,11 @@ const LONE_TRAILING_SURROGATE = /[\uD800-\uDBFF]$/u;
  *
  * The seven is the punctuation around a value: `<`, `>`, a newline, a newline,
  * `<`, `/`, `>`. The label itself is counted twice, once per tag.
+ *
+ * `sliceWellFormed` only when the value is longer than the room, never on a
+ * value that fits: the helper strips a trailing high surrogate even when it
+ * cuts nothing, and this text feeds the hash, so calling it on every value
+ * would change the source of a project whose text ends on one.
  */
 export function buildSocialSummarySource(
   project: SocialSummarySourceProject
@@ -86,10 +85,7 @@ export function buildSocialSummarySource(
     if (room < 1) {
       break;
     }
-    const body =
-      value.length > room
-        ? value.slice(0, room).replace(LONE_TRAILING_SURROGATE, "")
-        : value;
+    const body = value.length > room ? sliceWellFormed(value, room) : value;
     if (!body) {
       break;
     }
