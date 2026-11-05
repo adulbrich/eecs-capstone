@@ -73,8 +73,9 @@ export function trickyText(
  * cut.
  *
  * The filler stops 1 to 24 code units short of `limit`, and the tail is 12 to
- * 24 units, each at least one code unit, so the cut lands anywhere from the
- * tail's first unit to just past its end, where nothing is cut at all.
+ * 24 of `trickyText`'s units, one or more code units each, so the cut lands
+ * anywhere from the tail's first code unit to beyond its end, where the whole
+ * string fits and nothing is cut.
  */
 export function trickyTextAcross(limit: number): fc.Arbitrary<string> {
   return fc
