@@ -1,4 +1,4 @@
-import { fc, test } from "@fast-check/vitest";
+import { test } from "@fast-check/vitest";
 import { describe, expect, it } from "vitest";
 import { buildEmbedConfig } from "#/lib/_internal/bedrock-embed";
 import {
@@ -8,11 +8,8 @@ import {
   type EmbeddableProject,
   embeddingHash,
 } from "#/lib/embedding-source";
-import {
-  isWellFormed,
-  trickyText,
-  trickyTextAcross,
-} from "#/test/shared/arbitraries";
+import { isWellFormed } from "#/test/shared/arbitraries";
+import { embeddableProject } from "#/test/shared/project-arbitraries";
 
 /** A lone half of a surrogate pair, either half, anywhere in the string. */
 const BROKEN_PAIR =
@@ -181,24 +178,6 @@ describe("EMBEDDING_SOURCE_LIMIT", () => {
  */
 const EMPTY_SECTION =
   /(?:^|\n\n)(?:Title|Description|Problem|Objectives|Minimum qualifications|Preferred qualifications|License):\s*\n\n/u;
-
-/**
- * Short fields, or a title long enough that the cut at the limit lands in
- * tricky text: the title is the first section, so its filler is the only
- * thing in front of the cut besides its own label.
- */
-const embeddableProject = fc.record({
-  title: fc.oneof(
-    trickyText(),
-    trickyTextAcross(EMBEDDING_SOURCE_LIMIT - "Title: ".length)
-  ),
-  description: fc.option(trickyText()),
-  problemStatement: fc.option(trickyText()),
-  objectives: fc.option(trickyText()),
-  minQualifications: fc.option(trickyText()),
-  prefQualifications: fc.option(trickyText()),
-  licenseRestrictions: fc.option(trickyText()),
-});
 
 describe("buildProjectEmbeddingSource, on generated projects", () => {
   test.prop([embeddableProject])(

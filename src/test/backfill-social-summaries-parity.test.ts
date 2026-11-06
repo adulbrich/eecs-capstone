@@ -1,5 +1,14 @@
+import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
+import { fc, test } from "@fast-check/vitest";
 import { describe, expect, it } from "vitest";
+import {
+  buildSocialSummarySource,
+  socialSummaryHash,
+} from "#/lib/social-summary-source";
+import { trickyText } from "#/test/shared/arbitraries";
+import { summaryProject } from "#/test/shared/project-arbitraries";
+import { runScriptDeclarations } from "#/test/shared/script-twin";
 
 /**
  * The social summary backfill is two scripts, split by runtime rather than by
@@ -69,7 +78,10 @@ import { describe, expect, it } from "vitest";
  * comment, no TypeScript annotation and no scheme. Explain above the function.
  *
  * Read as text rather than imported, since importing the `.mjs` would run it
- * and it expects a database.
+ * and it expects a database. The builder and the hash are also lifted out of
+ * that text and run, without the signer or the pool, against their `src/`
+ * twins on generated projects: the last `describe` below. The text pins stay,
+ * because they cover branches no generator reaches.
  */
 const SCRIPT = readFileSync("scripts/backfill-social-summaries.mjs", "utf8");
 const SOURCE = readFileSync("src/lib/social-summary-source.ts", "utf8");
@@ -409,4 +421,42 @@ describe("the social summary backfill script", () => {
     expect(normalize("const a = 1; // gone")).toBe("const a = 1;");
     expect(normalize("const a = 1; /* gone */")).toBe("const a = 1;");
   });
+});
+
+/**
+ * The script's own builder, hash and the constants they read, run. A text pin
+ * says the bodies read alike once normalised; this says they produce the same
+ * string, which is what lands beside the stored hash.
+ */
+const twin = runScriptDeclarations<{
+  buildSocialSummarySource: typeof buildSocialSummarySource;
+  socialSummaryHash: typeof socialSummaryHash;
+}>(
+  "scripts/backfill-social-summaries.mjs",
+  [
+    "SOCIAL_SUMMARY_SOURCE_LIMIT",
+    "SUMMARY_FIELDS",
+    "LONE_TRAILING_SURROGATE",
+    "sliceWellFormed",
+    "buildSocialSummarySource",
+    "socialSummaryHash",
+  ],
+  { createHash }
+);
+
+describe("the social summary backfill script, run on generated input", () => {
+  test.prop([summaryProject])("builds the same summarised text", (project) => {
+    expect(twin.buildSocialSummarySource(project)).toBe(
+      buildSocialSummarySource(project)
+    );
+  });
+
+  test.prop([trickyText(), fc.string()])(
+    "hashes to the same value",
+    (source, modelId) => {
+      expect(twin.socialSummaryHash(source, modelId)).toBe(
+        socialSummaryHash(source, modelId)
+      );
+    }
+  );
 });

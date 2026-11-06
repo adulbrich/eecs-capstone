@@ -1,7 +1,10 @@
 import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
+import { fc, test } from "@fast-check/vitest";
 import { describe, expect, it } from "vitest";
 import { PROJECT_STATUSES } from "#/lib/vocabularies";
+import { trickyText } from "#/test/shared/arbitraries";
+import { runScriptDeclarations } from "#/test/shared/script-twin";
 
 /**
  * The legacy import is two scripts, split by responsibility rather than by
@@ -34,7 +37,9 @@ import { PROJECT_STATUSES } from "#/lib/vocabularies";
  * import either.
  *
  * Read as text rather than imported, following `env-contract.test.ts`, since
- * importing either module expects a database or object storage.
+ * importing either module expects a database or object storage. The namespace
+ * and `uuidv5` are also lifted out of both texts and run: the describe after
+ * this one.
  */
 const IMAGES_SOURCE = readFileSync("scripts/import-legacy-images.ts", "utf8");
 const IMPORT_SOURCE = readFileSync("scripts/import-legacy.mjs", "utf8");
@@ -129,8 +134,7 @@ describe("the legacy import's two scripts", () => {
   /**
    * A regression pin, independent of both sources: it recomputes the id here
    * and compares to the value an imported database already holds. It does NOT
-   * execute either script, so it is the assertions above that tie it to what
-   * the scripts really do.
+   * execute either script; the describe below runs both on the same cp_id.
    */
   it("turn a known cp_id into a known project id", () => {
     const namespace = NAMESPACE_PATTERN.exec(IMPORT_SOURCE)?.[1] as string;
@@ -156,6 +160,44 @@ describe("the legacy import's two scripts", () => {
     // in an imported database. If this changes, every imported row is re-keyed
     // and every image object in the bucket is orphaned.
     expect(id).toBe("40eb1fdf-97d2-5b09-92d6-e61e96059deb");
+  });
+});
+
+interface IdTwin {
+  uuidv5: (name: string) => string;
+}
+
+/**
+ * Each script's own namespace and `uuidv5`, run. The `.ts` copy is
+ * transpiled first, which strips its annotations and nothing else.
+ */
+const fromImport = runScriptDeclarations<IdTwin>(
+  "scripts/import-legacy.mjs",
+  ["NAMESPACE", "uuidv5"],
+  { Buffer, createHash }
+);
+const fromImages = runScriptDeclarations<IdTwin>(
+  "scripts/import-legacy-images.ts",
+  ["NAMESPACE", "uuidv5"],
+  { Buffer, createHash }
+);
+
+describe("the legacy import's two scripts, run", () => {
+  // Every name either script derives an id from: a cp_id for a row, and
+  // `image:<id>` for an image object.
+  test.prop([fc.oneof(trickyText(), fc.string({ unit: "binary" }))])(
+    "derive the same id from any name",
+    (name) => {
+      expect(fromImages.uuidv5(name)).toBe(fromImport.uuidv5(name));
+    }
+  );
+
+  it("turn the known cp_id into the id an imported database holds", () => {
+    for (const twin of [fromImport, fromImages]) {
+      expect(twin.uuidv5("Qlp7QCpPLveoERMn")).toBe(
+        "40eb1fdf-97d2-5b09-92d6-e61e96059deb"
+      );
+    }
   });
 });
 

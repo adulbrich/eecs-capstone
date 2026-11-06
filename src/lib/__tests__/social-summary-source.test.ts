@@ -1,15 +1,12 @@
-import { fc, test } from "@fast-check/vitest";
+import { test } from "@fast-check/vitest";
 import { describe, expect, it } from "vitest";
 import {
   buildSocialSummarySource,
   SOCIAL_SUMMARY_SOURCE_LIMIT,
   socialSummaryHash,
 } from "#/lib/social-summary-source";
-import {
-  isWellFormed,
-  trickyText,
-  trickyTextAcross,
-} from "#/test/shared/arbitraries";
+import { isWellFormed } from "#/test/shared/arbitraries";
+import { summaryProject } from "#/test/shared/project-arbitraries";
 
 const EMOJI = "\u{1F600}";
 
@@ -169,49 +166,6 @@ describe("buildSocialSummarySource", () => {
       })
     ).toBe("<Title>\nRover\n</Title>");
   });
-});
-
-/**
- * What the builder spends around its values, measured from its own output
- * rather than restated, so a change to the tags moves these with it and the
- * generator below keeps reaching the cut.
- */
-const TITLE_TAGS =
-  buildSocialSummarySource({
-    description: null,
-    problemStatement: null,
-    title: "a",
-  }).length - 1;
-const TITLE_AND_DESCRIPTION_TAGS =
-  buildSocialSummarySource({
-    description: "a",
-    problemStatement: null,
-    title: "a",
-  }).length - 2;
-
-/** A title of filler sized to leave the description `room` code units. */
-function titleLeaving(room: number): string {
-  return "a".repeat(
-    SOCIAL_SUMMARY_SOURCE_LIMIT - TITLE_AND_DESCRIPTION_TAGS - room
-  );
-}
-
-/**
- * Short fields, a title that leaves the description a few units of room, or a
- * title cut itself. The constant 1 is weighted in because one unit of room
- * with an emoji first is the only way to reach the empty-body check (#831),
- * and random sizes would almost never land on it.
- */
-const summaryProject = fc.record({
-  title: fc.oneof(
-    trickyText(),
-    fc
-      .oneof(fc.constant(1), fc.integer({ max: 40, min: -2 }))
-      .map(titleLeaving),
-    trickyTextAcross(SOCIAL_SUMMARY_SOURCE_LIMIT - TITLE_TAGS)
-  ),
-  description: fc.option(trickyText({ size: "medium" })),
-  problemStatement: fc.option(trickyText({ size: "medium" })),
 });
 
 describe("buildSocialSummarySource, on generated projects", () => {
