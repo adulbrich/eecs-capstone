@@ -84,8 +84,9 @@ carries the diff command, the commit list, the full checklist from step 3, and a
   state not sequence, and comment claims. Also carries the spec from step 2. Brief:
   "For each entry, walk every hunk it applies to. Report each finding under the
   entry's name with the sequence that triggers it, actor by actor, call by call."
-- **Boundaries.** Entry: boundary conditions. Brief: _The Boundaries brief_ below,
-  pasted whole. The property source it hands back sits outside the 400 words.
+- **Boundaries.** Entry: boundary conditions. Also carries the spec from step 2.
+  Brief: _The Boundaries brief_ below, pasted whole. The property source it hands
+  back sits outside the 400 words.
 - **Assumptions.** Entries: never-executed code and unvalidated assumptions. Brief:
   "For each script, migration and new branch, say what would run it for the first
   time. For each name, shape or behaviour the diff takes from another system, say
