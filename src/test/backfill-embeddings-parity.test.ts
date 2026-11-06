@@ -60,9 +60,9 @@ import { runScriptDeclarations } from "#/test/shared/script-twin";
  * builder, `section` and the hash are also lifted out of that text and run,
  * without the Bedrock client or the pool, against their `src/` twins on
  * generated projects, in "the embedding backfill script, run on generated
- * input". The text pins stay, because
- * they cover branches no generator reaches, and `functionBody` collapses the
- * whitespace inside a template literal, which only a run can see.
+ * input". The text pins stay, because they cover branches no generator
+ * reaches, and `functionBody` collapses the whitespace inside a template
+ * literal, which only a run can see.
  */
 const SOURCE_FILE = readFileSync("src/lib/embedding-source.ts", "utf8");
 const WELL_FORMED_CUT_FILE = readFileSync("src/lib/well-formed-cut.ts", "utf8");

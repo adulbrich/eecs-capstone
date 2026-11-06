@@ -87,8 +87,8 @@ import { runScriptDeclarations } from "#/test/shared/script-twin";
  * and it expects a database. The builder and the hash are also lifted out of
  * that text and run, without the signer or the pool, against their `src/`
  * twins on generated projects, in "the social summary backfill script, run
- * on generated input". The text pins stay,
- * because they cover branches no generator reaches.
+ * on generated input". The text pins stay, because they cover branches no
+ * generator reaches.
  */
 const SCRIPT = readFileSync("scripts/backfill-social-summaries.mjs", "utf8");
 const SOURCE = readFileSync("src/lib/social-summary-source.ts", "utf8");
@@ -474,7 +474,7 @@ describe("the social summary backfill script, run on generated input", () => {
         {
           title: titleLeaving(1),
           description: "\u{1F600} sensors",
-          problemStatement: "Greenhouses are checked by hand.",
+          problemStatement: null,
         },
       ],
     ],
