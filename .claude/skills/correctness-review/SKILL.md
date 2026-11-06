@@ -26,11 +26,11 @@ spawning anything. Note whether the user passed `mutate`.
 ### 2. Find the spec
 
 The spec is what the "State, not sequence" entry and the Boundaries triage read.
-Look in this order: issue
-references in the commit messages, fetched by the workflow in
-`docs/agents/issue-tracker.md`; a path the user passed; for pre-2026-10 work only,
-a design doc under `docs/superpowers/specs/` matching the branch. If none exists,
-that entry reports "no spec".
+Look in this order: issue references in the commit messages, fetched by the
+workflow in `docs/agents/issue-tracker.md`; a path the user passed; for
+pre-2026-10 work only, a design doc under `docs/superpowers/specs/` matching the
+branch. If none exists, the "State, not sequence" entry reports "no spec" and the
+triage reads the doc comment and the callers alone.
 
 ### 3. The checklist
 
@@ -113,14 +113,21 @@ the module's test file, so the work outlives the review.
    comments say what each draws. Aim at every cap: `trickyTextAcross(limit)` for
    one string, and for a budget spent across fields, filler sized from the
    function's own output so the room left for each later field lands at and just
-   above zero, as `titleLeaving` does. Weight the exact values, the cap and one
-   past it, with `fc.oneof`: a range of 25 lands on any one value in 4% of draws.
-   Use `fc` builtins where no shared arbitrary fits.
+   above zero, as `titleLeaving` does. Weight the exact values with `fc.oneof`
+   (the cap and one past it; a room of 0 and of 1): a range of 25 lands on any
+   one value in 4% of draws. Use `fc` builtins where no shared arbitrary fits.
 4. **Run** with the command sandbox off for every step: `$TMPDIR` names a
    different directory inside the sandbox, and Vitest needs it off
    (`docs/QUIRKS.md`). With the sandbox off, read only is yours to keep: read other
    commits with `git show <ref>:<path>`, and run no `checkout`, `switch`, `stash`,
    `add`, `commit`, `merge`, `reset` or `worktree`.
+
+   `C` is the checkout root and `N` its `node_modules`. When `$N/@fast-check/vitest`
+   is missing, the checkout is older than the property tests: set `N` instead to
+   a `node_modules` that has it, such as the `main` checkout's in
+   `git worktree list`, before linking. The run uses `$N`'s own `vitest` so the
+   runner and `@fast-check/vitest` load the same Vitest. If no checkout has it,
+   report the step as not run.
 
    ```bash
    C=$(git rev-parse --show-toplevel); N="$C/node_modules"
@@ -130,38 +137,35 @@ the module's test file, so the work outlives the review.
    ```
 
    Shell variables end with each call, so every later call spells out the paths
-   that `echo` printed. Write `$D/<module>.test.ts`, importing the module and the
-   arbitraries by absolute path under `$C`: `#/` resolves only for a file inside a
-   checkout, and the module's own `#/` imports still do. Then run, from `$C` so the
-   wrapper finds `.nvmrc` and the run gets the Node CI uses:
+   that `echo` printed in place of `$C`, `$N` and `$D`. Write
+   `$D/<module>.test.ts`, importing the module and the arbitraries by absolute path
+   under `$C`: `#/` resolves only for a file inside a checkout, and the module's
+   own `#/` imports still do. Then run from `$C`, where the wrapper finds `.nvmrc`
+   and gives the run the Node CI uses:
 
    ```bash
-   ulimit -n 8192; sh "$C/scripts/nvmrc-node.sh" "$N/.bin/vitest" run --root "$D"
+   cd "$C" && ulimit -n 8192 && sh scripts/nvmrc-node.sh "$N/.bin/vitest" run --root "$D"
    ```
 
    With `--root "$D"` Vitest loads no config and collects only `$D`, so the
    checkout's integration files stay out without the excludes `npm test` carries.
 
-   An older checkout lacks the pieces. Without `src/test/shared/arbitraries.ts`,
-   copy it from `main` and import `./arbitraries`; it imports only
-   `@fast-check/vitest`, so it runs at any commit:
+   Without `src/test/shared/arbitraries.ts`, copy it from `main` and import
+   `./arbitraries`; it imports only `@fast-check/vitest`, so it runs at any
+   commit:
 
    ```bash
    git show origin/main:src/test/shared/arbitraries.ts > "$D/arbitraries.ts"
    ```
 
    Without `src/test/shared/project-arbitraries.ts`, build project inputs inline;
-   it imports through `#/` and cannot be copied. Without `$N/@fast-check/vitest`,
-   set `N` to a
-   `node_modules` that has it, such as the `main` checkout's in
-   `git worktree list`, and run that copy's `vitest`: the runner and
-   `@fast-check/vitest` must load the same Vitest. If no checkout has it, report
-   the step as not run.
+   it imports through `#/` and cannot be copied.
 5. **Triage** every red property: a **bug** when the counterexample breaks the doc
    comment, a caller or the spec; an **overreach** when the property claimed more
    than the function promises. Replay it first: its error prints
-   `{ seed, path, endOnFailure: true }`, which goes in as the property's second
-   argument and fails at once on the same counterexample.
+   `{ seed, path, endOnFailure: true }`, which goes into the property's second
+   argument, merged into any options already there, and fails at once on the same
+   counterexample.
 6. **Report** per property: the function, the claim, then pass, or the shrunk
    counterexample with its seed, path and triage. Name a long counterexample by
    the parts that vary, not its filler. Then the "not run" names and `$D`. After
