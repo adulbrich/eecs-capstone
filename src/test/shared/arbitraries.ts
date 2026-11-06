@@ -107,9 +107,14 @@ export function tagsIn(text: string): string[] {
   return text.match(TAG_SPAN) ?? [];
 }
 
-/** The brackets left once every span `tagsIn` finds is removed. */
-export function strayBrackets(text: string): string[] {
-  return text.replace(TAG_SPAN, "").match(BRACKET) ?? [];
+/**
+ * How many brackets sit outside every span `tagsIn` finds. Each span holds
+ * exactly one `<` and one `>`, so the rest is the total less two a span.
+ * Counted rather than stripped: a `replace` of `<...>` with nothing is what
+ * CodeQL reads as a half-done HTML sanitizer, and this text never reaches HTML.
+ */
+export function strayBrackets(text: string): number {
+  return (text.match(BRACKET)?.length ?? 0) - 2 * tagsIn(text).length;
 }
 
 /**

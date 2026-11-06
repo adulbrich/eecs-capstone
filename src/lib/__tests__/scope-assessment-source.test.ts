@@ -182,7 +182,7 @@ describe("buildScopeSource, on generated projects", () => {
         .filter(([key]) => generated[key as keyof typeof SCOPE_TAGS]?.trim())
         .flatMap(([, open]) => [open, "</field>"]);
       expect(tagsIn(source)).toEqual(["<program>", "</program>", ...fields]);
-      expect(strayBrackets(source)).toEqual([]);
+      expect(strayBrackets(source)).toBe(0);
     }
   );
 });

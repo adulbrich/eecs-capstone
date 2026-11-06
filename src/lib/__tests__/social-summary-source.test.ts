@@ -193,7 +193,7 @@ describe("buildSocialSummarySource", () => {
     );
     expect(source.length).toBeLessThanOrEqual(SOCIAL_SUMMARY_SOURCE_LIMIT);
     expect(source.endsWith("</Description>")).toBe(true);
-    expect(strayBrackets(source)).toEqual([]);
+    expect(strayBrackets(source)).toBe(0);
   });
 });
 
@@ -280,7 +280,7 @@ describe("buildSocialSummarySource, on generated projects", () => {
   ])("writes exactly its own tags, whatever the fields hold", (generated) => {
     const source = buildSocialSummarySource(generated);
     expect(tagsIn(source)).toEqual(tagsFor(generated));
-    expect(strayBrackets(source)).toEqual([]);
+    expect(strayBrackets(source)).toBe(0);
   });
 
   test.prop([summaryProject])(
@@ -294,7 +294,7 @@ describe("buildSocialSummarySource, on generated projects", () => {
       const tags = tagsIn(source);
       expect(tags.length % 2).toBe(0);
       expect(tags).toEqual(tagsFor(generated).slice(0, tags.length));
-      expect(strayBrackets(source)).toEqual([]);
+      expect(strayBrackets(source)).toBe(0);
       expect(source).not.toMatch(EMPTY_TAG);
     }
   );

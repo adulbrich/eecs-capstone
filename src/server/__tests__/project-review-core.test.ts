@@ -90,7 +90,7 @@ describe("buildUserMessage, on generated fields", () => {
         fields[field]?.trim()
       ).flatMap((field) => [openingTag(field), "</field>"]);
       expect(tagsIn(msg)).toEqual(expected);
-      expect(strayBrackets(msg)).toEqual([]);
+      expect(strayBrackets(msg)).toBe(0);
     }
   );
 });
