@@ -10,9 +10,12 @@ import {
   strayBrackets,
   tagBreakingText,
   tagsIn,
-  trickyText,
-  trickyTextAcross,
 } from "#/test/shared/arbitraries";
+import {
+  SUMMARY_LABELS,
+  SUMMARY_TAGS,
+  summaryProject,
+} from "#/test/shared/project-arbitraries";
 
 const EMOJI = "\u{1F600}";
 
@@ -197,42 +200,6 @@ describe("buildSocialSummarySource", () => {
   });
 });
 
-/**
- * What the builder spends around its values, measured from its own output
- * rather than restated, so a change to the tags moves these with it and the
- * generator below keeps reaching the cut.
- */
-const TITLE_TAGS =
-  buildSocialSummarySource({
-    description: null,
-    problemStatement: null,
-    title: "a",
-  }).length - 1;
-const TITLE_AND_DESCRIPTION_TAGS =
-  buildSocialSummarySource({
-    description: "a",
-    problemStatement: null,
-    title: "a",
-  }).length - 2;
-
-/** A title of filler sized to leave the description `room` code units. */
-function titleLeaving(room: number): string {
-  return "a".repeat(
-    SOCIAL_SUMMARY_SOURCE_LIMIT - TITLE_AND_DESCRIPTION_TAGS - room
-  );
-}
-
-const SUMMARY_LABELS = {
-  title: "Title",
-  description: "Description",
-  problemStatement: "Problem statement",
-} as const;
-
-const SUMMARY_TAGS = Object.values(SUMMARY_LABELS).flatMap((label) => [
-  `<${label}>`,
-  `</${label}>`,
-]);
-
 /** The tags the builder writes for a project when every field fits. */
 function tagsFor(
   fields: Parameters<typeof buildSocialSummarySource>[0]
@@ -241,34 +208,6 @@ function tagsFor(
     .filter(([key]) => fields[key as keyof typeof SUMMARY_LABELS]?.trim())
     .flatMap(([, label]) => [`<${label}>`, `</${label}>`]);
 }
-
-/**
- * Field text that sometimes carries a tag, so a cut can land inside an
- * escaped bracket as well as inside an emoji.
- */
-const summaryText = fc.oneof(
-  trickyText({ size: "medium" }),
-  tagBreakingText(SUMMARY_TAGS, { size: "medium" })
-);
-
-/**
- * Short fields, a title that leaves the description a few units of room, or a
- * title cut itself. The constant 1 is weighted in because one unit of room
- * with an emoji first is the only way to reach the empty-body check (#831),
- * and random sizes would almost never land on it.
- */
-const summaryProject = fc.record({
-  title: fc.oneof(
-    trickyText(),
-    fc
-      .oneof(fc.constant(1), fc.integer({ max: 40, min: -2 }))
-      .map(titleLeaving),
-    trickyTextAcross(SOCIAL_SUMMARY_SOURCE_LIMIT - TITLE_TAGS),
-    tagBreakingText(SUMMARY_TAGS)
-  ),
-  description: fc.option(summaryText),
-  problemStatement: fc.option(summaryText),
-});
 
 describe("buildSocialSummarySource, on generated projects", () => {
   test.prop([

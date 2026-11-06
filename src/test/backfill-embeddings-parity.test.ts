@@ -1,5 +1,14 @@
+import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
+import { fc, test } from "@fast-check/vitest";
 import { describe, expect, it } from "vitest";
+import {
+  buildProjectEmbeddingSource,
+  embeddingHash,
+} from "#/lib/embedding-source";
+import { trickyText } from "#/test/shared/arbitraries";
+import { embeddableProject } from "#/test/shared/project-arbitraries";
+import { runScriptDeclarations } from "#/test/shared/script-twin";
 
 /**
  * The embedding backfill is two scripts, split by runtime rather than by
@@ -47,7 +56,13 @@ import { describe, expect, it } from "vitest";
  * carry annotations an `.mjs` cannot hold.
  *
  * Read as text rather than imported, following `import-legacy-parity.test.ts`,
- * since importing the `.mjs` would run it and it expects a database.
+ * since importing the `.mjs` would run it and it expects a database. The
+ * builder, `section` and the hash are also lifted out of that text and run,
+ * without the Bedrock client or the pool, against their `src/` twins on
+ * generated projects, in "the embedding backfill script, run on generated
+ * input". The text pins stay, because they cover branches no generator
+ * reaches, and `functionBody` collapses the whitespace inside a template
+ * literal, which only a run can see.
  */
 const SOURCE_FILE = readFileSync("src/lib/embedding-source.ts", "utf8");
 const WELL_FORMED_CUT_FILE = readFileSync("src/lib/well-formed-cut.ts", "utf8");
@@ -557,4 +572,43 @@ describe("the production backfill's copies of the embedding helpers", () => {
     const dockerfile = readFileSync("Dockerfile", "utf8");
     expect(dockerfile).toContain("scripts/backfill-embeddings.mjs");
   });
+});
+
+/**
+ * The script's own builder, `section`, hash and the constants they read, run.
+ * `section` is not compared alone: its only caller on either side is the
+ * builder, so the builder's output is all of its behaviour that reaches a
+ * stored hash.
+ */
+const twin = runScriptDeclarations<{
+  buildProjectEmbeddingSource: typeof buildProjectEmbeddingSource;
+  embeddingHash: typeof embeddingHash;
+}>(
+  "scripts/backfill-embeddings.mjs",
+  [
+    "EMBEDDING_SOURCE_LIMIT",
+    "LONE_TRAILING_SURROGATE",
+    "sliceWellFormed",
+    "section",
+    "buildProjectEmbeddingSource",
+    "embeddingHash",
+  ],
+  { createHash }
+);
+
+describe("the embedding backfill script, run on generated input", () => {
+  test.prop([embeddableProject])("builds the same embedded text", (project) => {
+    expect(twin.buildProjectEmbeddingSource(project)).toBe(
+      buildProjectEmbeddingSource(project)
+    );
+  });
+
+  test.prop([trickyText(), fc.string(), fc.integer()])(
+    "hashes to the same value",
+    (source, modelId, dimensions) => {
+      expect(twin.embeddingHash(source, modelId, dimensions)).toBe(
+        embeddingHash(source, modelId, dimensions)
+      );
+    }
+  );
 });

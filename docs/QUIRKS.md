@@ -360,13 +360,13 @@ When a test drives a process that has its own timeouts, give that test a ceiling
 
 ### A failing property prints a seed and a path; replay with both
 
-A `test.prop` from `@fast-check/vitest` draws new inputs every run, so a red one can pass on a rerun. That is a real counterexample, not flake: never rerun to green. The test's name ends `(with seed=N)`, and its error prints `{ seed: N, path: "...", endOnFailure: true }` above the shrunk counterexample. Pass that object as the property's second argument and the next run fails on the counterexample at once; delete it before committing.
+A `test.prop` from `@fast-check/vitest` draws new inputs every run, so a red one can pass on a rerun. That is a real counterexample, not flake: never rerun to green. The test's name ends `(with seed=N)`, and its error prints `{ seed: N, path: "...", endOnFailure: true }` above the shrunk counterexample. Pass that object as the property's second argument, merged into any options it already has, such as `examples`, which `path` counts; the next run fails on the counterexample at once. Remove those three keys before committing.
 
 ```ts
 test.prop([trickyText()], { endOnFailure: true, path: "4:1:0", seed: 1_188_394_663 })(
 ```
 
-The shared arbitrary and `isWellFormed` are in `src/test/shared/arbitraries.ts`.
+The shared arbitrary and `isWellFormed` are in `src/test/shared/arbitraries.ts`; the generated projects for the hashed builders are in `src/test/shared/project-arbitraries.ts`.
 
 ### `npm run start` gets no dotenv, unlike the dev server
 
