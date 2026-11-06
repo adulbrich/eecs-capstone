@@ -74,6 +74,13 @@ describe("the tool schema", () => {
     expect(SCOPE_SYSTEM_PROMPT).toContain(PROPOSAL_SCOPE_RULE);
     expect(SCOPE_SYSTEM_PROMPT).toContain(TERM_CALIBRATION);
   });
+
+  it("says brackets arrive escaped and asks for them plain in the rationale", () => {
+    expect(SCOPE_SYSTEM_PROMPT).toContain("arrive written as &lt; and &gt;");
+    expect(SCOPE_SYSTEM_PROMPT).toContain(
+      "write them as plain < and > in your rationale"
+    );
+  });
 });
 
 describe("parseScopeResponse", () => {

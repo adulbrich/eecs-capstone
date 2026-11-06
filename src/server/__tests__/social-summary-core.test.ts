@@ -7,6 +7,7 @@ import { SOCIAL_SUMMARY_MAX_LENGTH } from "#/lib/social-summary";
 import {
   parseSocialSummaryResponse,
   runSocialSummary,
+  SOCIAL_SUMMARY_SYSTEM_PROMPT,
   SOCIAL_SUMMARY_TOOL_NAME,
   socialSummaryToolSpec,
 } from "../_internal/social-summary-core";
@@ -140,6 +141,19 @@ describe("socialSummaryToolSpec", () => {
     // producing summaries the schema then throws away.
     expect(socialSummaryToolSpec.parameters.properties.summary.maxLength).toBe(
       SOCIAL_SUMMARY_MAX_LENGTH
+    );
+  });
+});
+
+describe("SOCIAL_SUMMARY_SYSTEM_PROMPT", () => {
+  // The summary is published as the page's preview text, so a model that
+  // echoed `&lt;` back would show the entity on every share of the link.
+  it("says brackets arrive escaped and asks for them plain in the sentence", () => {
+    expect(SOCIAL_SUMMARY_SYSTEM_PROMPT).toContain(
+      "arrive written as &lt; and &gt;"
+    );
+    expect(SOCIAL_SUMMARY_SYSTEM_PROMPT).toContain(
+      "write them as plain < and > in your sentence"
     );
   });
 });

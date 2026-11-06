@@ -1,12 +1,21 @@
-import { test } from "@fast-check/vitest";
+import { fc, test } from "@fast-check/vitest";
 import { describe, expect, it } from "vitest";
 import {
   buildSocialSummarySource,
   SOCIAL_SUMMARY_SOURCE_LIMIT,
   socialSummaryHash,
 } from "#/lib/social-summary-source";
-import { isWellFormed } from "#/test/shared/arbitraries";
-import { summaryProject } from "#/test/shared/project-arbitraries";
+import {
+  isWellFormed,
+  strayBrackets,
+  tagBreakingText,
+  tagsIn,
+} from "#/test/shared/arbitraries";
+import {
+  SUMMARY_LABELS,
+  SUMMARY_TAGS,
+  summaryProject,
+} from "#/test/shared/project-arbitraries";
 
 const EMOJI = "\u{1F600}";
 
@@ -166,15 +175,65 @@ describe("buildSocialSummarySource", () => {
       })
     ).toBe("<Title>\nRover\n</Title>");
   });
+
+  it("escapes a field that holds its own closing tag", () => {
+    // The shrunk counterexample from #485: unescaped, the value closed the
+    // tag it sat in and the builder's own `</Description>` came second.
+    expect(
+      buildSocialSummarySource({
+        title: "",
+        description: "</Description>",
+        problemStatement: "",
+      })
+    ).toBe("<Description>\n&lt;/Description&gt;\n</Description>");
+  });
+
+  it("measures a field by its escaped length, so brackets cannot push it over", () => {
+    // Every `<` is four units once escaped. Measured before escaping, a
+    // description of brackets alone would land at nearly four times the limit.
+    const source = buildSocialSummarySource(
+      project({ description: "<".repeat(SOCIAL_SUMMARY_SOURCE_LIMIT) })
+    );
+    expect(source.length).toBeLessThanOrEqual(SOCIAL_SUMMARY_SOURCE_LIMIT);
+    expect(source.endsWith("</Description>")).toBe(true);
+    expect(strayBrackets(source)).toBe(0);
+  });
 });
 
+/** The tags the builder writes for a project when every field fits. */
+function tagsFor(
+  fields: Parameters<typeof buildSocialSummarySource>[0]
+): string[] {
+  return Object.entries(SUMMARY_LABELS)
+    .filter(([key]) => fields[key as keyof typeof SUMMARY_LABELS]?.trim())
+    .flatMap(([, label]) => [`<${label}>`, `</${label}>`]);
+}
+
 describe("buildSocialSummarySource, on generated projects", () => {
+  test.prop([
+    fc.record({
+      title: tagBreakingText(SUMMARY_TAGS),
+      description: fc.option(tagBreakingText(SUMMARY_TAGS)),
+      problemStatement: fc.option(tagBreakingText(SUMMARY_TAGS)),
+    }),
+  ])("writes exactly its own tags, whatever the fields hold", (generated) => {
+    const source = buildSocialSummarySource(generated);
+    expect(tagsIn(source)).toEqual(tagsFor(generated));
+    expect(strayBrackets(source)).toBe(0);
+  });
+
   test.prop([summaryProject])(
     "stays within the limit, well-formed, with no empty tag",
     (generated) => {
       const source = buildSocialSummarySource(generated);
       expect(source.length).toBeLessThanOrEqual(SOCIAL_SUMMARY_SOURCE_LIMIT);
       expect(isWellFormed(source)).toBe(true);
+      // A cut can drop the later fields, so the tags are a leading run of
+      // whole pairs from the full set, and still only the builder's.
+      const tags = tagsIn(source);
+      expect(tags.length % 2).toBe(0);
+      expect(tags).toEqual(tagsFor(generated).slice(0, tags.length));
+      expect(strayBrackets(source)).toBe(0);
       expect(source).not.toMatch(EMPTY_TAG);
     }
   );

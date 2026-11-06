@@ -46,6 +46,9 @@ import { runScriptDeclarations } from "#/test/shared/script-twin";
  *   exactly why it needs pinning: half the catalog ends up summarised in one
  *   voice and half in another, with nothing stored to say which is which and
  *   nothing that would ever recompute them.
+ * - The angle-bracket escape drifts. A copy that escapes one bracket fewer
+ *   sends text the app never produces, beside a hash the app reads as current,
+ *   and a field can close its own tag again in the script's prompts alone.
  * - The kill switch drifts. An operator who turned the feature off gets a
  *   sweep that spends a catalog of model calls anyway and writes summaries the
  *   app would never have generated. Silent, expensive, and the opposite of
@@ -288,6 +291,18 @@ describe("the social summary backfill script", () => {
     );
   });
 
+  it("escapes the same angle brackets before it measures a field", () => {
+    // The builder pin above checks the call; this checks what it calls. A
+    // copy that escaped one bracket fewer would send text the app never
+    // produces beside a hash the app reads as current.
+    assertComparable("function escapeAngleBrackets(");
+    same(
+      "function escapeAngleBrackets(",
+      readFileSync("src/lib/angle-brackets.ts", "utf8"),
+      "export function escapeAngleBrackets("
+    );
+  });
+
   it("counts the summary cap in code points, as the app does", () => {
     // `summary.length` counts UTF-16 code units, so the script rejected at 302
     // what the app accepted at 151 and failed those rows on every run (#565).
@@ -438,6 +453,7 @@ const twin = runScriptDeclarations<{
     "SUMMARY_FIELDS",
     "LONE_TRAILING_SURROGATE",
     "sliceWellFormed",
+    "escapeAngleBrackets",
     "buildSocialSummarySource",
     "socialSummaryHash",
   ],

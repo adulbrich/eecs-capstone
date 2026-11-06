@@ -4,7 +4,7 @@ import {
   buildSocialSummarySource,
   SOCIAL_SUMMARY_SOURCE_LIMIT,
 } from "#/lib/social-summary-source";
-import { trickyText, trickyTextAcross } from "./arbitraries";
+import { tagBreakingText, trickyText, trickyTextAcross } from "./arbitraries";
 
 /**
  * Generated projects for the two hashed source builders. Shared by each
@@ -38,6 +38,26 @@ function titleLeaving(room: number): string {
   );
 }
 
+export const SUMMARY_LABELS = {
+  title: "Title",
+  description: "Description",
+  problemStatement: "Problem statement",
+} as const;
+
+export const SUMMARY_TAGS = Object.values(SUMMARY_LABELS).flatMap((label) => [
+  `<${label}>`,
+  `</${label}>`,
+]);
+
+/**
+ * Field text that sometimes carries a tag, so a cut can land inside an
+ * escaped bracket as well as inside an emoji.
+ */
+const summaryText = fc.oneof(
+  trickyText({ size: "medium" }),
+  tagBreakingText(SUMMARY_TAGS, { size: "medium" })
+);
+
 /**
  * Short fields, a title that leaves the description a few units of room, or a
  * title cut itself. The constant 1 is weighted in because one unit of room
@@ -50,10 +70,11 @@ export const summaryProject = fc.record({
     fc
       .oneof(fc.constant(1), fc.integer({ max: 40, min: -2 }))
       .map(titleLeaving),
-    trickyTextAcross(SOCIAL_SUMMARY_SOURCE_LIMIT - TITLE_TAGS)
+    trickyTextAcross(SOCIAL_SUMMARY_SOURCE_LIMIT - TITLE_TAGS),
+    tagBreakingText(SUMMARY_TAGS)
   ),
-  description: fc.option(trickyText({ size: "medium" })),
-  problemStatement: fc.option(trickyText({ size: "medium" })),
+  description: fc.option(summaryText),
+  problemStatement: fc.option(summaryText),
 });
 
 /**
