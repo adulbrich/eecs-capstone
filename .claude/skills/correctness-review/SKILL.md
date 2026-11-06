@@ -25,7 +25,8 @@ spawning anything. Note whether the user passed `mutate`.
 
 ### 2. Find the spec
 
-The spec is what the "State, not sequence" entry reads. Look in this order: issue
+The spec is what the "State, not sequence" entry and the Boundaries triage read.
+Look in this order: issue
 references in the commit messages, fetched by the workflow in
 `docs/agents/issue-tracker.md`; a path the user passed; for pre-2026-10 work only,
 a design doc under `docs/superpowers/specs/` matching the branch. If none exists,
@@ -47,10 +48,9 @@ sub-agent prompt: the sub-agent has no other access to it.
   the other end.
 - **Boundary conditions in pure functions.** Empty input, exactly at a limit, one
   past it, and characters outside the Basic Multilingual Plane (an emoji is two
-  UTF-16 code units). Find it: a `test.prop` property whose generator reaches each
-  of those, run against the checkout from a scratch file outside the repository. A
-  random string almost never lands on a cap of 12,000, so aim the generator at the
-  cap. Reading the function is not finding it.
+  UTF-16 code units). Find it: a `test.prop` property whose generator is aimed at
+  each of those, run against the checkout from a scratch file outside the
+  repository. Reading the function is not finding it.
 - **Never-executed code.** A script, migration or branch that no run has touched. A
   test that imports the file is not a run. Find it: ask what has to happen for the
   line to execute for the first time, and whether that is production. Prefer a
@@ -99,23 +99,23 @@ Read each function, state what must hold for every input, run each claim as a
 property, triage what fails. The properties that hold are the author's to commit to
 the module's test file, so the work outlives the review.
 
-1. **List** every pure function the diff adds or changes. When the list outgrows
-   the budget, take first the functions that cut, cap, count, tag or parse a date,
-   and name the rest under "not run".
+1. **List** every pure function the diff adds or changes. When the list is more
+   than one report can cover, take first the functions that cut, cap, count, tag
+   or parse a date, and name the rest under "not run".
 2. **State** the claims that hold for every input of its type, from its doc
    comment, its callers and the spec: within its cap, well-formed (`isWellFormed`),
    no empty or half-written tag, a prefix of its input, a round trip, idempotent,
    never throws. Write each claim as one `test.prop` from `@fast-check/vitest`, in
-   the style of the module's test file: fast-check's default run count, no setup
-   file.
+   the style of the module's test file, on fast-check's default run count unless
+   one property has a stated reason to raise it.
 3. **Generate** from the shared arbitraries in `src/test/shared/arbitraries.ts`,
    and `src/test/shared/project-arbitraries.ts` for the hashed builders; their
    comments say what each draws. Aim at every cap: `trickyTextAcross(limit)` for
    one string, and for a budget spent across fields, filler sized from the
    function's own output so the room left for each later field lands at and just
-   above zero, as `titleLeaving` does. Draw only the parts that vary and build the
-   filler in the test body, so a counterexample prints on one line. Use `fc`
-   builtins where no shared arbitrary fits.
+   above zero, as `titleLeaving` does. Weight the exact values, the cap and one
+   past it, with `fc.oneof`: a range of 25 lands on any one value in 4% of draws.
+   Use `fc` builtins where no shared arbitrary fits.
 4. **Run** with the command sandbox off for every step: `$TMPDIR` names a
    different directory inside the sandbox, and Vitest needs it off
    (`docs/QUIRKS.md`). With the sandbox off, read only is yours to keep: read other
@@ -124,48 +124,51 @@ the module's test file, so the work outlives the review.
 
    ```bash
    C=$(git rev-parse --show-toplevel); N="$C/node_modules"
-   D=$(mktemp -d "$TMPDIR/boundaries.XXXXXX"); echo "$D"
+   D=$(mktemp -d "$TMPDIR/boundaries.XXXXXX"); echo "C=$C N=$N D=$D"
    mkdir -p "$D/node_modules/@fast-check"
    for p in vitest fast-check @fast-check/vitest; do ln -s "$N/$p" "$D/node_modules/$p"; done
    ```
 
-   Write `$D/<module>.test.ts`, importing the module and the arbitraries by
-   absolute path under `$C`: `#/` resolves only for a file inside a checkout, and
-   the module's own `#/` imports still do. Then run:
+   Shell variables end with each call, so every later call spells out the paths
+   that `echo` printed. Write `$D/<module>.test.ts`, importing the module and the
+   arbitraries by absolute path under `$C`: `#/` resolves only for a file inside a
+   checkout, and the module's own `#/` imports still do. Then run, from `$C` so the
+   wrapper finds `.nvmrc` and the run gets the Node CI uses:
 
    ```bash
-   ulimit -n 8192; "$N/.bin/vitest" run --root "$D"
+   ulimit -n 8192; sh "$C/scripts/nvmrc-node.sh" "$N/.bin/vitest" run --root "$D"
    ```
 
    With `--root "$D"` Vitest loads no config and collects only `$D`, so the
-   checkout's integration files stay out; that is why a bare `vitest` is right here
-   while step 5 uses `npm test`. Shell variables end with each call, so carry the
-   absolute paths.
+   checkout's integration files stay out without the excludes `npm test` carries.
 
-   A checkout older than #840 lacks the pieces. Without
-   `src/test/shared/arbitraries.ts`, copy it from `main` and import `./arbitraries`;
-   it imports only `@fast-check/vitest`, so it runs at any commit:
+   An older checkout lacks the pieces. Without `src/test/shared/arbitraries.ts`,
+   copy it from `main` and import `./arbitraries`; it imports only
+   `@fast-check/vitest`, so it runs at any commit:
 
    ```bash
    git show origin/main:src/test/shared/arbitraries.ts > "$D/arbitraries.ts"
    ```
 
-   `project-arbitraries.ts` imports through `#/` and cannot be copied, so build
-   project inputs inline. Without `$N/@fast-check/vitest`, set `N` to a
+   Without `src/test/shared/project-arbitraries.ts`, build project inputs inline;
+   it imports through `#/` and cannot be copied. Without `$N/@fast-check/vitest`,
+   set `N` to a
    `node_modules` that has it, such as the `main` checkout's in
    `git worktree list`, and run that copy's `vitest`: the runner and
    `@fast-check/vitest` must load the same Vitest. If no checkout has it, report
    the step as not run.
 5. **Triage** every red property: a **bug** when the counterexample breaks the doc
    comment, a caller or the spec; an **overreach** when the property claimed more
-   than the function promises. Replay it with its seed and path first
-   (`docs/QUIRKS.md`, "A failing property prints a seed and a path").
+   than the function promises. Replay it first: its error prints
+   `{ seed, path, endOnFailure: true }`, which goes in as the property's second
+   argument and fails at once on the same counterexample.
 6. **Report** per property: the function, the claim, then pass, or the shrunk
-   counterexample with its seed, path and triage. Then the "not run" names and
-   `$D`. After the report, one fenced block per destination test file (the
-   module's existing one, or where a new one would go), headed by its path,
-   holding the properties that passed and the bugs, which pass once the fix lands.
-   Import as that file does, through `#/`. Leave the overreaches out.
+   counterexample with its seed, path and triage. Name a long counterexample by
+   the parts that vary, not its filler. Then the "not run" names and `$D`. After
+   the report, one fenced block per destination test file (the module's existing
+   one, or where a new one would go), headed by its path, holding the properties
+   that passed and the bugs, which pass once the fix lands. Import as that file
+   does, through `#/`, and leave out the replay keys and the overreaches.
 
 ### 5. Mutate the guards (only with `mutate`)
 
