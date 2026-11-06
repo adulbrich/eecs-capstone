@@ -1,4 +1,5 @@
 import { createHash } from "node:crypto";
+import { escapeAngleBrackets } from "./angle-brackets";
 import { sliceWellFormed } from "./well-formed-cut";
 
 /**
@@ -68,6 +69,12 @@ export const SOCIAL_SUMMARY_SOURCE_LIMIT = 12_000;
  * value that fits: the helper strips a trailing high surrogate even when it
  * cuts nothing, and this text feeds the hash, so calling it on every value
  * would change the source of a project whose text ends on one.
+ *
+ * The value is escaped before its room is measured, because the escaped text
+ * is what is sent and what the hash covers, and a `<` escaped after the cut
+ * would push the source past the limit by three units a bracket (#841). The
+ * cut can then land inside an entity and leave `&l` at the end of a value,
+ * which reads as noise rather than as a tag.
  */
 export function buildSocialSummarySource(
   project: SocialSummarySourceProject
@@ -75,10 +82,11 @@ export function buildSocialSummarySource(
   const parts: string[] = [];
   let remaining = SOCIAL_SUMMARY_SOURCE_LIMIT;
   for (const [key, label] of SUMMARY_FIELDS) {
-    const value = project[key]?.trim();
-    if (!value) {
+    const trimmed = project[key]?.trim();
+    if (!trimmed) {
       continue;
     }
+    const value = escapeAngleBrackets(trimmed);
     const separator = parts.length > 0 ? 2 : 0;
     const wrapper = label.length * 2 + 7;
     const room = remaining - separator - wrapper;
