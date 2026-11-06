@@ -366,7 +366,7 @@ A `test.prop` from `@fast-check/vitest` draws new inputs every run, so a red one
 test.prop([trickyText()], { endOnFailure: true, path: "4:1:0", seed: 1_188_394_663 })(
 ```
 
-The shared arbitrary and `isWellFormed` are in `src/test/shared/arbitraries.ts`.
+The shared arbitrary and `isWellFormed` are in `src/test/shared/arbitraries.ts`; the generated projects for the hashed builders are in `src/test/shared/project-arbitraries.ts`.
 
 ### `npm run start` gets no dotenv, unlike the dev server
 

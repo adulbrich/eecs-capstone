@@ -7,7 +7,10 @@ import {
   socialSummaryHash,
 } from "#/lib/social-summary-source";
 import { trickyText } from "#/test/shared/arbitraries";
-import { summaryProject } from "#/test/shared/project-arbitraries";
+import {
+  summaryProject,
+  titleLeaving,
+} from "#/test/shared/project-arbitraries";
 import { runScriptDeclarations } from "#/test/shared/script-twin";
 
 /**
@@ -83,7 +86,8 @@ import { runScriptDeclarations } from "#/test/shared/script-twin";
  * Read as text rather than imported, since importing the `.mjs` would run it
  * and it expects a database. The builder and the hash are also lifted out of
  * that text and run, without the signer or the pool, against their `src/`
- * twins on generated projects: the last `describe` below. The text pins stay,
+ * twins on generated projects, in "the social summary backfill script, run
+ * on generated input". The text pins stay,
  * because they cover branches no generator reaches.
  */
 const SCRIPT = readFileSync("scripts/backfill-social-summaries.mjs", "utf8");
@@ -461,7 +465,20 @@ const twin = runScriptDeclarations<{
 );
 
 describe("the social summary backfill script, run on generated input", () => {
-  test.prop([summaryProject])("builds the same summarised text", (project) => {
+  // The generator reaches the empty-body guard (#831) in about one case in
+  // 27, so 100 runs would miss a drift there about one run in 44. The example
+  // reaches it on every run: one unit of room, and an emoji the cut halves.
+  test.prop([summaryProject], {
+    examples: [
+      [
+        {
+          title: titleLeaving(1),
+          description: "\u{1F600} sensors",
+          problemStatement: "Greenhouses are checked by hand.",
+        },
+      ],
+    ],
+  })("builds the same summarised text", (project) => {
     expect(twin.buildSocialSummarySource(project)).toBe(
       buildSocialSummarySource(project)
     );

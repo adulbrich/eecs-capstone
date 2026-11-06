@@ -32,7 +32,7 @@ const TITLE_AND_DESCRIPTION_TAGS =
   }).length - 2;
 
 /** A title of filler sized to leave the description `room` code units. */
-function titleLeaving(room: number): string {
+export function titleLeaving(room: number): string {
   return "a".repeat(
     SOCIAL_SUMMARY_SOURCE_LIMIT - TITLE_AND_DESCRIPTION_TAGS - room
   );

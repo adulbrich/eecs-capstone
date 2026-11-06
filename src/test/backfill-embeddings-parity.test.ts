@@ -59,7 +59,8 @@ import { runScriptDeclarations } from "#/test/shared/script-twin";
  * since importing the `.mjs` would run it and it expects a database. The
  * builder, `section` and the hash are also lifted out of that text and run,
  * without the Bedrock client or the pool, against their `src/` twins on
- * generated projects: the last `describe` below. The text pins stay, because
+ * generated projects, in "the embedding backfill script, run on generated
+ * input". The text pins stay, because
  * they cover branches no generator reaches, and `functionBody` collapses the
  * whitespace inside a template literal, which only a run can see.
  */
@@ -575,9 +576,9 @@ describe("the production backfill's copies of the embedding helpers", () => {
 
 /**
  * The script's own builder, `section`, hash and the constants they read, run.
- * `section` is not compared alone: `src/` does not export it, and its only
- * caller on either side is the builder, so the builder's output is all of its
- * behaviour that reaches a stored hash.
+ * `section` is not compared alone: its only caller on either side is the
+ * builder, so the builder's output is all of its behaviour that reaches a
+ * stored hash.
  */
 const twin = runScriptDeclarations<{
   buildProjectEmbeddingSource: typeof buildProjectEmbeddingSource;

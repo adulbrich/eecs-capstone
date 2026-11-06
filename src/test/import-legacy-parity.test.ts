@@ -38,8 +38,8 @@ import { runScriptDeclarations } from "#/test/shared/script-twin";
  *
  * Read as text rather than imported, following `env-contract.test.ts`, since
  * importing either module expects a database or object storage. The namespace
- * and `uuidv5` are also lifted out of both texts and run: the describe after
- * this one.
+ * and `uuidv5` are also lifted out of both texts and run, in "the legacy
+ * import's two scripts, run".
  */
 const IMAGES_SOURCE = readFileSync("scripts/import-legacy-images.ts", "utf8");
 const IMPORT_SOURCE = readFileSync("scripts/import-legacy.mjs", "utf8");
@@ -134,7 +134,8 @@ describe("the legacy import's two scripts", () => {
   /**
    * A regression pin, independent of both sources: it recomputes the id here
    * and compares to the value an imported database already holds. It does NOT
-   * execute either script; the describe below runs both on the same cp_id.
+   * execute either script; "the legacy import's two scripts, run" runs both
+   * on the same cp_id.
    */
   it("turn a known cp_id into a known project id", () => {
     const namespace = NAMESPACE_PATTERN.exec(IMPORT_SOURCE)?.[1] as string;
@@ -171,12 +172,12 @@ interface IdTwin {
  * Each script's own namespace and `uuidv5`, run. The `.ts` copy is
  * transpiled first, which strips its annotations and nothing else.
  */
-const fromImport = runScriptDeclarations<IdTwin>(
+const importTwin = runScriptDeclarations<IdTwin>(
   "scripts/import-legacy.mjs",
   ["NAMESPACE", "uuidv5"],
   { Buffer, createHash }
 );
-const fromImages = runScriptDeclarations<IdTwin>(
+const imagesTwin = runScriptDeclarations<IdTwin>(
   "scripts/import-legacy-images.ts",
   ["NAMESPACE", "uuidv5"],
   { Buffer, createHash }
@@ -188,12 +189,12 @@ describe("the legacy import's two scripts, run", () => {
   test.prop([fc.oneof(trickyText(), fc.string({ unit: "binary" }))])(
     "derive the same id from any name",
     (name) => {
-      expect(fromImages.uuidv5(name)).toBe(fromImport.uuidv5(name));
+      expect(imagesTwin.uuidv5(name)).toBe(importTwin.uuidv5(name));
     }
   );
 
   it("turn the known cp_id into the id an imported database holds", () => {
-    for (const twin of [fromImport, fromImages]) {
+    for (const twin of [importTwin, imagesTwin]) {
       expect(twin.uuidv5("Qlp7QCpPLveoERMn")).toBe(
         "40eb1fdf-97d2-5b09-92d6-e61e96059deb"
       );
