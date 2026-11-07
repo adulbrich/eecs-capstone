@@ -7,6 +7,7 @@ import {
   formatHoldShort,
   holdFromStoredRow,
 } from "#/lib/hold";
+import { checkoutFloorDay } from "#/lib/inventory-deadlines";
 import {
   HARD_DELETE_HISTORY_REFUSAL,
   needsDueAt,
@@ -743,6 +744,9 @@ export function InventoryLifecyclePanel({
                   className="mt-1"
                   id="due-date"
                   max={lastDeadlineDay()}
+                  // The picker's bound only; typing past it reaches the
+                  // server's refusal, which names the day.
+                  min={checkoutFloorDay(status, history)}
                   onChange={(e) => setDueDate(e.target.value)}
                   type="date"
                   value={dueDate}

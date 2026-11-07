@@ -13,23 +13,43 @@
  * Deadlines are informational columns and overdue is derived at query time,
  * which is why this is a rule rather than a stored flag.
  */
-import { dayEnd, lastDeadlineDay, shiftDay } from "./day-range";
+import {
+  dayEnd,
+  dayStart,
+  formatOfficeDay,
+  lastDeadlineDay,
+  localDay,
+  shiftDay,
+} from "./day-range";
 
 /**
  * The deadline a due date picked as a day stands for: the last millisecond
  * of that day in the office's zone. Reading "2026-10-25" as UTC midnight made
  * the item overdue at 5 pm on the 24th and showed the 24th on the page while
  * the email said the 25th (#805). Blank means no due date; the workflow
- * decides whether the transition may go without one. A past day is allowed,
- * as it always was; `now` only bounds how far out the day may be.
+ * decides whether the transition may go without one.
+ *
+ * The day may fall from `floor`, the day the item was checked out (see
+ * `checkoutFloorDay`), to a year past `now`. An earlier day is a typo, 2002
+ * or 0026 for 2026, and was stored as an item overdue the moment it went out.
  */
 export function dueAtForDay(
   day: string | null | undefined,
-  now: number = Date.now()
+  now: number = Date.now(),
+  floor: string = localDay(new Date(now))
 ): Date | null {
   const picked = day?.trim() || null;
   if (!picked) {
     return null;
+  }
+  // Before the calendar check, and a plain string comparison, which the
+  // fixed-width `YYYY-MM-DD` the wire schema enforces makes exact: a year
+  // under 100 fails the calendar check (`Date.UTC` reads it as 19xx), and a
+  // two-digit year typed as 0026 should be told the day it is short of.
+  if (picked < floor) {
+    throw new Error(
+      `Pick a due date on or after ${formatOfficeDay(dayStart(floor))}. An item cannot be due before the day it was checked out.`
+    );
   }
   // The wire shape lets "2026-02-31" through, and the arithmetic would read
   // it as March 3; `resolvePickupWindow` refuses it the same way.
@@ -40,6 +60,46 @@ export function dueAtForDay(
     throw new Error("Pick a due date within the next year.");
   }
   return dayEnd(picked);
+}
+
+/** A status history row, as far as `checkoutFloorDay` reads it. */
+export interface StatusChange {
+  createdAt: Date | string;
+  newStatus: string;
+  oldStatus: string | null;
+}
+
+/**
+ * The earliest day a due date may fall on: the day the item was checked out,
+ * in the office's zone, for the date input's `min` and the server's refusal
+ * alike.
+ *
+ * An item not checked out yet is checked out the moment the transition is
+ * saved, so its floor is today. One already checked out can be re-saved as
+ * `checked_out` through "Change status to", to move its due date or change
+ * its holder, and its floor is the day the current checkout began: the latest
+ * change into `checked_out` from another status. A re-save writes a row from
+ * `checked_out` to `checked_out`, which is not a new checkout. Never later
+ * than today, so the refusal never names a day staff could not have picked.
+ */
+export function checkoutFloorDay(
+  status: string,
+  history: readonly StatusChange[],
+  now: number = Date.now()
+): string {
+  let began = now;
+  if (status === "checked_out") {
+    const starts = history
+      .filter(
+        (row) =>
+          row.newStatus === "checked_out" && row.oldStatus !== "checked_out"
+      )
+      .map((row) => new Date(row.createdAt).getTime());
+    if (starts.length > 0) {
+      began = Math.min(Math.max(...starts), now);
+    }
+  }
+  return localDay(new Date(began));
 }
 
 /**

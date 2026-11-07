@@ -15,6 +15,7 @@ import {
   user,
 } from "#/db/schema";
 import { auth } from "#/lib/auth";
+import { dayEnd, localDay, shiftDay } from "#/lib/day-range";
 import { isOpenRow } from "#/lib/my-items-filter";
 import type { UserRole } from "#/lib/vocabularies";
 import { deleteAccountAs } from "#/server/_internal/account";
@@ -1973,12 +1974,15 @@ describe("staff-assigned holds without a request line", () => {
   it("stores a due date picked on the item page as the end of that day in Corvallis", async () => {
     const admin = await makeUser(`wi-due-${Date.now()}@x.com`, "admin");
     const item = await makeItem();
+    // Relative to today, which is the floor; the DST cases are unit tests on
+    // `dueAtForDay`, which pins the clock.
+    const day = shiftDay(localDay(new Date()), 3);
     // The wire shape the lifecycle dialog sends: the day, never a Date (#805).
     const { sendEmail, ...fields } = transitionSchema.parse({
       itemId: item.id,
       nextStatus: "checked_out",
       holderLabel: "Lab 204",
-      dueDay: "2026-11-01",
+      dueDay: day,
     });
 
     await transitionInventoryItemAs(admin, fields, { sendEmail });
@@ -1987,8 +1991,84 @@ describe("staff-assigned holds without a request line", () => {
       .select()
       .from(inventoryItems)
       .where(eq(inventoryItems.id, item.id));
-    // Fall back day, so the end is on PST: midnight Pacific is 08:00 UTC.
-    expect(after.currentDueAt?.toISOString()).toBe("2026-11-02T07:59:59.999Z");
+    expect(after.currentDueAt?.toISOString()).toBe(dayEnd(day).toISOString());
+    // The last millisecond in Corvallis, which UTC midnight never is.
+    expect(after.currentDueAt?.toISOString()).toMatch(/T0[67]:59:59\.999Z$/u);
+  });
+
+  describe("the due date floor", () => {
+    /** The lifecycle dialog's checkout of `itemId`, due on `dueDay`. */
+    function checkout(itemId: string, dueDay: string) {
+      const { sendEmail, ...fields } = transitionSchema.parse({
+        itemId,
+        nextStatus: "checked_out",
+        holderLabel: "Lab 204",
+        dueDay,
+      });
+      return { fields, sendEmail };
+    }
+
+    it("refuses a day before a new checkout, and writes nothing", async () => {
+      const admin = await makeUser(`wi-floor-${Date.now()}@x.com`, "admin");
+      const item = await makeItem();
+      const { fields, sendEmail } = checkout(
+        item.id,
+        shiftDay(localDay(new Date()), -1)
+      );
+
+      await expect(
+        transitionInventoryItemAs(admin, fields, { sendEmail })
+      ).rejects.toThrow(/^Pick a due date on or after /u);
+
+      const [after] = await db
+        .select()
+        .from(inventoryItems)
+        .where(eq(inventoryItems.id, item.id));
+      expect(after.status).toBe("available");
+      const history = await db
+        .select()
+        .from(inventoryItemStatusHistory)
+        .where(eq(inventoryItemStatusHistory.itemId, item.id));
+      expect(history).toHaveLength(0);
+    });
+
+    it("measures a re-saved checkout from the day it began, not today", async () => {
+      const admin = await makeUser(`wi-resave-${Date.now()}@x.com`, "admin");
+      const item = await makeItem();
+      await transitionItem(admin, {
+        itemId: item.id,
+        nextStatus: "checked_out",
+        holderLabel: "Lab 204",
+        dueAt: new Date(Date.now() + 3 * 86_400_000),
+      });
+      // Recorded ten days ago: a transition stamps its row with now.
+      const began = new Date(Date.now() - 10 * 86_400_000);
+      await db
+        .update(inventoryItemStatusHistory)
+        .set({ createdAt: began })
+        .where(eq(inventoryItemStatusHistory.itemId, item.id));
+      const beganDay = localDay(began);
+
+      const early = checkout(item.id, shiftDay(beganDay, -1));
+      await expect(
+        transitionInventoryItemAs(admin, early.fields, {
+          sendEmail: early.sendEmail,
+        })
+      ).rejects.toThrow(/^Pick a due date on or after /u);
+
+      // The day it began: in the past, and still allowed.
+      const onTheDay = checkout(item.id, beganDay);
+      await transitionInventoryItemAs(admin, onTheDay.fields, {
+        sendEmail: onTheDay.sendEmail,
+      });
+      const [after] = await db
+        .select()
+        .from(inventoryItems)
+        .where(eq(inventoryItems.id, item.id));
+      expect(after.currentDueAt?.toISOString()).toBe(
+        dayEnd(beganDay).toISOString()
+      );
+    });
   });
 
   it("resolves an assigned email to the matching account and notifies it", async () => {

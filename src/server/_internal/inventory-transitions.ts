@@ -1,4 +1,4 @@
-import { eq, sql } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import type { db as Db } from "#/db";
 import { db } from "#/db";
 import {
@@ -12,7 +12,7 @@ import {
 import { requireUser } from "#/lib/_internal/auth-guards";
 import { buildNotificationConfig } from "#/lib/email/config";
 import { type Hold, holdFromInput, holdToColumns } from "#/lib/hold";
-import { dueAtForDay } from "#/lib/inventory-deadlines";
+import { checkoutFloorDay, dueAtForDay } from "#/lib/inventory-deadlines";
 import {
   type InventoryNotice,
   type NoticeRecipient,
@@ -463,13 +463,47 @@ export async function transitionInventoryItemAs(
     pickupPlace,
     pickupNote,
   });
-  await transitionItem(
-    viewer,
-    { ...input, ...terms, dueAt: dueAtForDay(dueDay) },
-    undefined,
-    opts
+  const now = Date.now();
+  const dueAt = dueAtForDay(
+    dueDay,
+    now,
+    dueDay ? await checkoutFloorOf(input.itemId, now) : undefined
   );
+  await transitionItem(viewer, { ...input, ...terms, dueAt }, undefined, opts);
   return { ok: true as const };
+}
+
+/**
+ * The item's `checkoutFloorDay`, read before the transaction because the day
+ * is refused before a row is locked, as the pickup window is. Only a return
+ * that lands between this read and the lock loosens it: the re-save becomes a
+ * new checkout under the old one's floor. That takes two staff on one item at
+ * once, and a seed or test that wants a past due date passes `dueAt` to
+ * `transitionItem` directly.
+ */
+async function checkoutFloorOf(itemId: string, now: number): Promise<string> {
+  const [item] = await db
+    .select({ status: inventoryItems.status })
+    .from(inventoryItems)
+    .where(eq(inventoryItems.id, itemId));
+  const status = item?.status ?? "available";
+  if (status !== "checked_out") {
+    return checkoutFloorDay(status, [], now);
+  }
+  const checkouts = await db
+    .select({
+      createdAt: inventoryItemStatusHistory.createdAt,
+      newStatus: inventoryItemStatusHistory.newStatus,
+      oldStatus: inventoryItemStatusHistory.oldStatus,
+    })
+    .from(inventoryItemStatusHistory)
+    .where(
+      and(
+        eq(inventoryItemStatusHistory.itemId, itemId),
+        eq(inventoryItemStatusHistory.newStatus, "checked_out")
+      )
+    );
+  return checkoutFloorDay(status, checkouts, now);
 }
 
 // The skip rides in `EmailOptions`, as on the approve paths (#387).
