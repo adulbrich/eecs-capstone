@@ -49,7 +49,8 @@ const CALL_BREAK = new Set([";", "\n", "&", "|"]);
 const HEREDOC =
   /<<-?[ \t]*(['"]?)([\w.-]+)\1([^\n]*)\n[\s\S]*?^\t*\2[ \t]*$/gmu;
 const SHELL_EXPANDS = /[$`]/u;
-const QUOTE_SPLICE = "'\\''";
+// What may follow a shell word's closing quote; anything else splices on.
+const WORD_END = /^(?:\s|\)|$)/u;
 const TRAILER = "Assisted-by: Claude Code";
 const TRAILER_LINE = /^Assisted-by: Claude Code[ \t]*$/mu;
 const CUT_LINE = /^---[ \t]*$/mu;
@@ -113,8 +114,9 @@ function textProblems(text, where) {
 
 /**
  * Whether the inline `--body` is text the shell rewrites before `gh` sees it:
- * an expansion inside double quotes, or a `'\''` splice. Such a body cannot be
- * read from the command line, so it is not checked for the trailer.
+ * an expansion inside double quotes, or more quoted text spliced onto the
+ * first (`'It'\''s'`, `'don'"'"'t'`). Such a body cannot be read from the
+ * command line, so it is not checked for the trailer.
  */
 function shellRewritesBody(call) {
   if (BODY_FILE_FLAG.test(call)) {
@@ -124,9 +126,8 @@ function shellRewritesBody(call) {
   if (!inline) {
     return false;
   }
-  return inline[1] === undefined
-    ? call.includes(QUOTE_SPLICE)
-    : SHELL_EXPANDS.test(inline[1]);
+  const spliced = !WORD_END.test(call.slice(inline.index + inline[0].length));
+  return spliced || SHELL_EXPANDS.test(inline[1] ?? "");
 }
 
 /**

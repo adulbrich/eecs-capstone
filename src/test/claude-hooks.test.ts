@@ -388,6 +388,7 @@ describe("guard-gh Assisted-by trailer", () => {
       `gh pr edit 5 -F ${clean}`,
       `gh pr create ${T} --body "Closes #1\n\nAssisted-by: Claude Code"`,
       `url=$(gh pr create ${T} --body-file ${clean})`,
+      `url=$(gh pr create ${T} --body 'Closes #1\n\nAssisted-by: Claude Code')`,
     ]) {
       expect(bash("guard-gh", command).status, command).toBe(0);
     }
@@ -431,6 +432,7 @@ describe("guard-gh Assisted-by trailer", () => {
       `gh pr create ${T} --body "$BODY"`,
       `gh pr create ${T} --body "$(cat <<'EOF'\nfixes the "submit" button\n\nAssisted-by: Claude Code\nEOF\n)"`,
       `gh pr create ${T} --body 'It'\\''s done\n\nAssisted-by: Claude Code'`,
+      `gh pr create ${T} --body 'don'"'"'t\n\nAssisted-by: Claude Code'`,
     ]) {
       expect(bash("guard-gh", command).status, command).toBe(0);
     }
