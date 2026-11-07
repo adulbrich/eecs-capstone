@@ -476,10 +476,11 @@ export async function transitionInventoryItemAs(
 /**
  * The item's `checkoutFloorDay`, read before the transaction because the day
  * is refused before a row is locked, as the pickup window is. Only a return
- * that lands between this read and the lock loosens it: the re-save becomes a
- * new checkout under the old one's floor. That takes two staff on one item at
- * once, and a seed or test that wants a past due date passes `dueAt` to
- * `transitionItem` directly.
+ * that lands between this read and the lock loosens it: the transition then
+ * belongs to a later checkout than the floor came from, and a day from the
+ * earlier one's start gets through. That takes two staff on one item at once.
+ * A seed or test that wants a past due date passes `dueAt` to `transitionItem`
+ * directly.
  */
 async function checkoutFloorOf(itemId: string, now: number): Promise<string> {
   const [item] = await db

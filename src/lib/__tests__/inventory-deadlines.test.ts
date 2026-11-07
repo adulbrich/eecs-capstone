@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import { officeDay, wallTime } from "#/test/shared/arbitraries";
 import {
   dayEnd,
+  dayStart,
   lastDeadlineDay,
   localDay,
   localInstant,
@@ -35,6 +36,26 @@ const endOf = (day: string | null) => dueAtForDay(day, NOW, "2026-01-01");
 
 const FLOOR_REFUSAL = /^Pick a due date on or after /u;
 const CEILING_REFUSAL = "Pick a due date within the next year.";
+
+/** A moment on the office clock, weighted toward the DST change days. */
+const instant = fc
+  .tuple(officeDay, wallTime)
+  .map(([day, time]) => localInstant(day, time).getTime());
+
+const MONTHS = [
+  "Jan",
+  "Feb",
+  "Mar",
+  "Apr",
+  "May",
+  "Jun",
+  "Jul",
+  "Aug",
+  "Sep",
+  "Oct",
+  "Nov",
+  "Dec",
+];
 
 describe("dueAtForDay", () => {
   it("is the end of the day in Corvallis, not UTC midnight (#805)", () => {
@@ -168,6 +189,30 @@ describe("dueAtForDay", () => {
       }
     }
   );
+
+  test.prop([officeDay, fc.integer({ max: 900, min: 1 }), instant])(
+    "names the floor in its refusal, whatever the floor",
+    (floor, daysShort, now) => {
+      // Spelled out here rather than through `formatOfficeDay`, so the
+      // property does not share the formatter it checks.
+      const [year, month, date] = floor.split("-").map(Number);
+      const named = `${MONTHS[month - 1]} ${date}, ${year}`;
+      expect(() =>
+        dueAtForDay(shiftDay(floor, -daysShort), now, floor)
+      ).toThrow(`Pick a due date on or after ${named}.`);
+    }
+  );
+
+  test.prop([officeDay])(
+    "moves today over at midnight in Corvallis, change days included",
+    (day) => {
+      const midnight = dayStart(day).getTime();
+      const yesterday = shiftDay(day, -1);
+      expect(dueAtForDay(day, midnight)).toEqual(dayEnd(day));
+      expect(() => dueAtForDay(yesterday, midnight)).toThrow(FLOOR_REFUSAL);
+      expect(dueAtForDay(yesterday, midnight - 1)).toEqual(dayEnd(yesterday));
+    }
+  );
 });
 
 describe("checkoutFloorDay", () => {
@@ -217,6 +262,43 @@ describe("checkoutFloorDay", () => {
       )
     ).toBe("2026-08-11");
   });
+
+  /** History rows, some sharing one instant, in any order and status. */
+  const rows = fc.array(
+    fc.record({
+      at: fc.oneof(instant, fc.constant(1_800_000_000_000)),
+      newStatus: fc.constantFrom("available", "reserved", "checked_out"),
+      oldStatus: fc.constantFrom<string | null>(
+        null,
+        "available",
+        "reserved",
+        "checked_out"
+      ),
+    }),
+    { maxLength: 8 }
+  );
+
+  test.prop([rows, instant])(
+    "never passes today, ignores row order, and reads a Date and its ISO string alike",
+    (generated, now) => {
+      const today = localDay(new Date(now));
+      const asDates = generated.map(({ at, ...row }) => ({
+        ...row,
+        createdAt: new Date(at),
+      }));
+      const asStrings = generated.map(({ at, ...row }) => ({
+        ...row,
+        createdAt: new Date(at).toISOString(),
+      }));
+      const floor = checkoutFloorDay("checked_out", asDates, now);
+      expect(floor <= today).toBe(true);
+      expect(checkoutFloorDay("checked_out", [...asDates].reverse(), now)).toBe(
+        floor
+      );
+      expect(checkoutFloorDay("checked_out", asStrings, now)).toBe(floor);
+      expect(checkoutFloorDay("reserved", asDates, now)).toBe(today);
+    }
+  );
 });
 
 describe("overdueFlags", () => {

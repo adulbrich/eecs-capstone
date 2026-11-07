@@ -87,18 +87,16 @@ export function checkoutFloorDay(
   history: readonly StatusChange[],
   now: number = Date.now()
 ): string {
-  let began = now;
-  if (status === "checked_out") {
-    const starts = history
-      .filter(
-        (row) =>
-          row.newStatus === "checked_out" && row.oldStatus !== "checked_out"
-      )
-      .map((row) => new Date(row.createdAt).getTime());
-    if (starts.length > 0) {
-      began = Math.min(Math.max(...starts), now);
-    }
-  }
+  const starts =
+    status === "checked_out"
+      ? history
+          .filter(
+            (row) =>
+              row.newStatus === "checked_out" && row.oldStatus !== "checked_out"
+          )
+          .map((row) => new Date(row.createdAt).getTime())
+      : [];
+  const began = starts.length > 0 ? Math.min(Math.max(...starts), now) : now;
   return localDay(new Date(began));
 }
 
