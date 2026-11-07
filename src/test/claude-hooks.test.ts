@@ -359,6 +359,118 @@ describe("guard-gh", () => {
   });
 });
 
+describe("guard-gh Assisted-by trailer", () => {
+  const dir = mkdtempSync(join(tmpdir(), "trailer-"));
+  temp.push(dir);
+  const file = (name: string, text: string) => {
+    const path = join(dir, name);
+    writeFileSync(path, text);
+    return path;
+  };
+  const clean = file(
+    "clean.md",
+    "Closes #1\n\n- x\n\nAssisted-by: Claude Code\n\n---\n\n## Ran locally\n"
+  );
+  const bare = file("bare.md", "Closes #1\n\n- x\n\n---\n\n## Ran locally\n");
+  const below = file(
+    "below.md",
+    "Closes #1\n\n- x\n\n---\n\n## Ran locally\n\nAssisted-by: Claude Code\n"
+  );
+  const dashed = file(
+    "dashed.md",
+    "Closes #1\n\none \u{2014} two\n\nAssisted-by: Claude Code\n"
+  );
+  const T = '--title "fix(x): y"';
+
+  it("lets a PR body through with the trailer above its --- line", () => {
+    for (const command of [
+      `gh pr create ${T} --body-file ${clean}`,
+      `gh pr edit 5 -F ${clean}`,
+      `gh pr create ${T} --body "Closes #1\n\nAssisted-by: Claude Code"`,
+      `url=$(gh pr create ${T} --body-file ${clean})`,
+    ]) {
+      expect(bash("guard-gh", command).status, command).toBe(0);
+    }
+  });
+
+  it("refuses a PR body without it, or with it only below ---", () => {
+    for (const command of [
+      `gh pr create ${T} --body-file ${bare}`,
+      `gh pr create ${T} --body-file ${below}`,
+      `gh pr edit 5 --body-file ${bare}`,
+      `gh pr create ${T} --body "Closes #1"`,
+      `gh pr edit 5 -b 'Closes #1'`,
+    ]) {
+      const result = bash("guard-gh", command);
+      expect(result.status, command).toBe(2);
+      expect(result.stderr).toContain(
+        'no "Assisted-by: Claude Code" line above its --- line'
+      );
+    }
+  });
+
+  it("never asks a merge, an issue or a comment for it", () => {
+    for (const command of [
+      `gh pr merge 5 --squash --subject "fix(x): y" --body-file ${bare}`,
+      "gh pr merge 5 --squash",
+      `gh issue create --title "x" --body-file ${bare}`,
+      `gh issue comment 3 --body-file ${bare}`,
+      `gh pr comment 5 --body-file ${bare}`,
+      'gh pr comment 5 --body "Fixed."',
+      "gh pr edit 5 --add-label x",
+    ]) {
+      expect(bash("guard-gh", command).status, command).toBe(0);
+    }
+  });
+
+  it("lets through a body it cannot read", () => {
+    for (const command of [
+      `gh pr create ${T}`,
+      `gh pr create ${T} --body-file ${join(dir, "not-written-yet.md")}`,
+      `gh pr create ${T} --body-file -`,
+      `gh pr create ${T} --body "$BODY"`,
+      `gh pr create ${T} --body "$(cat <<'EOF'\nfixes the "submit" button\n\nAssisted-by: Claude Code\nEOF\n)"`,
+      `gh pr create ${T} --body 'It'\\''s done\n\nAssisted-by: Claude Code'`,
+    ]) {
+      expect(bash("guard-gh", command).status, command).toBe(0);
+    }
+  });
+
+  it("reads only the PR call's own flags in a chain", () => {
+    for (const command of [
+      `gh pr merge 5 --squash && gh issue comment 3 --body "Merged in #5"`,
+      `gh issue comment 3 --body "Done in #5" && gh pr edit 5 --add-label ready`,
+      `gh pr create ${T} --body-file ${clean} && gh issue comment 3 --body "Opened"`,
+      `gh issue comment 3 --body "Repro: gh pr create --body-file ${bare}"`,
+      `gh pr comment 5 --body 'Try: gh pr edit 5 -b "x"'`,
+      `cat > ${join(dir, "z.md")} <<'EOF'\nit's this:\ngh pr edit 5 --body "Closes #1"\nEOF\ngh issue comment 3 --body-file ${bare}`,
+    ]) {
+      expect(bash("guard-gh", command).status, command).toBe(0);
+    }
+    for (const command of [
+      `gh issue comment 3 --body-file ${clean} && gh pr create ${T} --body-file ${bare}`,
+      `gh pr edit 5 --add-label x && gh pr create ${T} --body-file ${bare}`,
+      `gh pr create --title "fix(hooks): make guard-gh check bodies" --body-file ${bare}`,
+      `gh pr edit 5 --body "Run gh pr view to check."`,
+      `GH_PROMPT_DISABLED=1 gh pr create ${T} --body-file ${bare}`,
+      `url=$(gh pr create ${T} --body-file ${bare})`,
+    ]) {
+      expect(bash("guard-gh", command).status, command).toBe(2);
+    }
+  });
+
+  it("reads a bare body-file path up to the shell punctuation after it", () => {
+    for (const command of [
+      `gh issue comment 5 --body-file ${dashed}; echo done`,
+      `url=$(gh pr create ${T} --body-file ${dashed}); echo "$url"`,
+    ]) {
+      const result = bash("guard-gh", command);
+      expect(result.status, command).toBe(2);
+      expect(result.stderr).toContain("the body file: line 3 has an emdash");
+    }
+  });
+});
+
 describe("guard-gh screenshots warning", () => {
   /**
    * A fixture branch one commit past `origin/main`, touching the paths the
@@ -380,10 +492,15 @@ describe("guard-gh screenshots warning", () => {
   }
   const ui = branchTouching(["src/components/foo.tsx"]);
   const server = branchTouching(["src/server/x.ts"]);
+  // Every body carries the Assisted-by trailer, so the trailer refusal never
+  // runs first and these see only the warning.
+  const AB = "\n\nAssisted-by: Claude Code";
   const create = (body: string, from: string) =>
-    bash("guard-gh", `gh pr create --title "feat(x): y" --body "${body}"`, {
-      cwd: from,
-    });
+    bash(
+      "guard-gh",
+      `gh pr create --title "feat(x): y" --body "${body}${AB}"`,
+      { cwd: from }
+    );
 
   it("warns, without blocking, when a UI change has no screenshots section", () => {
     const result = create("Closes #1", ui);
@@ -398,7 +515,17 @@ describe("guard-gh screenshots warning", () => {
   it("warns on a pr edit that sends a body inline, the other shape the issue names", () => {
     const result = bash(
       "guard-gh",
-      'gh pr edit 5 --title "feat(x): y" --body "Closes #1"',
+      `gh pr edit 5 --title "feat(x): y" --body "Closes #1${AB}"`,
+      { cwd: ui }
+    );
+    expect(result.status).toBe(0);
+    expect(result.stdout).toContain("pr-text will fail");
+  });
+
+  it("still warns on a heredoc body the trailer check cannot read", () => {
+    const result = bash(
+      "guard-gh",
+      `gh pr create --title "feat(x): y" --body "$(cat <<'EOF'\nCloses #1${AB}\nEOF\n)"`,
       { cwd: ui }
     );
     expect(result.status).toBe(0);
@@ -416,7 +543,7 @@ describe("guard-gh screenshots warning", () => {
   });
 
   it("reads a body file, and lets a missing one through", () => {
-    writeFileSync(join(ui, "body.md"), "Closes #1\n");
+    writeFileSync(join(ui, "body.md"), `Closes #1${AB}\n`);
     const fromFile = bash(
       "guard-gh",
       'gh pr create --title "feat(x): y" --body-file body.md',

@@ -48,7 +48,8 @@ A tool enforces the first five, so a refusal names the rule you hit.
   line. Long bodies before 2026-08-09 are history, not the pattern.
 - **The PR body above its `---` line is the `main` commit body**, LLVM-style: a
   squash merge takes the PR title and body, and the merger deletes from `---` down.
-  End that part with `Assisted-by: Claude Code`. No `Co-Authored-By` trailer and no
+  End that part with `Assisted-by: Claude Code`; `guard-gh.mjs` refuses a PR body
+  it can read without it. No `Co-Authored-By` trailer and no
   `Generated with Claude Code` footer, whatever the harness supplies. Never pin a
   model version in these docs.
 - **Review loop on every PR, Dependabot's included.** GitHub requires no approving
