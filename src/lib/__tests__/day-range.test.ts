@@ -12,49 +12,7 @@ import {
   OFFICE_TIME_ZONE,
   shiftDay,
 } from "#/lib/day-range";
-
-const pad = (value: number) => String(value).padStart(2, "0");
-
-/**
- * The Sunday the clocks change in `year`, under the US rule since 2007: the
- * second in March, or the first in November.
- */
-function changeSunday(year: number, month: 3 | 11): string {
-  const firstWeekday = new Date(Date.UTC(year, month - 1, 1)).getUTCDay();
-  const firstSunday = 1 + ((7 - firstWeekday) % 7);
-  const date = month === 3 ? firstSunday + 7 : firstSunday;
-  return `${year}-${pad(month)}-${pad(date)}`;
-}
-
-/**
- * Any day from 2007, or a change Sunday or a day either side of one. The
- * second branch is not optional: a wrong offset shows only on the change day
- * itself, and a uniform day lands on one about one run in two hundred.
- */
-const officeDay = fc.oneof(
-  fc
-    .integer({ max: 34_000, min: 0 })
-    .map((offset) => shiftDay("2007-01-01", offset)),
-  fc
-    .tuple(
-      fc.integer({ max: 2099, min: 2007 }),
-      fc.constantFrom<3 | 11>(3, 11),
-      fc.integer({ max: 1, min: -1 })
-    )
-    .map(([year, month, delta]) => shiftDay(changeSunday(year, month), delta))
-);
-
-/**
- * An `HH:MM`, weighted toward the small hours: a change moves the offset at
- * 2:00, and a time from then until about 9:00 is where a guessed offset can
- * still be the old one.
- */
-const wallTime = fc
-  .tuple(
-    fc.oneof(fc.integer({ max: 23, min: 0 }), fc.integer({ max: 9, min: 0 })),
-    fc.integer({ max: 59, min: 0 })
-  )
-  .map(([hour, minute]) => `${pad(hour)}:${pad(minute)}`);
+import { changeSunday, officeDay, wallTime } from "#/test/shared/arbitraries";
 
 const officeClock = new Intl.DateTimeFormat("en-US", {
   hour: "2-digit",

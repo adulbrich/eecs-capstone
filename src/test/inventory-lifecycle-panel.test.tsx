@@ -7,6 +7,7 @@ import {
   within,
 } from "@testing-library/react";
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
+import { lastDeadlineDay, localDay } from "#/lib/day-range";
 import { INVENTORY_ITEM_STATUSES, type ItemStatus } from "#/lib/vocabularies";
 import { renderWithQueryClient } from "./shared/query-client";
 
@@ -191,6 +192,45 @@ describe("InventoryLifecyclePanel: the status override", () => {
       await screen.findByRole("option", { name: next.replace(/_/gu, " ") })
     );
   }
+
+  it("bounds a checked-out item's re-saved due date from the day its checkout began", async () => {
+    const began = new Date(Date.now() - 10 * 86_400_000);
+    const row = (
+      oldStatus: string,
+      newStatus: string,
+      createdAt: Date
+    ): HistoryRow => ({
+      changedByEmail: "staff@example.com",
+      changedByName: "Staff",
+      comment: null,
+      createdAt,
+      holderEmail: null,
+      holderId: null,
+      holderLabel: "Lab 204",
+      holderName: null,
+      holderProgram: null,
+      id: `h-${createdAt.getTime()}`,
+      newStatus,
+      oldStatus,
+    });
+    renderPanel({
+      status: "checked_out",
+      history: [
+        // A re-save two days ago is not a new checkout.
+        row(
+          "checked_out",
+          "checked_out",
+          new Date(Date.now() - 2 * 86_400_000)
+        ),
+        row("available", "checked_out", began),
+      ],
+    });
+    await pickOverride("checked_out");
+    const dialog = await screen.findByRole("dialog");
+    expect(within(dialog).getByLabelText("Due date").getAttribute("min")).toBe(
+      localDay(began)
+    );
+  });
 
   // The same rule as the recommended button, asked of the other handler:
   // the override opens the holder dialog exactly when needsHolder says so.
@@ -433,6 +473,16 @@ describe("InventoryLifecyclePanel: the checkout dialog", () => {
         }),
       })
     );
+  });
+
+  it("bounds a new checkout's due date from today to a year out", async () => {
+    renderPanel({ status: "available" });
+    fireEvent.click(screen.getByRole("button", { name: "Check out" }));
+    const due = within(await screen.findByRole("dialog")).getByLabelText(
+      "Due date"
+    );
+    expect(due.getAttribute("min")).toBe(localDay(new Date()));
+    expect(due.getAttribute("max")).toBe(lastDeadlineDay());
   });
 
   it("stays open and shows the refusal inside when the transition fails", async () => {
