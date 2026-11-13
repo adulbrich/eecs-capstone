@@ -31,9 +31,9 @@ interface Props {
 /**
  * The category list for one domain. A public catalog, so the key names the
  * domain and no viewer. Read again on every mount, as the effect did: staff
- * add categories on the admin pages, which invalidate nothing here.
+ * add categories on the admin pages, which invalidate nothing here. Exported
+ * so a section that creates a category can refresh the picker.
  */
-/** Exported so a section that creates a category can refresh the picker. */
 export function categoriesQuery(domain: Domain) {
   return queryOptions({
     queryKey: ["categories", domain],

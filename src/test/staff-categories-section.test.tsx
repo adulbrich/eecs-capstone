@@ -204,6 +204,9 @@ describe("a proposed category", () => {
     expect(
       screen.queryByRole("region", { name: "Suggested new category" })
     ).toBeNull();
+    expect(
+      screen.getByText('Added "Animal Acoustics" to Field and to this project.')
+    ).toBeTruthy();
   });
 
   it("is dropped by Dismiss without a write", async () => {
