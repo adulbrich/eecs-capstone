@@ -206,7 +206,7 @@ export function StaffCategoriesSection({
         </p>
         <p className="text-xs">
           <Link
-            className="text-primary hover:underline"
+            className="hover:underline"
             search={{ tab: "project" }}
             to="/admin/categories"
           >

@@ -95,6 +95,25 @@ describe("ProjectCategoryPicker", () => {
     expect(screen.getByTestId("value").textContent).toBe("f-web,f-games");
   });
 
+  it("matches the search as a substring of the name or type", async () => {
+    renderWithQueryClient(<Harness initial={[]} />);
+    await screen.findByText("No categories yet.");
+    const add = screen.getByRole("combobox", { name: "Add a category" });
+    await vi.waitFor(() => expect(add.hasAttribute("disabled")).toBe(false));
+    fireEvent.click(add);
+    const box = screen.getByPlaceholderText("Search categories");
+
+    fireEvent.change(box, { target: { value: "ga" } });
+    expect(
+      (await screen.findAllByRole("option")).map((o) => o.textContent)
+    ).toEqual(["Game Development"]);
+
+    fireEvent.change(box, { target: { value: "field" } });
+    expect(
+      (await screen.findAllByRole("option")).map((o) => o.textContent)
+    ).toEqual(["Game Development", "Web Development"]);
+  });
+
   it("offers no way to create a category", async () => {
     renderWithQueryClient(<Harness initial={[]} />);
     expect(await screen.findByText("No categories yet.")).toBeTruthy();

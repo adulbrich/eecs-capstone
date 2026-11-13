@@ -23,6 +23,15 @@ interface Category {
   type: string | null;
 }
 
+/**
+ * A plain substring match on the name and type, in place of cmdk's fuzzy
+ * score, which matched "ga" to Machine Learning and Existing System by
+ * scattered letters. Typing a type's name lists that type.
+ */
+function containsSearch(value: string, search: string): number {
+  return value.toLowerCase().includes(search.trim().toLowerCase()) ? 1 : 0;
+}
+
 function byTypeThenName(a: Category, b: Category): number {
   return (
     typeOrder(a.type ?? "", b.type ?? "") ||
@@ -130,7 +139,7 @@ export function ProjectCategoryPicker({
           </Button>
         </PopoverTrigger>
         <PopoverContent align="start" className="w-72 p-0">
-          <Command>
+          <Command filter={containsSearch}>
             <CommandInput
               onValueChange={setSearch}
               placeholder="Search categories"
@@ -144,7 +153,7 @@ export function ProjectCategoryPicker({
                     <CommandItem
                       key={c.id}
                       onSelect={() => add(c.id)}
-                      value={`${type} ${c.name} ${c.id}`}
+                      value={`${c.name} ${type}`}
                     >
                       {c.name}
                     </CommandItem>
