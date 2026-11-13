@@ -18,10 +18,12 @@ import { Button } from "#/components/ui/button";
 import { FieldError } from "#/components/ui/field";
 import { Input } from "#/components/ui/input";
 import { Label } from "#/components/ui/label";
+import { Textarea } from "#/components/ui/textarea";
 import { requireStaff } from "#/lib/access-denied";
 import { pageTitle } from "#/lib/page-title";
 import { useAction } from "#/lib/use-action";
 import {
+  CATEGORY_DESCRIPTION_MAX_LENGTH,
   deleteCategory,
   getCategory,
   listCategoryTypes,
@@ -70,6 +72,7 @@ function CategoryForm({
   const isProject = category.domain === "project";
   const [name, setName] = useState(category.name);
   const [type, setType] = useState(category.type ?? "");
+  const [description, setDescription] = useState(category.description ?? "");
   const { busy, error, run } = useAction({ fallback: "Save failed" });
 
   function onSave(e: React.FormEvent) {
@@ -77,7 +80,13 @@ function CategoryForm({
     void run(async () => {
       if (isProject) {
         await updateCategory({
-          data: { id: category.id, domain: "project", name, type },
+          data: {
+            id: category.id,
+            domain: "project",
+            name,
+            type,
+            description,
+          },
         });
       } else {
         await updateCategory({
@@ -134,6 +143,24 @@ function CategoryForm({
           value={name}
         />
       </div>
+      {isProject && (
+        <div className="space-y-1.5">
+          <Label htmlFor="cat-description">Description</Label>
+          <p
+            className="text-muted-foreground text-xs"
+            id="cat-description-description"
+          >
+            {CATEGORY_FIELD_DESCRIPTION.description}
+          </p>
+          <Textarea
+            aria-describedby="cat-description-description"
+            id="cat-description"
+            maxLength={CATEGORY_DESCRIPTION_MAX_LENGTH}
+            onChange={(e) => setDescription(e.target.value)}
+            value={description}
+          />
+        </div>
+      )}
       <div className="flex gap-2">
         <Button disabled={busy} type="submit">
           {busy ? "Saving..." : "Save"}
@@ -180,7 +207,7 @@ function CategoryEdit() {
       <h1 className="mt-2 text-2xl font-semibold">Edit category</h1>
       <CategoryForm
         category={category}
-        key={`${category.name}|${category.type ?? ""}`}
+        key={`${category.name}|${category.type ?? ""}|${category.description ?? ""}`}
         types={types}
       />
     </div>

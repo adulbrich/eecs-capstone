@@ -24,6 +24,8 @@ import { cn } from "#/lib/utils.ts";
  * the edit route saying the same thing (#374).
  */
 export const CATEGORY_FIELD_DESCRIPTION = {
+  description:
+    "One sentence on what belongs in this category. It is the definition used when categories are suggested for a project, and it is never shown publicly.",
   name: "The category itself, such as React under Technology or Robotics under Field.",
   type: "The group this category is filed under in the picker, such as Technology, Field or Industry.",
 } as const;

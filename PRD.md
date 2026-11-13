@@ -269,6 +269,11 @@ Each project carries:
   type, technology, industry, field) that groups them in the pickers; the
   admin form autocompletes existing types. Inventory categories are flat and
   carry no type.
+- [x] A default list of four types, Field, Technology, Industry and Kind of
+  work, 57 categories in all, each with a one-sentence description staff edit
+  on `/admin/categories` and nobody else sees (#31). It lives in
+  `src/lib/default-categories.ts`; the dev seed reads it, and migration 0043
+  put it in production, replacing the live Type facet with Kind of work.
 - [x] Categories created/edited/deleted by staff (`/admin/categories`).
 - [x] Categories assigned by staff only, many per record, through a
   multi-select in the project page's staff panel (#322) and on the item form.

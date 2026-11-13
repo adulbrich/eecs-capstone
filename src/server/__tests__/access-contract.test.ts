@@ -57,7 +57,6 @@ describe("the server function access contract", () => {
     // endpoint should be reachable with no session at all.
     expect(declaredAt("public")).toEqual([
       "lib/auth-guards.ts:getSession",
-      "server/categories.ts:getCategory",
       "server/categories.ts:listCategories",
       "server/categories.ts:listCategoryTypes",
       "server/categories.ts:listProjectCategories",

@@ -21,6 +21,10 @@ import {
 } from "../src/db/schema";
 import { auth } from "../src/lib/auth";
 import { localDay, localInstant } from "../src/lib/day-range";
+import {
+  DEFAULT_CATEGORIES,
+  type DefaultCategoryName,
+} from "../src/lib/default-categories";
 import type { UserRole } from "../src/lib/vocabularies";
 import {
   addToCartAs,
@@ -214,7 +218,7 @@ async function ensureProgram(p: (typeof PROGRAMS)[number]) {
 // rather than one shape with an optional/nullable `type`, is what makes a
 // project entry that forgets its type a compile error instead of a
 // silently-null one.
-type ProjectCat = { name: string; type: string };
+type ProjectCat = { name: string; type: string; description: string };
 type InventoryCat = { name: string };
 type Cat =
   | (ProjectCat & { domain: "project" })
@@ -241,26 +245,9 @@ async function ensureCategory(c: Cat) {
   return row;
 }
 
-const PROJECT_CATEGORIES: ProjectCat[] = [
-  // Field.
-  { name: "Web Development", type: "field" },
-  { name: "Robotics", type: "field" },
-  { name: "Data Science", type: "field" },
-  { name: "AR / VR", type: "field" },
-  { name: "IoT / Embedded", type: "field" },
-  { name: "Mobile", type: "field" },
-  { name: "Health Tech", type: "field" },
-  // Technology.
-  { name: "React", type: "technology" },
-  { name: "Python", type: "technology" },
-  { name: "C++ / Embedded", type: "technology" },
-  { name: "Machine Learning", type: "technology" },
-  { name: "Unity / VR", type: "technology" },
-  { name: "AWS Cloud", type: "technology" },
-  { name: "React Native", type: "technology" },
-];
-
-const CATEGORIES: Cat[] = PROJECT_CATEGORIES.map(
+// The defaults production got from migration 0043, so a fresh database
+// carries the same list, descriptions included, that the categorizer reads.
+const CATEGORIES: Cat[] = DEFAULT_CATEGORIES.map(
   (c): Cat => ({ ...c, domain: "project" })
 );
 
@@ -350,7 +337,8 @@ async function main() {
     publishedAt: Date | null;
     /** Lowercase, as the column is stored (ADR-0015); no writer normalizes it here. */
     mentorEmail?: string;
-    categories: string[];
+    /** Checked against the default list, so a renamed category fails to compile. */
+    categories: DefaultCategoryName[];
   };
 
   const PROJECTS: SeedProject[] = [
@@ -386,9 +374,11 @@ async function main() {
       status: "published",
       publishedAt: daysAgo(40),
       categories: [
-        "Robotics",
+        "Robotics & Controls",
         "Python",
-        "C++ / Embedded",
+        "ROS",
+        "Manufacturing & Industry",
+        "New Build",
       ],
     },
     {
@@ -417,10 +407,11 @@ async function main() {
       status: "published",
       publishedAt: daysAgo(38),
       categories: [
-        "Web Development",
+        "Data & Visualization",
+        "Cloud & DevOps",
         "React",
-        "AWS Cloud",
-        "IoT / Embedded",
+        "AWS",
+        "New Build",
       ],
     },
     {
@@ -449,9 +440,12 @@ async function main() {
       status: "published",
       publishedAt: daysAgo(35),
       categories: [
-        "Data Science",
-        "Python",
         "Machine Learning",
+        "Computer Vision",
+        "Python",
+        "PyTorch / TensorFlow",
+        "Environment & Sustainability",
+        "Research",
       ],
     },
     {
@@ -479,7 +473,7 @@ async function main() {
       programIds: [p461.id],
       status: "approved",
       publishedAt: null,
-      categories: ["AR / VR", "Unity / VR"],
+      categories: ["AR / VR", "Unity", "Education", "New Build"],
     },
     {
       title: "Campus Sustainability Tracker",
@@ -506,7 +500,14 @@ async function main() {
       programIds: [p461.id],
       status: "submitted",
       publishedAt: null,
-      categories: ["Web Development", "React", "Mobile", "React Native"],
+      categories: [
+        "Web Development",
+        "Mobile Apps",
+        "React",
+        "Flutter / React Native",
+        "Environment & Sustainability",
+        "New Build",
+      ],
     },
     {
       title: "Edge AI Inference on Single-Board Computers",
@@ -534,10 +535,11 @@ async function main() {
       status: "published",
       publishedAt: daysAgo(20),
       categories: [
-        "IoT / Embedded",
+        "Embedded Systems",
         "Machine Learning",
         "Python",
-        "C++ / Embedded",
+        "C / C++",
+        "New Build",
       ],
     },
     {
@@ -565,7 +567,13 @@ async function main() {
       programIds: [p461.id],
       status: "published",
       publishedAt: daysAgo(12),
-      categories: ["Web Development", "React"],
+      categories: [
+        "Web Development",
+        "React",
+        "Accessibility",
+        "Education",
+        "New Build",
+      ],
     },
     {
       title: "Open-Source Drone Telemetry Platform",
@@ -592,7 +600,12 @@ async function main() {
       programIds: [p461.id],
       status: "draft",
       publishedAt: null,
-      categories: ["Robotics", "Python", "IoT / Embedded"],
+      categories: [
+        "Robotics & Controls",
+        "Communications & RF",
+        "Python",
+        "New Build",
+      ],
     },
     {
       // A title at the 200-character cap, so the listings have one row that
@@ -618,7 +631,13 @@ async function main() {
       programIds: [p461.id],
       status: "published",
       publishedAt: daysAgo(3),
-      categories: ["Machine Learning", "Python", "Data Science"],
+      categories: [
+        "Machine Learning",
+        "Data & Visualization",
+        "Python",
+        "Agriculture & Food",
+        "Research",
+      ],
     },
   ];
 
