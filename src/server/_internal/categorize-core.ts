@@ -61,7 +61,7 @@ Each category has a handle such as c12, a name, the number of published projects
 
 - ${KIND_OF_WORK_TYPE}: exactly one. Its categories are listed in order of precedence: take the first whose definition fits, so a research group's prototype is Research even when it builds on existing code.
 - Field: one, or two when a large part of the work is in each. The engineering area the team's work is in, not the sponsor's industry.
-- Technology: only a technology the proposal names, or one the work cannot be done without. Do not infer a language from an engine or framework it names. Most proposals name none, and then pick none.
+- Technology: only a technology the proposal names as one the team will work in, under any heading but preferred qualifications. A choice one category spans counts ("Flutter or React Native"); a choice between categories ("Unity or Unreal") picks neither. Not a technology of the sponsor's that the team will not work in. Never one inferred from the kind of work or from another technology, such as C or C++ for firmware, Python for data work, or C# from Unity. Most proposals name none, and then pick none.
 - Industry: who the result serves, only when that is clear from the proposal.
 - Any other type: at most two, only where one clearly applies.
 
