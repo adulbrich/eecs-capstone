@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { Plus, X } from "lucide-react";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { typeOrder } from "#/lib/categorize";
 import { errorMessage } from "#/lib/error-message";
 import { categoriesQuery } from "./category-multi-select";
@@ -59,10 +59,25 @@ export function ProjectCategoryPicker({
   const [search, setSearch] = useState("");
   const all = query.data ?? [];
   const byId = new Map(all.map((c) => [c.id, c]));
-  const chosen = value
-    .map((id) => byId.get(id))
-    .filter((c): c is Category => !!c)
-    .sort(byTypeThenName);
+  // An id the list no longer returns, a category deleted since the project
+  // was saved, still gets a chip, so staff can see it and take it off rather
+  // than Save write it back unseen.
+  const chosen = query.data
+    ? value
+        .map(
+          (id): Category =>
+            byId.get(id) ?? { id, name: "Unknown category", type: null }
+        )
+        .sort(byTypeThenName)
+    : [];
+  // Removing a chip unmounts the button that had focus; keyboard users land
+  // on Add a category rather than at the top of the page.
+  const addButton = useRef<HTMLButtonElement>(null);
+
+  function remove(id: string) {
+    onChange(value.filter((v) => v !== id));
+    addButton.current?.focus();
+  }
   const groups = new Map<string, Category[]>();
   for (const c of [...all].sort(byTypeThenName)) {
     if (value.includes(c.id)) {
@@ -83,7 +98,9 @@ export function ProjectCategoryPicker({
         <p className="text-muted-foreground text-sm">Loading categories...</p>
       )}
       {query.data !== undefined && chosen.length === 0 && (
-        <p className="text-muted-foreground text-sm">No categories yet.</p>
+        <p className="text-muted-foreground text-sm">
+          No categories on this project yet.
+        </p>
       )}
       {chosen.length > 0 && (
         <ul
@@ -109,7 +126,7 @@ export function ProjectCategoryPicker({
                 <Button
                   aria-label={`Remove ${c.name}`}
                   className="-my-1"
-                  onClick={() => onChange(value.filter((id) => id !== c.id))}
+                  onClick={() => remove(c.id)}
                   size="icon-xs"
                   type="button"
                   variant="ghost"
@@ -129,6 +146,7 @@ export function ProjectCategoryPicker({
             aria-expanded={open}
             aria-label="Add a category"
             disabled={query.data === undefined}
+            ref={addButton}
             role="combobox"
             size="sm"
             type="button"
