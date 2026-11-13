@@ -41,6 +41,19 @@ async function rethrowNameCollision(
   if (!findUniqueViolation(error, CATEGORY_NAME_INDEX)) {
     throw error;
   }
+  throw new Error(await nameCollisionMessage(data));
+}
+
+/**
+ * The sentence for a name the unique index refused. Exported for the category
+ * cleanup (#857), whose rename and move report it per change rather than
+ * throwing.
+ */
+export async function nameCollisionMessage(data: {
+  domain: CategoryDomain;
+  name: string;
+  type: string | null;
+}): Promise<string> {
   const [existing] = await db
     .select({ name: categories.name })
     .from(categories)
@@ -53,7 +66,7 @@ async function rethrowNameCollision(
     );
   const name = existing?.name ?? data.name;
   const where = data.type ? ` with type "${data.type}"` : "";
-  throw new Error(`A category named "${name}" already exists${where}.`);
+  return `A category named "${name}" already exists${where}.`;
 }
 
 /**

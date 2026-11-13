@@ -651,7 +651,7 @@ The vocabulary is in [`../CONTEXT.md`](../CONTEXT.md). The rules are pure module
 
 ### Categories: `domain` is closed, `type` is a project-only facet, filtering is all-match
 
-`categories.domain` never changes after creation. Both listings filter all-match with `HAVING count(*) = <number selected>` over the junction (`buildInventoryScope`, `searchProjectsImpl`); a plain `inArray` gives any-match. The param is `categories: z.array(z.string().uuid())`, and `.catch([])` in `validateSearch` turns a malformed value into no filter. A column on `projects` never also becomes a category ([ADR-0021](./adr/0021-a-column-on-projects-never-becomes-a-category.md)). `categories.description` is staff only (#31): `listCategoriesImpl` selects `CATALOG_COLUMNS` by name and `getCategory` is staff, so a bare `select()` on a public category read would leak it.
+`categories.domain` never changes after creation. Both listings filter all-match with `HAVING count(*) = <number selected>` over the junction (`buildInventoryScope`, `searchProjectsImpl`); a plain `inArray` gives any-match. The param is `categories: z.array(z.string().uuid())`, and `.catch([])` in `validateSearch` turns a malformed value into no filter. A column on `projects` never also becomes a category ([ADR-0021](./adr/0021-a-column-on-projects-never-becomes-a-category.md)). `categories.description` is staff only (#31): `listCategoriesImpl` selects `CATALOG_COLUMNS` by name and `getCategory` is staff, so a bare `select()` on a public category read would leak it. Lock the project row before any category row (`project-category-lock.ts`); the cleanup is [ADR-0069](./adr/0069-a-model-proposes-a-category-cleanup-and-staff-apply-each-change.md).
 
 ### Two role predicates, in `src/lib/viewer.ts`
 
@@ -813,7 +813,7 @@ Unsaved text belongs to nobody else, so a verified session is the gate and `asse
 
 ### `ai_review_usage` is both the limiter and the usage log
 
-One row per call that reached Bedrock, failed or not, with token counts. Concurrent calls may overshoot by one. A new per-user counter table goes in `TABLES` in `src/test/db-reset.ts`, or a later test trips its limit.
+One row per call that reached Bedrock, failed or not, with token counts. `categories` meters Regenerate and the category cleanup together; a cleanup row has no `project_id`. Concurrent calls may overshoot by one. A new per-user counter table goes in `TABLES` in `src/test/db-reset.ts`, or a later test trips its limit.
 
 ### Field length ceilings have one home, and the review enforces them twice
 

@@ -366,7 +366,9 @@ a free-text facet that groups them in the picker; the defaults are Field, Techno
 Industry and Kind of work. Inventory categories are flat. Staff manage categories,
 and a project category's description, its one-sentence definition, is staff only.
 A model picks a project's categories on submit and when staff press Regenerate
-categories; it may only propose a new category, which staff approve.
+categories; it may only propose a new category, which staff approve. A category
+cleanup is the model's proposed merges, renames, moves and retirements of project
+categories, each applied by staff or not at all.
 Filtering by several categories means all of them, not any.
 _Avoid_: tag, label (that is an inventory field), topic, keyword, facet (that is
 the type, not the category)

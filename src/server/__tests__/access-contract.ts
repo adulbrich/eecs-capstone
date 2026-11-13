@@ -137,6 +137,14 @@ export const ACCESS_CONTRACT: Record<string, AccessDeclaration> = {
     level: "staff",
     note: "One step of the backfill: a paid model call that writes a published project's categories, metered against no one's limit (#31). assertStaff decides, before the call.",
   },
+  "server/categories.ts:proposeCategoryCleanup": {
+    level: "staff",
+    note: "A paid model call over every project category that writes nothing but its usage row, metered per staff member under `categories` (#857). assertStaff decides, before the limiter and the call.",
+  },
+  "server/categories.ts:applyCategoryCleanup": {
+    level: "staff",
+    note: "Merges, renames, moves or retires project categories staff picked from a cleanup proposal (#857). assertStaff decides; every rule the tool put on the model is checked again against the current rows, since the changes arrive from the browser.",
+  },
   "server/categories.ts:approveProposedCategory": {
     level: "staff",
     note: "Creates a category through createCategoryAs and adds it to the project. assertStaff decides; the type must already exist and not be Kind of work, since the proposal arrives from the browser.",

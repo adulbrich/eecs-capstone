@@ -301,6 +301,13 @@ Each project carries:
   categories, one per call from the browser with a running count and a stop
   button (ADR-0056). It writes straight to published projects, meters against
   no one's AI limit, and resumes where a stopped run left off.
+- [x] Category cleanup (#857, ADR-0069), a button on `/admin/categories` that
+  asks the model once for merges, renames, moves and retirements across the
+  project categories, judged by each one's definition, counts and published
+  titles. Staff tick the changes to apply, each shown with its effect; each
+  applies on its own against the current rows and is refused with a reason
+  when it went stale. Never stored, never touching Kind of work, and metered
+  against the caller's AI limit.
 
 ## 10. AI-Assisted Proposal Review
 
