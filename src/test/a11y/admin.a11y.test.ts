@@ -1384,6 +1384,20 @@ test("admin programs: create dialog and Columns dropdown coexist", async ({
   }
 });
 
+test("admin categories: categorize uncategorized dialog", async ({ page }) => {
+  await page.goto("/admin/categories");
+  await waitForHydration(page);
+
+  // Opened and scanned, never started: Start calls the model (#31).
+  await page.getByRole("button", { name: "Categorize uncategorized" }).click();
+  const dialog = page.getByRole("dialog", {
+    name: "Categorize uncategorized projects",
+  });
+  await expect(dialog.getByText(/no categories\./u)).toBeVisible();
+  await waitForSurfaceSettled(dialog);
+  await checkA11y(page);
+});
+
 test("admin categories: create dialog and Columns dropdown coexist", async ({
   page,
 }) => {

@@ -296,6 +296,11 @@ Each project carries:
   Regenerate categories on the staff panel to replace the set from the current
   text, metered against their AI limit; it may propose one new category, which
   staff approve or dismiss and which is never stored otherwise.
+- [x] Categorize uncategorized projects (#31), a button on `/admin/categories`
+  that runs the model over every published or archived project with no
+  categories, one per call from the browser with a running count and a stop
+  button (ADR-0056). It writes straight to published projects, meters against
+  no one's AI limit, and resumes where a stopped run left off.
 
 ## 10. AI-Assisted Proposal Review
 

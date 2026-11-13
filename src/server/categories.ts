@@ -90,6 +90,13 @@ export type ApproveProposedCategoryInput = z.infer<
   typeof approveProposedCategorySchema
 >;
 
+/** The backfill's cursor: the last project this run reached, or null (#31). */
+const categorizeNextSchema = z.object({
+  after: z.string().uuid().nullable(),
+});
+
+export type CategorizeNextInput = z.infer<typeof categorizeNextSchema>;
+
 export const listCategories = createServerFn({ method: "GET" })
   .validator((data: unknown) => listSchema.parse(data ?? {}))
   .handler(async ({ data }) => {
@@ -183,6 +190,24 @@ export const approveProposedCategory = createServerFn({ method: "POST" })
       "./_internal/regenerate-categories"
     );
     return approveProposedCategoryForCurrentUser(data);
+  });
+
+export const countUncategorizedProjects = createServerFn({
+  method: "GET",
+}).handler(async () => {
+  const { countUncategorizedForCurrentUser } = await import(
+    "./_internal/categorize-backfill"
+  );
+  return countUncategorizedForCurrentUser();
+});
+
+export const categorizeNextProject = createServerFn({ method: "POST" })
+  .validator((data: unknown) => categorizeNextSchema.parse(data))
+  .handler(async ({ data }) => {
+    const { categorizeNextForCurrentUser } = await import(
+      "./_internal/categorize-backfill"
+    );
+    return categorizeNextForCurrentUser(data);
   });
 
 export const listProjectCategories = createServerFn({ method: "GET" })
