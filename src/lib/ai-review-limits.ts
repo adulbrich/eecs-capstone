@@ -32,9 +32,10 @@ export type ReviewOutcome = "ok" | "truncated" | "failed";
  * Only the staff-pressed Regenerate button meters as `social-summary`. The
  * automatic generation on publish and on edit has no user to attribute to and
  * no button to abuse, so it is not counted here at all. The same holds for
- * `categories` (#31): Regenerate categories meters, and the run on submit and
- * the backfill do not, since charging a proposer for a run they did not ask
- * for could block the review they did ask for.
+ * `categories` (#31): Regenerate categories and the category cleanup (#857)
+ * meter, and the run on submit and the backfill do not, since charging a
+ * proposer for a run they did not ask for could block the review they did ask
+ * for. A cleanup row is the one with no project.
  */
 export type AiFeature = "review" | "scope" | "social-summary" | "categories";
 
@@ -42,7 +43,7 @@ export const AI_FEATURE_NOUN: Record<AiFeature, string> = {
   review: "AI reviews",
   scope: "scope assessments",
   "social-summary": "social summary rewrites",
-  categories: "category regenerations",
+  categories: "category regenerations and cleanups",
 };
 
 /**

@@ -1,6 +1,11 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { PROPOSAL_NAME_MAX_LENGTH } from "#/lib/categorize";
+import {
+  CLEANUP_MAX_MERGE_SOURCES,
+  CLEANUP_MAX_OPERATIONS,
+  CLEANUP_NAME_MAX_LENGTH,
+} from "#/lib/category-cleanup";
 import { CATEGORY_DESCRIPTION_MAX_LENGTH } from "#/lib/default-categories";
 
 /**
@@ -88,6 +93,64 @@ const approveProposedCategorySchema = z.object({
 
 export type ApproveProposedCategoryInput = z.infer<
   typeof approveProposedCategorySchema
+>;
+
+/**
+ * A category as the cleanup proposal saw it (#857). Compared, never written,
+ * so the caps are loose ones that only bound the payload.
+ */
+const cleanupRefSchema = z.object({
+  id: z.string().uuid(),
+  name: z.string().max(1000),
+  type: z.string().max(1000),
+  description: z.string().max(2000).nullable(),
+});
+
+const cleanupNewText = (max: number) =>
+  z
+    .string()
+    .trim()
+    .max(max)
+    .nullable()
+    .transform((v) => v || null);
+
+/**
+ * The changes staff picked, as the proposal returned them: proposals are never
+ * stored, so this is what the server checks. The reason and the effect ride
+ * along from the browser and are stripped here.
+ */
+const applyCategoryCleanupSchema = z.object({
+  changes: z
+    .array(
+      z.discriminatedUnion("kind", [
+        z.object({
+          kind: z.literal("merge"),
+          target: cleanupRefSchema,
+          sources: z
+            .array(cleanupRefSchema)
+            .min(1)
+            .max(CLEANUP_MAX_MERGE_SOURCES),
+        }),
+        z.object({
+          kind: z.literal("rename"),
+          category: cleanupRefSchema,
+          name: cleanupNewText(CLEANUP_NAME_MAX_LENGTH),
+          description: cleanupNewText(CATEGORY_DESCRIPTION_MAX_LENGTH),
+        }),
+        z.object({
+          kind: z.literal("move"),
+          category: cleanupRefSchema,
+          type: z.string().trim().min(1).max(50),
+        }),
+        z.object({ kind: z.literal("retire"), category: cleanupRefSchema }),
+      ])
+    )
+    .min(1)
+    .max(CLEANUP_MAX_OPERATIONS),
+});
+
+export type ApplyCategoryCleanupInput = z.infer<
+  typeof applyCategoryCleanupSchema
 >;
 
 /** The backfill's cursor: the last project this run reached, or null (#31). */
@@ -208,6 +271,24 @@ export const categorizeNextProject = createServerFn({ method: "POST" })
       "./_internal/categorize-backfill"
     );
     return categorizeNextForCurrentUser(data);
+  });
+
+export const proposeCategoryCleanup = createServerFn({
+  method: "POST",
+}).handler(async () => {
+  const { proposeCategoryCleanupForCurrentUser } = await import(
+    "./_internal/category-cleanup"
+  );
+  return proposeCategoryCleanupForCurrentUser();
+});
+
+export const applyCategoryCleanup = createServerFn({ method: "POST" })
+  .validator((data: unknown) => applyCategoryCleanupSchema.parse(data))
+  .handler(async ({ data }) => {
+    const { applyCategoryCleanupForCurrentUser } = await import(
+      "./_internal/category-cleanup"
+    );
+    return applyCategoryCleanupForCurrentUser(data);
   });
 
 export const listProjectCategories = createServerFn({ method: "GET" })
