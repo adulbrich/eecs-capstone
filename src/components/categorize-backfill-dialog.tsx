@@ -33,6 +33,12 @@ function tallied(tally: Tally): number {
   return tally.categorized + tally.failed + tally.skipped;
 }
 
+/** "2 categorized, 1 failed", with skipped only when there were some. */
+function summary(tally: Tally): string {
+  const skipped = tally.skipped ? `, ${tally.skipped} skipped` : "";
+  return `${tally.categorized} categorized, ${tally.failed} failed${skipped}`;
+}
+
 /**
  * The categorization backfill (#31): one button on `/admin/categories` that
  * files every published or archived project with no categories, one project
@@ -63,6 +69,9 @@ export function CategorizeBackfillDialog() {
 
   async function load() {
     run.current = null;
+    // A stopped loop may still be waiting on its last project; this dialog
+    // is no longer its, so it must not show Stop for it.
+    setRunning(false);
     setTotal(null);
     setTally(EMPTY);
     setLast(null);
@@ -136,10 +145,10 @@ export function CategorizeBackfillDialog() {
   const done = tallied(tally);
   let status: string | null = null;
   if (total !== null && (running || done > 0)) {
-    status = `${done} of ${total} done: ${tally.categorized} categorized, ${tally.failed} failed${tally.skipped ? `, ${tally.skipped} skipped` : ""}.`;
+    status = `${done} of ${total} done: ${summary(tally)}.`;
   }
   if (finished) {
-    status = `Done. ${tally.categorized} categorized, ${tally.failed} failed${tally.skipped ? `, ${tally.skipped} skipped` : ""}.`;
+    status = `Done. ${summary(tally)}.`;
   }
 
   return (

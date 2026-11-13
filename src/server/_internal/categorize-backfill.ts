@@ -138,6 +138,12 @@ export async function categorizeNextAs(
     return { done: true };
   }
   const outcome = await categorizeProject(next.id, invoke, "backfill");
+  if (outcome === "skipped") {
+    // A skip on a project picked for having no categories means the list
+    // lost its last Field or Kind of work mid-run; say so, rather than walk
+    // the rest of the catalog skipping each one.
+    await assertCanRun();
+  }
   return { done: false, outcome, projectId: next.id, title: next.title };
 }
 

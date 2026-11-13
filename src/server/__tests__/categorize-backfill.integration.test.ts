@@ -201,6 +201,21 @@ describe("the categorization backfill", () => {
     expect(model).not.toHaveBeenCalled();
   });
 
+  it("stops with a reason when the list loses its last Field mid-run", async () => {
+    const ids = await seedCategories();
+    const admin = await makeUser(`bf7-${Date.now()}@x.com`, "admin");
+    await project("Stranded", "published");
+    await db
+      .delete(categories)
+      .where(eq(categories.id, ids["Web Development"]));
+    const model = fakeModel();
+
+    await expect(
+      categorizeNextAs(admin, { after: null }, model)
+    ).rejects.toThrow(/at least one Field/u);
+    expect(model).not.toHaveBeenCalled();
+  });
+
   it("refuses to run while the kill switch is off", async () => {
     await seedCategories();
     const admin = await makeUser(`bf6-${Date.now()}@x.com`, "admin");
