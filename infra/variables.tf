@@ -240,6 +240,30 @@ variable "ai_social_summary_limit_per_day" {
   default     = "60"
 }
 
+variable "bedrock_categories_reasoning_effort" {
+  description = "Reasoning effort for the categorizer (#31). One of none, low, medium, high, xhigh, max."
+  type        = string
+  default     = "medium"
+}
+
+variable "bedrock_categories_enabled" {
+  description = "Kill switch for the categorizer's run on submit and its backfill (#31). Plumbed because both run without anyone pressing a button for that project."
+  type        = string
+  default     = "true"
+}
+
+variable "ai_categories_limit_per_hour" {
+  description = "Per-user hourly ceiling on staff Regenerate categories. The run on submit and the backfill are not counted."
+  type        = string
+  default     = "20"
+}
+
+variable "ai_categories_limit_per_day" {
+  description = "Per-user daily ceiling on staff Regenerate categories."
+  type        = string
+  default     = "60"
+}
+
 variable "ai_scope_limit_per_hour" {
   description = "Per-user hourly ceiling on scope assessments. Metered apart from AI reviews."
   type        = string

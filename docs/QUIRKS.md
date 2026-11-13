@@ -823,6 +823,10 @@ One row per call that reached Bedrock, failed or not, with token counts. Concurr
 
 It has its own tool, prompt, effort and ceiling, so a review never pays for staff-only reasoning. Its three `projects` columns go stale like the embedding, and `scope-assessment.integration.test.ts` keeps them out of public projections.
 
+### Without `strict: true` a tool's schema only advises the model
+
+The categorizer's tool (#31) carries each type's category handles as an `enum` and its cap as `minItems` and `maxItems`. With `strict` off, as the review and scope tools have it, 2 of 20 answers in the 2026-11-12 trial broke the schema (a Technology handle in Field, three Technology picks) and the Zod parse refused them. With `strict: true` all 20 conformed. Strict mode needs every property in `required`, takes `["object", "null"]` for an optional object, and refuses `uniqueItems`, so duplicates are left to Zod.
+
 ### Function call arguments arrive as a JSON string
 
 Parse `arguments` before Zod. The item can sit at the top of `output` or inside an item's `content`; `findToolCall` checks both.

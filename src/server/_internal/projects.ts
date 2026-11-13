@@ -46,6 +46,7 @@ import {
 } from "./project-emails";
 import { isEmbeddableStatus } from "./project-embeddings";
 import {
+  categorizeProjectInBackground,
   type RefreshDeps,
   refreshProjectInBackground,
 } from "./project-refresh";
@@ -56,6 +57,8 @@ export interface AuthUser {
 }
 
 export interface TransitionOptions extends EmailOptions {
+  /** The categorizer's model seam, for the run a submission starts (#31). */
+  categorize?: ResponsesFn;
   embed?: EmbedFn;
   /**
    * The social summary's model seam, threaded exactly as `embed` is so a test
@@ -737,6 +740,15 @@ async function commitTransition(
       embed: opts?.embed,
       summarize: opts?.summarize,
     });
+  }
+
+  // A submission starts the categorizer, for the same reasons and in the same
+  // place: after the commit, started and not awaited (#31). It writes only to
+  // a project that still carries no categories, so a resubmission after
+  // changes requested does nothing unless staff cleared them. Safe on a
+  // submitted project because the public listing shows published ones only.
+  if (target === "submitted") {
+    categorizeProjectInBackground(project.id, opts?.categorize);
   }
 
   // Same reasoning, and it matters more here: a failed email must not undo an

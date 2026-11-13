@@ -365,6 +365,8 @@ to one domain, project or inventory, for life. Project categories also carry a t
 a free-text facet that groups them in the picker; the defaults are Field, Technology,
 Industry and Kind of work. Inventory categories are flat. Staff manage categories,
 and a project category's description, its one-sentence definition, is staff only.
+A model picks a project's categories on submit and when staff press Regenerate
+categories; it may only propose a new category, which staff approve.
 Filtering by several categories means all of them, not any.
 _Avoid_: tag, label (that is an inventory field), topic, keyword, facet (that is
 the type, not the category)

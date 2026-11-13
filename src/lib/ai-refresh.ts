@@ -2,13 +2,17 @@
 // refresh attempt (#631). Client-safe: the staff panel renders these, the
 // schema types its columns with them. No AWS, no DB, no node built-ins here.
 
-/** Which of a project's AI outputs an attempt wrote. */
-export type AiRefreshKind = "embedding" | "social_summary";
+/**
+ * Which of a project's AI outputs an attempt wrote. `categories` is the
+ * categorizer's pick from the live list (#31).
+ */
+export type AiRefreshKind = "embedding" | "social_summary" | "categories";
 
 /**
- * `automatic` is the background refresh after a commit, and the workstation
- * backfill scripts, which call the same writers. `staff` is a button in the
- * Social preview section.
+ * `automatic` is the background refresh after a commit, the categorizer's run
+ * on submit and its backfill, and the workstation backfill scripts, which call
+ * the same writers. `staff` is a button: Regenerate or Recompute on the staff
+ * panel.
  */
 export type AiRefreshTrigger = "automatic" | "staff";
 

@@ -121,6 +121,18 @@ export const ACCESS_CONTRACT: Record<string, AccessDeclaration> = {
     note: "assertStaff decides. The canSeeProject call after it cannot reject, because canSeeProject returns true for staff before it looks at anything else; the live second guard is the `if (!project)` above it. Do not read this as the checked-visibility shape addBookmark uses.",
   },
   "server/categories.ts:updateCategory": { level: "staff" },
+  "server/categories.ts:getProjectCategorization": {
+    level: "staff",
+    note: "The last categorizer attempt on a project (#31). assertStaff decides.",
+  },
+  "server/categories.ts:regenerateProjectCategories": {
+    level: "staff",
+    note: "A paid model call that replaces a project's categories, metered per staff member under `categories`. assertStaff decides, before the limiter and the call.",
+  },
+  "server/categories.ts:approveProposedCategory": {
+    level: "staff",
+    note: "Creates a category through createCategoryAs and adds it to the project. assertStaff decides; the type must already exist and not be Kind of work, since the proposal arrives from the browser.",
+  },
 
   "server/comments.ts:addComment": {
     level: "owner-or-staff",

@@ -1,6 +1,7 @@
 import type { EmbedFn } from "#/lib/_internal/bedrock-embed";
 import type { ResponsesFn } from "#/lib/_internal/bedrock-mantle";
 import { redactQueryError } from "#/lib/_internal/redact-query-error";
+import { categorizeProject } from "./project-categorize";
 import { refreshProjectEmbedding } from "./project-embeddings";
 import { refreshSocialSummary } from "./project-social-summary";
 
@@ -29,19 +30,45 @@ export function refreshProjectInBackground(
   deps: RefreshDeps = {}
 ): void {
   const queuedAt = Date.now();
+  enqueue(projectId, "refresh", () => refreshAndLog(projectId, deps, queuedAt));
+}
+
+/**
+ * Starts the categorizer on a project just submitted, and returns without
+ * waiting (#31): a proposer must never wait on a model, and a submission must
+ * never fail because one did. On the same per-project queue as the refreshes,
+ * so `settleProjectRefreshes` covers it. `categorizeProject` decides whether
+ * there is anything to do, which there is only while the project carries no
+ * categories, and records its own attempt and log line.
+ */
+export function categorizeProjectInBackground(
+  projectId: string,
+  categorize?: ResponsesFn
+): void {
+  enqueue(projectId, "categorization", async () => {
+    await categorizeProject(projectId, categorize);
+  });
+}
+
+/**
+ * Chains `work` behind the project's previous background job. Every job
+ * catches its own errors; this catch is for anything that slips past them,
+ * since nobody awaits `run`. Nitro would log an unhandled rejection and carry
+ * on, but a Vitest run fails on one, and this keeps the line redacted either
+ * way.
+ */
+function enqueue(
+  projectId: string,
+  label: string,
+  work: () => Promise<void>
+): void {
   const previous = latestByProject.get(projectId) ?? Promise.resolve();
-  // Both refreshes catch their own errors; this catch is for anything that
-  // slips past them, since nobody awaits `run`. Nitro would log an unhandled
-  // rejection and carry on, but a Vitest run fails on one, and this keeps the
-  // line redacted either way.
-  const run = previous
-    .then(() => refreshAndLog(projectId, deps, queuedAt))
-    .catch((error: unknown) => {
-      console.error(
-        `Project refresh failed for ${projectId}`,
-        redactQueryError(error)
-      );
-    });
+  const run = previous.then(work).catch((error: unknown) => {
+    console.error(
+      `Project ${label} failed for ${projectId}`,
+      redactQueryError(error)
+    );
+  });
   latestByProject.set(projectId, run);
   inFlight.add(run);
   run.finally(() => {

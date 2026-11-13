@@ -79,6 +79,7 @@ describe("AI usage per user (#413)", () => {
       { feature: "review", calls: 2 },
       { feature: "scope", calls: 1 },
       { feature: "social-summary", calls: 0 },
+      { feature: "categories", calls: 0 },
     ]);
     expect(aiUsage.inputTokens).toBe(37);
     expect(aiUsage.reasoningTokens).toBe(6);
@@ -95,6 +96,7 @@ describe("AI usage per user (#413)", () => {
       { feature: "review", calls: 0 },
       { feature: "scope", calls: 1 },
       { feature: "social-summary", calls: 0 },
+      { feature: "categories", calls: 0 },
     ]);
 
     const quiet = await makeUser(`nocalls-${Date.now()}@x.com`, "user");

@@ -19,6 +19,7 @@ import type {
 } from "../categories";
 import type { Tx } from "./inventory-transitions";
 import { findUniqueViolation } from "./pg-errors";
+import { lockProjectCategories } from "./project-category-lock";
 
 type CategoryDomain = (typeof categoryDomainEnum.enumValues)[number];
 
@@ -256,6 +257,7 @@ export async function setProjectCategoriesAs(
     throw new Error("Forbidden");
   }
   await db.transaction(async (tx) => {
+    await lockProjectCategories(tx, data.projectId);
     await tx
       .delete(projectCategories)
       .where(eq(projectCategories.projectId, data.projectId));

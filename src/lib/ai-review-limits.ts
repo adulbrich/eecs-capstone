@@ -31,14 +31,18 @@ export type ReviewOutcome = "ok" | "truncated" | "failed";
  *
  * Only the staff-pressed Regenerate button meters as `social-summary`. The
  * automatic generation on publish and on edit has no user to attribute to and
- * no button to abuse, so it is not counted here at all.
+ * no button to abuse, so it is not counted here at all. The same holds for
+ * `categories` (#31): Regenerate categories meters, and the run on submit and
+ * the backfill do not, since charging a proposer for a run they did not ask
+ * for could block the review they did ask for.
  */
-export type AiFeature = "review" | "scope" | "social-summary";
+export type AiFeature = "review" | "scope" | "social-summary" | "categories";
 
 export const AI_FEATURE_NOUN: Record<AiFeature, string> = {
   review: "AI reviews",
   scope: "scope assessments",
   "social-summary": "social summary rewrites",
+  categories: "category regenerations",
 };
 
 /**
@@ -74,6 +78,15 @@ export function socialSummaryLimits(
   };
 }
 
+export function categoriesLimits(
+  env: NodeJS.ProcessEnv = process.env
+): ReviewLimits {
+  return {
+    perHour: Number(env.AI_CATEGORIES_LIMIT_PER_HOUR ?? "20"),
+    perDay: Number(env.AI_CATEGORIES_LIMIT_PER_DAY ?? "60"),
+  };
+}
+
 const LIMIT_READERS: Record<
   AiFeature,
   (env: NodeJS.ProcessEnv) => ReviewLimits
@@ -81,6 +94,7 @@ const LIMIT_READERS: Record<
   review: reviewLimits,
   scope: scopeLimits,
   "social-summary": socialSummaryLimits,
+  categories: categoriesLimits,
 };
 
 export function limitsFor(

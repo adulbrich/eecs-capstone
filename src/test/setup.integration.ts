@@ -1,4 +1,5 @@
 import { beforeEach } from "vitest";
+import { categoriesEnabled } from "#/lib/_internal/categories-flag";
 import { embeddingsEnabled } from "#/lib/_internal/embeddings-flag";
 import { socialSummariesEnabled } from "#/lib/_internal/social-summary-flag";
 import { settleProjectRefreshes } from "#/server/_internal/project-refresh";
@@ -35,6 +36,17 @@ if (embeddingsEnabled()) {
 if (socialSummariesEnabled()) {
   throw new Error(
     'Social summaries are enabled during the integration run. BEDROCK_SOCIAL_SUMMARY_ENABLED must be "false"; anything else, including unset, is on. See the env block in vitest.integration.config.ts.'
+  );
+}
+
+/**
+ * And for the categorizer, which every submission in this suite would start
+ * (#31). Its integration tests turn it back on for themselves and inject a
+ * fake `ResponsesFn` through the `categorize` seam.
+ */
+if (categoriesEnabled()) {
+  throw new Error(
+    'The categorizer is enabled during the integration run. BEDROCK_CATEGORIES_ENABLED must be "false"; anything else, including unset, is on. See the env block in vitest.integration.config.ts.'
   );
 }
 
