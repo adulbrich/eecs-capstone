@@ -1,6 +1,6 @@
 import { useRouter } from "@tanstack/react-router";
 import { Sparkles } from "lucide-react";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { errorMessage } from "#/lib/error-message";
 import {
   categorizeNextProject,
@@ -54,11 +54,15 @@ export function CategorizeBackfillDialog() {
   const [running, setRunning] = useState(false);
   const [finished, setFinished] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  // Aborted by Stop and by closing the dialog; the loop checks it between
-  // projects, so the project in flight finishes and nothing after it starts.
+  // Aborted by Stop, by closing the dialog and by leaving the page; the loop
+  // checks it between projects, so the project in flight finishes and nothing
+  // after it starts. Cleared when the dialog reopens, so a loop still waiting
+  // on its last project cannot write into the fresh counts.
   const run = useRef<AbortController | null>(null);
+  useEffect(() => () => run.current?.abort(), []);
 
   async function load() {
+    run.current = null;
     setTotal(null);
     setTally(EMPTY);
     setLast(null);
@@ -74,14 +78,20 @@ export function CategorizeBackfillDialog() {
   async function start() {
     const controller = new AbortController();
     run.current = controller;
+    const current = () => run.current === controller;
     setRunning(true);
     setFinished(false);
     setError(null);
     setTally(EMPTY);
     let after: string | null = null;
     try {
+      // Counted again, since the last run filed some of them.
+      setTotal((await countUncategorizedProjects()).count);
       while (!controller.signal.aborted) {
         const step: Step = await categorizeNextProject({ data: { after } });
+        if (!current()) {
+          break;
+        }
         if (step.done) {
           setFinished(true);
           break;
@@ -99,9 +109,13 @@ export function CategorizeBackfillDialog() {
         });
       }
     } catch (e) {
-      setError(errorMessage(e, "The run stopped on an error."));
+      if (current()) {
+        setError(errorMessage(e, "The run stopped on an error."));
+      }
     } finally {
-      setRunning(false);
+      if (current() || run.current === null) {
+        setRunning(false);
+      }
       // The Projects column on the table behind the dialog.
       void router.invalidate();
     }
@@ -119,7 +133,7 @@ export function CategorizeBackfillDialog() {
   const done = tallied(tally);
   let status: string | null = null;
   if (total !== null && (running || done > 0)) {
-    status = `${done} of ${total} done: ${tally.categorized} categorized, ${tally.failed} failed.`;
+    status = `${done} of ${total} done: ${tally.categorized} categorized, ${tally.failed} failed${tally.skipped ? `, ${tally.skipped} skipped` : ""}.`;
   }
   if (finished) {
     status = `Done. ${tally.categorized} categorized, ${tally.failed} failed${tally.skipped ? `, ${tally.skipped} skipped` : ""}.`;

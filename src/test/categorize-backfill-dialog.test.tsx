@@ -97,6 +97,22 @@ describe("the categorization backfill dialog", () => {
     expect(screen.getByRole("button", { name: "Start again" })).toBeTruthy();
   });
 
+  it("starts nothing more once the page it runs on is gone", async () => {
+    const first = deferred<ReturnType<typeof step>>();
+    server.categorizeNextProject.mockReturnValueOnce(first.promise);
+    await openDialog();
+    fireEvent.click(screen.getByRole("button", { name: "Start" }));
+    await waitFor(() =>
+      expect(server.categorizeNextProject).toHaveBeenCalledTimes(1)
+    );
+
+    cleanup();
+    first.resolve(step(0, "updated"));
+    await new Promise((resolve) => setTimeout(resolve, 20));
+
+    expect(server.categorizeNextProject).toHaveBeenCalledTimes(1);
+  });
+
   it("stops and says why when a step fails", async () => {
     server.categorizeNextProject.mockRejectedValueOnce(
       new Error("Categorizing is turned off on this server.")

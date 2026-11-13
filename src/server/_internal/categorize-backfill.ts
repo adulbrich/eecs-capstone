@@ -59,13 +59,21 @@ function uncategorized() {
   );
 }
 
-/** Throws the reason the backfill cannot run, if there is one. */
-async function assertCanRun(): Promise<void> {
+function assertEnabled(): void {
   if (!categoriesEnabled()) {
     throw new Error(
       "Categorizing is turned off on this server (BEDROCK_CATEGORIES_ENABLED)."
     );
   }
+}
+
+/**
+ * Throws the reason the backfill cannot run, if there is one. Checked when
+ * the dialog opens; a step checks only the kill switch, since a list that
+ * lost its last Field mid-run makes `categorizeProject` skip, not fail.
+ */
+async function assertCanRun(): Promise<void> {
+  assertEnabled();
   const tool = buildCategorizeTool(await loadCategoryOptions(), {
     allowProposal: false,
   });
@@ -115,7 +123,7 @@ export async function categorizeNextAs(
   invoke?: ResponsesFn
 ): Promise<BackfillStep> {
   assertStaff(viewer);
-  await assertCanRun();
+  assertEnabled();
   const [next] = await db
     .select({ id: projects.id, title: projects.title })
     .from(projects)
