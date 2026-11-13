@@ -234,6 +234,28 @@ async function effectOf(
 
 const FAILED = "Couldn't propose a cleanup. Try again.";
 
+/**
+ * Each change with its effect, or null when a count query fails. Null rather
+ * than a throw with the error as its `cause`: seroval sends every own property
+ * of an error to the browser, and a query error carries its parameters.
+ */
+async function withEffects(
+  operations: CleanupOperation[],
+  rows: CleanupCategory[]
+): Promise<CleanupProposal[] | null> {
+  const usage = new Map(rows.map((r) => [r.id, r.usage]));
+  const proposals: CleanupProposal[] = [];
+  try {
+    for (const operation of operations) {
+      proposals.push({ operation, effect: await effectOf(operation, usage) });
+    }
+    return proposals;
+  } catch (error) {
+    console.error("Category cleanup effects failed", redactQueryError(error));
+    return null;
+  }
+}
+
 function parseCleanupResponse(response: MantleResponse, tool: CleanupTool) {
   if (response.status === "incomplete") {
     throw new Error("The model ran out of room before it finished.");
@@ -288,13 +310,9 @@ export async function proposeCategoryCleanupAs(
     throw new Error(FAILED);
   }
 
-  const usageById = new Map(rows.map((r) => [r.id, r.usage]));
-  const proposals: CleanupProposal[] = [];
-  for (const operation of run.answer.operations) {
-    proposals.push({
-      operation,
-      effect: await effectOf(operation, usageById),
-    });
+  const proposals = await withEffects(run.answer.operations, rows);
+  if (!proposals) {
+    throw new Error(FAILED);
   }
   console.log(
     `Category cleanup proposed for ${viewer.id}: ${proposals.length} changes, ${run.answer.dropped} dropped, ${config.modelId}, ${run.usage.inputTokens ?? "?"} in, ${run.usage.outputTokens ?? "?"} out, ${Date.now() - startedAt} ms`
@@ -419,14 +437,36 @@ async function applyOne(
     }
     const collision = collisionOf(change);
     if (collision && findUniqueViolation(error, CATEGORY_NAME_INDEX)) {
-      return {
-        ok: false,
-        reason: await nameCollisionMessage({ domain: "project", ...collision }),
-      };
+      return { ok: false, reason: await collisionReason(collision) };
     }
     console.error("Category cleanup apply failed", redactQueryError(error));
     return { ok: false, reason: APPLY_FAILED };
   }
+}
+
+/**
+ * The unique index's sentence, or the generic one if reading the stored
+ * spelling fails: a throw here would lose the results of the changes already
+ * applied in this batch.
+ */
+async function collisionReason(collision: {
+  name: string;
+  type: string;
+}): Promise<string> {
+  try {
+    return await nameCollisionMessage({ domain: "project", ...collision });
+  } catch (error) {
+    console.error("Category cleanup apply failed", redactQueryError(error));
+    return APPLY_FAILED;
+  }
+}
+
+/** The categories a change deletes: a merge's sources, or the retired one. */
+function deletedBy(change: CleanupChange): string[] {
+  if (change.kind === "merge") {
+    return change.sources.map((s) => s.id);
+  }
+  return change.kind === "retire" ? [change.category.id] : [];
 }
 
 /** The name and type a rename or move writes, for the unique index message. */
@@ -443,12 +483,20 @@ function collisionOf(
 }
 
 /**
- * Locks every named category, checks it is still what the proposal saw, then
- * writes. The lock comes first so the check and the write see the same rows:
- * a Save that adds a link to a merge's source takes a key-share lock on that
- * category for its foreign key, so it either committed before this lock, and
- * the merge moves its link, or waits and then fails on the deleted category,
- * rather than landing a link the cascade drops with no error.
+ * Locks, checks the categories are still what the proposal saw, then writes.
+ * The locks come first so the check and the write see the same rows, and in
+ * the order every writer of a project's set takes them, the project before
+ * any category.
+ *
+ * A merge or a retirement first takes the project lock of every project
+ * carrying a category it deletes (`lockProjectCategories`'s lock), in id
+ * order. Without it, a Save of such a project that had deleted the link and
+ * was about to re-insert it deadlocked against the cascade, and a Save that
+ * dropped the link saw the merge copy it to the target anyway. A Save that
+ * adds a link to one of these categories after the read below takes a
+ * key-share lock on it for its foreign key, waits for this transaction, and
+ * then fails on the deleted category rather than landing a link the cascade
+ * drops with no error.
  *
  * Returns the log line.
  */
@@ -460,6 +508,23 @@ async function applyInTransaction(
   const ids = named.map((c) => c.id);
   if (new Set(ids).size !== ids.length) {
     throw new CleanupRefusal("This change names one category twice.");
+  }
+  const deleted = deletedBy(change);
+  if (deleted.length > 0) {
+    await tx
+      .select({ id: projects.id })
+      .from(projects)
+      .where(
+        inArray(
+          projects.id,
+          tx
+            .select({ id: projectCategories.projectId })
+            .from(projectCategories)
+            .where(inArray(projectCategories.categoryId, deleted))
+        )
+      )
+      .orderBy(projects.id)
+      .for("update");
   }
   const rows = await tx
     .select({
@@ -557,7 +622,12 @@ async function rename(
   tx: Tx,
   change: Extract<CleanupChange, { kind: "rename" }>
 ): Promise<string> {
-  const { category, name, description } = change;
+  // The locked row equals `category` by now, so a value it already holds is
+  // no change: refused, rather than reported as applied.
+  const { category } = change;
+  const name = change.name === category.name ? null : change.name;
+  const description =
+    change.description === category.description ? null : change.description;
   if (!(name || description)) {
     throw new CleanupRefusal("This rename changes nothing.");
   }

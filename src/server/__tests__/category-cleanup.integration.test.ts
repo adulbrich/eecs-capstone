@@ -16,6 +16,7 @@ import {
   CLEANUP_TOOL_NAME,
   proposeCategoryCleanupAs,
 } from "#/server/_internal/category-cleanup";
+import { lockProjectCategories } from "#/server/_internal/project-category-lock";
 
 /**
  * The category cleanup (#857) against the database. Every model call is a
@@ -492,5 +493,108 @@ describe("applying a cleanup", () => {
       { reason: expect.stringMatching(/one category twice/u) },
     ]);
     expect(await snapshot()).toEqual(before);
+  });
+
+  it("refuses a rename to the values the category already holds", async () => {
+    const cats = await seedCategories();
+    const admin = await makeUser(`same-${Date.now()}@x.com`, "admin");
+
+    const { results } = await applyCategoryCleanupAs(admin, {
+      changes: [
+        {
+          kind: "rename",
+          category: refOf(cats.VR),
+          name: "VR",
+          description: "Virtual reality headsets.",
+        },
+      ],
+    });
+
+    expect(results).toEqual([
+      { ok: false, reason: "This rename changes nothing." },
+    ]);
+  });
+});
+
+/**
+ * A staff Save running beside a merge, the way `setProjectCategoriesAs`
+ * writes: the project lock, the delete of the whole set, then the insert of
+ * the new one, held open between the two until the merge is waiting.
+ */
+async function saveBesideMerge(
+  projectId: string,
+  newSet: string[],
+  merge: () => Promise<unknown>
+) {
+  let deleted!: () => void;
+  const ready = new Promise<void>((resolve) => {
+    deleted = resolve;
+  });
+  let release!: () => void;
+  const gate = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  const save = db.transaction(async (tx) => {
+    await lockProjectCategories(tx, projectId);
+    await tx
+      .delete(projectCategories)
+      .where(eq(projectCategories.projectId, projectId));
+    deleted();
+    await gate;
+    await tx
+      .insert(projectCategories)
+      .values(newSet.map((categoryId) => ({ projectId, categoryId })));
+  });
+  await ready;
+  const merged = merge();
+  // Long enough for the merge to reach the lock it waits on.
+  await new Promise((resolve) => setTimeout(resolve, 300));
+  release();
+  await save;
+  return merged;
+}
+
+describe("applying a cleanup beside a staff Save", () => {
+  it("waits for a Save that keeps the source, then moves its link", async () => {
+    const cats = await seedCategories();
+    const admin = await makeUser(`dead-${Date.now()}@x.com`, "admin");
+    const id = await project("Kept", "published", [cats.VR.id]);
+    vi.spyOn(console, "log").mockImplementation(() => {});
+
+    const applied = await saveBesideMerge(id, [cats.VR.id], () =>
+      applyCategoryCleanupAs(admin, {
+        changes: [
+          {
+            kind: "merge",
+            target: refOf(cats["AR / VR"]),
+            sources: [refOf(cats.VR)],
+          },
+        ],
+      })
+    );
+
+    expect(applied).toEqual({ results: [{ ok: true }] });
+    expect(await namesOf(id)).toEqual(["AR / VR"]);
+  });
+
+  it("does not copy a link the Save removed to the target", async () => {
+    const cats = await seedCategories();
+    const admin = await makeUser(`drop-${Date.now()}@x.com`, "admin");
+    const id = await project("Dropped", "published", [cats.VR.id]);
+    vi.spyOn(console, "log").mockImplementation(() => {});
+
+    await saveBesideMerge(id, [cats.Python.id], () =>
+      applyCategoryCleanupAs(admin, {
+        changes: [
+          {
+            kind: "merge",
+            target: refOf(cats["AR / VR"]),
+            sources: [refOf(cats.VR)],
+          },
+        ],
+      })
+    );
+
+    expect(await namesOf(id)).toEqual(["Python"]);
   });
 });
