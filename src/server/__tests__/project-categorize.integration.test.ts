@@ -219,6 +219,26 @@ describe("the run on submit", () => {
     });
   });
 
+  it("holds off a resubmission for an hour after a failed run", async () => {
+    await seedCategories();
+    const admin = await makeUser(`loop-${Date.now()}@x.com`, "admin");
+    const { id } = await createProjectAs(admin, baseProject("Loops"));
+    const error = vi.spyOn(console, "error").mockImplementation(() => {});
+    expect(await categorizeProject(id, failing)).toBe("failed");
+    error.mockRestore();
+    const model = fakeModel(PICKS);
+
+    expect(await categorizeProject(id, model)).toBe("skipped");
+    expect(model).not.toHaveBeenCalled();
+
+    // An hour on, the outage is retried.
+    await db
+      .update(projectAiRefreshes)
+      .set({ attemptedAt: new Date(Date.now() - 61 * 60 * 1000) })
+      .where(eq(projectAiRefreshes.projectId, id));
+    expect(await categorizeProject(id, model)).toBe("updated");
+  });
+
   it("writes nothing when staff set categories during the call", async () => {
     const ids = await seedCategories();
     const admin = await makeUser(`race-${Date.now()}@x.com`, "admin");

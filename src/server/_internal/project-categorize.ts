@@ -106,6 +106,23 @@ function logRun(
 export type CategorizeOutcome = "skipped" | "updated" | "superseded" | "failed";
 
 /**
+ * How long a failed run on submit holds off the next one for that project.
+ * A success ends the runs by itself, since the project then has categories,
+ * so only failures can repeat; without this a proposer could withdraw and
+ * resubmit a project the model keeps failing on, each time an unmetered paid
+ * call. An hour bounds that to a handful a day and still retries an outage.
+ */
+export const SUBMIT_RETRY_AFTER_MS = 60 * 60 * 1000;
+
+async function failedRecently(projectId: string): Promise<boolean> {
+  const last = await readAiRefresh(projectId, "categories");
+  return (
+    last?.outcome === "failed" &&
+    Date.now() - last.at.getTime() < SUBMIT_RETRY_AFTER_MS
+  );
+}
+
+/**
  * Files a project that carries no categories, the automatic run on submit
  * and each step of the backfill (#31). Picks from the live list only: its
  * tool has no field for a new category.
@@ -156,6 +173,9 @@ async function writeFirstCategories(
       return "skipped";
     }
     if ((await projectCategoryIds(projectId)).length > 0) {
+      return "skipped";
+    }
+    if (how === "submit" && (await failedRecently(projectId))) {
       return "skipped";
     }
     const tool = buildCategorizeTool(await loadCategoryOptions(), {
