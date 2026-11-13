@@ -12,7 +12,7 @@ import type { Tx } from "./inventory-transitions";
 // cascades onto its links, so it locks every project carrying the category
 // first (`lockProjectsCarrying`), or it deadlocks against a Save that has
 // deleted a link and is re-inserting it. The category cleanup (#857) does;
-// `deleteCategoryAs` does not yet.
+// `deleteCategoryAs` does not yet (#861).
 
 /**
  * Takes the project's row lock for the rest of `tx`. Every writer of a
