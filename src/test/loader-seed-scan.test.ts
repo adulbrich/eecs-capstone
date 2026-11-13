@@ -150,6 +150,13 @@ const CENSUS = new Map<string, { class: SeedClass; why: string }>([
   ],
   // Class D.
   [
+    "src/components/categorize-backfill-dialog.tsx: useState(EMPTY)",
+    {
+      class: "D",
+      why: "a module constant, the zero tally a run starts from; never loader data",
+    },
+  ],
+  [
     "src/components/staff-categories-section.tsx: useState(proposal.description)",
     {
       class: "D",

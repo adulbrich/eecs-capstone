@@ -129,6 +129,14 @@ export const ACCESS_CONTRACT: Record<string, AccessDeclaration> = {
     level: "staff",
     note: "A paid model call that replaces a project's categories, metered per staff member under `categories`. assertStaff decides, before the limiter and the call.",
   },
+  "server/categories.ts:countUncategorizedProjects": {
+    level: "staff",
+    note: "How many published or archived projects carry no category, for the backfill (#31). assertStaff decides.",
+  },
+  "server/categories.ts:categorizeNextProject": {
+    level: "staff",
+    note: "One step of the backfill: a paid model call that writes a published project's categories, metered against no one's limit (#31). assertStaff decides, before the call.",
+  },
   "server/categories.ts:approveProposedCategory": {
     level: "staff",
     note: "Creates a category through createCategoryAs and adds it to the project. assertStaff decides; the type must already exist and not be Kind of work, since the proposal arrives from the browser.",

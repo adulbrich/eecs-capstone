@@ -12,6 +12,7 @@ import {
   AdminDataTable,
   defineAdminColumns,
 } from "#/components/admin-data-table";
+import { CategorizeBackfillDialog } from "#/components/categorize-backfill-dialog";
 import {
   CATEGORY_FIELD_DESCRIPTION,
   CategoryTypeCombobox,
@@ -275,107 +276,112 @@ function CategoriesAdmin() {
       </Breadcrumb>
       <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
         <h1 className="text-2xl font-semibold">Categories</h1>
-        <Dialog onOpenChange={setOpen} open={open}>
-          <DialogTrigger asChild>
-            <Button size="sm" type="button">
-              <FolderPlus aria-hidden="true" />
-              New category
-            </Button>
-          </DialogTrigger>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>
-                {tab === "project"
-                  ? "New project category"
-                  : "New inventory category"}
-              </DialogTitle>
-              <DialogDescription>
-                {tab === "project"
-                  ? "Pick the type first, then name the category."
-                  : "Add a category for inventory items."}
-              </DialogDescription>
-            </DialogHeader>
-            <form
-              className="flex min-h-0 flex-1 flex-col gap-4"
-              onSubmit={onCreate}
-            >
-              <DialogBody>
-                {/*
+        <div className="flex flex-wrap gap-2">
+          {/* The backfill files projects, so it belongs to the project tab
+              alone (#31). */}
+          {tab === "project" && <CategorizeBackfillDialog />}
+          <Dialog onOpenChange={setOpen} open={open}>
+            <DialogTrigger asChild>
+              <Button size="sm" type="button">
+                <FolderPlus aria-hidden="true" />
+                New category
+              </Button>
+            </DialogTrigger>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>
+                  {tab === "project"
+                    ? "New project category"
+                    : "New inventory category"}
+                </DialogTitle>
+                <DialogDescription>
+                  {tab === "project"
+                    ? "Pick the type first, then name the category."
+                    : "Add a category for inventory items."}
+                </DialogDescription>
+              </DialogHeader>
+              <form
+                className="flex min-h-0 flex-1 flex-col gap-4"
+                onSubmit={onCreate}
+              >
+                <DialogBody>
+                  {/*
                 Type above Name on the project tab: the type is the group and
                 the name is the category, and a first-time reader who meets
                 Name first files the group under the category (#374).
               */}
-                {tab === "project" && (
-                  <div className="flex flex-col gap-2">
-                    <Label htmlFor="cat-type">Type</Label>
-                    <p
-                      className="text-muted-foreground text-xs"
-                      id="cat-type-description"
-                    >
-                      {CATEGORY_FIELD_DESCRIPTION.type}
-                    </p>
-                    <CategoryTypeCombobox
-                      describedBy="cat-type-description"
-                      id="cat-type"
-                      onChange={setType}
-                      types={types}
-                      value={type}
-                    />
-                  </div>
-                )}
-                <div className="flex flex-col gap-2">
-                  <Label htmlFor="cat-name">Name</Label>
                   {tab === "project" && (
-                    <p
-                      className="text-muted-foreground text-xs"
-                      id="cat-name-description"
-                    >
-                      {CATEGORY_FIELD_DESCRIPTION.name}
-                    </p>
+                    <div className="flex flex-col gap-2">
+                      <Label htmlFor="cat-type">Type</Label>
+                      <p
+                        className="text-muted-foreground text-xs"
+                        id="cat-type-description"
+                      >
+                        {CATEGORY_FIELD_DESCRIPTION.type}
+                      </p>
+                      <CategoryTypeCombobox
+                        describedBy="cat-type-description"
+                        id="cat-type"
+                        onChange={setType}
+                        types={types}
+                        value={type}
+                      />
+                    </div>
                   )}
-                  <Input
-                    aria-describedby={
-                      tab === "project" ? "cat-name-description" : undefined
-                    }
-                    id="cat-name"
-                    onChange={(e) => setName(e.target.value)}
-                    required
-                    value={name}
-                  />
-                </div>
-                {tab === "project" && (
                   <div className="flex flex-col gap-2">
-                    <Label htmlFor="cat-description">Description</Label>
-                    <p
-                      className="text-muted-foreground text-xs"
-                      id="cat-description-description"
-                    >
-                      {CATEGORY_FIELD_DESCRIPTION.description}
-                    </p>
-                    <Textarea
-                      aria-describedby="cat-description-description"
-                      id="cat-description"
-                      maxLength={CATEGORY_DESCRIPTION_MAX_LENGTH}
-                      onChange={(e) => setDescription(e.target.value)}
-                      value={description}
+                    <Label htmlFor="cat-name">Name</Label>
+                    {tab === "project" && (
+                      <p
+                        className="text-muted-foreground text-xs"
+                        id="cat-name-description"
+                      >
+                        {CATEGORY_FIELD_DESCRIPTION.name}
+                      </p>
+                    )}
+                    <Input
+                      aria-describedby={
+                        tab === "project" ? "cat-name-description" : undefined
+                      }
+                      id="cat-name"
+                      onChange={(e) => setName(e.target.value)}
+                      required
+                      value={name}
                     />
                   </div>
-                )}
-                <FieldError message={error} />
-              </DialogBody>
-              <DialogFooter>
-                <Button
-                  disabled={
-                    busy || (tab === "project" ? !(name && type) : !name)
-                  }
-                  type="submit"
-                >
-                  {busy ? "Creating..." : "Create category"}
-                </Button>
-              </DialogFooter>
-            </form>
-          </DialogContent>
-        </Dialog>
+                  {tab === "project" && (
+                    <div className="flex flex-col gap-2">
+                      <Label htmlFor="cat-description">Description</Label>
+                      <p
+                        className="text-muted-foreground text-xs"
+                        id="cat-description-description"
+                      >
+                        {CATEGORY_FIELD_DESCRIPTION.description}
+                      </p>
+                      <Textarea
+                        aria-describedby="cat-description-description"
+                        id="cat-description"
+                        maxLength={CATEGORY_DESCRIPTION_MAX_LENGTH}
+                        onChange={(e) => setDescription(e.target.value)}
+                        value={description}
+                      />
+                    </div>
+                  )}
+                  <FieldError message={error} />
+                </DialogBody>
+                <DialogFooter>
+                  <Button
+                    disabled={
+                      busy || (tab === "project" ? !(name && type) : !name)
+                    }
+                    type="submit"
+                  >
+                    {busy ? "Creating..." : "Create category"}
+                  </Button>
+                </DialogFooter>
+              </form>
+            </DialogContent>
+          </Dialog>
+        </div>
       </div>
 
       {/* Manual activation: selecting a tab pushes a navigation and rewrites
