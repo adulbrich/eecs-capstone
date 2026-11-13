@@ -400,15 +400,27 @@ describe("applying a cleanup", () => {
             reason: REASON,
           },
         ],
+        moves: [
+          {
+            category: h("Web Development"),
+            type: "Technology",
+            reason: REASON,
+          },
+        ],
         retires: [{ category: h("Blockchain"), reason: REASON }],
       }))
     );
-    // A colleague deletes VR and edits Python by hand after the proposal.
+    // After the proposal a colleague deletes VR, rewrites Python's description
+    // and renames Web Development, by hand.
     await db.delete(categories).where(eq(categories.id, cats.VR.id));
     await db
       .update(categories)
       .set({ description: "The language." })
       .where(eq(categories.id, cats.Python.id));
+    await db
+      .update(categories)
+      .set({ name: "Web" })
+      .where(eq(categories.id, cats["Web Development"].id));
     vi.spyOn(console, "log").mockImplementation(() => {});
 
     const { results } = await applyCategoryCleanupAs(admin, {
@@ -422,8 +434,18 @@ describe("applying a cleanup", () => {
         reason:
           "Python was edited after the proposal. Propose a cleanup again.",
       },
+      {
+        ok: false,
+        reason:
+          "Web Development was edited after the proposal. Propose a cleanup again.",
+      },
       { ok: true },
     ]);
+    const [web] = await db
+      .select()
+      .from(categories)
+      .where(eq(categories.id, cats["Web Development"].id));
+    expect(web.type).toBe("Field");
     expect(
       await db
         .select()

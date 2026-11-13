@@ -70,6 +70,9 @@ type WithoutReason<T> = T extends unknown ? Omit<T, "reason"> : never;
 /** A change as apply takes it: the operation, less the model's reason. */
 export type CleanupChange = WithoutReason<CleanupOperation>;
 
+/** What applying one change did, with the sentence staff read if refused. */
+export type CleanupApplyResult = { ok: true } | { ok: false; reason: string };
+
 /** The same caps the staff form puts on a category. */
 export const CLEANUP_NAME_MAX_LENGTH = 100;
 export const CLEANUP_REASON_MAX_LENGTH = 300;

@@ -19,6 +19,7 @@ import type { ReviewOutcome } from "#/lib/ai-review-limits";
 import {
   buildCleanupTool,
   CLEANUP_SAMPLE_TITLES,
+  type CleanupApplyResult,
   type CleanupCategory,
   type CleanupChange,
   type CleanupEffect,
@@ -76,9 +77,11 @@ Prefer fewer, broader categories. Four kinds of change, each with a one-sentence
 - merges: fold one or more categories into a target of the same type when they mean the same thing, or when one is too narrow to stand alone, such as "VR" beside "AR / VR". Every project moves to the target and the sources are deleted. Make the broader or more used category the target.
 - renames: a clearer name, a better definition, or both, for a category that is sound but badly named or defined. Set whichever you keep to null. Keep the style of the other names and definitions.
 - moves: a category filed under the wrong type, to another listed type.
-- retires: a category that holds no project, or is too narrow to help a student filter, where no merge fits. The reason says what the projects carrying it lose.
+- retires: a category too narrow to help a student filter, or one that has carried no project for a long time, where no merge fits. The reason says what the projects carrying it lose.
 
 Rules:
+- Holding no project yet is not by itself a reason to retire or merge a category: the list is curated ahead of the projects it will hold. Judge it by its definition and its neighbours, and treat a category created in the last year as new.
+- Propose what a careful staff member would change, not every change you can justify. Most lists need only a few.
 - Each category appears in at most one change.
 - Never propose a new category or a split. ${KIND_OF_WORK_TYPE} is fixed and shown only for context: no change may touch its categories or move one into it.
 - Do not merge distinct ideas only to shrink the list: a student filtering for one must not get the other.
@@ -87,10 +90,14 @@ Rules:
 Respond only by calling the ${CLEANUP_TOOL_NAME} tool.`;
 }
 
-/** The user message: the per-type totals, then the list. */
+/**
+ * The user message: today's date, so the creation dates mean something, the
+ * per-type totals, then the list.
+ */
 export function cleanupInput(
   tool: CleanupTool,
-  rows: CleanupCategory[]
+  rows: CleanupCategory[],
+  today: Date = new Date()
 ): string {
   const totals = new Map<string, number>();
   for (const row of rows) {
@@ -101,7 +108,7 @@ export function cleanupInput(
     .join(", ")
     .replaceAll("<", "&lt;")
     .replaceAll(">", "&gt;");
-  return `The list holds ${rows.length} categories: ${summary}.\n\n<categories>\n${tool.catalog}\n</categories>`;
+  return `Today is ${today.toISOString().slice(0, 10)}. The list holds ${rows.length} categories: ${summary}.\n\n<categories>\n${tool.catalog}\n</categories>`;
 }
 
 /** Non-draft projects that are not deleted: the admin table's population. */
@@ -365,8 +372,6 @@ export async function proposeCategoryCleanupForCurrentUser(): Promise<CategoryCl
 
 /** Why one change was not applied, in a sentence staff read. */
 class CleanupRefusal extends Error {}
-
-export type CleanupApplyResult = { ok: true } | { ok: false; reason: string };
 
 const APPLY_FAILED = "Couldn't apply this change. Try again.";
 

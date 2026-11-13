@@ -1398,6 +1398,95 @@ test("admin categories: categorize uncategorized dialog", async ({ page }) => {
   await checkA11y(page);
 });
 
+/** A POST to the `proposeCategoryCleanup` server function (#857). */
+function isCleanupProposal(request: {
+  method: () => string;
+  url: () => string;
+}): boolean {
+  const encoded = /\/_serverFn\/([^/?]+)/u.exec(request.url())?.[1];
+  return (
+    request.method() === "POST" &&
+    !!encoded &&
+    Buffer.from(encoded, "base64")
+      .toString("utf8")
+      .includes("proposeCategoryCleanup")
+  );
+}
+
+const CLEANUP_REF = (id: string, name: string) => ({
+  id: `00000000-0000-4000-8000-00000000000${id}`,
+  name,
+  type: "Field",
+  description: null,
+});
+
+test("admin categories: cleanup dialog, opened and with proposals", async ({
+  page,
+}) => {
+  await page.goto("/admin/categories");
+  await waitForHydration(page);
+
+  await page.getByRole("button", { name: "Propose a cleanup" }).click();
+  const dialog = page.getByRole("dialog", { name: "Propose a cleanup" });
+  await expect(dialog.getByRole("button", { name: "Propose" })).toBeVisible();
+  await waitForSurfaceSettled(dialog);
+  await checkA11y(page);
+
+  // A fixed answer: the suite reaches no model. The client returns plain
+  // JSON as is and reads its `result`.
+  await page.route(
+    (url) => url.pathname.startsWith("/_serverFn/"),
+    (route) =>
+      isCleanupProposal(route.request())
+        ? route.fulfill({
+            contentType: "application/json",
+            body: JSON.stringify({
+              result: {
+                proposals: [
+                  {
+                    operation: {
+                      kind: "merge",
+                      target: CLEANUP_REF("1", "AR / VR"),
+                      sources: [CLEANUP_REF("2", "VR")],
+                      reason: "One idea split across two checkboxes.",
+                    },
+                    effect: {
+                      kind: "merge",
+                      targetUsage: 6,
+                      sourceUsage: [3],
+                      after: 8,
+                      shared: 1,
+                    },
+                  },
+                  {
+                    operation: {
+                      kind: "rename",
+                      category: CLEANUP_REF("3", "ML"),
+                      name: "Machine Learning",
+                      description: "Models that learn from data.",
+                      reason: "Spell it out like its siblings.",
+                    },
+                    effect: { kind: "rename", usage: 11 },
+                  },
+                ],
+              },
+            }),
+          })
+        : route.fallback()
+  );
+  try {
+    await dialog.getByRole("button", { name: "Propose" }).click();
+    await dialog.getByLabel(/^Merge VR \(3\) into AR \/ VR/u).click();
+    await expect(
+      dialog.getByRole("button", { name: "Apply 1 change" })
+    ).toBeEnabled();
+    await waitForSurfaceSettled(dialog);
+    await checkA11y(page);
+  } finally {
+    await page.unrouteAll({ behavior: "ignoreErrors" });
+  }
+});
+
 test("admin categories: create dialog and Columns dropdown coexist", async ({
   page,
 }) => {

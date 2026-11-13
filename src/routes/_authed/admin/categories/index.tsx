@@ -13,6 +13,7 @@ import {
   defineAdminColumns,
 } from "#/components/admin-data-table";
 import { CategorizeBackfillDialog } from "#/components/categorize-backfill-dialog";
+import { CategoryCleanupDialog } from "#/components/category-cleanup-dialog";
 import {
   CATEGORY_FIELD_DESCRIPTION,
   CategoryTypeCombobox,
@@ -277,8 +278,10 @@ function CategoriesAdmin() {
       <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
         <h1 className="text-2xl font-semibold">Categories</h1>
         <div className="flex flex-wrap gap-2">
-          {/* The backfill files projects, so it belongs to the project tab
-              alone (#31). */}
+          {/* The backfill files projects and the cleanup reshapes the
+              project facets, so both belong to the project tab alone (#31,
+              #857). */}
+          {tab === "project" && <CategoryCleanupDialog />}
           {tab === "project" && <CategorizeBackfillDialog />}
           <Dialog onOpenChange={setOpen} open={open}>
             <DialogTrigger asChild>
