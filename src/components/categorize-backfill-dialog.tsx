@@ -86,7 +86,10 @@ export function CategorizeBackfillDialog() {
     let after: string | null = null;
     try {
       // Counted again, since the last run filed some of them.
-      setTotal((await countUncategorizedProjects()).count);
+      const { count } = await countUncategorizedProjects();
+      if (current()) {
+        setTotal(count);
+      }
       while (!controller.signal.aborted) {
         const step: Step = await categorizeNextProject({ data: { after } });
         if (!current()) {
