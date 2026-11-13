@@ -1420,70 +1420,121 @@ const CLEANUP_REF = (id: string, name: string) => ({
   description: null,
 });
 
-test("admin categories: cleanup dialog, opened and with proposals", async ({
+/**
+ * Opened, proposed and applied. Only the proposal is a fixed answer, since the
+ * suite reaches no model; Apply goes to the real server against two rows this
+ * test inserts, one retired and one refused as edited since the proposal.
+ */
+test("admin categories: cleanup dialog, opened, proposed and applied", async ({
   page,
-}) => {
-  await page.goto("/admin/categories");
-  await waitForHydration(page);
+}, testInfo) => {
+  const stamp = `${testInfo.project.name} ${Date.now()}`;
+  const retired = `A11y Cleanup Retired ${stamp}`;
+  const edited = `A11y Cleanup Edited ${stamp}`;
+  const rows = await getDb()
+    .insert(schema.categories)
+    .values([
+      { domain: "project", type: "Technology", name: retired },
+      { domain: "project", type: "Technology", name: edited },
+    ])
+    .returning();
+  const ref = (row: (typeof rows)[number], name = row.name) => ({
+    id: row.id,
+    name,
+    type: "Technology",
+    description: null,
+  });
 
-  await page.getByRole("button", { name: "Propose a cleanup" }).click();
-  const dialog = page.getByRole("dialog", { name: "Propose a cleanup" });
-  await expect(dialog.getByRole("button", { name: "Propose" })).toBeVisible();
-  await waitForSurfaceSettled(dialog);
-  await checkA11y(page);
-
-  // A fixed answer: the suite reaches no model. The client returns plain
-  // JSON as is and reads its `result`.
-  await page.route(
-    (url) => url.pathname.startsWith("/_serverFn/"),
-    (route) =>
-      isCleanupProposal(route.request())
-        ? route.fulfill({
-            contentType: "application/json",
-            body: JSON.stringify({
-              result: {
-                proposals: [
-                  {
-                    operation: {
-                      kind: "merge",
-                      target: CLEANUP_REF("1", "AR / VR"),
-                      sources: [CLEANUP_REF("2", "VR")],
-                      reason: "One idea split across two checkboxes.",
-                    },
-                    effect: {
-                      kind: "merge",
-                      targetUsage: 6,
-                      sourceUsage: [3],
-                      after: 8,
-                      shared: 1,
-                    },
-                  },
-                  {
-                    operation: {
-                      kind: "rename",
-                      category: CLEANUP_REF("3", "ML"),
-                      name: "Machine Learning",
-                      description: "Models that learn from data.",
-                      reason: "Spell it out like its siblings.",
-                    },
-                    effect: { kind: "rename", usage: 11 },
-                  },
-                ],
-              },
-            }),
-          })
-        : route.fallback()
-  );
   try {
+    await page.goto("/admin/categories");
+    await waitForHydration(page);
+
+    await page.getByRole("button", { name: "Propose a cleanup" }).click();
+    const dialog = page.getByRole("dialog", { name: "Propose a cleanup" });
+    await expect(dialog.getByRole("button", { name: "Propose" })).toBeVisible();
+    await waitForSurfaceSettled(dialog);
+    await checkA11y(page);
+
+    // The client returns plain JSON as is and reads its `result`.
+    await page.route(
+      (url) => url.pathname.startsWith("/_serverFn/"),
+      (route) =>
+        isCleanupProposal(route.request())
+          ? route.fulfill({
+              contentType: "application/json",
+              body: JSON.stringify({
+                result: {
+                  proposals: [
+                    {
+                      operation: {
+                        kind: "merge",
+                        target: CLEANUP_REF("1", "AR / VR"),
+                        sources: [CLEANUP_REF("2", "VR")],
+                        reason: "One idea split across two checkboxes.",
+                      },
+                      effect: {
+                        kind: "merge",
+                        targetUsage: 6,
+                        sourceUsage: [3],
+                        after: 8,
+                        shared: 1,
+                      },
+                    },
+                    {
+                      operation: {
+                        kind: "retire",
+                        category: ref(rows[0]),
+                        reason: "No project carries it.",
+                      },
+                      effect: { kind: "retire", usage: 0 },
+                    },
+                    {
+                      operation: {
+                        kind: "retire",
+                        category: ref(rows[1], `${edited} before`),
+                        reason: "No project carries it.",
+                      },
+                      effect: { kind: "retire", usage: 0 },
+                    },
+                  ],
+                },
+              }),
+            })
+          : route.fallback()
+    );
     await dialog.getByRole("button", { name: "Propose" }).click();
-    await dialog.getByLabel(/^Merge VR \(3\) into AR \/ VR/u).click();
+    await dialog.getByLabel(`Retire ${retired}: 0 projects lose it`).click();
+    await dialog
+      .getByLabel(`Retire ${edited} before: 0 projects lose it`)
+      .click();
     await expect(
-      dialog.getByRole("button", { name: "Apply 1 change" })
+      dialog.getByRole("button", { name: "Apply 2 changes" })
     ).toBeEnabled();
     await waitForSurfaceSettled(dialog);
     await checkA11y(page);
+
+    await dialog.getByRole("button", { name: "Apply 2 changes" }).click();
+    await expect(dialog.getByText("Applied.")).toBeVisible();
+    await expect(
+      dialog.getByText(
+        `Refused: ${edited} before was edited after the proposal. Propose a cleanup again.`
+      )
+    ).toBeVisible();
+    await expect(
+      dialog.getByRole("button", { name: "Apply 0 changes" })
+    ).toBeVisible();
+    await waitForSurfaceSettled(dialog);
+    await checkA11y(page);
+    expect(
+      await getDb()
+        .select({ id: schema.categories.id })
+        .from(schema.categories)
+        .where(eq(schema.categories.id, rows[0].id))
+    ).toEqual([]);
   } finally {
     await page.unrouteAll({ behavior: "ignoreErrors" });
+    await deleteCategoryByName(retired);
+    await deleteCategoryByName(edited);
   }
 });
 

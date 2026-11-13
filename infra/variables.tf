@@ -253,13 +253,13 @@ variable "bedrock_categories_enabled" {
 }
 
 variable "ai_categories_limit_per_hour" {
-  description = "Per-user hourly ceiling on staff Regenerate categories. The run on submit and the backfill are not counted."
+  description = "Per-user hourly ceiling on staff Regenerate categories and Propose a cleanup together. The run on submit and the backfill are not counted."
   type        = string
   default     = "20"
 }
 
 variable "ai_categories_limit_per_day" {
-  description = "Per-user daily ceiling on staff Regenerate categories."
+  description = "Per-user daily ceiling on staff Regenerate categories and Propose a cleanup together."
   type        = string
   default     = "60"
 }
