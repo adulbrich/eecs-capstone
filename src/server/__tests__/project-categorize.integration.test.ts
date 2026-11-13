@@ -13,10 +13,8 @@ import type { ResponsesFn } from "#/lib/_internal/bedrock-mantle";
 import { auth } from "#/lib/auth";
 import { CATEGORIZE_TOOL_NAME } from "#/server/_internal/categorize-core";
 import {
-  approveProposedCategoryAs,
   categorizeProject,
   loadCategoryOptions,
-  regenerateProjectCategoriesAs,
 } from "#/server/_internal/project-categorize";
 import { settleProjectRefreshes } from "#/server/_internal/project-refresh";
 import {
@@ -24,6 +22,10 @@ import {
   performTransitionAs,
   softDeleteProjectAs,
 } from "#/server/_internal/projects";
+import {
+  approveProposedCategoryAs,
+  regenerateProjectCategoriesAs,
+} from "#/server/_internal/regenerate-categories";
 
 /**
  * The categorizer (#31) against the database. Every model call is a fake

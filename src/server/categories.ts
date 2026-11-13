@@ -161,7 +161,7 @@ export const getProjectCategorization = createServerFn({ method: "GET" })
   .validator((data: unknown) => projectCategorizationSchema.parse(data))
   .handler(async ({ data }) => {
     const { getProjectCategorizationForCurrentUser } = await import(
-      "./_internal/project-categorize"
+      "./_internal/regenerate-categories"
     );
     return getProjectCategorizationForCurrentUser(data);
   });
@@ -170,7 +170,7 @@ export const regenerateProjectCategories = createServerFn({ method: "POST" })
   .validator((data: unknown) => projectCategorizationSchema.parse(data))
   .handler(async ({ data }) => {
     const { regenerateProjectCategoriesForCurrentUser } = await import(
-      "./_internal/project-categorize"
+      "./_internal/regenerate-categories"
     );
     return regenerateProjectCategoriesForCurrentUser(data);
   });
@@ -179,7 +179,7 @@ export const approveProposedCategory = createServerFn({ method: "POST" })
   .validator((data: unknown) => approveProposedCategorySchema.parse(data))
   .handler(async ({ data }) => {
     const { approveProposedCategoryForCurrentUser } = await import(
-      "./_internal/project-categorize"
+      "./_internal/regenerate-categories"
     );
     return approveProposedCategoryForCurrentUser(data);
   });
