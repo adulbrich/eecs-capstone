@@ -100,12 +100,12 @@ export const ACCESS_CONTRACT: Record<string, AccessDeclaration> = {
   "server/categories.ts:createCategory": { level: "staff" },
   "server/categories.ts:deleteCategory": { level: "staff" },
   "server/categories.ts:getCategory": {
-    level: "public",
-    note: "Public catalog. No join to user. Nothing projects that: getCategoryImpl is a bare select() returning every column, so a column added to `categories` would ride into a public read. categories.integration.test.ts pins the exact key set and is the only enforcement.",
+    level: "staff",
+    note: "Staff since #31, because it returns `description`, which is not public. Its one caller is the staff edit page.",
   },
   "server/categories.ts:listCategories": {
     level: "public",
-    note: "Public catalog. No join to user. Nothing projects that: listCategoriesImpl is a bare select() returning every column, so a column added to `categories` would ride into a public read. categories.integration.test.ts pins the exact key set and is the only enforcement.",
+    note: "Public catalog. No join to user. listCategoriesImpl projects CATALOG_COLUMNS by name, which leaves out the staff-only `description`; categories.integration.test.ts pins the exact key set.",
   },
   "server/categories.ts:listCategoriesWithUsage": { level: "staff" },
   "server/categories.ts:listCategoryTypes": {

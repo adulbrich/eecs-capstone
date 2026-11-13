@@ -149,6 +149,14 @@ export const categories = pgTable(
      * Never a fact that is a column on `projects` (ADR-0021).
      */
     type: text("type"),
+    /**
+     * One sentence defining what belongs here: the definition a model is
+     * given when it picks a project's categories (#31). Staff only, never
+     * public: `listCategoriesImpl` projects the catalog columns by name and
+     * leaves this out. Nullable, because a category staff create from a
+     * picker carries none.
+     */
+    description: text("description"),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
       .defaultNow(),
@@ -156,8 +164,8 @@ export const categories = pgTable(
   (t) => [
     /**
      * Two rows may not name the same thing in the same domain. Nothing stopped
-     * that before, and #31 gives the model a creation path at 100+ projects a
-     * term, which turns an occasional duplicate into a catalog of near-identical
+     * that before, and at 100+ projects a term a model proposing categories
+     * (#31) turns an occasional duplicate into a catalog of near-identical
      * rows. A split "Robotics" also breaks the all-match filter: a student who
      * ticks both chips gets nothing back.
      *

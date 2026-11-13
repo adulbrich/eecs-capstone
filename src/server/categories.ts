@@ -1,11 +1,25 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
+import { CATEGORY_DESCRIPTION_MAX_LENGTH } from "#/lib/default-categories";
+
+/**
+ * Project categories only: it is the definition the categorizer reads, and
+ * inventory categories are never categorized by a model. Optional, so a
+ * category created from a picker carries none; the writers store a blank one
+ * as null.
+ */
+const descriptionSchema = z
+  .string()
+  .trim()
+  .max(CATEGORY_DESCRIPTION_MAX_LENGTH)
+  .optional();
 
 export const categorySchema = z.discriminatedUnion("domain", [
   z.object({
     domain: z.literal("project"),
     name: z.string().trim().min(1).max(100),
     type: z.string().trim().min(1).max(50),
+    description: descriptionSchema,
   }),
   z.object({
     domain: z.literal("inventory"),
@@ -24,6 +38,7 @@ const categoryUpdateSchema = z.discriminatedUnion("domain", [
     domain: z.literal("project"),
     name: z.string().trim().min(1).max(100),
     type: z.string().trim().min(1).max(50),
+    description: descriptionSchema,
   }),
   z.object({
     id: z.string().uuid(),
@@ -77,8 +92,10 @@ export const listCategoryTypes = createServerFn({ method: "GET" }).handler(
 export const getCategory = createServerFn({ method: "GET" })
   .validator((data: unknown) => idSchema.parse(data))
   .handler(async ({ data }) => {
-    const { getCategoryImpl } = await import("./_internal/categories");
-    return getCategoryImpl(data);
+    const { getCategoryForCurrentUser } = await import(
+      "./_internal/categories"
+    );
+    return getCategoryForCurrentUser(data);
   });
 
 export const createCategory = createServerFn({ method: "POST" })

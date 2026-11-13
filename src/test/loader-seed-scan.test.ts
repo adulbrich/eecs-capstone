@@ -89,11 +89,15 @@ const CENSUS = new Map<string, { class: SeedClass; why: string }>([
   // Class B.
   [
     "src/routes/_authed/admin/categories/$categoryId.tsx: useState(category.name)",
-    { class: "B", why: "keyed on the seeded name and type" },
+    { class: "B", why: "keyed on the seeded name, type and description" },
   ],
   [
     'src/routes/_authed/admin/categories/$categoryId.tsx: useState(category.type ?? "")',
-    { class: "B", why: "keyed on the seeded name and type" },
+    { class: "B", why: "keyed on the seeded name, type and description" },
+  ],
+  [
+    'src/routes/_authed/admin/categories/$categoryId.tsx: useState(category.description ?? "")',
+    { class: "B", why: "keyed on the seeded name, type and description" },
   ],
   [
     "src/routes/_authed/admin/programs/$programId.tsx: useState(program.courseId)",

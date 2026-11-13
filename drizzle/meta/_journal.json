@@ -302,6 +302,13 @@
       "when": 1792790138161,
       "tag": "0042_pickup_window_place_note",
       "breakpoints": true
+    },
+    {
+      "idx": 43,
+      "version": "7",
+      "when": 1794530446148,
+      "tag": "0043_default_categories",
+      "breakpoints": true
     }
   ]
 }

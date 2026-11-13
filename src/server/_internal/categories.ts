@@ -55,6 +55,38 @@ async function rethrowNameCollision(
   throw new Error(`A category named "${name}" already exists${where}.`);
 }
 
+/**
+ * The columns a public category read returns, named rather than a bare
+ * `select()`: `listCategories` answers callers with no session, and a column
+ * added to `categories` must not ride into that answer unnoticed.
+ * `description` is the first one that would have (#31).
+ */
+const CATALOG_COLUMNS = {
+  id: categories.id,
+  name: categories.name,
+  domain: categories.domain,
+  type: categories.type,
+  createdAt: categories.createdAt,
+};
+
+/**
+ * A blank description is stored as null, and an inventory category never
+ * carries one: only the categorizer reads it, and it reads project categories.
+ */
+function storedDescription(data: CategoryInput): string | null {
+  return data.domain === "project" ? data.description || null : null;
+}
+
+/**
+ * The description an update writes, or none at all when the caller sent none:
+ * an update that omits the field must not wipe what staff wrote.
+ */
+function descriptionUpdate(data: CategoryUpdateInput) {
+  return data.domain === "project" && data.description === undefined
+    ? {}
+    : { description: storedDescription(data) };
+}
+
 export async function listCategoriesImpl(data: {
   domain?: CategoryDomain | null;
   type?: string | null;
@@ -67,7 +99,7 @@ export async function listCategoriesImpl(data: {
     conditions.push(eq(categories.type, data.type));
   }
   const rows = await db
-    .select()
+    .select(CATALOG_COLUMNS)
     .from(categories)
     .where(conditions.length ? and(...conditions) : undefined)
     // Type first groups the project pickers. Inventory rows all have a null
@@ -104,9 +136,15 @@ function assertDomainShape(data: {
   }
 }
 
-export async function getCategoryImpl(data: { id: string }) {
+/**
+ * One category with its description, for the staff edit page. Staff only
+ * since #31 gave categories a column that is not public; its one caller is
+ * that page, which `requireStaff` already guards.
+ */
+export async function getCategoryAs(viewer: AuthUser, data: { id: string }) {
+  assertStaff(viewer);
   const [row] = await db
-    .select()
+    .select({ ...CATALOG_COLUMNS, description: categories.description })
     .from(categories)
     .where(eq(categories.id, data.id));
   if (!row) {
@@ -115,13 +153,23 @@ export async function getCategoryImpl(data: { id: string }) {
   return { category: row };
 }
 
+export async function getCategoryForCurrentUser(data: { id: string }) {
+  const viewer = await requireUser();
+  return getCategoryAs(viewer, data);
+}
+
 export async function createCategoryAs(viewer: AuthUser, data: CategoryInput) {
   assertStaff(viewer);
   assertDomainShape(data);
   try {
     const [row] = await db
       .insert(categories)
-      .values({ name: data.name, domain: data.domain, type: data.type })
+      .values({
+        name: data.name,
+        domain: data.domain,
+        type: data.type,
+        description: storedDescription(data),
+      })
       .returning();
     // The listing's filter options are cached per task (ADR-0051).
     clearAllReferenceListCaches();
@@ -161,7 +209,12 @@ export async function updateCategoryAs(
   try {
     await db
       .update(categories)
-      .set({ name: data.name, domain: data.domain, type: data.type })
+      .set({
+        name: data.name,
+        domain: data.domain,
+        type: data.type,
+        ...descriptionUpdate(data),
+      })
       .where(eq(categories.id, data.id));
   } catch (error) {
     return rethrowNameCollision(error, data);
@@ -331,6 +384,7 @@ export async function listCategoriesWithUsageAs(
       name: categories.name,
       domain: categories.domain,
       type: categories.type,
+      description: categories.description,
       createdAt: categories.createdAt,
       usageCount,
     })

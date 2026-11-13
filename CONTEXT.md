@@ -362,11 +362,19 @@ an endpoint requires), privacy
 **Category**:
 A tag from a fixed list that classifies a project or an item. Every category belongs
 to one domain, project or inventory, for life. Project categories also carry a type,
-a free-text facet such as technology or industry that groups them in the picker;
-inventory categories are flat. Staff manage categories. Filtering by several
-categories means all of them, not any.
+a free-text facet that groups them in the picker; the defaults are Field, Technology,
+Industry and Kind of work. Inventory categories are flat. Staff manage categories,
+and a project category's description, its one-sentence definition, is staff only.
+Filtering by several categories means all of them, not any.
 _Avoid_: tag, label (that is an inventory field), topic, keyword, facet (that is
 the type, not the category)
+
+**Kind of work**:
+The project category type that says how the year will run, exactly one per project:
+Competition, Research, Existing System or New Build, the first that fits winning.
+It replaced the Type facet, which mixed who a project is for, where it starts and
+its licence.
+_Avoid_: project type, engagement, Consultancy (that is who it is for)
 
 **Private notes**:
 Free text on a project that only staff and the proposer can read or write; the

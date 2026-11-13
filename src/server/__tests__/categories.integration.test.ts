@@ -13,7 +13,7 @@ import { auth } from "#/lib/auth";
 import {
   createCategoryAs,
   deleteCategoryAs,
-  getCategoryImpl,
+  getCategoryAs,
   listCategoriesImpl,
   listCategoriesWithUsageAs,
   listCategoryTypesImpl,
@@ -144,19 +144,20 @@ describe("categories", () => {
     expect(inventoryOnly.rows.map((r) => r.name)).toEqual(["Electronics"]);
   });
 
-  it("keeps the two public category reads to the catalog columns", async () => {
-    // `listCategoriesImpl` and `getCategoryImpl` back endpoints declared
-    // `public` in access-contract.ts, and both are a bare `select()` with no
-    // projection, so a column added to `categories` later would ride straight
-    // into an unauthenticated read with nothing failing. This is the
-    // enforcement, in the shape of the same pin on `listProgramsImpl`. Sorted,
-    // because the point is the key set, not Drizzle's projection order.
+  it("keeps the public category read to the catalog columns", async () => {
+    // `listCategoriesImpl` backs an endpoint declared `public` in
+    // access-contract.ts, so a column added to `categories` must not ride
+    // into an unauthenticated read with nothing failing. `description` is the
+    // first that would have (#31). This is the enforcement, in the shape of
+    // the same pin on `listProgramsImpl`. Sorted, because the point is the key
+    // set, not Drizzle's projection order.
     const admin = await makeUser(`pub-${Date.now()}@x.com`, "admin");
     const name = `Public ${Date.now()}`;
     const { id } = await createCategoryAs(admin, {
       domain: "project",
       name,
       type: "technology",
+      description: "Staff only.",
     });
     const catalogColumns = ["createdAt", "domain", "id", "name", "type"];
 
@@ -165,8 +166,85 @@ describe("categories", () => {
     expect(listed).toBeDefined();
     expect(Object.keys(listed ?? {}).sort()).toEqual(catalogColumns);
 
-    const { category } = await getCategoryImpl({ id });
-    expect(Object.keys(category).sort()).toEqual(catalogColumns);
+    const { category } = await getCategoryAs(admin, { id });
+    expect(Object.keys(category).sort()).toEqual(
+      [...catalogColumns, "description"].sort()
+    );
+  });
+
+  it("refuses the single-category read to anyone but staff", async () => {
+    const admin = await makeUser(`one-${Date.now()}@x.com`, "admin");
+    const u = await makeUser(`one-u-${Date.now()}@x.com`, "user");
+    const { id } = await createCategoryAs(admin, {
+      domain: "project",
+      name: "Robotics",
+      type: "field",
+      description: "Staff only.",
+    });
+
+    await expect(getCategoryAs(u, { id })).rejects.toThrow();
+  });
+
+  it("stores a project category's description, and a blank one as null", async () => {
+    const admin = await makeUser(`desc-${Date.now()}@x.com`, "admin");
+    const { id } = await createCategoryAs(admin, {
+      domain: "project",
+      name: "Robotics",
+      type: "field",
+      description: "Robots and their controls.",
+    });
+    expect((await getCategoryAs(admin, { id })).category.description).toBe(
+      "Robots and their controls."
+    );
+
+    await updateCategoryAs(admin, {
+      id,
+      domain: "project",
+      name: "Robotics",
+      type: "field",
+      description: "Robots, drones and rovers.",
+    });
+    expect((await getCategoryAs(admin, { id })).category.description).toBe(
+      "Robots, drones and rovers."
+    );
+
+    // An update that sends no description leaves the stored one alone.
+    await updateCategoryAs(admin, {
+      id,
+      domain: "project",
+      name: "Robotics",
+      type: "field",
+    });
+    expect((await getCategoryAs(admin, { id })).category.description).toBe(
+      "Robots, drones and rovers."
+    );
+
+    await updateCategoryAs(admin, {
+      id,
+      domain: "project",
+      name: "Robotics",
+      type: "field",
+      description: "",
+    });
+    expect(
+      (await getCategoryAs(admin, { id })).category.description
+    ).toBeNull();
+  });
+
+  it("lists the description on the staff read", async () => {
+    const admin = await makeUser(`wu-${Date.now()}@x.com`, "admin");
+    const { id } = await createCategoryAs(admin, {
+      domain: "project",
+      name: "Robotics",
+      type: "field",
+      description: "Robots and their controls.",
+    });
+    const { rows } = await listCategoriesWithUsageAs(admin, {
+      domain: "project",
+    });
+    expect(rows.find((r) => r.id === id)?.description).toBe(
+      "Robots and their controls."
+    );
   });
 
   it("requires a type for a project category", async () => {

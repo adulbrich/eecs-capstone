@@ -42,8 +42,10 @@ import { Input } from "#/components/ui/input";
 import { Label } from "#/components/ui/label";
 import { ListCount } from "#/components/ui/pagination";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "#/components/ui/tabs";
+import { Textarea } from "#/components/ui/textarea";
 import { requireStaff } from "#/lib/access-denied";
 import { defineCsvColumns, toCsv } from "#/lib/csv";
+import { CATEGORY_DESCRIPTION_MAX_LENGTH } from "#/lib/default-categories";
 import { pageTitle } from "#/lib/page-title";
 import type { SortState } from "#/lib/table-state";
 import { useAction } from "#/lib/use-action";
@@ -127,6 +129,18 @@ const TYPE_COLUMN = {
   id: "type" as const,
 } satisfies AdminColumn<Row>;
 
+// Staff only, like the column: the public reads leave it out (#31).
+const DESCRIPTION_COLUMN = {
+  accessorFn: (row) => row.description ?? undefined,
+  cell: ({ row }) => (
+    <span className="text-muted-foreground md:line-clamp-2 md:max-w-md md:min-w-xs md:whitespace-normal">
+      {row.original.description ?? "None"}
+    </span>
+  ),
+  header: "Description",
+  id: "description" as const,
+} satisfies AdminColumn<Row>;
+
 const CREATED_COLUMN = {
   accessorFn: (row) => row.createdAt,
   cell: ({ row }) => <LocalTime dateOnly value={row.original.createdAt} />,
@@ -158,6 +172,7 @@ const PROJECT_COLUMNS = defineAdminColumns<Row>()([
   NAME_COLUMN,
   PROJECT_USAGE_COLUMN,
   TYPE_COLUMN,
+  DESCRIPTION_COLUMN,
   CREATED_COLUMN,
   ACTIONS_COLUMN,
 ]);
@@ -179,6 +194,11 @@ const EXPORT_COLUMNS = defineCsvColumns<Row>()([
   { header: "Name", key: "name", value: (row) => row.name },
   { header: "Type", key: "type", value: (row) => row.type },
   { header: "Domain", key: "domain", value: (row) => row.domain },
+  {
+    header: "Description",
+    key: "description",
+    value: (row) => row.description,
+  },
   { header: "Usage", key: "usageCount", value: (row) => row.usageCount },
   { header: "Created", key: "createdAt", value: (row) => row.createdAt },
 ]);
@@ -197,6 +217,7 @@ function CategoriesAdmin() {
   const [open, setOpen] = useState(false);
   const [name, setName] = useState("");
   const [type, setType] = useState("");
+  const [description, setDescription] = useState("");
   const { busy, error, run } = useAction({
     fallback: "Could not create the category",
   });
@@ -205,7 +226,9 @@ function CategoriesAdmin() {
     e.preventDefault();
     void run(async () => {
       if (tab === "project") {
-        await createCategory({ data: { domain: "project", name, type } });
+        await createCategory({
+          data: { domain: "project", name, type, description },
+        });
       } else {
         await createCategory({
           data: { domain: "inventory", name, type: null },
@@ -216,6 +239,7 @@ function CategoriesAdmin() {
       await router.invalidate();
       setName("");
       setType("");
+      setDescription("");
       setOpen(false);
     });
   }
@@ -319,6 +343,24 @@ function CategoriesAdmin() {
                     value={name}
                   />
                 </div>
+                {tab === "project" && (
+                  <div className="flex flex-col gap-2">
+                    <Label htmlFor="cat-description">Description</Label>
+                    <p
+                      className="text-muted-foreground text-xs"
+                      id="cat-description-description"
+                    >
+                      {CATEGORY_FIELD_DESCRIPTION.description}
+                    </p>
+                    <Textarea
+                      aria-describedby="cat-description-description"
+                      id="cat-description"
+                      maxLength={CATEGORY_DESCRIPTION_MAX_LENGTH}
+                      onChange={(e) => setDescription(e.target.value)}
+                      value={description}
+                    />
+                  </div>
+                )}
                 <FieldError message={error} />
               </DialogBody>
               <DialogFooter>
