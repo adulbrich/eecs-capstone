@@ -1,4 +1,5 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { Link } from "@tanstack/react-router";
 import { useId, useState } from "react";
 import {
   type CategoryProposal,
@@ -27,9 +28,10 @@ import {
   setProjectCategories,
 } from "#/server/categories";
 import { AttemptFailed, triggerPhrase } from "./ai-attempt";
-import { CategoryMultiSelect, categoriesQuery } from "./category-multi-select";
+import { categoriesQuery } from "./category-multi-select";
 import { LocalTime } from "./local-time";
 import { PanelSection } from "./panel";
+import { ProjectCategoryPicker } from "./project-category-picker";
 import { Button } from "./ui/button";
 import { FieldError, SavedNote } from "./ui/field";
 import { Input } from "./ui/input";
@@ -172,11 +174,7 @@ export function StaffCategoriesSection({
             them below.
           </AttemptFailed>
         )}
-        <CategoryMultiSelect
-          domain="project"
-          onChange={setDraft}
-          value={draft}
-        />
+        <ProjectCategoryPicker onChange={setDraft} value={draft} />
         <FieldError message={error ?? loadError} />
         <FieldError message={notice} />
         <SavedNote message={added} />
@@ -205,6 +203,15 @@ export function StaffCategoriesSection({
           {status.data && !regenerable
             ? "Restore the project to regenerate its categories."
             : "Regenerate replaces the saved categories, and any unsaved changes here, with AI picks from the project's current text. It counts toward your AI limit."}
+        </p>
+        <p className="text-xs">
+          <Link
+            className="text-primary hover:underline"
+            search={{ tab: "project" }}
+            to="/admin/categories"
+          >
+            Add or edit categories on the Categories page
+          </Link>
         </p>
         {proposal && (
           <ProposedCategory

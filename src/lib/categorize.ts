@@ -104,9 +104,10 @@ function facetKeys(types: string[]): Map<string, string> {
 
 /**
  * Kind of work first, then Field, then the rest by name, so the prompt reads
- * the way the rules do.
+ * the way the rules do. The staff picker orders its chips and groups the same
+ * way.
  */
-function typeOrder(a: string, b: string): number {
+export function typeOrder(a: string, b: string): number {
   const rank = (type: string) => {
     if (type === KIND_OF_WORK_TYPE) {
       return 0;
