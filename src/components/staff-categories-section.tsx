@@ -1,6 +1,9 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useId, useState } from "react";
-import type { CategoryProposal } from "#/lib/categorize";
+import {
+  type CategoryProposal,
+  PROPOSAL_NAME_MAX_LENGTH,
+} from "#/lib/categorize";
 import {
   CATEGORY_DESCRIPTION_MAX_LENGTH,
   KIND_OF_WORK_TYPE,
@@ -86,6 +89,8 @@ export function StaffCategoriesSection({
   useSeedOnArrival(projectId, saved.data, setDraft);
   const [proposal, setProposal] = useState<CategoryProposal | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  // Here rather than in the proposal box, which unmounts on Approve.
+  const [added, setAdded] = useState<string | null>(null);
   // One action for both writes, so Save and Regenerate can never run at once;
   // `use-action.ts` says why the hook's ref is what stops a double activation
   // (#443).
@@ -119,6 +124,7 @@ export function StaffCategoriesSection({
     setRunning("regenerate");
     return run(async () => {
       setNotice(null);
+      setAdded(null);
       setProposal(null);
       const result = await regenerateProjectCategories({
         data: { projectId },
@@ -141,8 +147,9 @@ export function StaffCategoriesSection({
     }, "Could not regenerate the categories");
   }
 
-  async function approved(categoryId: string) {
+  async function approved(categoryId: string, message: string) {
     setProposal(null);
+    setAdded(message);
     setDraft((current) =>
       current.includes(categoryId) ? current : [...current, categoryId]
     );
@@ -172,6 +179,7 @@ export function StaffCategoriesSection({
         />
         <FieldError message={error ?? loadError} />
         <FieldError message={notice} />
+        <SavedNote message={added} />
         <div className="flex flex-wrap gap-2">
           <Button
             disabled={busy || saved.data === undefined}
@@ -224,7 +232,7 @@ function ProposedCategory({
   projectId,
   proposal,
 }: {
-  onApproved: (categoryId: string) => Promise<void>;
+  onApproved: (categoryId: string, message: string) => Promise<void>;
   onDismiss: () => void;
   projectId: string;
   proposal: CategoryProposal;
@@ -244,15 +252,15 @@ function ProposedCategory({
   const { busy, error, run } = useAction({
     fallback: "Could not add the category",
   });
-  const [added, setAdded] = useState<string | null>(null);
-
   function approve() {
     return run(async () => {
       const result = await approveProposedCategory({
         data: { projectId, name, type, description },
       });
-      setAdded(`Added "${name}" to ${type} and to this project.`);
-      await onApproved(result.categoryId);
+      await onApproved(
+        result.categoryId,
+        `Added "${name.trim()}" to ${type} and to this project.`
+      );
     });
   }
 
@@ -286,7 +294,7 @@ function ProposedCategory({
         <Label htmlFor={`${id}-name`}>Name</Label>
         <Input
           id={`${id}-name`}
-          maxLength={100}
+          maxLength={PROPOSAL_NAME_MAX_LENGTH}
           onChange={(e) => setName(e.target.value)}
           value={name}
         />
@@ -301,7 +309,6 @@ function ProposedCategory({
         />
       </div>
       <FieldError message={error} />
-      <SavedNote message={added} />
       <div className="flex flex-wrap gap-2">
         <Button
           disabled={busy || !name.trim()}

@@ -25,6 +25,7 @@ import {
 import { KIND_OF_WORK_TYPE } from "#/lib/default-categories";
 import { type CategorizeRun, runCategorize } from "./categorize-core";
 import { readAiRefresh, recordAiRefresh } from "./project-ai-refreshes";
+import { lockProjectCategories } from "./project-category-lock";
 
 /**
  * The live project categories with how many published projects carry each,
@@ -92,6 +93,9 @@ export function logRun(
 
 export type CategorizeOutcome = "skipped" | "updated" | "superseded" | "failed";
 
+/** Which automatic path started a run, for the hold-off and the log line. */
+export type CategorizeHow = "submit" | "backfill";
+
 /**
  * How long a failed run on submit holds off the next one for that project.
  * A success ends the runs by itself, since the project then has categories,
@@ -128,7 +132,7 @@ async function failedRecently(projectId: string): Promise<boolean> {
 export async function categorizeProject(
   projectId: string,
   invoke?: ResponsesFn,
-  how: "submit" | "backfill" = "submit"
+  how: CategorizeHow = "submit"
 ): Promise<CategorizeOutcome> {
   const startedAt = new Date();
   const outcome = await writeFirstCategories(projectId, invoke, how, startedAt);
@@ -145,7 +149,7 @@ export async function categorizeProject(
 async function writeFirstCategories(
   projectId: string,
   invoke: ResponsesFn | undefined,
-  how: string,
+  how: CategorizeHow,
   startedAt: Date
 ): Promise<CategorizeOutcome> {
   try {
@@ -185,31 +189,36 @@ async function writeFirstCategories(
       return "failed";
     }
     const ids = run.result.categoryIds;
-    const written = await db
-      .insert(projectCategories)
-      .select(
-        db
-          .select({
-            projectId: sql<string>`${projectId}::uuid`.as("project_id"),
-            categoryId: categories.id,
-          })
-          .from(categories)
-          // A category deleted during the call drops out here rather than
-          // failing the foreign key.
-          .where(
-            and(
-              inArray(categories.id, ids),
-              notExists(
-                db
-                  .select({ one: sql`1` })
-                  .from(projectCategories)
-                  .where(eq(projectCategories.projectId, projectId))
+    // Under the lock every writer of a project's set takes, so a staff Save
+    // either committed before the NOT EXISTS and wins, or waits for this.
+    const written = await db.transaction(async (tx) => {
+      await lockProjectCategories(tx, projectId);
+      return await tx
+        .insert(projectCategories)
+        .select(
+          tx
+            .select({
+              projectId: sql<string>`${projectId}::uuid`.as("project_id"),
+              categoryId: categories.id,
+            })
+            .from(categories)
+            // A category deleted during the call drops out here rather than
+            // failing the foreign key.
+            .where(
+              and(
+                inArray(categories.id, ids),
+                notExists(
+                  tx
+                    .select({ one: sql`1` })
+                    .from(projectCategories)
+                    .where(eq(projectCategories.projectId, projectId))
+                )
               )
             )
-          )
-      )
-      .onConflictDoNothing()
-      .returning({ id: projectCategories.categoryId });
+        )
+        .onConflictDoNothing()
+        .returning({ id: projectCategories.categoryId });
+    });
     const outcome = written.length > 0 ? "updated" : "superseded";
     logRun(projectId, how, outcome, run, startedAt);
     return outcome;

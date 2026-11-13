@@ -27,6 +27,7 @@ import {
   logRun,
   projectCategoryIds,
 } from "./project-categorize";
+import { lockProjectCategories } from "./project-category-lock";
 
 /**
  * The categorizer's staff paths (#31): the panel's read, Regenerate and
@@ -156,12 +157,9 @@ export async function regenerateProjectCategoriesAs(
   }
   const picked = run.result.categoryIds;
   const outcome = await db.transaction(async (tx) => {
-    // The lock serializes two Regenerates on one project; the comparison
-    // catches a staff Save, which takes no lock, as long as it committed
-    // before this read.
-    await tx.execute(
-      sql`select 1 from ${projects} where ${projects.id} = ${project.id} for update`
-    );
+    // Under the lock every other writer of the set takes, so a Save either
+    // committed before this read, and the comparison sees it, or waits.
+    await lockProjectCategories(tx, project.id);
     const current = (
       await tx
         .select({ id: projectCategories.categoryId })
@@ -171,6 +169,15 @@ export async function regenerateProjectCategoriesAs(
       .map((r) => r.id)
       .sort();
     if (current.join() !== before.join()) {
+      return "superseded" as const;
+    }
+    // Staff may have deleted what the model picked while it worked; replacing
+    // the set with nothing would read as a result.
+    const surviving = await tx
+      .select({ id: categories.id })
+      .from(categories)
+      .where(inArray(categories.id, picked));
+    if (surviving.length === 0) {
       return "superseded" as const;
     }
     await tx

@@ -1,5 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
+import { PROPOSAL_NAME_MAX_LENGTH } from "#/lib/categorize";
 import { CATEGORY_DESCRIPTION_MAX_LENGTH } from "#/lib/default-categories";
 
 /**
@@ -80,7 +81,7 @@ export type ProjectCategorizationInput = z.infer<
  */
 const approveProposedCategorySchema = z.object({
   projectId: z.string().uuid(),
-  name: z.string().trim().min(1).max(100),
+  name: z.string().trim().min(1).max(PROPOSAL_NAME_MAX_LENGTH),
   type: z.string().trim().min(1).max(50),
   description: descriptionSchema,
 });

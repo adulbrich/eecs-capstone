@@ -1,4 +1,4 @@
-import { eq } from "drizzle-orm";
+import { eq, inArray } from "drizzle-orm";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { db } from "#/db";
 import {
@@ -385,6 +385,38 @@ describe("Regenerate categories", () => {
         .insert(projectCategories)
         .values({ projectId: id, categoryId: ids.Research });
       return answer(body);
+    };
+
+    const result = await regenerateProjectCategoriesAs(
+      admin,
+      { projectId: id },
+      model
+    );
+
+    expect(result.outcome).toBe("superseded");
+    expect(await categoryNames(id)).toEqual(["Research"]);
+  });
+
+  it("keeps the set when every pick was deleted during the call", async () => {
+    const ids = await seedCategories();
+    const admin = await makeUser(`gone-${Date.now()}@x.com`, "admin");
+    const { id } = await createProjectAs(admin, baseProject("Gone"));
+    await db
+      .insert(projectCategories)
+      .values({ projectId: id, categoryId: ids.Research });
+    const answer = fakeModel(PICKS);
+    const model: ResponsesFn = async (body) => {
+      const reply = await answer(body);
+      await db
+        .delete(categories)
+        .where(
+          inArray(categories.name, [
+            "New Build",
+            "Web Development",
+            "Healthcare",
+          ])
+        );
+      return reply;
     };
 
     const result = await regenerateProjectCategoriesAs(
