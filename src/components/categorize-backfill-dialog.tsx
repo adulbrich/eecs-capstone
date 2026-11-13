@@ -68,10 +68,10 @@ export function CategorizeBackfillDialog() {
   useEffect(() => () => run.current?.abort(), []);
 
   async function load() {
+    // A stopped loop may still be waiting on its last project. It keeps
+    // `running` until that call returns, so Start stays hidden and a new run
+    // cannot pay for the same project a second time.
     run.current = null;
-    // A stopped loop may still be waiting on its last project; this dialog
-    // is no longer its, so it must not show Stop for it.
-    setRunning(false);
     setTotal(null);
     setTally(EMPTY);
     setLast(null);
