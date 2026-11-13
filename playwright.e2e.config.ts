@@ -102,6 +102,8 @@ export default defineConfig({
       // on a runner that has no instance metadata.
       BEDROCK_EMBEDDINGS_ENABLED: "false",
       BEDROCK_SOCIAL_SUMMARY_ENABLED: "false",
+      // A submission starts the categorizer, the same way (#31).
+      BEDROCK_CATEGORIES_ENABLED: "false",
     },
   },
 });

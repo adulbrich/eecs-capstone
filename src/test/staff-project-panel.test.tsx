@@ -60,6 +60,10 @@ const { listProjectCategories, setProjectCategories } = vi.hoisted(() => ({
 vi.mock("#/server/categories", () => ({
   listProjectCategories,
   setProjectCategories,
+  // The categorizer's controls (#31) have their own test file.
+  getProjectCategorization: vi.fn(() =>
+    Promise.resolve({ attempt: null, regenerable: true })
+  ),
 }));
 // The real control loads the category list through its own server function;
 // a checkbox per known id is enough to drive the section's draft and save.

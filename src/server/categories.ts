@@ -66,6 +66,29 @@ export type SetProjectCategoriesInput = z.infer<
   typeof setProjectCategoriesSchema
 >;
 
+const projectCategorizationSchema = z.object({
+  projectId: z.string().uuid(),
+});
+
+export type ProjectCategorizationInput = z.infer<
+  typeof projectCategorizationSchema
+>;
+
+/**
+ * A proposal staff approve, as edited in the form: the proposal itself is
+ * never stored, so this is what the server checks (#31).
+ */
+const approveProposedCategorySchema = z.object({
+  projectId: z.string().uuid(),
+  name: z.string().trim().min(1).max(100),
+  type: z.string().trim().min(1).max(50),
+  description: descriptionSchema,
+});
+
+export type ApproveProposedCategoryInput = z.infer<
+  typeof approveProposedCategorySchema
+>;
+
 export const listCategories = createServerFn({ method: "GET" })
   .validator((data: unknown) => listSchema.parse(data ?? {}))
   .handler(async ({ data }) => {
@@ -132,6 +155,33 @@ export const setProjectCategories = createServerFn({ method: "POST" })
       "./_internal/categories"
     );
     return setProjectCategoriesForCurrentUser(data);
+  });
+
+export const getProjectCategorization = createServerFn({ method: "GET" })
+  .validator((data: unknown) => projectCategorizationSchema.parse(data))
+  .handler(async ({ data }) => {
+    const { getProjectCategorizationForCurrentUser } = await import(
+      "./_internal/project-categorize"
+    );
+    return getProjectCategorizationForCurrentUser(data);
+  });
+
+export const regenerateProjectCategories = createServerFn({ method: "POST" })
+  .validator((data: unknown) => projectCategorizationSchema.parse(data))
+  .handler(async ({ data }) => {
+    const { regenerateProjectCategoriesForCurrentUser } = await import(
+      "./_internal/project-categorize"
+    );
+    return regenerateProjectCategoriesForCurrentUser(data);
+  });
+
+export const approveProposedCategory = createServerFn({ method: "POST" })
+  .validator((data: unknown) => approveProposedCategorySchema.parse(data))
+  .handler(async ({ data }) => {
+    const { approveProposedCategoryForCurrentUser } = await import(
+      "./_internal/project-categorize"
+    );
+    return approveProposedCategoryForCurrentUser(data);
   });
 
 export const listProjectCategories = createServerFn({ method: "GET" })

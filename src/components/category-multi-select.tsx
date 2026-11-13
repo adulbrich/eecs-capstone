@@ -33,7 +33,8 @@ interface Props {
  * domain and no viewer. Read again on every mount, as the effect did: staff
  * add categories on the admin pages, which invalidate nothing here.
  */
-function categoriesQuery(domain: Domain) {
+/** Exported so a section that creates a category can refresh the picker. */
+export function categoriesQuery(domain: Domain) {
   return queryOptions({
     queryKey: ["categories", domain],
     queryFn: async () => {

@@ -12,6 +12,8 @@ export const staffProjectKeys = {
   all: (projectId: string) => ["staff-project", projectId] as const,
   categories: (projectId: string) =>
     [...staffProjectKeys.all(projectId), "categories"] as const,
+  categorization: (projectId: string) =>
+    [...staffProjectKeys.all(projectId), "categorization"] as const,
   editLog: (projectId: string) =>
     [...staffProjectKeys.all(projectId), "edit-log"] as const,
   mentorship: (projectId: string) =>

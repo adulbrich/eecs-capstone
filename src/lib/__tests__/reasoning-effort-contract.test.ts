@@ -1,6 +1,7 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { MANTLE_REASONING_EFFORTS } from "#/lib/_internal/bedrock-mantle";
+import { buildCategorizeConfig } from "#/server/_internal/categorize-core";
 import { buildReviewConfig } from "#/server/_internal/project-review-core";
 import { buildScopeConfig } from "#/server/_internal/scope-assessment-core";
 import { buildSocialSummaryConfig } from "#/server/_internal/social-summary-core";
@@ -102,5 +103,8 @@ describe("reasoning effort contract", () => {
     );
     expect(SUPPORTED.has(buildScopeConfig(empty).reasoningEffort)).toBe(true);
     expect(SUPPORTED.has(buildReviewConfig(empty).reasoningEffort)).toBe(true);
+    expect(SUPPORTED.has(buildCategorizeConfig(empty).reasoningEffort)).toBe(
+      true
+    );
   });
 });

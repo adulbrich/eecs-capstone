@@ -277,6 +277,7 @@ Each project carries:
 - [x] Categories created/edited/deleted by staff (`/admin/categories`).
 - [x] Categories assigned by staff only, many per record, through a
   multi-select in the project page's staff panel (#322) and on the item form.
+  A model also picks a project's categories (#31, below); staff correct it.
 - [ ] Partial: Multiple category types exist and can be filtered, but per-type faceted
   filtering on the public listing is not broken out into separate filters.
 - [x] The admin categories table shows a usage count per category: for the
@@ -289,8 +290,12 @@ Each project carries:
   instructors.
 - [x] Programs created/edited/deleted by admins (`/admin/programs`); instructors
   are drawn from users with role `admin` or `instructor`.
-- [ ] Gen-AI category suggestion (auto-suggesting best categories from project
-  content).
+- [x] Gen-AI category suggestion (#31, ADR-0068). On submit, a project with no
+  categories is filed by a model picking from the live list: exactly one Kind
+  of work, one or two Field, at most two of any other type. Staff press
+  Regenerate categories on the staff panel to replace the set from the current
+  text, metered against their AI limit; it may propose one new category, which
+  staff approve or dismiss and which is never stored otherwise.
 
 ## 10. AI-Assisted Proposal Review
 

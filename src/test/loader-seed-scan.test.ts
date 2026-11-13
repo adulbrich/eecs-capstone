@@ -150,6 +150,27 @@ const CENSUS = new Map<string, { class: SeedClass; why: string }>([
   ],
   // Class D.
   [
+    "src/components/staff-categories-section.tsx: useState(proposal.description)",
+    {
+      class: "D",
+      why: "a Regenerate answer held in component state, keyed by the parent on its type and name; never loader data",
+    },
+  ],
+  [
+    "src/components/staff-categories-section.tsx: useState(proposal.name)",
+    {
+      class: "D",
+      why: "a Regenerate answer held in component state, keyed by the parent on its type and name; never loader data",
+    },
+  ],
+  [
+    "src/components/staff-categories-section.tsx: useState(proposal.type)",
+    {
+      class: "D",
+      why: "a Regenerate answer held in component state, keyed by the parent on its type and name; never loader data",
+    },
+  ],
+  [
     "src/lib/use-search-draft.ts: useState(pathname)",
     {
       class: "D",

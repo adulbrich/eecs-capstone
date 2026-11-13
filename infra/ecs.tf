@@ -193,6 +193,10 @@ resource "aws_ecs_task_definition" "app" {
         { name = "AI_SCOPE_LIMIT_PER_DAY", value = var.ai_scope_limit_per_day },
         { name = "AI_SOCIAL_SUMMARY_LIMIT_PER_HOUR", value = var.ai_social_summary_limit_per_hour },
         { name = "AI_SOCIAL_SUMMARY_LIMIT_PER_DAY", value = var.ai_social_summary_limit_per_day },
+        { name = "BEDROCK_CATEGORIES_REASONING_EFFORT", value = var.bedrock_categories_reasoning_effort },
+        { name = "BEDROCK_CATEGORIES_ENABLED", value = var.bedrock_categories_enabled },
+        { name = "AI_CATEGORIES_LIMIT_PER_HOUR", value = var.ai_categories_limit_per_hour },
+        { name = "AI_CATEGORIES_LIMIT_PER_DAY", value = var.ai_categories_limit_per_day },
         { name = "BEDROCK_EMBEDDING_MODEL_ID", value = var.bedrock_embedding_model_id },
         { name = "BEDROCK_EMBEDDING_DIMENSIONS", value = var.bedrock_embedding_dimensions },
         # How long each task keeps the project listing's filter options
