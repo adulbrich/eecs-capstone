@@ -1394,6 +1394,7 @@ test("admin categories: categorize uncategorized dialog", async ({ page }) => {
     name: "Categorize uncategorized projects",
   });
   await expect(dialog.getByText(/no categories\./u)).toBeVisible();
+  await waitForSurfaceSettled(dialog);
   await checkA11y(page);
 });
 
