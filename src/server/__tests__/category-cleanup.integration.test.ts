@@ -517,9 +517,10 @@ describe("applying a cleanup", () => {
 });
 
 /**
- * A staff Save running beside a merge, the way `setProjectCategoriesAs`
- * writes: the project lock, the delete of the whole set, then the insert of
- * the new one, held open between the two until the merge is waiting.
+ * A staff Save running beside a merge, with `setProjectCategoriesAs`'s
+ * statements copied rather than called, since the function cannot be held
+ * open: the project lock, the delete of the whole set, then the insert of the
+ * new one, held between the two until the merge is waiting.
  */
 async function saveBesideMerge(
   projectId: string,
@@ -547,11 +548,34 @@ async function saveBesideMerge(
   });
   await ready;
   const merged = merge();
-  // Long enough for the merge to reach the lock it waits on.
-  await new Promise((resolve) => setTimeout(resolve, 300));
+  // Observed by the awaiter below; this only keeps a rejection that lands
+  // while the Save is pending from being reported as unhandled.
+  merged.catch(() => undefined);
+  await untilABackendWaitsOnALock();
   release();
   await save;
   return merged;
+}
+
+/**
+ * Polls until some backend on this database is blocked on a lock, which here
+ * can only be the merge: with the project lock it waits on the Save's project
+ * row, without it on the link row the Save deleted. Fails rather than going on
+ * after a timeout, so the Save cannot commit first and pass the test for
+ * nothing.
+ */
+async function untilABackendWaitsOnALock() {
+  for (let i = 0; i < 250; i++) {
+    const result = await db.execute(
+      sql`select count(*)::int as n from pg_stat_activity where datname = current_database() and wait_event_type = 'Lock'`
+    );
+    const [row] = result.rows as { n: number }[];
+    if (row && row.n > 0) {
+      return;
+    }
+    await new Promise((resolve) => setTimeout(resolve, 20));
+  }
+  throw new Error("The merge never waited on a lock.");
 }
 
 describe("applying a cleanup beside a staff Save", () => {

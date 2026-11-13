@@ -36,6 +36,7 @@ import { nameCollisionMessage } from "./categories";
 import { buildCategorizeConfig } from "./categorize-core";
 import type { Tx } from "./inventory-transitions";
 import { findUniqueViolation } from "./pg-errors";
+import { lockProjectsCarrying } from "./project-category-lock";
 
 /**
  * The category cleanup (#857): staff ask a model to propose merges, renames,
@@ -484,19 +485,19 @@ function collisionOf(
 
 /**
  * Locks, checks the categories are still what the proposal saw, then writes.
- * The locks come first so the check and the write see the same rows, and in
- * the order every writer of a project's set takes them, the project before
- * any category.
+ * The locks come first so the check and the write see the same rows, in the
+ * order `project-category-lock.ts` sets: the project before any category.
  *
- * A merge or a retirement first takes the project lock of every project
- * carrying a category it deletes (`lockProjectCategories`'s lock), in id
- * order. Without it, a Save of such a project that had deleted the link and
- * was about to re-insert it deadlocked against the cascade, and a Save that
- * dropped the link saw the merge copy it to the target anyway. A Save that
- * adds a link to one of these categories after the read below takes a
- * key-share lock on it for its foreign key, waits for this transaction, and
- * then fails on the deleted category rather than landing a link the cascade
- * drops with no error.
+ * A merge or a retirement first locks every project carrying a category it
+ * deletes. Without that, a Save of such a project that had deleted the link
+ * and was re-inserting it deadlocked against the cascade, and a Save that
+ * dropped the link saw the merge copy it to the target anyway.
+ *
+ * One window is left. A Save of a project that carried none of these
+ * categories when they were read, adding two of them in the opposite id
+ * order to this lock, can still deadlock against it; Postgres aborts one
+ * side, so either this change reports the generic failure or the Save fails,
+ * and nothing is half-written.
  *
  * Returns the log line.
  */
@@ -509,23 +510,7 @@ async function applyInTransaction(
   if (new Set(ids).size !== ids.length) {
     throw new CleanupRefusal("This change names one category twice.");
   }
-  const deleted = deletedBy(change);
-  if (deleted.length > 0) {
-    await tx
-      .select({ id: projects.id })
-      .from(projects)
-      .where(
-        inArray(
-          projects.id,
-          tx
-            .select({ id: projectCategories.projectId })
-            .from(projectCategories)
-            .where(inArray(projectCategories.categoryId, deleted))
-        )
-      )
-      .orderBy(projects.id)
-      .for("update");
-  }
+  await lockProjectsCarrying(tx, deletedBy(change));
   const rows = await tx
     .select({
       id: categories.id,
