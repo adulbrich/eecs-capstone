@@ -77,6 +77,19 @@ describe("ProjectCategoryPicker", () => {
     fireEvent.click(screen.getByRole("button", { name: "Remove React" }));
 
     expect(screen.getByTestId("value").textContent).toBe("f-web");
+    expect(document.activeElement).toBe(
+      screen.getByRole("combobox", { name: "Add a category" })
+    );
+  });
+
+  it("shows an id the list no longer has, so it can be removed", async () => {
+    renderWithQueryClient(<Harness initial={["f-web", "gone"]} />);
+
+    expect(await chips()).toContain("Unknown category");
+    fireEvent.click(
+      screen.getByRole("button", { name: "Remove Unknown category" })
+    );
+    expect(screen.getByTestId("value").textContent).toBe("f-web");
   });
 
   it("adds from a search that lists only the categories not yet chosen", async () => {
@@ -97,7 +110,7 @@ describe("ProjectCategoryPicker", () => {
 
   it("matches the search as a substring of the name or type", async () => {
     renderWithQueryClient(<Harness initial={[]} />);
-    await screen.findByText("No categories yet.");
+    await screen.findByText("No categories on this project yet.");
     const add = screen.getByRole("combobox", { name: "Add a category" });
     await vi.waitFor(() => expect(add.hasAttribute("disabled")).toBe(false));
     fireEvent.click(add);
@@ -116,7 +129,9 @@ describe("ProjectCategoryPicker", () => {
 
   it("offers no way to create a category", async () => {
     renderWithQueryClient(<Harness initial={[]} />);
-    expect(await screen.findByText("No categories yet.")).toBeTruthy();
+    expect(
+      await screen.findByText("No categories on this project yet.")
+    ).toBeTruthy();
     const add = screen.getByRole("combobox", { name: "Add a category" });
     await vi.waitFor(() => expect(add.hasAttribute("disabled")).toBe(false));
     fireEvent.click(add);
