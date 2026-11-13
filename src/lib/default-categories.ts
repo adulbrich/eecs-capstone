@@ -31,6 +31,12 @@ export const DEFAULT_CATEGORY_TYPES = [
 
 export type DefaultCategoryType = (typeof DEFAULT_CATEGORY_TYPES)[number];
 
+/**
+ * The longest description staff may save: room for the one sentence a
+ * description is meant to be, with slack. The longest default is under 200.
+ */
+export const CATEGORY_DESCRIPTION_MAX_LENGTH = 300;
+
 export interface DefaultCategory {
   /**
    * One sentence, the definition a model is given when it picks categories.

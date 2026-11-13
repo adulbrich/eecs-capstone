@@ -77,6 +77,16 @@ function storedDescription(data: CategoryInput): string | null {
   return data.domain === "project" ? data.description || null : null;
 }
 
+/**
+ * The description an update writes, or none at all when the caller sent none:
+ * an update that omits the field must not wipe what staff wrote.
+ */
+function descriptionUpdate(data: CategoryUpdateInput) {
+  return data.domain === "project" && data.description === undefined
+    ? {}
+    : { description: storedDescription(data) };
+}
+
 export async function listCategoriesImpl(data: {
   domain?: CategoryDomain | null;
   type?: string | null;
@@ -203,7 +213,7 @@ export async function updateCategoryAs(
         name: data.name,
         domain: data.domain,
         type: data.type,
-        description: storedDescription(data),
+        ...descriptionUpdate(data),
       })
       .where(eq(categories.id, data.id));
   } catch (error) {

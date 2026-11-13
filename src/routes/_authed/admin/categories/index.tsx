@@ -45,12 +45,12 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "#/components/ui/tabs";
 import { Textarea } from "#/components/ui/textarea";
 import { requireStaff } from "#/lib/access-denied";
 import { defineCsvColumns, toCsv } from "#/lib/csv";
+import { CATEGORY_DESCRIPTION_MAX_LENGTH } from "#/lib/default-categories";
 import { pageTitle } from "#/lib/page-title";
 import type { SortState } from "#/lib/table-state";
 import { useAction } from "#/lib/use-action";
 import { useAdminTable } from "#/lib/use-admin-table";
 import {
-  CATEGORY_DESCRIPTION_MAX_LENGTH,
   createCategory,
   listCategoriesWithUsage,
   listCategoryTypes,
@@ -134,7 +134,7 @@ const DESCRIPTION_COLUMN = {
   accessorFn: (row) => row.description ?? undefined,
   cell: ({ row }) => (
     <span className="text-muted-foreground md:line-clamp-2 md:max-w-md md:min-w-xs md:whitespace-normal">
-      {row.original.description}
+      {row.original.description ?? "None"}
     </span>
   ),
   header: "Description",

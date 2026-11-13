@@ -1,10 +1,10 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import {
+  CATEGORY_DESCRIPTION_MAX_LENGTH,
   DEFAULT_CATEGORIES,
   DEFAULT_CATEGORY_TYPES,
 } from "#/lib/default-categories";
-import { CATEGORY_DESCRIPTION_MAX_LENGTH } from "#/server/categories";
 
 /**
  * The default category list lives twice: in `src/lib/default-categories.ts`,

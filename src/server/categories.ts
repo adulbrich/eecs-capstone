@@ -1,11 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
-
-/**
- * Room for the one sentence a description is meant to be, with slack: the
- * longest default description is under 200 characters.
- */
-export const CATEGORY_DESCRIPTION_MAX_LENGTH = 300;
+import { CATEGORY_DESCRIPTION_MAX_LENGTH } from "#/lib/default-categories";
 
 /**
  * Project categories only: it is the definition the categorizer reads, and

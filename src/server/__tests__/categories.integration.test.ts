@@ -208,6 +208,17 @@ describe("categories", () => {
       "Robots, drones and rovers."
     );
 
+    // An update that sends no description leaves the stored one alone.
+    await updateCategoryAs(admin, {
+      id,
+      domain: "project",
+      name: "Robotics",
+      type: "field",
+    });
+    expect((await getCategoryAs(admin, { id })).category.description).toBe(
+      "Robots, drones and rovers."
+    );
+
     await updateCategoryAs(admin, {
       id,
       domain: "project",

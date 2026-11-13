@@ -651,7 +651,7 @@ The vocabulary is in [`../CONTEXT.md`](../CONTEXT.md). The rules are pure module
 
 ### Categories: `domain` is closed, `type` is a project-only facet, filtering is all-match
 
-`categories.domain` never changes after creation. Both listings filter all-match with `HAVING count(*) = <number selected>` over the junction (`buildInventoryScope`, `searchProjectsImpl`); a plain `inArray` gives any-match. The param is `categories: z.array(z.string().uuid())`, and `.catch([])` in `validateSearch` turns a malformed value into no filter. A column on `projects` never also becomes a category ([ADR-0021](./adr/0021-a-column-on-projects-never-becomes-a-category.md)).
+`categories.domain` never changes after creation. Both listings filter all-match with `HAVING count(*) = <number selected>` over the junction (`buildInventoryScope`, `searchProjectsImpl`); a plain `inArray` gives any-match. The param is `categories: z.array(z.string().uuid())`, and `.catch([])` in `validateSearch` turns a malformed value into no filter. A column on `projects` never also becomes a category ([ADR-0021](./adr/0021-a-column-on-projects-never-becomes-a-category.md)). `categories.description` is staff only (#31): `listCategoriesImpl` selects `CATALOG_COLUMNS` by name and `getCategory` is staff, so a bare `select()` on a public category read would leak it.
 
 ### Two role predicates, in `src/lib/viewer.ts`
 

@@ -20,10 +20,10 @@ import { Input } from "#/components/ui/input";
 import { Label } from "#/components/ui/label";
 import { Textarea } from "#/components/ui/textarea";
 import { requireStaff } from "#/lib/access-denied";
+import { CATEGORY_DESCRIPTION_MAX_LENGTH } from "#/lib/default-categories";
 import { pageTitle } from "#/lib/page-title";
 import { useAction } from "#/lib/use-action";
 import {
-  CATEGORY_DESCRIPTION_MAX_LENGTH,
   deleteCategory,
   getCategory,
   listCategoryTypes,
