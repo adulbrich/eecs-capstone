@@ -551,21 +551,27 @@ async function saveBesideMerge(
   // Observed by the awaiter below; this only keeps a rejection that lands
   // while the Save is pending from being reported as unhandled.
   merged.catch(() => undefined);
-  await untilABackendWaitsOnALock();
-  release();
-  await save;
+  try {
+    await untilABackendWaitsOnALock();
+  } finally {
+    // Even on a timeout, so the Save's transaction does not stay open and
+    // block the next test's truncate.
+    release();
+    await save;
+  }
   return merged;
 }
 
 /**
- * Polls until some backend on this database is blocked on a lock, which here
- * can only be the merge: with the project lock it waits on the Save's project
- * row, without it on the link row the Save deleted. Fails rather than going on
- * after a timeout, so the Save cannot commit first and pass the test for
- * nothing.
+ * Polls until some backend on this database is blocked on a lock, which is
+ * the merge, since the integration files run one at a time: with the project
+ * lock it waits on the Save's project row, without it on the link row the
+ * Save deleted. Fails rather than going on, so the Save cannot commit first
+ * and pass the test for nothing, and gives up after about two seconds, inside
+ * Vitest's own five-second timeout, so this error is the one reported.
  */
 async function untilABackendWaitsOnALock() {
-  for (let i = 0; i < 250; i++) {
+  for (let i = 0; i < 100; i++) {
     const result = await db.execute(
       sql`select count(*)::int as n from pg_stat_activity where datname = current_database() and wait_event_type = 'Lock'`
     );
