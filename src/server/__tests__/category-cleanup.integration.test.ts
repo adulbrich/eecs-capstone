@@ -16,7 +16,7 @@ import {
   CLEANUP_TOOL_NAME,
   proposeCategoryCleanupAs,
 } from "#/server/_internal/category-cleanup";
-import { lockProjectCategories } from "#/server/_internal/project-category-lock";
+import { saveBeside } from "./save-race";
 
 /**
  * The category cleanup (#857) against the database. Every model call is a
@@ -516,74 +516,6 @@ describe("applying a cleanup", () => {
   });
 });
 
-/**
- * A staff Save running beside a merge, with `setProjectCategoriesAs`'s
- * statements copied rather than called, since the function cannot be held
- * open: the project lock, the delete of the whole set, then the insert of the
- * new one, held between the two until the merge is waiting.
- */
-async function saveBesideMerge(
-  projectId: string,
-  newSet: string[],
-  merge: () => Promise<unknown>
-) {
-  let deleted!: () => void;
-  const ready = new Promise<void>((resolve) => {
-    deleted = resolve;
-  });
-  let release!: () => void;
-  const gate = new Promise<void>((resolve) => {
-    release = resolve;
-  });
-  const save = db.transaction(async (tx) => {
-    await lockProjectCategories(tx, projectId);
-    await tx
-      .delete(projectCategories)
-      .where(eq(projectCategories.projectId, projectId));
-    deleted();
-    await gate;
-    await tx
-      .insert(projectCategories)
-      .values(newSet.map((categoryId) => ({ projectId, categoryId })));
-  });
-  await ready;
-  const merged = merge();
-  // Observed by the awaiter below; this only keeps a rejection that lands
-  // while the Save is pending from being reported as unhandled.
-  merged.catch(() => undefined);
-  try {
-    await untilABackendWaitsOnALock();
-  } finally {
-    // Even on a timeout, so the Save's transaction does not stay open and
-    // block the next test's truncate.
-    release();
-    await save;
-  }
-  return merged;
-}
-
-/**
- * Polls until some backend on this database is blocked on a lock, which is
- * the merge, since the integration files run one at a time: with the project
- * lock it waits on the Save's project row, without it on the link row the
- * Save deleted. Fails rather than going on, so the Save cannot commit first
- * and pass the test for nothing, and gives up after about two seconds, inside
- * Vitest's own five-second timeout, so this error is the one reported.
- */
-async function untilABackendWaitsOnALock() {
-  for (let i = 0; i < 100; i++) {
-    const result = await db.execute(
-      sql`select count(*)::int as n from pg_stat_activity where datname = current_database() and wait_event_type = 'Lock'`
-    );
-    const [row] = result.rows as { n: number }[];
-    if (row && row.n > 0) {
-      return;
-    }
-    await new Promise((resolve) => setTimeout(resolve, 20));
-  }
-  throw new Error("The merge never waited on a lock.");
-}
-
 describe("applying a cleanup beside a staff Save", () => {
   it("waits for a Save that keeps the source, then moves its link", async () => {
     const cats = await seedCategories();
@@ -591,7 +523,7 @@ describe("applying a cleanup beside a staff Save", () => {
     const id = await project("Kept", "published", [cats.VR.id]);
     vi.spyOn(console, "log").mockImplementation(() => {});
 
-    const applied = await saveBesideMerge(id, [cats.VR.id], () =>
+    const applied = await saveBeside(id, [cats.VR.id], () =>
       applyCategoryCleanupAs(admin, {
         changes: [
           {
@@ -613,7 +545,7 @@ describe("applying a cleanup beside a staff Save", () => {
     const id = await project("Dropped", "published", [cats.VR.id]);
     vi.spyOn(console, "log").mockImplementation(() => {});
 
-    await saveBesideMerge(id, [cats.Python.id], () =>
+    await saveBeside(id, [cats.Python.id], () =>
       applyCategoryCleanupAs(admin, {
         changes: [
           {

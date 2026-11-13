@@ -19,7 +19,10 @@ import type {
 } from "../categories";
 import type { Tx } from "./inventory-transitions";
 import { findUniqueViolation } from "./pg-errors";
-import { lockProjectCategories } from "./project-category-lock";
+import {
+  lockProjectCategories,
+  lockProjectsCarrying,
+} from "./project-category-lock";
 
 type CategoryDomain = (typeof categoryDomainEnum.enumValues)[number];
 
@@ -242,9 +245,18 @@ export async function updateCategoryForCurrentUser(data: CategoryUpdateInput) {
   return updateCategoryAs(viewer, data);
 }
 
+/**
+ * Locks every project carrying the category before deleting it, the order
+ * `project-category-lock.ts` sets: the delete cascades onto the links, and
+ * without the project locks it deadlocks against a Save that has deleted a
+ * link and is re-inserting it (#861).
+ */
 export async function deleteCategoryAs(viewer: AuthUser, id: string) {
   assertStaff(viewer);
-  await db.delete(categories).where(eq(categories.id, id));
+  await db.transaction(async (tx) => {
+    await lockProjectsCarrying(tx, [id]);
+    await tx.delete(categories).where(eq(categories.id, id));
+  });
   clearAllReferenceListCaches();
   return { id };
 }

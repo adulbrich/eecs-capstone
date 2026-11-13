@@ -11,8 +11,8 @@ import type { Tx } from "./inventory-transitions";
 // category they link, for its foreign key. A writer that deletes a category
 // cascades onto its links, so it locks every project carrying the category
 // first (`lockProjectsCarrying`), or it deadlocks against a Save that has
-// deleted a link and is re-inserting it. The category cleanup (#857) does;
-// `deleteCategoryAs` does not yet (#861).
+// deleted a link and is re-inserting it. The category cleanup (#857) and
+// `deleteCategoryAs` (#861) both do.
 
 /**
  * Takes the project's row lock for the rest of `tx`. Every writer of a
