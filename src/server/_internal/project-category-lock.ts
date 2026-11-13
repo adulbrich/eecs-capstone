@@ -11,8 +11,7 @@ import type { Tx } from "./inventory-transitions";
 // category they link, for its foreign key. A writer that deletes a category
 // cascades onto its links, so it locks every project carrying the category
 // first (`lockProjectsCarrying`), or it deadlocks against a Save that has
-// deleted a link and is re-inserting it. The category cleanup (#857) and
-// `deleteCategoryAs` (#861) both do.
+// deleted a link and is re-inserting it.
 
 /**
  * Takes the project's row lock for the rest of `tx`. Every writer of a
@@ -31,8 +30,12 @@ export async function lockProjectCategories(tx: Tx, projectId: string) {
 /**
  * The same lock on every project carrying one of `categoryIds`, in id order,
  * for a writer about to delete those categories. The set is read once, so a
- * project that links one of them after this read is not locked; its Save
- * waits on the category's key-share lock and fails on the deleted row.
+ * project that links one of them after this read is not locked. A Save that
+ * reaches the category after the writer has locked it waits and fails on the
+ * deleted row. One that commits the link before then leaves a window: a
+ * second Save of that project, re-inserting the link while the writer
+ * deletes, can still deadlock against it, and Postgres aborts one side with
+ * nothing half-written.
  */
 export async function lockProjectsCarrying(tx: Tx, categoryIds: string[]) {
   if (categoryIds.length === 0) {

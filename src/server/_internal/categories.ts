@@ -246,10 +246,10 @@ export async function updateCategoryForCurrentUser(data: CategoryUpdateInput) {
 }
 
 /**
- * Locks every project carrying the category before deleting it, the order
- * `project-category-lock.ts` sets: the delete cascades onto the links, and
- * without the project locks it deadlocks against a Save that has deleted a
- * link and is re-inserting it (#861).
+ * Locks the projects carrying the category first, in the order and for the
+ * reason `project-category-lock.ts` gives (#861). An inventory category's
+ * item links take no such lock, so an item save re-inserting one can still
+ * deadlock against this delete, as it could before.
  */
 export async function deleteCategoryAs(viewer: AuthUser, id: string) {
   assertStaff(viewer);
