@@ -23,12 +23,20 @@ const server = vi.hoisted(() => ({
   setProjectCategories: vi.fn(),
 }));
 vi.mock("#/server/categories", () => server);
-// The real picker loads the list through its own server function; one
-// checkbox per known id is enough to see the draft.
+// The real picker loads the list through its own server function and has
+// its own test; the draft it is handed is what these tests read.
 vi.mock("#/components/category-multi-select", () => ({
   categoriesQuery: () => ({ queryKey: ["categories", "project"] }),
-  CategoryMultiSelect: ({ value }: { value: string[] }) => (
+}));
+vi.mock("#/components/project-category-picker", () => ({
+  ProjectCategoryPicker: ({ value }: { value: string[] }) => (
     <output data-testid="draft">{[...value].sort().join(",")}</output>
+  ),
+}));
+vi.mock("@tanstack/react-router", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@tanstack/react-router")>()),
+  Link: ({ children, to }: { children: React.ReactNode; to: string }) => (
+    <a href={to}>{children}</a>
   ),
 }));
 
@@ -89,6 +97,17 @@ async function regenerateTo(categoryIds: string[], proposal = null as unknown) {
     })
   );
 }
+
+describe("the Categories section", () => {
+  it("links to the Categories page instead of creating a category here", async () => {
+    renderSection();
+
+    const link = await screen.findByRole("link", {
+      name: "Add or edit categories on the Categories page",
+    });
+    expect(link.getAttribute("href")).toBe("/admin/categories");
+  });
+});
 
 describe("Regenerate categories", () => {
   it("reseeds the draft from what the server stored", async () => {

@@ -1,9 +1,15 @@
+import { fc, test } from "@fast-check/vitest";
 import { describe, expect, it } from "vitest";
 import {
   buildCategorizeSource,
   buildCategorizeTool,
   type CategoryOption,
 } from "#/lib/categorize";
+import {
+  strayBrackets,
+  tagBreakingText,
+  tagsIn,
+} from "#/test/shared/arbitraries";
 
 function option(
   id: string,
@@ -294,5 +300,65 @@ describe("the categorize source", () => {
     expect(source).toContain("&lt;/field&gt;");
     expect(source).not.toContain("Objectives");
     expect(source.match(/<\/field>/gu)).toHaveLength(3);
+  });
+});
+
+/** The opening tag for each field, in the builder's order. */
+const SOURCE_TAGS = {
+  title: '<field name="Title">',
+  description: '<field name="Description">',
+  problemStatement: '<field name="Problem statement">',
+  objectives: '<field name="Objectives / deliverables">',
+  minQualifications: '<field name="Minimum qualifications">',
+  prefQualifications: '<field name="Preferred qualifications">',
+} as const;
+
+const promptText = tagBreakingText([
+  "<categories>",
+  "</categories>",
+  "</field>",
+  ...Object.values(SOURCE_TAGS),
+]);
+
+const sourceProject = fc.record({
+  title: promptText,
+  description: fc.option(promptText),
+  problemStatement: fc.option(promptText),
+  objectives: fc.option(promptText),
+  minQualifications: fc.option(promptText),
+  prefQualifications: fc.option(promptText),
+});
+
+describe("buildCategorizeSource, on generated projects", () => {
+  test.prop([sourceProject])(
+    "writes exactly its own tags, whatever the fields hold",
+    (generated) => {
+      const source = buildCategorizeSource(generated);
+      const expected = Object.entries(SOURCE_TAGS)
+        .filter(([key]) => generated[key as keyof typeof SOURCE_TAGS]?.trim())
+        .flatMap(([, open]) => [open, "</field>"]);
+      expect(tagsIn(source)).toEqual(expected);
+      expect(strayBrackets(source)).toBe(0);
+    }
+  );
+});
+
+describe("the categorize catalog, on generated categories", () => {
+  test.prop([
+    fc.array(
+      fc.record({
+        name: promptText,
+        description: fc.option(promptText),
+        type: promptText,
+      }),
+      { maxLength: 4 }
+    ),
+  ])("holds no tag and no bracket, whatever staff named things", (extra) => {
+    const built = buildCategorizeTool(
+      [...OPTIONS, ...extra.map((e, i) => ({ ...e, id: `x-${i}`, usage: 0 }))],
+      { allowProposal: false }
+    );
+    expect(tagsIn(built?.catalog ?? "")).toEqual([]);
+    expect(strayBrackets(built?.catalog ?? "")).toBe(0);
   });
 });

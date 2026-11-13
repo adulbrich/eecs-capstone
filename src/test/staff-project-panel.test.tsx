@@ -68,7 +68,10 @@ vi.mock("#/server/categories", () => ({
 // The real control loads the category list through its own server function;
 // a checkbox per known id is enough to drive the section's draft and save.
 vi.mock("#/components/category-multi-select", () => ({
-  CategoryMultiSelect: ({
+  categoriesQuery: () => ({ queryKey: ["categories", "project"] }),
+}));
+vi.mock("#/components/project-category-picker", () => ({
+  ProjectCategoryPicker: ({
     onChange,
     value,
   }: {
