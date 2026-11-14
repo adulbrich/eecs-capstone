@@ -1,4 +1,4 @@
-import { eq, inArray } from "drizzle-orm";
+import { eq, inArray, sql } from "drizzle-orm";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { db } from "#/db";
 import {
@@ -26,6 +26,8 @@ import {
   approveProposedCategoryAs,
   regenerateProjectCategoriesAs,
 } from "#/server/_internal/regenerate-categories";
+import { deferred } from "#/test/shared/deferred";
+import { holdOpen, untilABackendWaitsOn } from "./save-race";
 
 /**
  * The categorizer (#31) against the database. Every model call is a fake
@@ -144,6 +146,38 @@ async function categoryNames(projectId: string) {
   return rows.map((r) => r.name).sort();
 }
 
+type Held = Awaited<ReturnType<typeof holdOpen>>;
+
+/**
+ * A model that answers with `PICKS` and, before it returns, starts deleting
+ * the categories `doomed` in a transaction it leaves open (#864): the delete
+ * has not committed when the writer reaches the categories.
+ */
+function deletingDuringTheCall(doomed: string[]) {
+  const answer = fakeModel(PICKS);
+  const deletion = deferred<Held>();
+  const model: ResponsesFn = async (body) => {
+    const reply = await answer(body);
+    deletion.resolve(
+      await holdOpen(
+        sql`delete from ${categories} where ${inArray(categories.id, doomed)}`
+      )
+    );
+    return reply;
+  };
+  return { model, deletion: deletion.promise };
+}
+
+/** Lets the delete commit once the writer is waiting on it. */
+async function waitOutDeletion(deletion: Promise<Held>) {
+  const held = await deletion;
+  try {
+    await untilABackendWaitsOn(held.pid);
+  } finally {
+    await held.release();
+  }
+}
+
 async function attempt(projectId: string) {
   const [row] = await db
     .select()
@@ -255,6 +289,36 @@ describe("the run on submit", () => {
 
     expect(await categorizeProject(id, model)).toBe("superseded");
     expect(await categoryNames(id)).toEqual(["Machine Learning"]);
+  });
+
+  it("writes nothing when every pick is deleted while it writes", async () => {
+    const ids = await seedCategories();
+    const admin = await makeUser(`allgone-${Date.now()}@x.com`, "admin");
+    const { id } = await createProjectAs(admin, baseProject("All gone"));
+    const { model, deletion } = deletingDuringTheCall([
+      ids["New Build"],
+      ids["Web Development"],
+      ids.Healthcare,
+    ]);
+
+    const running = categorizeProject(id, model);
+    await waitOutDeletion(deletion);
+
+    expect(await running).toBe("superseded");
+    expect(await categoryNames(id)).toEqual([]);
+  });
+
+  it("files the rest when a pick is deleted while it writes", async () => {
+    const ids = await seedCategories();
+    const admin = await makeUser(`inflight-${Date.now()}@x.com`, "admin");
+    const { id } = await createProjectAs(admin, baseProject("In flight"));
+    const { model, deletion } = deletingDuringTheCall([ids.Healthcare]);
+
+    const running = categorizeProject(id, model);
+    await waitOutDeletion(deletion);
+
+    expect(await running).toBe("updated");
+    expect(await categoryNames(id)).toEqual(["New Build", "Web Development"]);
   });
 
   it("meters against no one's limit", async () => {
@@ -427,6 +491,25 @@ describe("Regenerate categories", () => {
 
     expect(result.outcome).toBe("superseded");
     expect(await categoryNames(id)).toEqual(["Research"]);
+  });
+
+  it("drops a pick deleted while it writes and saves the rest", async () => {
+    const ids = await seedCategories();
+    const admin = await makeUser(`inflight-${Date.now()}@x.com`, "admin");
+    const { id } = await createProjectAs(admin, baseProject("In flight"));
+    const { model, deletion } = deletingDuringTheCall([ids.Healthcare]);
+
+    const running = regenerateProjectCategoriesAs(
+      admin,
+      { projectId: id },
+      model
+    );
+    running.catch(() => undefined);
+    await waitOutDeletion(deletion);
+
+    expect((await running).outcome).toBe("updated");
+    expect(await categoryNames(id)).toEqual(["New Build", "Web Development"]);
+    expect(await attempt(id)).toEqual({ outcome: "updated", trigger: "staff" });
   });
 
   it("returns a proposal and writes nothing to categories", async () => {

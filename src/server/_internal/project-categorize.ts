@@ -25,7 +25,10 @@ import {
 import { KIND_OF_WORK_TYPE } from "#/lib/default-categories";
 import { type CategorizeRun, runCategorize } from "./categorize-core";
 import { readAiRefresh, recordAiRefresh } from "./project-ai-refreshes";
-import { lockProjectCategories } from "./project-category-lock";
+import {
+  lockCategoriesToLink,
+  lockProjectCategories,
+} from "./project-category-lock";
 
 /**
  * The live project categories with how many published projects carry each,
@@ -193,6 +196,12 @@ async function writeFirstCategories(
     // either committed before the NOT EXISTS and wins, or waits for this.
     const written = await db.transaction(async (tx) => {
       await lockProjectCategories(tx, projectId);
+      // A category deleted during the call, or being deleted now, drops out
+      // here rather than failing the foreign key.
+      const surviving = await lockCategoriesToLink(tx, ids);
+      if (surviving.length === 0) {
+        return [];
+      }
       return await tx
         .insert(projectCategories)
         .select(
@@ -202,11 +211,9 @@ async function writeFirstCategories(
               categoryId: categories.id,
             })
             .from(categories)
-            // A category deleted during the call drops out here rather than
-            // failing the foreign key.
             .where(
               and(
-                inArray(categories.id, ids),
+                inArray(categories.id, surviving),
                 notExists(
                   tx
                     .select({ one: sql`1` })

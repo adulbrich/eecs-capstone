@@ -1,5 +1,5 @@
 import { inArray, sql } from "drizzle-orm";
-import { projectCategories, projects } from "#/db/schema";
+import { categories, projectCategories, projects } from "#/db/schema";
 import type { Tx } from "./inventory-transitions";
 
 // Alone, and importing nothing that reads a session, so the categorizer's
@@ -8,10 +8,11 @@ import type { Tx } from "./inventory-transitions";
 //
 // The order: a project row before any category row. A Save, Regenerate and
 // the categorizer lock the project and then take a key-share lock on each
-// category they link, for its foreign key. A writer that deletes a category
-// cascades onto its links, so it locks every project carrying the category
-// first (`lockProjectsCarrying`), or it deadlocks against a Save that has
-// deleted a link and is re-inserting it.
+// category they add, for its foreign key, in id order. None of them deletes
+// and re-inserts a link it keeps (`replaceProjectCategories` in
+// `categories.ts`), so a category delete cascading onto that link waits on
+// none of them (#864). A writer that deletes categories locks every project
+// carrying them first (`lockProjectsCarrying`).
 
 /**
  * Takes the project's row lock for the rest of `tx`. Every writer of a
@@ -29,13 +30,20 @@ export async function lockProjectCategories(tx: Tx, projectId: string) {
 
 /**
  * The same lock on every project carrying one of `categoryIds`, in id order,
- * for a writer about to delete those categories. The set is read once, so a
- * project that links one of them after this read is not locked. A Save that
- * reaches the category after the writer has locked it waits and fails on the
- * deleted row. One that commits the link before then leaves a window: a
- * second Save of that project, re-inserting the link while the writer
- * deletes, can still deadlock against it, and Postgres aborts one side with
- * nothing half-written.
+ * for a writer about to delete those categories. A cleanup merge needs it:
+ * its insert into a carrier's links takes a key-share lock on the carrier's
+ * row, which an unfinished Save of that carrier holds. A delete and a
+ * retirement take it too, so every writer that deletes categories keeps one
+ * order.
+ *
+ * The set is read once, so a project that gains one of these categories
+ * after this read is not locked. A Save that reaches a category after the
+ * writer has locked it waits and fails on the deleted row. A delete or a
+ * retirement cannot deadlock against a Save of a project that gained the
+ * category earlier. A merge still can, when that Save is in flight as the
+ * merge reaches the project's links: one that has yet to delete a source link
+ * the merge has locked, or one that adds the merge's target. Postgres aborts
+ * one side with nothing half-written.
  */
 export async function lockProjectsCarrying(tx: Tx, categoryIds: string[]) {
   if (categoryIds.length === 0) {
@@ -55,4 +63,28 @@ export async function lockProjectsCarrying(tx: Tx, categoryIds: string[]) {
     )
     .orderBy(projects.id)
     .for("update");
+}
+
+/**
+ * Takes the key-share lock a link's foreign key takes, ahead of the insert,
+ * on each of `categoryIds` that still exists, in id order, and returns those
+ * ids. A delete of one of them still in flight is waited out and the
+ * category left out, where an insert that read `categories` first would see
+ * it and then fail the foreign key once the delete committed (#864). Held to
+ * the end of `tx`, so none of the rest can be deleted before the insert.
+ */
+export async function lockCategoriesToLink(
+  tx: Tx,
+  categoryIds: string[]
+): Promise<string[]> {
+  if (categoryIds.length === 0) {
+    return [];
+  }
+  const rows = await tx
+    .select({ id: categories.id })
+    .from(categories)
+    .where(inArray(categories.id, categoryIds))
+    .orderBy(categories.id)
+    .for("key share");
+  return rows.map((r) => r.id);
 }
