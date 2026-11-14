@@ -493,11 +493,13 @@ function collisionOf(
  * and was re-inserting it deadlocked against the cascade, and a Save that
  * dropped the link saw the merge copy it to the target anyway.
  *
- * One window is left. A Save of a project that carried none of these
- * categories when they were read, adding two of them in the opposite id
- * order to this lock, can still deadlock against it; Postgres aborts one
- * side, so either this change reports the generic failure or the Save fails,
- * and nothing is half-written.
+ * Two windows are left. In the one `lockProjectsCarrying` names, a second
+ * Save that keeps the link can deadlock against this change, and one that
+ * drops it can see a merge copy it to the target anyway. A Save of a project
+ * that carried none of these categories when they were read, adding two of
+ * them in the opposite id order to this lock, can deadlock against it too.
+ * In a deadlock Postgres aborts one side, so either this change reports the
+ * generic failure or the Save fails, and nothing is half-written.
  *
  * Returns the log line.
  */

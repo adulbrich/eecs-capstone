@@ -23,6 +23,7 @@ import {
 } from "#/server/_internal/categories";
 import { createProjectAs } from "#/server/_internal/projects";
 import { getProjectAs } from "#/server/_internal/projects-queries";
+import { saveBeside } from "./save-race";
 
 async function makeUser(email: string, role: "user" | "admin") {
   await auth.api.createUser({
@@ -615,5 +616,36 @@ describe("category name collisions", () => {
         type: "technology",
       })
     ).resolves.toEqual({ id });
+  });
+});
+
+describe("deleting a category beside a staff Save", () => {
+  it("waits for a Save that keeps the category, then removes its link", async () => {
+    const admin = await makeUser(`del-${Date.now()}@x.com`, "admin");
+    const { id: catId } = await createCategoryAs(admin, {
+      domain: "project",
+      name: "react",
+      type: "technology",
+    });
+    const { id: projId } = await createProjectAs(admin, baseProject());
+    await setProjectCategoriesAs(admin, {
+      projectId: projId,
+      categoryIds: [catId],
+    });
+
+    const deleted = await saveBeside(projId, [catId], () =>
+      deleteCategoryAs(admin, catId)
+    );
+
+    expect(deleted).toEqual({ id: catId });
+    expect(
+      await db
+        .select()
+        .from(projectCategories)
+        .where(eq(projectCategories.projectId, projId))
+    ).toEqual([]);
+    expect(
+      await db.select().from(categories).where(eq(categories.id, catId))
+    ).toEqual([]);
   });
 });

@@ -19,7 +19,10 @@ import type {
 } from "../categories";
 import type { Tx } from "./inventory-transitions";
 import { findUniqueViolation } from "./pg-errors";
-import { lockProjectCategories } from "./project-category-lock";
+import {
+  lockProjectCategories,
+  lockProjectsCarrying,
+} from "./project-category-lock";
 
 type CategoryDomain = (typeof categoryDomainEnum.enumValues)[number];
 
@@ -242,9 +245,18 @@ export async function updateCategoryForCurrentUser(data: CategoryUpdateInput) {
   return updateCategoryAs(viewer, data);
 }
 
+/**
+ * Locks the projects carrying the category first, in the order and for the
+ * reason `project-category-lock.ts` gives (#861). An inventory category's
+ * item links take no such lock, so an item save re-inserting one can still
+ * deadlock against this delete, as it could before.
+ */
 export async function deleteCategoryAs(viewer: AuthUser, id: string) {
   assertStaff(viewer);
-  await db.delete(categories).where(eq(categories.id, id));
+  await db.transaction(async (tx) => {
+    await lockProjectsCarrying(tx, [id]);
+    await tx.delete(categories).where(eq(categories.id, id));
+  });
   clearAllReferenceListCaches();
   return { id };
 }
