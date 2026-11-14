@@ -489,17 +489,15 @@ function collisionOf(
  * order `project-category-lock.ts` sets: the project before any category.
  *
  * A merge or a retirement first locks every project carrying a category it
- * deletes. Without that, a Save of such a project that had deleted the link
- * and was re-inserting it deadlocked against the cascade, and a Save that
- * dropped the link saw the merge copy it to the target anyway.
+ * deletes, so a merge's insert into a carrier's links never waits on a Save
+ * of that carrier.
  *
- * Two windows are left. In the one `lockProjectsCarrying` names, a second
- * Save that keeps the link can deadlock against this change, and one that
- * drops it can see a merge copy it to the target anyway. A Save of a project
- * that carried none of these categories when they were read, adding two of
- * them in the opposite id order to this lock, can deadlock against it too.
- * In a deadlock Postgres aborts one side, so either this change reports the
- * generic failure or the Save fails, and nothing is half-written.
+ * One window is left, the one `lockProjectsCarrying` names: a merge can
+ * deadlock against a Save of a project that gained one of its sources after
+ * the carriers were read, when that Save is in flight as the merge
+ * reaches the project's links. Postgres aborts one side, so either this
+ * change reports the generic failure or the Save fails, and nothing is
+ * half-written.
  *
  * Returns the log line.
  */
@@ -588,6 +586,15 @@ async function merge(
   }
   const sourceIds = sources.map((s) => s.id);
   const links = await linkCount(tx, sourceIds);
+  // Waits out a Save that has deleted a source link and not committed, so the
+  // insert below reads the set that Save commits. Without it, a Save of a
+  // project that gained a source after `lockProjectsCarrying` read the
+  // carriers saw its dropped link copied to the target (#864).
+  await tx
+    .select({ one: sql`1` })
+    .from(projectCategories)
+    .where(inArray(projectCategories.categoryId, sourceIds))
+    .for("update");
   const added = await tx
     .insert(projectCategories)
     .select(

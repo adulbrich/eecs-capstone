@@ -1,4 +1,4 @@
-import { and, eq, isNotNull, type SQL, sql } from "drizzle-orm";
+import { and, eq, inArray, isNotNull, type SQL, sql } from "drizzle-orm";
 import { db } from "#/db";
 import {
   CATEGORY_NAME_INDEX,
@@ -246,10 +246,10 @@ export async function updateCategoryForCurrentUser(data: CategoryUpdateInput) {
 }
 
 /**
- * Locks the projects carrying the category first, in the order and for the
- * reason `project-category-lock.ts` gives (#861). An inventory category's
- * item links take no such lock, so an item save re-inserting one can still
- * deadlock against this delete, as it could before.
+ * Locks the projects carrying the category first, in the order
+ * `project-category-lock.ts` gives (#861). An inventory category's items take
+ * no lock: an item save never deletes and re-inserts a link it keeps, so the
+ * cascade waits on no save that keeps the category (#864).
  */
 export async function deleteCategoryAs(viewer: AuthUser, id: string) {
   assertStaff(viewer);
@@ -283,19 +283,55 @@ export async function setProjectCategoriesAs(
   }
   await db.transaction(async (tx) => {
     await lockProjectCategories(tx, data.projectId);
-    await tx
-      .delete(projectCategories)
-      .where(eq(projectCategories.projectId, data.projectId));
-    if (data.categoryIds.length > 0) {
-      await tx.insert(projectCategories).values(
-        data.categoryIds.map((cid) => ({
-          projectId: data.projectId,
-          categoryId: cid,
-        }))
-      );
-    }
+    await replaceProjectCategories(tx, data.projectId, data.categoryIds);
   });
   return { projectId: data.projectId, count: data.categoryIds.length };
+}
+
+/**
+ * Makes the project's links exactly `categoryIds`, deleting only the links it
+ * drops and inserting only the ones it adds, in id order, under the project
+ * lock the caller holds. A link it keeps is never touched: deleting and
+ * re-inserting one deadlocked against a category delete cascading onto it
+ * (#861, #864). Id order is the order a cleanup locks categories in.
+ */
+export async function replaceProjectCategories(
+  tx: Tx,
+  projectId: string,
+  categoryIds: string[]
+) {
+  const current = (
+    await tx
+      .select({ id: projectCategories.categoryId })
+      .from(projectCategories)
+      .where(eq(projectCategories.projectId, projectId))
+  ).map((r) => r.id);
+  const { dropped, added } = linkChanges(current, categoryIds);
+  if (dropped.length > 0) {
+    await tx
+      .delete(projectCategories)
+      .where(
+        and(
+          eq(projectCategories.projectId, projectId),
+          inArray(projectCategories.categoryId, dropped)
+        )
+      );
+  }
+  if (added.length > 0) {
+    await tx
+      .insert(projectCategories)
+      .values(added.map((categoryId) => ({ projectId, categoryId })));
+  }
+}
+
+/** What turns `current` into `next`: the ids to delete, and the ids to insert in id order. */
+function linkChanges(current: string[], next: string[]) {
+  const keep = new Set(next);
+  const have = new Set(current);
+  return {
+    dropped: current.filter((id) => !keep.has(id)),
+    added: [...keep].filter((id) => !have.has(id)).sort(),
+  };
 }
 
 export async function setProjectCategoriesForCurrentUser(
@@ -306,34 +342,38 @@ export async function setProjectCategoriesForCurrentUser(
 }
 
 /**
- * Mirrors setProjectCategoriesAs's delete-then-insert shape, but takes an
- * optional transaction: item create and update already open a transaction
- * for the item write itself, and this needs to join it rather than open a
- * second pooled connection.
+ * `replaceProjectCategories` for an item, inside the transaction item create
+ * and update open for the item write itself. Update holds the item's row
+ * lock by now, and a created item is not yet visible to anyone else, so no
+ * other save of the item can interleave with the read of its current set.
  */
 export async function setInventoryItemCategoriesAs(
   viewer: AuthUser,
   data: { itemId: string; categoryIds: string[] },
-  tx?: Tx
+  tx: Tx
 ) {
   assertStaff(viewer);
-  const run = async (executor: Tx) => {
-    await executor
+  const current = (
+    await tx
+      .select({ id: inventoryItemCategories.categoryId })
+      .from(inventoryItemCategories)
+      .where(eq(inventoryItemCategories.itemId, data.itemId))
+  ).map((r) => r.id);
+  const { dropped, added } = linkChanges(current, data.categoryIds);
+  if (dropped.length > 0) {
+    await tx
       .delete(inventoryItemCategories)
-      .where(eq(inventoryItemCategories.itemId, data.itemId));
-    if (data.categoryIds.length > 0) {
-      await executor.insert(inventoryItemCategories).values(
-        data.categoryIds.map((cid) => ({
-          itemId: data.itemId,
-          categoryId: cid,
-        }))
+      .where(
+        and(
+          eq(inventoryItemCategories.itemId, data.itemId),
+          inArray(inventoryItemCategories.categoryId, dropped)
+        )
       );
-    }
-  };
-  if (tx) {
-    await run(tx);
-  } else {
-    await db.transaction(run);
+  }
+  if (added.length > 0) {
+    await tx
+      .insert(inventoryItemCategories)
+      .values(added.map((categoryId) => ({ itemId: data.itemId, categoryId })));
   }
   return { itemId: data.itemId, count: data.categoryIds.length };
 }

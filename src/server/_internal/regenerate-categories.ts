@@ -1,6 +1,6 @@
-import { eq, inArray, sql } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import { db } from "#/db";
-import { categories, projectCategories, projects } from "#/db/schema";
+import { projectCategories, projects } from "#/db/schema";
 import { requireUser } from "#/lib/_internal/auth-guards";
 import {
   mantleResponses,
@@ -19,7 +19,11 @@ import type {
   ProjectCategorizationInput,
 } from "../categories";
 import { assertWithinLimit, recordReviewUsage } from "./ai-review-usage";
-import { createCategoryAs, listCategoryTypesImpl } from "./categories";
+import {
+  createCategoryAs,
+  listCategoryTypesImpl,
+  replaceProjectCategories,
+} from "./categories";
 import { runCategorize } from "./categorize-core";
 import { readAiRefresh, recordAiRefresh } from "./project-ai-refreshes";
 import {
@@ -27,7 +31,10 @@ import {
   logRun,
   projectCategoryIds,
 } from "./project-categorize";
-import { lockProjectCategories } from "./project-category-lock";
+import {
+  lockCategoriesToLink,
+  lockProjectCategories,
+} from "./project-category-lock";
 
 /**
  * The categorizer's staff paths (#31): the panel's read, Regenerate and
@@ -171,27 +178,14 @@ export async function regenerateProjectCategoriesAs(
     if (current.join() !== before.join()) {
       return "superseded" as const;
     }
-    // Staff may have deleted what the model picked while it worked; replacing
-    // the set with nothing would read as a result.
-    const surviving = await tx
-      .select({ id: categories.id })
-      .from(categories)
-      .where(inArray(categories.id, picked));
+    // Staff may have deleted what the model picked while it worked, or be
+    // deleting it now; those drop out. Replacing the set with nothing would
+    // read as a result.
+    const surviving = await lockCategoriesToLink(tx, picked);
     if (surviving.length === 0) {
       return "superseded" as const;
     }
-    await tx
-      .delete(projectCategories)
-      .where(eq(projectCategories.projectId, project.id));
-    await tx.insert(projectCategories).select(
-      tx
-        .select({
-          projectId: sql<string>`${project.id}::uuid`.as("project_id"),
-          categoryId: categories.id,
-        })
-        .from(categories)
-        .where(inArray(categories.id, picked))
-    );
+    await replaceProjectCategories(tx, project.id, surviving);
     return "updated" as const;
   });
   await recordAiRefresh(project.id, "categories", "staff", outcome, startedAt);
