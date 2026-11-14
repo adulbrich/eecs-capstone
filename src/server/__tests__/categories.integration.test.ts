@@ -43,6 +43,17 @@ async function makeUser(email: string, role: "user" | "admin") {
   return { id: u.id, role: u.role };
 }
 
+/**
+ * Two categories as the one a save adds and the one it keeps, the added one
+ * first in id order. A save that deleted and re-inserted the kept link, even
+ * in id order, then waits on the held added category before it locks the
+ * kept one: the deadlock the #864 tests guard against.
+ */
+function addedThenKept(a: { id: string }, b: { id: string }) {
+  const [added, kept] = [a.id, b.id].sort();
+  return { added, kept };
+}
+
 function baseProject() {
   return {
     title: "P",
@@ -661,16 +672,18 @@ describe("deleting a category beside a staff Save", () => {
   // re-inserted the kept link deadlocked against the cascade here.
   it("completes beside a Save that keeps a category it gained after the carriers were read", async () => {
     const admin = await makeUser(`late-${Date.now()}@x.com`, "admin");
-    const { id: kept } = await createCategoryAs(admin, {
-      domain: "project",
-      name: "react",
-      type: "technology",
-    });
-    const { id: added } = await createCategoryAs(admin, {
-      domain: "project",
-      name: "vue",
-      type: "technology",
-    });
+    const { added, kept } = addedThenKept(
+      await createCategoryAs(admin, {
+        domain: "project",
+        name: "react",
+        type: "technology",
+      }),
+      await createCategoryAs(admin, {
+        domain: "project",
+        name: "vue",
+        type: "technology",
+      })
+    );
     const { id: carrier } = await createProjectAs(admin, baseProject());
     const { id: late } = await createProjectAs(admin, baseProject());
     await setProjectCategoriesAs(admin, {
@@ -717,16 +730,18 @@ describe("deleting a category beside a staff Save", () => {
 
   it("completes beside an item save that keeps an inventory category", async () => {
     const admin = await makeUser(`inv-del-${Date.now()}@x.com`, "admin");
-    const { id: kept } = await createCategoryAs(admin, {
-      domain: "inventory",
-      name: "Sensors",
-      type: null,
-    });
-    const { id: added } = await createCategoryAs(admin, {
-      domain: "inventory",
-      name: "Cables",
-      type: null,
-    });
+    const { added, kept } = addedThenKept(
+      await createCategoryAs(admin, {
+        domain: "inventory",
+        name: "Sensors",
+        type: null,
+      }),
+      await createCategoryAs(admin, {
+        domain: "inventory",
+        name: "Cables",
+        type: null,
+      })
+    );
     const [item] = await db
       .insert(inventoryItems)
       .values({ name: "Probe" })
