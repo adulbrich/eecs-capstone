@@ -494,8 +494,9 @@ function collisionOf(
  *
  * One window is left, the one `lockProjectsCarrying` names: a merge can
  * deadlock against a Save of a project that gained one of its sources after
- * the carriers were read, when that Save is in flight as the merge
- * reaches the project's links. Postgres aborts one side, so either this
+ * the carriers were read, when that Save is in flight as the merge reaches
+ * the project's links: one that has yet to delete a source link the merge
+ * has locked, or one that adds the target. Postgres aborts one side, so either this
  * change reports the generic failure or the Save fails, and nothing is
  * half-written.
  *
@@ -586,8 +587,8 @@ async function merge(
   }
   const sourceIds = sources.map((s) => s.id);
   const links = await linkCount(tx, sourceIds);
-  // Waits out a Save that has deleted a source link and not committed, so the
-  // insert below reads the set that Save commits. Without it, a Save of a
+  // A lock only: waits out a Save that has deleted a source link and not
+  // committed, so the insert below reads the set that Save commits. Without it, a Save of a
   // project that gained a source after `lockProjectsCarrying` read the
   // carriers saw its dropped link copied to the target (#864).
   await tx

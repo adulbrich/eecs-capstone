@@ -324,9 +324,14 @@ export async function replaceProjectCategories(
   }
 }
 
-/** What turns `current` into `next`: the ids to delete, and the ids to insert in id order. */
+/**
+ * What turns `current` into `next`: the ids to delete, and the ids to insert
+ * in id order. `next` is lowercased first: the input schema accepts an
+ * uppercase uuid and the database returns lowercase, so an uppercase id for a
+ * kept link would otherwise be dropped and re-inserted.
+ */
 function linkChanges(current: string[], next: string[]) {
-  const keep = new Set(next);
+  const keep = new Set(next.map((id) => id.toLowerCase()));
   const have = new Set(current);
   return {
     dropped: current.filter((id) => !keep.has(id)),

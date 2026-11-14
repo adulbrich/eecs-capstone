@@ -150,17 +150,17 @@ type Held = Awaited<ReturnType<typeof holdOpen>>;
 
 /**
  * A model that answers with `PICKS` and, before it returns, starts deleting
- * the category `doomed` in a transaction it leaves open (#864): the delete
+ * the categories `doomed` in a transaction it leaves open (#864): the delete
  * has not committed when the writer reaches the categories.
  */
-function deletingDuringTheCall(doomed: string) {
+function deletingDuringTheCall(doomed: string[]) {
   const answer = fakeModel(PICKS);
   const deletion = deferred<Held>();
   const model: ResponsesFn = async (body) => {
     const reply = await answer(body);
     deletion.resolve(
       await holdOpen(
-        sql`delete from ${categories} where ${categories.id} = ${doomed}`
+        sql`delete from ${categories} where ${inArray(categories.id, doomed)}`
       )
     );
     return reply;
@@ -291,11 +291,28 @@ describe("the run on submit", () => {
     expect(await categoryNames(id)).toEqual(["Machine Learning"]);
   });
 
+  it("writes nothing when every pick is deleted while it writes", async () => {
+    const ids = await seedCategories();
+    const admin = await makeUser(`allgone-${Date.now()}@x.com`, "admin");
+    const { id } = await createProjectAs(admin, baseProject("All gone"));
+    const { model, deletion } = deletingDuringTheCall([
+      ids["New Build"],
+      ids["Web Development"],
+      ids.Healthcare,
+    ]);
+
+    const running = categorizeProject(id, model);
+    await waitOutDeletion(deletion);
+
+    expect(await running).toBe("superseded");
+    expect(await categoryNames(id)).toEqual([]);
+  });
+
   it("files the rest when a pick is deleted while it writes", async () => {
     const ids = await seedCategories();
     const admin = await makeUser(`inflight-${Date.now()}@x.com`, "admin");
     const { id } = await createProjectAs(admin, baseProject("In flight"));
-    const { model, deletion } = deletingDuringTheCall(ids.Healthcare);
+    const { model, deletion } = deletingDuringTheCall([ids.Healthcare]);
 
     const running = categorizeProject(id, model);
     await waitOutDeletion(deletion);
@@ -480,7 +497,7 @@ describe("Regenerate categories", () => {
     const ids = await seedCategories();
     const admin = await makeUser(`inflight-${Date.now()}@x.com`, "admin");
     const { id } = await createProjectAs(admin, baseProject("In flight"));
-    const { model, deletion } = deletingDuringTheCall(ids.Healthcare);
+    const { model, deletion } = deletingDuringTheCall([ids.Healthcare]);
 
     const running = regenerateProjectCategoriesAs(
       admin,

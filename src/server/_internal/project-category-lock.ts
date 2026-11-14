@@ -40,9 +40,10 @@ export async function lockProjectCategories(tx: Tx, projectId: string) {
  * after this read is not locked. A Save that reaches a category after the
  * writer has locked it waits and fails on the deleted row. A delete or a
  * retirement cannot deadlock against a Save of a project that gained the
- * category earlier; a merge still can, when that Save is in flight as the
- * merge reaches the project's links, and Postgres aborts one side with
- * nothing half-written.
+ * category earlier. A merge still can, when that Save is in flight as the
+ * merge reaches the project's links: one that has yet to delete a source link
+ * the merge has locked, or one that adds the merge's target. Postgres aborts
+ * one side with nothing half-written.
  */
 export async function lockProjectsCarrying(tx: Tx, categoryIds: string[]) {
   if (categoryIds.length === 0) {
