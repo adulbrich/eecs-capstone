@@ -1,4 +1,4 @@
-import { eq } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import { describe, expect, it } from "vitest";
 import { db } from "#/db";
 import {
@@ -21,9 +21,15 @@ import {
   setProjectCategoriesAs,
   updateCategoryAs,
 } from "#/server/_internal/categories";
+import { updateInventoryItemAs } from "#/server/_internal/inventory-catalog";
 import { createProjectAs } from "#/server/_internal/projects";
 import { getProjectAs } from "#/server/_internal/projects-queries";
-import { saveBeside } from "./save-race";
+import {
+  holdOpen,
+  saveBeside,
+  untilABackendWaitsOn,
+  untilSettledOrWaitingOn,
+} from "./save-race";
 
 async function makeUser(email: string, role: "user" | "admin") {
   await auth.api.createUser({
@@ -647,5 +653,119 @@ describe("deleting a category beside a staff Save", () => {
     expect(
       await db.select().from(categories).where(eq(categories.id, catId))
     ).toEqual([]);
+  });
+
+  // #864: the project gains the category after the delete read the carriers,
+  // so the delete holds no lock on it. The real Save is held open at its
+  // insert by a lock on the other category it adds; one that deleted and
+  // re-inserted the kept link deadlocked against the cascade here.
+  it("completes beside a Save that keeps a category it gained after the carriers were read", async () => {
+    const admin = await makeUser(`late-${Date.now()}@x.com`, "admin");
+    const { id: kept } = await createCategoryAs(admin, {
+      domain: "project",
+      name: "react",
+      type: "technology",
+    });
+    const { id: added } = await createCategoryAs(admin, {
+      domain: "project",
+      name: "vue",
+      type: "technology",
+    });
+    const { id: carrier } = await createProjectAs(admin, baseProject());
+    const { id: late } = await createProjectAs(admin, baseProject());
+    await setProjectCategoriesAs(admin, {
+      projectId: carrier,
+      categoryIds: [kept],
+    });
+
+    const carrierLock = await holdOpen(
+      sql`select 1 from ${projects} where ${projects.id} = ${carrier} for update`
+    );
+    const addedLock = await holdOpen(
+      sql`select 1 from ${categories} where ${categories.id} = ${added} for update`
+    );
+    try {
+      const deleting = deleteCategoryAs(admin, kept);
+      deleting.catch(() => undefined);
+      await untilABackendWaitsOn(carrierLock.pid);
+      await setProjectCategoriesAs(admin, {
+        projectId: late,
+        categoryIds: [kept],
+      });
+      const saving = setProjectCategoriesAs(admin, {
+        projectId: late,
+        categoryIds: [added, kept],
+      });
+      saving.catch(() => undefined);
+      const savePid = await untilABackendWaitsOn(addedLock.pid);
+      await carrierLock.release();
+      await untilSettledOrWaitingOn(deleting, savePid);
+      await addedLock.release();
+
+      await expect(deleting).resolves.toEqual({ id: kept });
+      await expect(saving).resolves.toBeDefined();
+    } finally {
+      await carrierLock.release();
+      await addedLock.release();
+    }
+    const links = await db
+      .select({ id: projectCategories.categoryId })
+      .from(projectCategories)
+      .where(eq(projectCategories.projectId, late));
+    expect(links).toEqual([{ id: added }]);
+  });
+
+  it("completes beside an item save that keeps an inventory category", async () => {
+    const admin = await makeUser(`inv-del-${Date.now()}@x.com`, "admin");
+    const { id: kept } = await createCategoryAs(admin, {
+      domain: "inventory",
+      name: "Sensors",
+      type: null,
+    });
+    const { id: added } = await createCategoryAs(admin, {
+      domain: "inventory",
+      name: "Cables",
+      type: null,
+    });
+    const [item] = await db
+      .insert(inventoryItems)
+      .values({ name: "Probe" })
+      .returning();
+    await db
+      .insert(inventoryItemCategories)
+      .values({ itemId: item.id, categoryId: kept });
+
+    const addedLock = await holdOpen(
+      sql`select 1 from ${categories} where ${categories.id} = ${added} for update`
+    );
+    try {
+      const saving = updateInventoryItemAs(admin, {
+        id: item.id,
+        name: "Probe",
+        description: null,
+        categoryIds: [added, kept],
+        serial: null,
+        label: null,
+        location: null,
+        notes: null,
+        imageUrl: null,
+      });
+      saving.catch(() => undefined);
+      const savePid = await untilABackendWaitsOn(addedLock.pid);
+      const deleting = deleteCategoryAs(admin, kept);
+      deleting.catch(() => undefined);
+      await untilSettledOrWaitingOn(deleting, savePid);
+      await addedLock.release();
+
+      await expect(deleting).resolves.toEqual({ id: kept });
+      await expect(saving).resolves.toBeDefined();
+    } finally {
+      await addedLock.release();
+    }
+    const links = await db
+      .select({ id: inventoryItemCategories.categoryId })
+      .from(inventoryItemCategories)
+      .where(eq(inventoryItemCategories.itemId, item.id));
+    expect(links).toEqual([{ id: added }]);
   });
 });

@@ -11,12 +11,13 @@ import {
 import type { ResponsesFn } from "#/lib/_internal/bedrock-mantle";
 import { auth } from "#/lib/auth";
 import type { CleanupCategoryRef } from "#/lib/category-cleanup";
+import { setProjectCategoriesAs } from "#/server/_internal/categories";
 import {
   applyCategoryCleanupAs,
   CLEANUP_TOOL_NAME,
   proposeCategoryCleanupAs,
 } from "#/server/_internal/category-cleanup";
-import { saveBeside } from "./save-race";
+import { holdOpen, saveBeside, untilABackendWaitsOn } from "./save-race";
 
 /**
  * The category cleanup (#857) against the database. Every model call is a
@@ -558,5 +559,58 @@ describe("applying a cleanup beside a staff Save", () => {
     );
 
     expect(await namesOf(id)).toEqual(["Python"]);
+  });
+
+  // #864: the project gains the source after the merge read the carriers, so
+  // the merge holds no lock on it. A second Save drops the source and is held
+  // open at its insert by a lock on the category it adds, while the merge
+  // reaches the project's links.
+  it("does not copy a link dropped by a Save of a project that gained the source late", async () => {
+    const cats = await seedCategories();
+    const admin = await makeUser(`late-${Date.now()}@x.com`, "admin");
+    const carrier = await project("Carrier", "published", [cats.VR.id]);
+    const late = await project("Late", "published", []);
+    vi.spyOn(console, "log").mockImplementation(() => {});
+
+    const carrierLock = await holdOpen(
+      sql`select 1 from ${projects} where ${projects.id} = ${carrier} for update`
+    );
+    const addedLock = await holdOpen(
+      sql`select 1 from ${categories} where ${categories.id} = ${cats.Python.id} for update`
+    );
+    try {
+      const applying = applyCategoryCleanupAs(admin, {
+        changes: [
+          {
+            kind: "merge",
+            target: refOf(cats["AR / VR"]),
+            sources: [refOf(cats.VR)],
+          },
+        ],
+      });
+      applying.catch(() => undefined);
+      await untilABackendWaitsOn(carrierLock.pid);
+      await setProjectCategoriesAs(admin, {
+        projectId: late,
+        categoryIds: [cats.VR.id],
+      });
+      const saving = setProjectCategoriesAs(admin, {
+        projectId: late,
+        categoryIds: [cats.Python.id],
+      });
+      saving.catch(() => undefined);
+      const savePid = await untilABackendWaitsOn(addedLock.pid);
+      await carrierLock.release();
+      await untilABackendWaitsOn(savePid);
+      await addedLock.release();
+
+      await expect(applying).resolves.toEqual({ results: [{ ok: true }] });
+      await expect(saving).resolves.toBeDefined();
+    } finally {
+      await carrierLock.release();
+      await addedLock.release();
+    }
+    expect(await namesOf(late)).toEqual(["Python"]);
+    expect(await namesOf(carrier)).toEqual(["AR / VR"]);
   });
 });
