@@ -1,7 +1,9 @@
 import { readdirSync, readFileSync } from "node:fs";
 import { join, relative } from "node:path";
+import { fc, test } from "@fast-check/vitest";
 import ts from "typescript";
 import { describe, expect, it } from "vitest";
+import { trickyText } from "#/test/shared/arbitraries";
 
 /**
  * Every once-only seed in `src/`, held to `CENSUS` below.
@@ -600,6 +602,73 @@ function labelsIn(source: string): string[] {
   return onceOnlySeeds(parse("fixture.tsx", source));
 }
 
+/** An initializer's source, and whether the scan should call it a seed. */
+interface Generated {
+  seeds: boolean;
+  text: string;
+}
+
+const literal = (text: string): Generated => ({ seeds: false, text });
+const nonLiteral = (text: string): Generated => ({ seeds: true, text });
+
+/**
+ * Initializers built from the grammar `isLiteral` accepts, nested and wrapped,
+ * with a non-literal sometimes put in at any depth: a read, a call, a spread
+ * or a computed key. One of them anywhere makes the whole a seed, the
+ * direction in which a mistake would drop a seed without a red test.
+ */
+const initializers = fc.letrec<{ init: Generated }>((tie) => {
+  const inner = tie("init");
+  const wrap = (shape: (text: string) => string, seeds?: boolean) =>
+    inner.map((init) => ({
+      seeds: seeds ?? init.seeds,
+      text: shape(init.text),
+    }));
+  const list = (shape: (texts: string[]) => string) =>
+    fc.array(inner, { maxLength: 3 }).map((inits) => ({
+      seeds: inits.some((init) => init.seeds),
+      text: shape(inits.map((init) => init.text)),
+    }));
+  return {
+    init: fc.oneof(
+      { depthSize: "small", maxDepth: 3 },
+      fc.oneof(
+        trickyText({ maxLength: 4 }).map((text) =>
+          literal(JSON.stringify(text))
+        ),
+        fc.integer().map((n) => literal(String(n))),
+        fc
+          .constantFrom(
+            "true",
+            "false",
+            "null",
+            "undefined",
+            "1.5",
+            "0x1f",
+            "1_000",
+            "`text`",
+            "new Set()",
+            "new Map<string, number>()"
+          )
+          .map(literal),
+        fc
+          .constantFrom("data.x", "load()", "-data.x", "new Set(rows)")
+          .map(nonLiteral)
+      ),
+      list((texts) => `[${texts.join(", ")}]`),
+      list(
+        (texts) => `{ ${texts.map((text, i) => `k${i}: ${text}`).join(", ")} }`
+      ),
+      wrap((text) => `() => (${text})`),
+      wrap((text) => `(${text}) as const`),
+      wrap((text) => `(${text}) satisfies Row`),
+      // A spread or a computed key seeds, whatever it holds.
+      wrap((text) => `[...${text}]`, true),
+      wrap((text) => `{ [key]: ${text} }`, true)
+    ),
+  };
+}).init;
+
 describe("once-only seeds", () => {
   it("are all in the census, and the census has none left over", () => {
     const found = treeSeeds();
@@ -766,6 +835,15 @@ describe("once-only seeds", () => {
       "useState({page})",
     ]);
   });
+
+  test.prop([initializers])(
+    "reads an initializer as a seed exactly when some part is not a literal",
+    ({ seeds, text }) => {
+      expect(labelsIn(`useState(${text});`)).toEqual(
+        seeds ? [`useState(${normalize(text)})`] : []
+      );
+    }
+  );
 });
 
 /**
