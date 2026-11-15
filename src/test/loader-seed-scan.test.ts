@@ -1,7 +1,9 @@
 import { readdirSync, readFileSync } from "node:fs";
 import { join, relative } from "node:path";
+import { fc, test } from "@fast-check/vitest";
 import ts from "typescript";
 import { describe, expect, it } from "vitest";
+import { trickyText } from "#/test/shared/arbitraries";
 
 /**
  * Every once-only seed in `src/`, held to `CENSUS` below.
@@ -20,11 +22,14 @@ import { describe, expect, it } from "vitest";
  * of that ADR said the routes seeding from loader data were keyed, and a sweep
  * found six that were not.
  *
- * What it cannot see is where a value came from. It finds every initializer
- * that is not a plain literal, written as a hook's argument, a `defaultValues`
- * key or a JSX attribute (not one spread in from an object), and asks that
- * somebody has said which class it is in; the reading of data flow is the
- * classifier's, written beside the entry.
+ * What it cannot see is where a value came from. It walks each file's syntax
+ * tree for initializers that are not plain literals: the argument of a hook
+ * called by its own name (`useState` or `React.useState`, not an alias), a
+ * `defaultValues` key, and a `defaultValue` or `defaultChecked` written on the
+ * element or in an object literal spread onto it, though not in an object
+ * spread in from a variable. It asks that somebody has said which class each
+ * is in; the reading of data flow is the classifier's, written beside the
+ * entry.
  */
 
 /**
@@ -347,109 +352,196 @@ const SRC_DIR = join(process.cwd(), "src");
 // included, and would do so silently.
 const TEST_DIR = join(SRC_DIR, "test");
 
-const CLOSER: Record<string, string> = { "(": ")", "[": "]", "{": "}" };
+const HOOKS = new Set(["useState", "useRef", "useReducer"]);
+const UNCONTROLLED = new Set(["defaultValue", "defaultChecked"]);
+
+function parse(path: string, source = readFileSync(path, "utf8")) {
+  return ts.createSourceFile(
+    path,
+    source,
+    ts.ScriptTarget.Latest,
+    true,
+    path.endsWith(".tsx") ? ts.ScriptKind.TSX : ts.ScriptKind.TS
+  );
+}
+
+/** `node` and every node under it, in source order. */
+function descendants(node: ts.Node, into: ts.Node[] = []): ts.Node[] {
+  into.push(node);
+  ts.forEachChild(node, (child) => {
+    descendants(child, into);
+  });
+  return into;
+}
+
+/** A name as written, or `undefined` for a computed one. */
+function nameOf(name: ts.Node): string | undefined {
+  return ts.isIdentifier(name) ||
+    ts.isStringLiteralLike(name) ||
+    ts.isNumericLiteral(name)
+    ? name.text
+    : undefined;
+}
+
+type Property = ts.PropertyAssignment | ts.ShorthandPropertyAssignment;
+
+function isProperty(node: ts.Node): node is Property {
+  return (
+    ts.isPropertyAssignment(node) || ts.isShorthandPropertyAssignment(node)
+  );
+}
+
+/** What a property sets: `{ a: b }` sets `b`, and `{ a }` sets `a`. */
+function propertyValue(property: Property): ts.Expression {
+  return ts.isPropertyAssignment(property)
+    ? property.initializer
+    : property.name;
+}
+
+/** The value of every object literal property called `name` in `file`. */
+function propertyValues(file: ts.SourceFile, name: string): ts.Expression[] {
+  return descendants(file)
+    .filter(isProperty)
+    .filter((property) => nameOf(property.name) === name)
+    .map(propertyValue);
+}
+
+/** A string, number, boolean, `null`, `undefined`, or a negative number. */
+function isPrimitive(node: ts.Expression): boolean {
+  return (
+    ts.isStringLiteralLike(node) ||
+    ts.isNumericLiteral(node) ||
+    node.kind === ts.SyntaxKind.TrueKeyword ||
+    node.kind === ts.SyntaxKind.FalseKeyword ||
+    node.kind === ts.SyntaxKind.NullKeyword ||
+    (ts.isIdentifier(node) && node.text === "undefined") ||
+    (ts.isPrefixUnaryExpression(node) &&
+      node.operator === ts.SyntaxKind.MinusToken &&
+      ts.isNumericLiteral(node.operand))
+  );
+}
+
+/** `new Set()` or `new Map()`, with type arguments or without. */
+function isEmptyCollection(node: ts.Expression): boolean {
+  return (
+    ts.isNewExpression(node) &&
+    ts.isIdentifier(node.expression) &&
+    (node.expression.text === "Set" || node.expression.text === "Map") &&
+    (node.arguments?.length ?? 0) === 0
+  );
+}
 
 /**
- * Just past the string or template literal that opens at `start`. A quoted
- * string ends at its line's end at the latest, as it must in JavaScript, so
- * an apostrophe in JSX text misreads the rest of that line and no further. A
- * backtick has no such stop: a stray one runs to the next backtick, or to the
- * end of the file.
+ * A plain literal, which cannot carry loader data: a primitive, an empty
+ * `Set` or `Map`, an arrow with no parameters whose body is one, or an array
+ * or object built only from them, with no spread and no computed key; any of
+ * those may be in parentheses, or under `as`, `as const` or `satisfies`.
+ * Everything else is a seed somebody has to classify.
  */
-function stringEnd(source: string, start: number): number {
-  const quote = source[start];
-  for (let i = start + 1; i < source.length; i++) {
-    const char = source[i];
-    if (char === "\\") {
-      i++;
-    } else if (quote !== "`" && char === "\n") {
-      return i;
-    } else if (quote === "`" && char === "$" && source[i + 1] === "{") {
-      i = closeOf(source, i + 1);
-    } else if (char === quote) {
-      return i + 1;
-    }
+function isLiteral(node: ts.Expression): boolean {
+  if (
+    ts.isParenthesizedExpression(node) ||
+    ts.isAsExpression(node) ||
+    ts.isSatisfiesExpression(node)
+  ) {
+    return isLiteral(node.expression);
   }
-  return source.length;
+  if (ts.isArrowFunction(node)) {
+    return (
+      node.parameters.length === 0 &&
+      !ts.isBlock(node.body) &&
+      isLiteral(node.body)
+    );
+  }
+  if (ts.isArrayLiteralExpression(node)) {
+    return node.elements.every(isLiteral);
+  }
+  if (ts.isObjectLiteralExpression(node)) {
+    return node.properties.every(
+      (property) =>
+        ts.isPropertyAssignment(property) &&
+        nameOf(property.name) !== undefined &&
+        isLiteral(property.initializer)
+    );
+  }
+  return isPrimitive(node) || isEmptyCollection(node);
 }
 
-function isCommentStart(source: string, i: number): boolean {
-  return source[i] === "/" && (source[i + 1] === "/" || source[i + 1] === "*");
+interface Seed {
+  /** Every argument that seeds, which is more than one only for `useReducer`. */
+  init: readonly ts.Expression[];
+  kind: string;
 }
 
-/** Just past the comment that opens at `start`, or at the newline ending it. */
-function commentEnd(source: string, start: number): number {
-  if (source[start + 1] === "/") {
-    const end = source.indexOf("\n", start);
-    return end === -1 ? source.length : end;
+/** `useState(x)` or `React.useState(x)`, and the same for the other hooks. */
+function hookSeed(call: ts.CallExpression): Seed | undefined {
+  const callee = ts.isPropertyAccessExpression(call.expression)
+    ? call.expression.name
+    : call.expression;
+  const kind = nameOf(callee);
+  if (kind === undefined || !HOOKS.has(kind)) {
+    return;
   }
-  const end = source.indexOf("*/", start + 2);
-  return end === -1 ? source.length : end + 2;
+  // `useReducer(reducer, initialArg, init?)`: the reducer is not a seed.
+  return { init: call.arguments.slice(kind === "useReducer" ? 1 : 0), kind };
+}
+
+/** `<Input defaultValue={x} />`; a bare `defaultChecked` is a literal `true`. */
+function attributeSeed(attribute: ts.JsxAttribute): Seed | undefined {
+  const kind = nameOf(attribute.name);
+  const value = attribute.initializer;
+  const init = value && ts.isJsxExpression(value) ? value.expression : value;
+  if (kind === undefined || !UNCONTROLLED.has(kind) || init === undefined) {
+    return;
+  }
+  return { init: [init], kind };
 }
 
 /**
- * The index of the bracket closing the one at `open`.
- *
- * Counted, not matched: a line regex misses an initializer Biome has wrapped
- * over several lines, and a non-greedy one stops at the first `)` of
- * `useState(() => programs.map((p) => p.id))`. Strings and template holes
- * are skipped so a bracket inside one is text; comments are gone already,
- * since every caller reads what `blankComments` returns. `<` counts only when
- * `open` is one, which is a type parameter list, and the `>` of an `=>` never
- * closes it: `useState<Record<string, () => void>>(x)` is one list.
- *
- * Known limit, inert in this tree: a regex literal holding a bracket, or JSX
- * text holding an apostrophe, inside the initializer would miscount. Neither
- * occurs in one; fix it if one ever does rather than in advance.
+ * Whether a JSX spread spreads `object`: `{...{ a }}`, and the same object in
+ * parentheses, under `as` or `satisfies`, as a branch of a `?:`, or as an
+ * operand of `&&`, `||` or `??`.
  */
-function closeOf(source: string, open: number): number {
-  const angles = source[open] === "<";
-  const expected: string[] = [];
-  for (let i = open; i < source.length; i++) {
-    const char = source[i];
-    if (char === '"' || char === "'" || char === "`") {
-      i = stringEnd(source, i) - 1;
-    } else if (char in CLOSER) {
-      expected.push(CLOSER[char]);
-    } else if (angles && char === "<") {
-      expected.push(">");
-    } else if (
-      char === expected.at(-1) &&
-      !(char === ">" && source[i - 1] === "=")
-    ) {
-      expected.pop();
-      if (expected.length === 0) {
-        return i;
-      }
-    }
+function isSpreadOntoElement(object: ts.Node): boolean {
+  let node = object.parent;
+  while (
+    ts.isParenthesizedExpression(node) ||
+    ts.isAsExpression(node) ||
+    ts.isSatisfiesExpression(node) ||
+    ts.isConditionalExpression(node) ||
+    ts.isBinaryExpression(node)
+  ) {
+    node = node.parent;
   }
-  return source.length;
+  return ts.isJsxSpreadAttribute(node);
 }
 
 /**
- * `text` split on its top-level commas, stopping early at the first top-level
- * character in `stops`, which is how a property value ends at the `,` or `}`
- * after it.
+ * A form's `defaultValues`, or an uncontrolled input's default written in an
+ * object literal spread onto the element: `<Input {...{ defaultValue: x }} />`.
  */
-function splitTopLevel(text: string, stops = ""): string[] {
-  const parts: string[] = [];
-  let from = 0;
-  for (let i = 0; i < text.length; i++) {
-    const char = text[i];
-    if (char === '"' || char === "'" || char === "`") {
-      i = stringEnd(text, i) - 1;
-    } else if (char in CLOSER) {
-      i = closeOf(text, i);
-    } else if (stops.includes(char)) {
-      parts.push(text.slice(from, i));
-      return parts;
-    } else if (char === ",") {
-      parts.push(text.slice(from, i));
-      from = i + 1;
-    }
+function propertySeed(property: Property): Seed | undefined {
+  const kind = nameOf(property.name);
+  const spreadOntoInput =
+    kind !== undefined &&
+    UNCONTROLLED.has(kind) &&
+    isSpreadOntoElement(property.parent);
+  if (kind !== "defaultValues" && !spreadOntoInput) {
+    return;
   }
-  parts.push(text.slice(from));
-  return parts;
+  return { init: [propertyValue(property)], kind };
+}
+
+function seedAt(node: ts.Node): Seed | undefined {
+  if (ts.isCallExpression(node)) {
+    return hookSeed(node);
+  }
+  if (ts.isJsxAttribute(node)) {
+    return attributeSeed(node);
+  }
+  if (isProperty(node)) {
+    return propertySeed(node);
+  }
 }
 
 /** One line, no padding inside brackets, no trailing comma: Biome's wrap undone. */
@@ -461,241 +553,25 @@ function normalize(text: string): string {
     .trim();
 }
 
-const PRIMITIVE =
-  /^(?:-?\d[\d_]*(?:\.\d+)?|true|false|null|undefined|"(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*'|`[^`$]*`)$/u;
-const EMPTY_COLLECTION = /^new (?:Set|Map)(?:<[^()]*>)?\(\)$/u;
-const LAZY = /^\(\)\s*=>\s*([\s\S]*)$/u;
-const PROPERTY = /^\s*(?:[\w$]+|"[^"]*"|'[^']*')\s*:\s*([\s\S]*)$/u;
-// One named type, so `[] as Row[] && loaderData.rows` is not a literal. Its
-// type arguments are names, commas and `[]` only, so the group closes at the
-// first `>` and cannot reach across an operator into a second `as A<B>`; a
-// nested or structural type argument reads as a seed, which is the safe way.
-const ASSERTION =
-  /^\s+(?:satisfies|as)\s+(?:const|[\w$.]+(?:<[\w$.,\s[\]]*>)?(?:\[\])*)\s*$/u;
-
-/**
- * A plain literal, which cannot carry loader data: a primitive, an empty
- * `Set` or `Map`, a lazy initializer returning one, or an array or object
- * built only from them, optionally followed by `as const` or by `as` or
- * `satisfies` and one named type.
- * Everything else is a seed somebody has to classify.
- */
-function isLiteral(raw: string): boolean {
-  const text = raw.trim();
-  if (text === "" || PRIMITIVE.test(text) || EMPTY_COLLECTION.test(text)) {
-    return true;
+function label({ init, kind }: Seed, file: ts.SourceFile): string {
+  if (kind === "defaultValues") {
+    return kind;
   }
-  const lazy = LAZY.exec(text)?.[1];
-  if (lazy !== undefined) {
-    return !lazy.startsWith("{") && isLiteral(lazy);
-  }
-  const open = text[0];
-  if (!(open in CLOSER)) {
-    return false;
-  }
-  const close = closeOf(text, 0);
-  const rest = text.slice(close + 1);
-  if (rest.trim() !== "" && !ASSERTION.test(rest)) {
-    return false;
-  }
-  const items = splitTopLevel(text.slice(1, close)).filter(
-    (item) => item.trim() !== ""
-  );
-  if (open === "(") {
-    return items.length === 1 && isLiteral(items[0]);
-  }
-  if (open === "[") {
-    return items.every(isLiteral);
-  }
-  return items.every((item) => {
-    const value = PROPERTY.exec(item)?.[1];
-    return value !== undefined && isLiteral(value);
-  });
+  const text = file.text.slice(init[0].getStart(file), init.at(-1)?.end);
+  return `${kind}(${normalize(text)})`;
 }
 
-type Kind =
-  | "useState"
-  | "useRef"
-  | "useReducer"
-  | "defaultValues"
-  | "defaultValue"
-  | "defaultChecked";
-
-interface Seed {
-  /** The initializer's source, comments blanked. */
-  init: string;
-  kind: Kind;
-}
-
-/**
- * Whether a `/` at `at` opens a regex literal rather than dividing: it does
- * after an operator, an opening bracket or `return`, and not after a value.
- * `<` and `>` are left out, so the `/` of a JSX `</div>` or `/>` is never one.
- */
-function opensRegex(source: string, at: number): boolean {
-  let i = at - 1;
-  while (i >= 0 && /\s/u.test(source[i])) {
-    i--;
-  }
-  return (
-    i < 0 ||
-    "(,=:[!&|?{};+-*%~^".includes(source[i]) ||
-    /\breturn$/u.test(source.slice(Math.max(0, i - 6), i + 1))
-  );
-}
-
-/** Just past the regex literal whose opening `/` is at `start`. */
-function regexEnd(source: string, start: number): number {
-  let inClass = false;
-  for (let i = start + 1; i < source.length; i++) {
-    const char = source[i];
-    if (char === "\\") {
-      i++;
-    } else if (char === "\n") {
-      return i;
-    } else if (inClass) {
-      inClass = char !== "]";
-    } else if (char === "[") {
-      inClass = true;
-    } else if (char === "/") {
-      return i + 1;
+/** The label of every once-only initializer in `file` that is not a plain literal. */
+function onceOnlySeeds(file: ts.SourceFile): string[] {
+  const labels: string[] = [];
+  for (const node of descendants(file)) {
+    const seed = seedAt(node);
+    // `every` holds on no arguments, so `useState()` is not a seed either.
+    if (seed && !seed.init.every(isLiteral)) {
+      labels.push(label(seed, file));
     }
   }
-  return source.length;
-}
-
-/**
- * `source` with every comment blanked to spaces, newlines kept, so it has the
- * same length and every offset into it is an offset into the file.
- *
- * The scan runs over this rather than asking of each match whether its line
- * looks like a comment. A per-line test silently drops a real seed that
- * follows a block comment on its line, such as a JSX label comment before an
- * `<Input defaultValue={user.name} />`, or a `//` inside a string earlier on
- * it. Strings, template literals and their `${}` holes, and regex literals are
- * walked so a `//` or `/*` inside one is text.
- *
- * It is a lexer without a parser, so some shapes fool it: JSX text holding
- * `http://` (it blanks the rest of the line) or `/*` (the rest of the file),
- * a stray backtick in JSX text (it flips template state for the rest of the
- * file), and a regex literal right after `)`, as in `if (x) /\/\//.test(y)`.
- * None occurs in `src/` today, and a test further down holds it to
- * TypeScript's parser over every file the scan reads, so one that appears
- * fails loudly rather than dropping a seed.
- *
- * It keeps its own template and hole state rather than calling `stringEnd`
- * on a backtick, because a comment inside a `${}` hole must be blanked, and
- * `stringEnd` jumps a hole whole.
- */
-function blankComments(source: string): string {
-  const out = source.split("");
-  // One entry per open template hole: the `{` depth inside it.
-  const holes: number[] = [];
-  let inTemplate = false;
-  const blank = (from: number, to: number) => {
-    for (let j = from; j < to; j++) {
-      if (out[j] !== "\n") {
-        out[j] = " ";
-      }
-    }
-  };
-  for (let i = 0; i < source.length; i++) {
-    const char = source[i];
-    if (inTemplate) {
-      if (char === "\\") {
-        i++;
-      } else if (char === "`") {
-        inTemplate = false;
-      } else if (char === "$" && source[i + 1] === "{") {
-        holes.push(0);
-        inTemplate = false;
-        i++;
-      }
-    } else if (char === '"' || char === "'") {
-      i = stringEnd(source, i) - 1;
-    } else if (char === "`") {
-      inTemplate = true;
-    } else if (isCommentStart(source, i)) {
-      const end = commentEnd(source, i);
-      blank(i, end);
-      i = end - 1;
-    } else if (char === "/" && opensRegex(source, i)) {
-      i = regexEnd(source, i) - 1;
-    } else if (char === "{" && holes.length > 0) {
-      holes[holes.length - 1]++;
-    } else if (char === "}" && holes.length > 0) {
-      if (holes.at(-1) === 0) {
-        holes.pop();
-        inTemplate = true;
-      } else {
-        holes[holes.length - 1]--;
-      }
-    }
-  }
-  return out.join("");
-}
-
-const HOOK = /\b(useState|useRef|useReducer)\s*(?=[<(])/gu;
-const FORM_DEFAULTS = /\bdefaultValues\s*([:,}])/gu;
-const UNCONTROLLED = /\b(defaultValue|defaultChecked)=([{"'])/gu;
-
-function hookSeeds(source: string): Seed[] {
-  const seeds: Seed[] = [];
-  for (const match of source.matchAll(HOOK)) {
-    const kind = match[1] as Kind;
-    let open = match.index + match[0].length;
-    if (source[open] === "<") {
-      open = closeOf(source, open) + 1;
-      while (/\s/u.test(source[open] ?? "")) {
-        open++;
-      }
-    }
-    if (source[open] !== "(") {
-      continue;
-    }
-    const args = source.slice(open + 1, closeOf(source, open));
-    // `useReducer(reducer, initialArg, init?)`: the reducer is not a seed.
-    const init =
-      kind === "useReducer" ? splitTopLevel(args).slice(1).join(",") : args;
-    seeds.push({ init, kind });
-  }
-  return seeds;
-}
-
-function formSeeds(source: string): Seed[] {
-  const seeds: Seed[] = [];
-  for (const match of source.matchAll(FORM_DEFAULTS)) {
-    const start = match.index + match[0].length;
-    const init =
-      match[1] === ":"
-        ? splitTopLevel(source.slice(start), ",)}")[0]
-        : // Shorthand, `{ defaultValues }`: a variable, never a literal.
-          "defaultValues";
-    seeds.push({ init, kind: "defaultValues" });
-  }
-  for (const match of source.matchAll(UNCONTROLLED)) {
-    const open = match.index + match[0].length - 1;
-    const init =
-      match[2] === "{"
-        ? source.slice(open + 1, closeOf(source, open))
-        : source.slice(open, stringEnd(source, open));
-    seeds.push({ init, kind: match[1] as Kind });
-  }
-  return seeds;
-}
-
-/** Every once-only initializer in `source` that is not a plain literal. */
-function onceOnlySeeds(source: string): Seed[] {
-  const code = blankComments(source);
-  return [...hookSeeds(code), ...formSeeds(code)].filter(
-    (seed) => !isLiteral(seed.init)
-  );
-}
-
-function label(seed: Seed): string {
-  return seed.kind === "defaultValues"
-    ? "defaultValues"
-    : `${seed.kind}(${normalize(seed.init)})`;
+  return labels;
 }
 
 function* sourceFiles(dir: string): Generator<string> {
@@ -715,16 +591,83 @@ function treeSeeds(): Set<string> {
   const found = new Set<string>();
   for (const path of sourceFiles(SRC_DIR)) {
     const file = relative(process.cwd(), path);
-    for (const seed of onceOnlySeeds(readFileSync(path, "utf8"))) {
-      found.add(`${file}: ${label(seed)}`);
+    for (const seed of onceOnlySeeds(parse(path))) {
+      found.add(`${file}: ${seed}`);
     }
   }
   return found;
 }
 
 function labelsIn(source: string): string[] {
-  return onceOnlySeeds(source).map(label);
+  return onceOnlySeeds(parse("fixture.tsx", source));
 }
+
+/** An initializer's source, and whether the scan should call it a seed. */
+interface Generated {
+  seeds: boolean;
+  text: string;
+}
+
+const literal = (text: string): Generated => ({ seeds: false, text });
+const nonLiteral = (text: string): Generated => ({ seeds: true, text });
+
+/**
+ * Initializers built from the grammar `isLiteral` accepts, nested and wrapped,
+ * with a non-literal sometimes put in at any depth: a read, a call, a spread
+ * or a computed key. One of them anywhere makes the whole a seed, the
+ * direction in which a mistake would drop a seed without a red test.
+ */
+const initializers = fc.letrec<{ init: Generated }>((tie) => {
+  const inner = tie("init");
+  const wrap = (shape: (text: string) => string, seeds?: boolean) =>
+    inner.map((init) => ({
+      seeds: seeds ?? init.seeds,
+      text: shape(init.text),
+    }));
+  const list = (shape: (texts: string[]) => string) =>
+    fc.array(inner, { maxLength: 3 }).map((inits) => ({
+      seeds: inits.some((init) => init.seeds),
+      text: shape(inits.map((init) => init.text)),
+    }));
+  return {
+    init: fc.oneof(
+      { depthSize: "small", maxDepth: 3 },
+      fc.oneof(
+        trickyText({ maxLength: 4 }).map((text) =>
+          literal(JSON.stringify(text))
+        ),
+        fc.integer().map((n) => literal(String(n))),
+        fc
+          .constantFrom(
+            "true",
+            "false",
+            "null",
+            "undefined",
+            "1.5",
+            "0x1f",
+            "1_000",
+            "`text`",
+            "new Set()",
+            "new Map<string, number>()"
+          )
+          .map(literal),
+        fc
+          .constantFrom("data.x", "load()", "-data.x", "new Set(rows)")
+          .map(nonLiteral)
+      ),
+      list((texts) => `[${texts.join(", ")}]`),
+      list(
+        (texts) => `{ ${texts.map((text, i) => `k${i}: ${text}`).join(", ")} }`
+      ),
+      wrap((text) => `() => (${text})`),
+      wrap((text) => `(${text}) as const`),
+      wrap((text) => `(${text}) satisfies Row`),
+      // A spread or a computed key seeds, whatever it holds.
+      wrap((text) => `[...${text}]`, true),
+      wrap((text) => `{ [key]: ${text} }`, true)
+    ),
+  };
+}).init;
 
 describe("once-only seeds", () => {
   it("are all in the census, and the census has none left over", () => {
@@ -765,7 +708,7 @@ describe("once-only seeds", () => {
     ).toEqual(["useState(record.name ?? fallback)"]);
   });
 
-  it("finds a lazy initializer and reads past its nested parens", () => {
+  it("finds a lazy initializer whole, nested calls and all", () => {
     expect(
       labelsIn("const [ids] = useState(() => record.items.map((i) => i.id));")
     ).toEqual(["useState(() => record.items.map((i) => i.id))"]);
@@ -821,16 +764,41 @@ describe("once-only seeds", () => {
     ]);
   });
 
-  it("skips plain literals, comments, and brackets inside strings", () => {
+  it("finds a hook called on a namespace and a default spread from an object literal", () => {
+    expect(
+      labelsIn(`
+        const [x] = React.useState(data.x);
+        <Input {...{ defaultValue: data.y }} />
+        <Checkbox {...{ defaultChecked: false }} />
+        <Input {...({ defaultValue: data.z } as InputProps)} />
+        <Checkbox {...(open ? { defaultChecked: data.on } : {})} />
+        <Input {...(editing && { defaultValue: data.w })} />
+        <Input {...props} />
+      `)
+    ).toEqual([
+      "useState(data.x)",
+      "defaultValue(data.y)",
+      "defaultValue(data.z)",
+      "defaultChecked(data.on)",
+      "defaultValue(data.w)",
+    ]);
+  });
+
+  it("skips plain literals and comments", () => {
     expect(
       labelsIn(`
         const [open] = useState(false);
         const [error] = useState<string | null>(null);
         const [draft] = useState("");
+        const [offset] = useState(-1);
         const [rows] = useState<Row[]>([]);
         const [picked] = useState(() => new Set<string>());
+        const [byId] = useState(new Map());
+        const [paging] = useState(() => ({ page: 1, size: undefined }));
         const [filters] = useState({ page: 1, q: "" } as const);
+        const [tabs] = useState(["a", \`b\`] satisfies Tab[]);
         const inputRef = useRef<HTMLInputElement>(null);
+        const [unset] = useState();
         const [step] = useState(
           // Where the flow starts.
           "address"
@@ -839,157 +807,50 @@ describe("once-only seeds", () => {
         /**
          * So is useState(record.name) in a docstring.
          */
-        const [title] = useState(record.title ?? "(untitled)");
         /* seed */ const [a] = useState(record.x);
         {/* Name */}<Input defaultValue={user.name} />
-        const sep = " // "; const [v] = useState(loaderData.v);
         const [rows2] = useState([] as Row[] && loaderData.rows);
         const [vals] = useState({} as Partial<V> && loaderData.v as Partial<V>);
         const [name] = useState([] as Tuple<S> + loaderData.name as Tuple<S>);
       `)
     ).toEqual([
-      'useState(record.title ?? "(untitled)")',
       "useState(record.x)",
-      "useState(loaderData.v)",
+      "defaultValue(user.name)",
       "useState([] as Row[] && loaderData.rows)",
       "useState({} as Partial<V> && loaderData.v as Partial<V>)",
       "useState([] as Tuple<S> + loaderData.name as Tuple<S>)",
-      "defaultValue(user.name)",
     ]);
   });
 
-  it("ends a quoted string at its line's end, so an apostrophe in JSX text misreads only that line", () => {
-    // Were the apostrophe read as a string running on to the next quote, the
-    // comment below would be taken for its text and never blanked.
+  it("reads a spread, a computed key or a shorthand as a seed", () => {
     expect(
       labelsIn(`
-        <p>Don't lose this</p>
-        // useState(record.prose) is prose.
-        const [v] = useState(record.v);
+        const [a] = useState([...base]);
+        const [b] = useState({ [key]: 1 });
+        const [c] = useState({ page });
       `)
-    ).toEqual(["useState(record.v)"]);
+    ).toEqual([
+      "useState([...base])",
+      "useState({[key]: 1})",
+      "useState({page})",
+    ]);
   });
-});
 
-/**
- * `source` with every comment TypeScript's parser finds blanked the way
- * `blankComments` blanks one: the oracle the hand lexer is held to.
- *
- * A comment is trivia, the gap before a token, so every leaf of the tree
- * `getChildren` builds (which adds the punctuation and keywords the AST
- * leaves implicit) has the trivia from its full start rescanned with the
- * parser's own scanner. JSX text is the one leaf whose full text is text
- * rather than trivia, so it is never rescanned, and a comment in JSX braces
- * is found as the trivia before that expression's `}`. JSDoc nodes are
- * skipped, because the comment each one parses is also the trivia of the
- * token after it. A shebang is stepped over like whitespace, since a rescan
- * from offset 0 meets it before any comment; nothing else is left out of the
- * comparison.
- */
-function blankCommentsByParser(path: string, source: string): string {
-  const file = ts.createSourceFile(
-    path,
-    source,
-    ts.ScriptTarget.Latest,
-    true,
-    path.endsWith(".tsx") ? ts.ScriptKind.TSX : ts.ScriptKind.TS
+  test.prop([initializers])(
+    "reads an initializer as a seed exactly when some part is not a literal",
+    ({ seeds, text }) => {
+      expect(labelsIn(`useState(${text});`)).toEqual(
+        seeds ? [`useState(${normalize(text)})`] : []
+      );
+    }
   );
-  const scanner = ts.createScanner(
-    ts.ScriptTarget.Latest,
-    false,
-    file.languageVariant,
-    source
-  );
-  const out = source.split("");
-  const visit = (node: ts.Node): void => {
-    if (
-      node.kind >= ts.SyntaxKind.FirstJSDocNode &&
-      node.kind <= ts.SyntaxKind.LastJSDocNode
-    ) {
-      return;
-    }
-    const children = node.getChildren(file);
-    if (children.length > 0) {
-      for (const child of children) {
-        visit(child);
-      }
-      return;
-    }
-    if (node.kind === ts.SyntaxKind.JsxText) {
-      return;
-    }
-    scanner.resetTokenState(node.pos);
-    for (;;) {
-      const kind = scanner.scan();
-      if (
-        kind === ts.SyntaxKind.SingleLineCommentTrivia ||
-        kind === ts.SyntaxKind.MultiLineCommentTrivia
-      ) {
-        for (let j = scanner.getTokenStart(); j < scanner.getTokenEnd(); j++) {
-          if (out[j] !== "\n") {
-            out[j] = " ";
-          }
-        }
-      } else if (
-        kind !== ts.SyntaxKind.WhitespaceTrivia &&
-        kind !== ts.SyntaxKind.NewLineTrivia &&
-        kind !== ts.SyntaxKind.ShebangTrivia
-      ) {
-        break;
-      }
-    }
-  };
-  visit(file);
-  return out.join("");
-}
-
-/** Where `blankComments` first parts from the parser in `path`, if it does. */
-function lexerDivergence(path: string): string | undefined {
-  const source = readFileSync(path, "utf8");
-  const hand = blankComments(source);
-  const parser = blankCommentsByParser(path, source);
-  if (hand === parser) {
-    return;
-  }
-  let at = 0;
-  while (hand[at] === parser[at]) {
-    at++;
-  }
-  const before = source.slice(0, at).split("\n");
-  const what =
-    hand[at] === " "
-      ? "blanks code the parser keeps"
-      : "keeps a comment the parser blanks";
-  return (
-    `${relative(process.cwd(), path)}:${before.length}:${(before.at(-1)?.length ?? 0) + 1} ` +
-    `(offset ${at}) ${what}: ${JSON.stringify(source.slice(at, at + 40))}`
-  );
-}
-
-describe("the comment blanking the scan reads through", () => {
-  it("agrees with TypeScript's parser on every file the scan walks", () => {
-    const diverged = [...sourceFiles(SRC_DIR)]
-      .map(lexerDivergence)
-      .filter((line) => line !== undefined);
-    expect(
-      diverged,
-      "blankComments, the hand lexer the seed scan reads through, diverged\n" +
-        "from TypeScript's parser at the first offset named below. Where it\n" +
-        "blanks code, a seed there is dropped without a red test; where it\n" +
-        "keeps a comment, prose there reads as a seed. Its docstring lists\n" +
-        "the shapes known to fool it. Teach blankComments the construct at\n" +
-        "that offset, in src/test/loader-seed-scan.test.ts, and add a fixture\n" +
-        "for it beside the others.\n\n" +
-        diverged.join("\n")
-    ).toEqual([]);
-  });
 });
 
 /**
  * The option the census rests on. Class A is correct only while a stale
  * revisit blocks, so reverting the router default, or opting one route out,
- * silently changes what every class A seed means. Both read the source with
- * comments blanked, so a commented-out line counts for nothing.
+ * silently changes what every class A seed means. Both read the syntax tree,
+ * so a commented-out line counts for nothing.
  */
 describe("the stale reload mode the census rests on", () => {
   const remedy =
@@ -999,21 +860,28 @@ describe("the stale reload mode the census rests on", () => {
     "the change reaches, and reclassify them in CENSUS.";
 
   it("is blocking by default, in src/router.tsx", () => {
-    const router = blankComments(
-      readFileSync(join(SRC_DIR, "router.tsx"), "utf8")
+    const modes = propertyValues(
+      parse(join(SRC_DIR, "router.tsx")),
+      "defaultStaleReloadMode"
     );
     expect(
-      /\bdefaultStaleReloadMode:\s*"blocking"/u.test(router),
+      modes.length > 0 &&
+        modes.every(
+          (mode) => ts.isStringLiteralLike(mode) && mode.text === "blocking"
+        ),
       `src/router.tsx no longer sets defaultStaleReloadMode: "blocking".\n${remedy}`
     ).toBe(true);
   });
 
   it("is not overridden by any route's loader", () => {
     // All of src/, not only src/routes: a loader object built elsewhere and
-    // spread into a route carries its staleReloadMode with it.
+    // spread into a route carries its staleReloadMode with it. Any identifier
+    // or string naming it counts, so an assignment or `loader["..."]` does too.
     const overrides = [...sourceFiles(SRC_DIR)]
       .filter((path) =>
-        /\bstaleReloadMode\b/u.test(blankComments(readFileSync(path, "utf8")))
+        descendants(parse(path)).some(
+          (node) => nameOf(node) === "staleReloadMode"
+        )
       )
       .map((path) => relative(process.cwd(), path))
       .sort();
@@ -1024,6 +892,20 @@ describe("the stale reload mode the census rests on", () => {
     ).toEqual([]);
   });
 });
+
+function isZero(node: ts.Expression): boolean {
+  return ts.isNumericLiteral(node) && node.text === "0";
+}
+
+/** The route id a route file passes to `createFileRoute`. */
+function routeIdOf(file: ts.SourceFile): string | undefined {
+  const call = descendants(file).find(
+    (node): node is ts.CallExpression =>
+      ts.isCallExpression(node) && nameOf(node.expression) === "createFileRoute"
+  );
+  const id = call?.arguments[0];
+  return id && ts.isStringLiteralLike(id) ? id.text : undefined;
+}
 
 /**
  * A click reuses a preload for the route's `preloadStaleTime`, so a page that
@@ -1037,11 +919,12 @@ describe("the stale reload mode the census rests on", () => {
  */
 describe("the preload window ADR-0062 allows", () => {
   it("is off by default, in src/router.tsx", () => {
-    const router = blankComments(
-      readFileSync(join(SRC_DIR, "router.tsx"), "utf8")
+    const windows = propertyValues(
+      parse(join(SRC_DIR, "router.tsx")),
+      "defaultPreloadStaleTime"
     );
     expect(
-      /\bdefaultPreloadStaleTime:\s*0\s*,/u.test(router),
+      windows.length > 0 && windows.every(isZero),
       "src/router.tsx no longer sets defaultPreloadStaleTime: 0, which opts\n" +
         "every route into a preload window. ADR-0062 allows one only on a page\n" +
         "that seeds no form from its loader; set it per route instead."
@@ -1049,15 +932,15 @@ describe("the preload window ADR-0062 allows", () => {
   });
 
   it("is kept only by a route whose page no census reason names", () => {
-    // Any value but a literal zero counts, so a named constant is a window.
-    const WINDOW = /\bpreloadStaleTime:\s*([^,}\n]+)/u;
-    const ROUTE_PATH = /\bcreateFileRoute\(\s*["']([^"']+)["']/u;
     const named: string[] = [];
     for (const path of sourceFiles(join(SRC_DIR, "routes"))) {
-      const code = blankComments(readFileSync(path, "utf8"));
-      const window = WINDOW.exec(code)?.[1].trim();
-      const routeId = ROUTE_PATH.exec(code)?.[1];
-      if (window === undefined || window === "0" || routeId === undefined) {
+      const file = parse(path);
+      // Any value but a literal zero counts, so a named constant is a window.
+      const keeps = propertyValues(file, "preloadStaleTime").some(
+        (window) => !isZero(window)
+      );
+      const routeId = routeIdOf(file);
+      if (!keeps || routeId === undefined) {
         continue;
       }
       // `/_public/projects/` is the page at `/projects`: no pathless layout
