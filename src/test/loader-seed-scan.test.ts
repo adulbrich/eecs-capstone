@@ -20,12 +20,14 @@ import { describe, expect, it } from "vitest";
  * of that ADR said the routes seeding from loader data were keyed, and a sweep
  * found six that were not.
  *
- * What it cannot see is where a value came from. It walks TypeScript's syntax
- * tree of each file and finds every initializer that is not a plain literal,
- * written as a hook's argument, a `defaultValues` key, or a JSX attribute or
- * a key of an object literal spread onto the element (not one spread in from
- * a variable), and asks that somebody has said which class it is in; the
- * reading of data flow is the classifier's, written beside the entry.
+ * What it cannot see is where a value came from. It walks each file's syntax
+ * tree for initializers that are not plain literals: the argument of a hook
+ * called by its own name (`useState` or `React.useState`, not an alias), a
+ * `defaultValues` key, and a `defaultValue` or `defaultChecked` written on the
+ * element or in an object literal spread onto it, though not in an object
+ * spread in from a variable. It asks that somebody has said which class each
+ * is in; the reading of data flow is the classifier's, written beside the
+ * entry.
  */
 
 /**
@@ -388,7 +390,7 @@ function isProperty(node: ts.Node): node is Property {
 }
 
 /** What a property sets: `{ a: b }` sets `b`, and `{ a }` sets `a`. */
-function assigned(property: Property): ts.Expression {
+function propertyValue(property: Property): ts.Expression {
   return ts.isPropertyAssignment(property)
     ? property.initializer
     : property.name;
@@ -399,7 +401,7 @@ function propertyValues(file: ts.SourceFile, name: string): ts.Expression[] {
   return descendants(file)
     .filter(isProperty)
     .filter((property) => nameOf(property.name) === name)
-    .map(assigned);
+    .map(propertyValue);
 }
 
 /** A string, number, boolean, `null`, `undefined`, or a negative number. */
@@ -494,19 +496,38 @@ function attributeSeed(attribute: ts.JsxAttribute): Seed | undefined {
 }
 
 /**
+ * Whether a JSX spread spreads `object`: `{...{ a }}`, and the same object in
+ * parentheses, under `as` or `satisfies`, as a branch of a `?:`, or as an
+ * operand of `&&`, `||` or `??`.
+ */
+function isSpreadOntoElement(object: ts.Node): boolean {
+  let node = object.parent;
+  while (
+    ts.isParenthesizedExpression(node) ||
+    ts.isAsExpression(node) ||
+    ts.isSatisfiesExpression(node) ||
+    ts.isConditionalExpression(node) ||
+    ts.isBinaryExpression(node)
+  ) {
+    node = node.parent;
+  }
+  return ts.isJsxSpreadAttribute(node);
+}
+
+/**
  * A form's `defaultValues`, or an uncontrolled input's default written in an
  * object literal spread onto the element: `<Input {...{ defaultValue: x }} />`.
  */
 function propertySeed(property: Property): Seed | undefined {
   const kind = nameOf(property.name);
   const spreadOntoInput =
-    ts.isJsxSpreadAttribute(property.parent.parent) &&
     kind !== undefined &&
-    UNCONTROLLED.has(kind);
+    UNCONTROLLED.has(kind) &&
+    isSpreadOntoElement(property.parent);
   if (kind !== "defaultValues" && !spreadOntoInput) {
     return;
   }
-  return { init: [assigned(property)], kind };
+  return { init: [propertyValue(property)], kind };
 }
 
 function seedAt(node: ts.Node): Seed | undefined {
@@ -543,7 +564,8 @@ function onceOnlySeeds(file: ts.SourceFile): string[] {
   const labels: string[] = [];
   for (const node of descendants(file)) {
     const seed = seedAt(node);
-    if (seed && seed.init.length > 0 && !seed.init.every(isLiteral)) {
+    // `every` holds on no arguments, so `useState()` is not a seed either.
+    if (seed && !seed.init.every(isLiteral)) {
       labels.push(label(seed, file));
     }
   }
@@ -617,7 +639,7 @@ describe("once-only seeds", () => {
     ).toEqual(["useState(record.name ?? fallback)"]);
   });
 
-  it("finds a lazy initializer and reads past its nested parens", () => {
+  it("finds a lazy initializer whole, nested calls and all", () => {
     expect(
       labelsIn("const [ids] = useState(() => record.items.map((i) => i.id));")
     ).toEqual(["useState(() => record.items.map((i) => i.id))"]);
@@ -679,8 +701,18 @@ describe("once-only seeds", () => {
         const [x] = React.useState(data.x);
         <Input {...{ defaultValue: data.y }} />
         <Checkbox {...{ defaultChecked: false }} />
+        <Input {...({ defaultValue: data.z } as InputProps)} />
+        <Checkbox {...(open ? { defaultChecked: data.on } : {})} />
+        <Input {...(editing && { defaultValue: data.w })} />
+        <Input {...props} />
       `)
-    ).toEqual(["useState(data.x)", "defaultValue(data.y)"]);
+    ).toEqual([
+      "useState(data.x)",
+      "defaultValue(data.y)",
+      "defaultValue(data.z)",
+      "defaultChecked(data.on)",
+      "defaultValue(data.w)",
+    ]);
   });
 
   it("skips plain literals and comments", () => {
@@ -697,6 +729,7 @@ describe("once-only seeds", () => {
         const [filters] = useState({ page: 1, q: "" } as const);
         const [tabs] = useState(["a", \`b\`] satisfies Tab[]);
         const inputRef = useRef<HTMLInputElement>(null);
+        const [unset] = useState();
         const [step] = useState(
           // Where the flow starts.
           "address"
@@ -764,10 +797,13 @@ describe("the stale reload mode the census rests on", () => {
 
   it("is not overridden by any route's loader", () => {
     // All of src/, not only src/routes: a loader object built elsewhere and
-    // spread into a route carries its staleReloadMode with it.
+    // spread into a route carries its staleReloadMode with it. Any identifier
+    // or string naming it counts, so an assignment or `loader["..."]` does too.
     const overrides = [...sourceFiles(SRC_DIR)]
-      .filter(
-        (path) => propertyValues(parse(path), "staleReloadMode").length > 0
+      .filter((path) =>
+        descendants(parse(path)).some(
+          (node) => nameOf(node) === "staleReloadMode"
+        )
       )
       .map((path) => relative(process.cwd(), path))
       .sort();
