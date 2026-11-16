@@ -42,12 +42,8 @@
     "typecheck": "tsc --noEmit"
   },
   "overrides": {
-    "@babel/core": ">=7.29.6 <8",
     "@stryker-mutator/core": {
       "minimatch": "^11.0.1"
-    },
-    "@stryker-mutator/instrumenter": {
-      "@babel/core": "~8.0.0"
     },
     "@tailwindcss/typography": {
       "postcss-selector-parser": "^7.1.6"

@@ -368,9 +368,9 @@ test.prop([trickyText()], { endOnFailure: true, path: "4:1:0", seed: 1_188_394_6
 
 The shared arbitrary and `isWellFormed` are in `src/test/shared/arbitraries.ts`; the generated projects for the hashed builders are in `src/test/shared/project-arbitraries.ts`.
 
-### Stryker's instrumenter needs its own Babel 8 core
+### A root `@babel/core` override breaks one of its two majors
 
-The root `@babel/core` override in `package.json` caps it at Babel 7, which hands Stryker's instrumenter a Babel 7 core beside its own Babel 8 parser and generator, and `npm run test:mutation` dies at once with `Cannot read properties of undefined (reading 'length')` printing a TypeScript interface. The nested `@stryker-mutator/instrumenter` override gives it the Babel 8 core it declares. Move that range with the instrumenter's own when a Stryker bump changes it: nothing on the pull-request path runs Stryker, so a mismatch shows only at the next dispatch.
+The tree runs both: the TanStack build plugins declare Babel 7, which cannot run on 8 (`start-plugin-core` default-imports `@babel/core`, and Babel 8 has none), and Stryker's instrumenter declares Babel 8. A root override replaces every range, so a Babel 7 cap hands the instrumenter a Babel 7 core beside its own Babel 8 parser, and `npm run test:mutation` dies with `Cannot read properties of undefined (reading 'length')`; an uncapped floor resolves the build to Babel 8. Answer a Babel advisory with an override nested under the package that resolves the vulnerable version. Nothing on the pull-request path runs Stryker, so its half of the break shows only at the next dispatch.
 
 ### Stryker needs a fixed fast-check seed
 
