@@ -3,8 +3,8 @@ import { configDefaults, defineConfig } from "vitest/config";
 
 // Stryker's own Vitest config (#843). `vite.config.ts` loads nitro,
 // `tanstackStart` and devtools, none of which a unit test needs and each of
-// which Stryker would start again in every worker. No `pool` here: the
-// Stryker runner supports threads only.
+// which Stryker would start again in every worker. No `pool` here: Stryker's
+// runner sets threads, the only pool it supports, itself.
 //
 // The include is the whole unit suite, the same set `npm test` runs, and not
 // just each module's own test file, which reported false survivors: an
