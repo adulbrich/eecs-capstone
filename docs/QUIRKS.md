@@ -517,13 +517,13 @@ In `*.test.ts(x)`, `__tests__/` and `src/test/`, `biome.json` also turns off `us
 
 ### Inline suppressions, and options `biome.json` repeats
 
-Inline ignores cover the Radix group headings in `ui/` and Biome 2.6 calling every case of `orderBySql`'s switch unreachable. Ultracite 8.2 turned `noNamespaceImport` and `noBarrelFile` off, so `import * as schema` and the schema re-export need none, and Biome warns about any ignore left for a rule that is off.
+Inline ignores cover the Radix group headings in `ui/` and Biome 2.6 calling every case of `orderBySql`'s switch unreachable. Ultracite turns `noNamespaceImport` and `noBarrelFile` off, so `import * as schema` and the schema re-export need none, and Biome warns about any ignore left for a rule that is off.
 
 `noLabelWithoutControl` adds `RadioGroupItem` as a control. Setting an option replaces Ultracite's whole list, so `biome.json` repeats `inputComponents` and `labelComponents`.
 
 ### No infinite-loop form passes lint
 
-Since Biome 2.6.7, `useWhile` rejects `for (;;)` and offers `while (true)` as its safe fix, which `noUnnecessaryConditions` then rejects as always truthy. Give the loop a real condition instead, usually by reading the first item before the loop and the next at the end of its body, as `readCappedBody` in `traffic-request.ts` does.
+Biome's `useWhile` rejects `for (;;)` and offers `while (true)` as its safe fix, which `noUnnecessaryConditions` then rejects as always truthy. Give the loop a real condition instead, usually by reading the first item before the loop and the next at the end of its body, as `readCappedBody` in `traffic-request.ts` does.
 
 ### Do not run `biome check --write --unsafe` blindly
 
