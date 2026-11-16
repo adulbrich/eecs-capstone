@@ -7,7 +7,6 @@
  * swept. Anything a test mutates is created by the test, in `fixtures.ts`.
  */
 import { eq } from "drizzle-orm";
-// biome-ignore lint/performance/noNamespaceImport: drizzle needs the schema namespace object
 import * as schema from "../../db/schema";
 import { saveStorageState } from "../shared/playwright";
 import {

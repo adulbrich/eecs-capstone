@@ -89,17 +89,15 @@ export async function readCappedBody(
   const reader = request.body.getReader();
   const chunks: Uint8Array[] = [];
   let size = 0;
-  for (;;) {
-    const { done, value } = await reader.read();
-    if (done) {
-      break;
-    }
-    size += value.byteLength;
+  let chunk = await reader.read();
+  while (!chunk.done) {
+    size += chunk.value.byteLength;
     if (size > maxBytes) {
       await reader.cancel();
       return null;
     }
-    chunks.push(value);
+    chunks.push(chunk.value);
+    chunk = await reader.read();
   }
   return new TextDecoder().decode(Buffer.concat(chunks));
 }

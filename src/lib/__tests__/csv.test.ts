@@ -149,12 +149,9 @@ function readField(text: string, start: number): [string, number] {
 function readCsv(text: string): string[][] {
   const records: string[][] = [[]];
   let i = 0;
-  for (;;) {
-    const [value, end] = readField(text, i);
-    records.at(-1)?.push(value);
-    if (end >= text.length) {
-      return records;
-    }
+  let [value, end] = readField(text, i);
+  records.at(-1)?.push(value);
+  while (end < text.length) {
     if (text[end] === ",") {
       i = end + 1;
     } else if (text.startsWith("\r\n", end)) {
@@ -163,7 +160,10 @@ function readCsv(text: string): string[][] {
     } else {
       throw new Error(`${JSON.stringify(text[end])} after a field at ${end}`);
     }
+    [value, end] = readField(text, i);
+    records.at(-1)?.push(value);
   }
+  return records;
 }
 
 /** A spreadsheet's formula lead-ins, which a cell must never start with. */

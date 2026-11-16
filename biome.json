@@ -91,6 +91,7 @@
             "useAwait": "off"
           },
           "style": {
+            "noExcessiveClassesPerFile": "off",
             "noNonNullAssertion": "off",
             "useDomQuerySelector": "off",
             "useImportsFirst": "off"
