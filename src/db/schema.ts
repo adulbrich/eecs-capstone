@@ -36,7 +36,6 @@ import {
 
 import { user } from "./auth-schema";
 
-// biome-ignore lint/performance/noBarrelFile: single schema surface for drizzle and better-auth
 export * from "./auth-schema";
 
 /**
