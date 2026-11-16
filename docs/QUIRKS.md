@@ -368,9 +368,13 @@ test.prop([trickyText()], { endOnFailure: true, path: "4:1:0", seed: 1_188_394_6
 
 The shared arbitrary and `isWellFormed` are in `src/test/shared/arbitraries.ts`; the generated projects for the hashed builders are in `src/test/shared/project-arbitraries.ts`.
 
-### Stryker needs its own Babel 8 core and a fixed fast-check seed
+### Stryker's instrumenter needs its own Babel 8 core
 
-The root `@babel/core` override in `package.json` caps it at Babel 7, which hands Stryker's instrumenter a Babel 7 core beside its own Babel 8 parser and generator, and `npm run test:mutation` dies at once with `Cannot read properties of undefined (reading 'length')` printing a TypeScript interface. The nested `@stryker-mutator/instrumenter` override gives it the Babel 8 core it declares. Move that range with the instrumenter's own when a Stryker bump changes it: nothing on the pull-request path runs Stryker, so a mismatch shows only at the next dispatch. `src/test/setup.stryker.ts` pins the fast-check seed: a fresh seed renames every `test.prop`, so Stryker runs no test against the mutants a property covers and reports them survived.
+The root `@babel/core` override in `package.json` caps it at Babel 7, which hands Stryker's instrumenter a Babel 7 core beside its own Babel 8 parser and generator, and `npm run test:mutation` dies at once with `Cannot read properties of undefined (reading 'length')` printing a TypeScript interface. The nested `@stryker-mutator/instrumenter` override gives it the Babel 8 core it declares. Move that range with the instrumenter's own when a Stryker bump changes it: nothing on the pull-request path runs Stryker, so a mismatch shows only at the next dispatch.
+
+### Stryker needs a fixed fast-check seed
+
+`src/test/setup.stryker.ts` pins it. A fresh seed renames every `test.prop`, since the name ends `(with seed=N)`, so Stryker matches none of the names it recorded in its dry run, runs no test against the mutants a property covers, and reports them survived.
 
 ### `npm run start` gets no dotenv, unlike the dev server
 

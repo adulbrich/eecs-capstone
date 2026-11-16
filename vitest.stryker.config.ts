@@ -12,7 +12,7 @@ import { configDefaults, defineConfig } from "vitest/config";
 // placement tests that reach it through `placementCsv`. The Stryker runner's
 // `related` option narrows the run to the test files that import a mutated
 // module. That set is wide, since every route imports `social-meta.ts`, and
-// it grows with `mutate`: 28 files for the first three modules (#843).
+// it grows with `mutate`.
 export default defineConfig({
   resolve: {
     alias: {
