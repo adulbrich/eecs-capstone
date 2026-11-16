@@ -337,7 +337,7 @@ ESM hoists imports above a `config()` call, so a script that loads dotenv and th
 
 ### Vitest needs the agent tool sandbox disabled
 
-Inside the agent's command sandbox Vitest dies with `EMFILE`, `gh` fails TLS, and anything that writes `.git/config` (`git branch -d`, `git worktree add`, `git remote`) half-completes. Run them with the sandbox off, Vitest with `ulimit -n 8192` as well. Every Vitest run prints a harmless `ReferenceError: module is not defined` from the nitro plugin.
+Inside the agent's command sandbox Vitest dies with `EMFILE`, `gh` fails TLS, and anything that writes `.git/config` (`git branch -d`, `git worktree add`, `git remote`) half-completes. Run them with the sandbox off, Vitest with `ulimit -n 8192` as well.
 
 ### A scratch script that reaches `src/lib/brand.ts` needs an `.svg` loader stub
 
