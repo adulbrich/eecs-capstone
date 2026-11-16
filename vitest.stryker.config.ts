@@ -7,11 +7,12 @@ import { configDefaults, defineConfig } from "vitest/config";
 // Stryker runner supports threads only.
 //
 // The include is the whole unit suite, the same set `npm test` runs, and not
-// just each module's own test file. The Stryker runner's `related` option
-// narrows a run to the test files that import a mutated module, so the wide
-// include costs nothing, and the narrow one reported false survivors: an
+// just each module's own test file, which reported false survivors: an
 // unanchored `GUARDED` in `csv.ts` passes `csv.test.ts` and fails the
-// placement tests that reach it through `placementCsv`.
+// placement tests that reach it through `placementCsv`. The Stryker runner's
+// `related` option narrows the run to the test files that import a mutated
+// module. That set is wide, since every route imports `social-meta.ts`, and
+// it grows with `mutate`: 28 files for the first three modules (#843).
 export default defineConfig({
   resolve: {
     alias: {

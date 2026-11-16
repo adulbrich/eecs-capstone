@@ -17,7 +17,7 @@ permissions:
 jobs:
   stryker:
     runs-on: ubuntu-latest
-    # A hang catcher, not a budget: the run takes under a minute locally.
+    # A hang catcher, not a budget: the run takes about a minute locally.
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1

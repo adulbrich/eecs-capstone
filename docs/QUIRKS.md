@@ -370,7 +370,7 @@ The shared arbitrary and `isWellFormed` are in `src/test/shared/arbitraries.ts`;
 
 ### Stryker needs its own Babel 8 core and a fixed fast-check seed
 
-The root override `"@babel/core": ">=7.29.6 <8"` hands Stryker's instrumenter a Babel 7 core beside its own Babel 8 parser and generator, and `npm run test:mutation` dies at once with `Cannot read properties of undefined (reading 'length')` printing a TypeScript interface. The nested `@stryker-mutator/instrumenter` override in `package.json` gives it `~8.0.0`; keep it when the root one moves. `src/test/setup.stryker.ts` pins the fast-check seed: a fresh seed renames every `test.prop`, so Stryker runs no test against the mutants a property covers and reports them survived.
+The root `@babel/core` override in `package.json` caps it at Babel 7, which hands Stryker's instrumenter a Babel 7 core beside its own Babel 8 parser and generator, and `npm run test:mutation` dies at once with `Cannot read properties of undefined (reading 'length')` printing a TypeScript interface. The nested `@stryker-mutator/instrumenter` override gives it the Babel 8 core it declares. Move that range with the instrumenter's own when a Stryker bump changes it: nothing on the pull-request path runs Stryker, so a mismatch shows only at the next dispatch. `src/test/setup.stryker.ts` pins the fast-check seed: a fresh seed renames every `test.prop`, so Stryker runs no test against the mutants a property covers and reports them survived.
 
 ### `npm run start` gets no dotenv, unlike the dev server
 

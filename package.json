@@ -43,6 +43,9 @@
   },
   "overrides": {
     "@babel/core": ">=7.29.6 <8",
+    "@stryker-mutator/core": {
+      "minimatch": "^11.0.1"
+    },
     "@stryker-mutator/instrumenter": {
       "@babel/core": "~8.0.0"
     },
@@ -55,6 +58,9 @@
     "solid-js": {
       "seroval": "^1.6.3",
       "seroval-plugins": "^1.6.3"
+    },
+    "typed-rest-client": {
+      "qs": "^6.16.1"
     },
     "ws": ">=8.21.0"
   },
