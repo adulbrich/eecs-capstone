@@ -37,11 +37,15 @@
     "test:e2e": "playwright test --config playwright.e2e.config.ts --global-timeout 1800000",
     "test:e2e:sweep": "tsx --env-file=.env.local scripts/sweep-e2e.ts",
     "test:integration": "vitest run --config vitest.integration.config.ts",
+    "test:mutation": "stryker run",
     "test:smoke": "playwright test --config playwright.e2e.config.ts --grep @smoke",
     "typecheck": "tsc --noEmit"
   },
   "overrides": {
     "@babel/core": ">=7.29.6 <8",
+    "@stryker-mutator/instrumenter": {
+      "@babel/core": "~8.0.0"
+    },
     "@tailwindcss/typography": {
       "postcss-selector-parser": "^7.1.6"
     },
@@ -107,6 +111,8 @@
     "@biomejs/biome": "2.6.5",
     "@fast-check/vitest": "^0.5.0",
     "@playwright/test": "^1.65.0",
+    "@stryker-mutator/core": "^10.1.1",
+    "@stryker-mutator/vitest-runner": "^10.1.1",
     "@tailwindcss/typography": "^0.5.20",
     "@tanstack/devtools-vite": "^0.8.6",
     "@testing-library/dom": "^10.4.2",

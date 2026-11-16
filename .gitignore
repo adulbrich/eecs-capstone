@@ -19,6 +19,8 @@ src/test/e2e/.*-auth.json
 src/test/e2e/.server.log
 playwright-report/
 test-results/
+.stryker-tmp/
+reports/mutation/
 .playwright-mcp/
 
 # Subagent-driven-development scratch: ledgers, briefs, review packages.

@@ -91,6 +91,7 @@ first column is what stops you locally; the last is what stops the merge.
 | Typecheck and unit suite green | `pre-push` | | `verify` |
 | Browser smoke and accessibility smoke green | you, when a covered flow changes | | `smoke / suite`, `accessibility-smoke / suite`, required |
 | Integration suite green | you, when the database layer changes | | `integration / suite`, required |
+| Mutation score of the modules `stryker.config.mjs` names: advisory, never required | you, with `npm run test:mutation` | | `Mutation`, dispatch only; uploads the HTML report and never fails on a score |
 | The server bundle names only assets the client build wrote | | | `verify`: `npm run check:assets`; the Dockerfile build stage in `deploy`, which is the run that can actually go red (#397) |
 
 Skipping locally: `LEFTHOOK=0 git commit` or `--no-verify`. The Claude Code hooks and

@@ -368,6 +368,10 @@ test.prop([trickyText()], { endOnFailure: true, path: "4:1:0", seed: 1_188_394_6
 
 The shared arbitrary and `isWellFormed` are in `src/test/shared/arbitraries.ts`; the generated projects for the hashed builders are in `src/test/shared/project-arbitraries.ts`.
 
+### Stryker needs its own Babel 8 core and a fixed fast-check seed
+
+The root override `"@babel/core": ">=7.29.6 <8"` hands Stryker's instrumenter a Babel 7 core beside its own Babel 8 parser and generator, and `npm run test:mutation` dies at once with `Cannot read properties of undefined (reading 'length')` printing a TypeScript interface. The nested `@stryker-mutator/instrumenter` override in `package.json` gives it `~8.0.0`; keep it when the root one moves. `src/test/setup.stryker.ts` pins the fast-check seed: a fresh seed renames every `test.prop`, so Stryker runs no test against the mutants a property covers and reports them survived.
+
 ### `npm run start` gets no dotenv, unlike the dev server
 
 `playwright.e2e.config.ts` loads dotenv at module scope for that reason, and its comment says what breaks without it. `VITE_STORAGE_PUBLIC_BASE` is inlined at build time, so a build without it serves relative `/storage` URLs that resolve to nothing.
