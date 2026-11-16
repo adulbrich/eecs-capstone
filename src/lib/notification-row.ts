@@ -9,7 +9,7 @@
  * `inventory-notifications.ts` and `project-notifications.ts` return it, and a
  * project module importing an inventory one to borrow a type is the coupling
  * `isStaff` moving to `viewer.ts` already argued against. Consumers import it
- * from here directly; Biome's `noBarrelFile` rejects a re-export.
+ * from here directly rather than through a re-export.
  *
  * `type` is the `NOTIFICATION_TYPES` union, so a decision that emits a value
  * the `pgEnum` behind the column does not know fails to compile here rather

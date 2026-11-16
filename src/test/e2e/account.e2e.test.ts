@@ -1,7 +1,6 @@
 import type { Page } from "@playwright/test";
 import { expect, test } from "@playwright/test";
 import { eq } from "drizzle-orm";
-// biome-ignore lint/performance/noNamespaceImport: drizzle needs the schema namespace object
 import * as schema from "../../db/schema";
 import { waitForHydration } from "../shared/playwright";
 import {

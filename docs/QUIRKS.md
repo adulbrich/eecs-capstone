@@ -521,13 +521,17 @@ Biome owns the formatting (2-space indent, double quotes) and the import order; 
 
 ### Rules relaxed in tests
 
-In `*.test.ts(x)`, `__tests__/` and `src/test/`, `biome.json` also turns off `useTopLevelRegex`, `noEmptyBlockStatements`, `useAwait`, `noNonNullAssertion`, `useImportsFirst` (imports follow the hoisted `vi.mock` calls they depend on), `noComponentHookFactories` (a harness component defined inside its test) and `useDomQuerySelector` (`getElementById` takes an id as is, where `querySelector` needs it escaped).
+In `*.test.ts(x)`, `__tests__/` and `src/test/`, `biome.json` also turns off `useTopLevelRegex`, `noEmptyBlockStatements`, `useAwait`, `noNonNullAssertion`, `useImportsFirst` (imports follow the hoisted `vi.mock` calls they depend on), `noComponentHookFactories` (a harness component defined inside its test), `useDomQuerySelector` (`getElementById` takes an id as is, where `querySelector` needs it escaped) and `noExcessiveClassesPerFile` (a `vi.mock` factory stubs one class per mocked export).
 
 ### Inline suppressions, and options `biome.json` repeats
 
-Inline ignores cover `noNamespaceImport` (`import * as schema`, shadcn), `noBarrelFile` (the schema re-export), the Radix group headings in `ui/`, and Biome 2.6 calling every case of `orderBySql`'s switch unreachable.
+Inline ignores cover the Radix group headings in `ui/` and Biome 2.6 calling every case of `orderBySql`'s switch unreachable. Ultracite turns `noNamespaceImport` and `noBarrelFile` off, so `import * as schema` and the schema re-export need none, and Biome warns about any ignore left for a rule that is off.
 
 `noLabelWithoutControl` adds `RadioGroupItem` as a control. Setting an option replaces Ultracite's whole list, so `biome.json` repeats `inputComponents` and `labelComponents`.
+
+### No infinite-loop form passes lint
+
+Biome's `useWhile` rejects `for (;;)` and offers `while (true)` as its safe fix, which `noUnnecessaryConditions` then rejects as always truthy. Give the loop a real condition instead, usually by reading the first item before the loop and the next at the end of its body, as `readCappedBody` in `traffic-request.ts` does.
 
 ### Do not run `biome check --write --unsafe` blindly
 

@@ -124,20 +124,18 @@ function calledFactory(
   names: ReadonlySet<string>
 ): ts.Identifier | undefined {
   let current: ts.Node = node;
-  for (;;) {
-    if (ts.isCallExpression(current)) {
-      if (
-        ts.isIdentifier(current.expression) &&
-        names.has(current.expression.text)
-      ) {
-        return current.expression;
-      }
-      current = current.expression;
-    } else if (ts.isPropertyAccessExpression(current)) {
-      current = current.expression;
-    } else {
-      return;
+  while (
+    ts.isCallExpression(current) ||
+    ts.isPropertyAccessExpression(current)
+  ) {
+    if (
+      ts.isCallExpression(current) &&
+      ts.isIdentifier(current.expression) &&
+      names.has(current.expression.text)
+    ) {
+      return current.expression;
     }
+    current = current.expression;
   }
 }
 

@@ -1,6 +1,5 @@
 import { expect, test } from "@playwright/test";
 import { and, eq, like, not } from "drizzle-orm";
-// biome-ignore lint/performance/noNamespaceImport: drizzle needs the schema namespace object
 import * as schema from "../../db/schema";
 import { E2E_PREFIX, openDb } from "./fixtures";
 

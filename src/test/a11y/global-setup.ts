@@ -8,7 +8,6 @@ import { and, eq, inArray, like, notInArray } from "drizzle-orm";
 import type { NodePgDatabase } from "drizzle-orm/node-postgres";
 import { drizzle } from "drizzle-orm/node-postgres";
 import { Pool } from "pg";
-// biome-ignore lint/performance/noNamespaceImport: drizzle needs the schema namespace object
 import * as schema from "../../db/schema";
 import { normalizeEmailAddress } from "../../lib/email-address";
 import { saveStorageState } from "../shared/playwright";

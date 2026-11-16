@@ -7,7 +7,6 @@ import {
   warmPool,
 } from "#/lib/_internal/db-pool";
 
-// biome-ignore lint/performance/noNamespaceImport: drizzle needs the schema namespace object
 import * as schema from "./schema.ts";
 
 const databaseUrl = process.env.DATABASE_URL;
