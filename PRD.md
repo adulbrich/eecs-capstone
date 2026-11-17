@@ -40,7 +40,8 @@ For developer setup, architecture notes, and the active roadmap, see
   is redeemed, so a new account is verified from the start; a new address is
   asked for a name before its code is spent. There is no password: email and
   password sign-in, email verification links and password reset were removed
-  in #576.
+  in #576. A minute after a send, the code step offers a new code to the same
+  address without retyping it (#893).
 - [x] A project proposed for someone before they have an account links to that
   account once they prove the address, by a code, ONID or a GitHub-verified
   email. Only proof does this, never a row alone, so nobody can claim another

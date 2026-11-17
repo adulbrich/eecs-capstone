@@ -116,7 +116,8 @@ for (const code of ["unable_to_get_user_info", "not_a_known_code"]) {
  * a real send. The code step therefore reaches no clean scan unless one drives
  * it, and it is the one most likely to go wrong: it is the only one-time-code
  * field in the app, drawn as six slots over one real input (#600), and a wrong
- * code marks every slot `aria-invalid`. Both states are scanned.
+ * code marks every slot `aria-invalid`. Both states are scanned, and so are
+ * the offer of a new code after the wait and the line a resend leaves (#893).
  *
  * The name step is scanned in the same test rather than its own, because each
  * test is a real send to one address in light and dark alike, and that address
@@ -126,6 +127,8 @@ for (const code of ["unable_to_get_user_info", "not_a_known_code"]) {
  * account; the form acts on the error code, which is all the stub has to match.
  */
 test("@smoke sign-in page, the emailed code form", async ({ page }) => {
+  // Installed before the page loads, so the wait for a new code can be skipped.
+  await page.clock.install();
   await page.goto("/sign-in");
   await waitForHydration(page, "form");
 
@@ -134,6 +137,28 @@ test("@smoke sign-in page, the emailed code form", async ({ page }) => {
 
   await expect(page.getByLabel("Code", { exact: true })).toBeVisible();
   await checkA11y(page);
+
+  // The offer of a new code a minute after the send (#893), and what a resend
+  // says. The resend is answered here rather than sent, to keep the address's
+  // mail budget.
+  await page.clock.fastForward("01:00");
+  const resend = page.getByRole("button", { name: "Send a new code" });
+  await expect(resend).toBeVisible();
+  await checkA11y(page);
+  const send = "**/api/auth/email-otp/send-verification-otp";
+  await page.route(send, (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({ success: true }),
+    })
+  );
+  await resend.click();
+  await expect(page.locator("form").getByRole("status")).toContainText(
+    "We asked for a new code"
+  );
+  await checkA11y(page);
+  await page.unroute(send);
 
   const check = "**/api/auth/email-otp/check-verification-otp";
   await page.route(check, (route) =>
