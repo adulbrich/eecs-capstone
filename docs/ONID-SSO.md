@@ -20,7 +20,7 @@ plugin and not the `@better-auth/sso` package. The design reasoning lives in
 | Scopes requested | `openid profile email` |
 | Claims released | `email`, `given_name`, `family_name`, and a UPN claim UIT call `username` |
 | Tenancy | Single tenant, and pinned to it in code. See "Why single tenant". |
-| Audience | Any ONID holder (maintainer, 2026-09-22). Whether tenant guests get in too is open: #578. |
+| Audience | Any ONID holder (maintainer, 2026-09-22). The mapper refuses a token whose `idp` names another tenant. |
 
 The client ID, tenant ID and discovery URL are public values. They appear in
 `.env.example` and `infra/variables.tf` on purpose; treating them as secrets
@@ -181,12 +181,15 @@ variable is a second thing to get out of step. An unset discovery URL yields an
 empty issuer and the mapper then refuses every token, so ONID fails closed when
 it is unconfigured rather than accepting tokens from anywhere.
 
-What the check does **not** do is make trusting `email` safe on its own. A guest
-invited into the OSU tenant carries this tenant's `iss` with a home-tenant email
-and passes. Any ONID holder can sign in, and nobody has confirmed whether UIT
-publish this registration to tenant guests as well, so the email trust is sound
-only as far as the answer is no. That guest case is an open risk, tracked in
-#578, and `idp` differing from `iss` is the discriminator for a guest.
+`iss` names the tenant the user signed in to, not the one that authenticated
+them; `idp` names that. Microsoft's claims reference says `idp` equals `iss`
+unless the account is homed outside the issuer's tenant, and that an absent
+`idp` means `iss`. So the mapper also accepts a token only when `idp` is absent
+or names this tenant, compared by tenant GUID because Entra spells the same
+tenant `https://sts.windows.net/<guid>/` or
+`https://login.microsoftonline.com/<guid>/v2.0`. An `idp` naming another tenant,
+the personal Microsoft account tenant, or no tenant at all, as `live.com` does,
+is refused.
 
 Industry partners and outside faculty do not need any of this. They sign in
 with an emailed code, or GitHub. Since #576 removed the password, the code is
@@ -300,8 +303,8 @@ code:
 - **A user without access sees a generic Entra error**, and UIT confirm it is not
   customizable. We cannot detect that case or explain it in our own UI, because
   the user never reaches our application. Any ONID holder has access, so nobody
-  is turned away for lacking a particular account; whether a tenant guest is
-  turned away or let in is the open question in #578.
+  is turned away for lacking a particular account. A token whose `idp` names
+  another tenant is refused by our mapper, after Entra has signed the user in.
 - **UIT have not published to external users before** and cannot confirm in
   advance whether it would work. Moot now that we are staying single tenant.
 
