@@ -197,7 +197,7 @@ Better Auth generates `text` primary keys and we keep the default, so every FK t
 
 ### A sign-in code whose mail failed answers success, and the after-hook undoes the send
 
-The send endpoint answers `{success: true}` whatever SES does, so `sendVerificationOTP` marks the request's `ctx.context` in `failedCodeMail`, and the after-hook in `src/lib/auth.ts` refunds the send and withholds the claim (#892). That relies on Better Auth handing both the same per-request context object; `email-otp-send-failure.integration.test.ts` fails if an upgrade stops it. Every email failure line, this one included, is counted by the `email_failures` alarm, so rewording one means changing the pattern in `infra/alarms.tf` and the `DEPLOYMENT.md` recipe; `email-failures.test.ts` catches a missed pattern.
+The send endpoint answers `{success: true}` whatever SES does, so `sendVerificationOTP` marks the request's `ctx.context` in `failedCodeMail`, and the after-hook in `src/lib/auth.ts` refunds the send and sets no claim cookie (#892). That relies on Better Auth handing both the same per-request context object and awaiting the sender before the after-hook; setting `advanced.backgroundTasks` breaks the second. `email-otp-send-failure.integration.test.ts` fails if either stops.
 
 ### `trustHost` is enabled in non-development
 
@@ -614,6 +614,10 @@ Radix fires `onOpenChange` only for closes it initiates (Escape, the overlay, `D
 
 `src/components/privacy-policy.tsx` states what `DeleteAccountDialog` promises ([ADR-0008](./adr/0008-account-deletion-anonymizes.md)) and what the traffic writer records; change one, change the other, and `src/test/privacy-policy.test.tsx` asserts each claim. The page is outside `_authed` so anyone can read it before signing in, and `public.e2e.test.ts`, loading it with no cookie, proves it stays there.
 
+### Rewording a log line an alarm counts silently zeroes that alarm
+
+Two alarms in `infra/alarms.tf` count log lines through a metric filter: `ai_write_failures` (the AI writers) and `email_failures` (every notifier's failed send, and the sign-in code's). Each pattern matches exact, case-sensitive wording at the line start, so a reworded line leaves its alarm OK through an outage. `project-refresh.test.ts` and `email-failures.test.ts` run each pattern against the lines the code prints. Change a message, its pattern and the `DEPLOYMENT.md` recipe together.
+
 ### Workflow conventions
 
 - **The issue is the spec, the pull request is the plan, the review loop is the gate.** [ADR-0013](./adr/0013-specs-live-in-github-issues.md).
@@ -804,10 +808,6 @@ Embeddings use `bedrock-runtime` through the AWS SDK; AI review uses `bedrock-ma
 ### Mantle rejects `minimal` as a reasoning effort, and the value production uses is not the one in `src`
 
 Mantle 400s on `minimal`, a valid OpenAI value that mocked unit tests pass. Production takes each effort from the `infra/variables.tf` default, never from the fallback in `src`. `reasoning-effort-contract.test.ts` checks both, and `.env.example`, against `MANTLE_REASONING_EFFORTS`.
-
-### Rewording an AI writer's log line silently zeroes the `ai_write_failures` alarm
-
-The metric filter in `infra/alarms.tf` matches exact, case-sensitive wording at the line start, so a reworded line leaves the alarm OK through an outage. `project-refresh.test.ts` runs the pattern against the real lines. Change a message, the pattern and the `DEPLOYMENT.md` log recipe together.
 
 ### A failed Mantle call's real error is in the log, not in `run.error`
 

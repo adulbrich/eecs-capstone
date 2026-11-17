@@ -400,8 +400,8 @@ resource "aws_cloudwatch_metric_alarm" "ai_write_failures" {
 # failure and runs this pattern on what it prints, and
 # `email-otp-send-failure.integration.test.ts` does the same for the sign-in
 # line, so rewording either side fails a test instead of zeroing the metric.
-# The `aws logs tail` recipe in DEPLOYMENT.md matches the same phrases and no
-# test checks it, so change it in the same commit.
+# The `aws logs tail` recipe in DEPLOYMENT.md tails this exact pattern, and
+# the same test holds it to that.
 #
 # No `default_value`, as above: the metric exists only when something failed.
 resource "aws_cloudwatch_log_metric_filter" "email_failures" {

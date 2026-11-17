@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { redactingAuthLogger } from "#/lib/_internal/redact-query-error";
 import type { NotificationConfig } from "#/lib/email/config";
@@ -17,7 +18,7 @@ import {
   notifyTransitionByEmail,
 } from "#/server/_internal/project-emails";
 import {
-  ANCHORED_REGEX,
+  expectAnchoredRegex,
   metricFilterMatches,
   metricFilterPattern,
 } from "#/test/shared/metric-filter";
@@ -55,10 +56,7 @@ afterEach(() => {
 
 describe("the email_failures metric filter in infra/alarms.tf", () => {
   it("is an anchored regex in the subset metricFilterMatches imitates", () => {
-    expect(pattern()).toMatch(ANCHORED_REGEX);
-    for (const alternative of pattern().slice(1, -1).split("|")) {
-      expect(alternative).toMatch(/^\^/u);
-    }
+    expectAnchoredRegex(pattern());
   });
 
   it.each([
@@ -194,6 +192,12 @@ describe("the email_failures metric filter in infra/alarms.tf", () => {
       expect(lines.filter(counted)).toHaveLength(1);
     }
   );
+
+  it("is the pattern the DEPLOYMENT.md recipe tails, so the runbook lists what the alarm counted", () => {
+    expect(readFileSync("DEPLOYMENT.md", "utf8")).toContain(
+      `--filter-pattern '${pattern()}'`
+    );
+  });
 
   it.each([
     "Refunding a sign-in code send failed Error: connection terminated",

@@ -7,7 +7,7 @@ import {
 } from "#/server/_internal/project-refresh";
 import type { SocialSummaryOutcome } from "#/server/_internal/project-social-summary";
 import {
-  ANCHORED_REGEX,
+  expectAnchoredRegex,
   metricFilterMatches,
   metricFilterPattern,
 } from "#/test/shared/metric-filter";
@@ -182,11 +182,7 @@ const PROJECT_ROW = {
 
 describe("the ai_write_failures metric filter in infra/alarms.tf", () => {
   it("is an anchored regex in the subset filterMatches imitates", () => {
-    const pattern = filterPattern();
-    expect(pattern).toMatch(ANCHORED_REGEX);
-    for (const alternative of pattern.slice(1, -1).split("|")) {
-      expect(alternative).toMatch(/^\^/u);
-    }
+    expectAnchoredRegex(filterPattern());
   });
 
   it.each([

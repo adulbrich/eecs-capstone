@@ -128,7 +128,7 @@ describe("a sign-in code whose mail failed", () => {
 
     expect(mail.lost).toHaveLength(limit + 1);
     expect(await sendsSpentBy(email)).toBe(0);
-    expect(await captureConsoleCode(() => postSend(email))).toHaveLength(6);
+    expect(await captureConsoleCode(() => postSend(email))).toMatch(/^\d{6}$/u);
   });
 
   it("hands out no claim, so nobody can redeem the code it wrote", async () => {

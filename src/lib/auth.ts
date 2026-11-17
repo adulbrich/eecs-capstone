@@ -125,7 +125,15 @@ const claimSecret =
  * limit and spend three guesses on each code. With no claim, nobody can redeem
  * the code a failed send wrote, so it is free and worth nothing.
  *
- * Weak, so a request's entry goes with its context.
+ * Two costs, both accepted. A call that throws after SES accepted the message,
+ * the 10 s timeout firing late, say, delivers a code nobody can redeem; asking
+ * again is free. And while sends fail, a stranger's send still rotates the
+ * record and kills a code the owner already holds, now without spending the
+ * owner's cap; that is a denial for the length of the outage, not a way in.
+ *
+ * It depends on Better Auth awaiting the sender before the after-hook, which
+ * `advanced.backgroundTasks` would stop: the hook would then issue a claim
+ * before the catch ran. Weak, so a request's entry goes with its context.
  */
 const failedCodeMail = new WeakSet<object>();
 

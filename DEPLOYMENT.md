@@ -1363,23 +1363,38 @@ summary. A project's next save or a backfill sweep puts it right; no sweep
 covers interest embeddings, so a user's is put right only by their next save
 of their interests.
 
-When the email one mails, these list the failed sends, each with the SES error
-after it:
+When the email one mails, this lists the failed sends, each with the SES error
+after it. The pattern is the metric filter's own, so it shows exactly the lines
+the alarm counted:
 
 ```bash
 aws --profile aws-capstone1 logs tail /ecs/eecs-capstone --since 3h --region us-west-2 \
-  --filter-pattern '?"Sending a sign-in code failed" ?"email failed for project" ?"Inventory email failed" ?"Request notice failed for request" ?"Role change email failed" ?"Ban email failed"'
+  --filter-pattern '%^Sending a sign-in code failed|^Review email failed for project|^Comment email failed for project|^Delete email failed for project|^Reassignment email failed for project|^Mentor email failed for project|^Inventory email failed|^Request notice failed for request|^Role change email failed|^Ban email failed%'
 ```
 
-No address is in any of them (#559); the project or request id is, and the
-inventory line names the notice type. Nothing retries a failed mail, so each
+The app puts no address in any of them (#559); the project or request id is
+there, and the inventory line names the notice type. SES's own error text,
+which follows, can name one: in the sandbox, a `MessageRejected` lists the
+unverified recipient. Nothing retries a failed mail, so each
 line is somebody who was not told and will not be unless someone tells them.
-A failed sign-in code costs the person nothing (#892): the send is given back,
-and asking again from the code form works once SES does. A run of failures with
-the same error is SES itself: `aws sesv2 get-account` shows a paused or
-sandboxed account, and `aws sesv2 get-email-identity` a revoked identity. The
-OK mail after an hour means no send failed in that hour, which while mail is
-this rare can mean none was tried, so send yourself a code before calling it
+A failed sign-in code costs the person none of their hourly sends (#892), so
+asking for a new code works once SES does. A run of failures with the same
+error is SES itself. These show a paused or sandboxed account and a revoked
+identity, as in sections 9.3 and 9.4:
+
+```bash
+aws --profile aws-capstone1 sesv2 get-account --region us-west-2 \
+  --query '{Status:EnforcementStatus,Production:ProductionAccessEnabled,Sending:SendingEnabled}'
+```
+
+```bash
+aws --profile aws-capstone1 sesv2 get-email-identity \
+  --email-identity capstone.eecs.oregonstate.edu --region us-west-2 \
+  --query '{Verified:VerifiedForSendingStatus,Dkim:DkimAttributes.Status}'
+```
+
+The OK mail after an hour means no send failed in that hour, which while mail
+is this rare can mean none was tried, so send yourself a code before calling it
 fixed.
 
 **Expect some mail that is not an incident.**

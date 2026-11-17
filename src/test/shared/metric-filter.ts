@@ -1,4 +1,5 @@
 import { readFileSync } from "node:fs";
+import { expect } from "vitest";
 
 /**
  * The `pattern` on one `aws_cloudwatch_log_metric_filter` in
@@ -24,12 +25,20 @@ export function metricFilterPattern(resource: string): string {
  * alternative starts with `^`, since a phrase matched anywhere in a line can
  * be text a stranger sent.
  */
-export const ANCHORED_REGEX = /^%\^[\w :#=@/;,\-^$?[\]{}|\\*+.]+%$/u;
+const ANCHORED_REGEX = /^%\^[\w :#=@/;,\-^$?[\]{}|\\*+.]+%$/u;
+
+/** Holds a pattern to `ANCHORED_REGEX`, every alternative included. */
+export function expectAnchoredRegex(pattern: string): void {
+  expect(pattern).toMatch(ANCHORED_REGEX);
+  for (const alternative of pattern.slice(1, -1).split("|")) {
+    expect(alternative).toMatch(/^\^/u);
+  }
+}
 
 /**
  * CloudWatch's match for a standalone `%regex%` pattern: the event matches
  * when the expression finds a match in it, case sensitive. Only faithful for a
- * pattern `ANCHORED_REGEX` accepts, so each test holds its pattern to that
+ * pattern `expectAnchoredRegex` accepts, so each test holds its pattern to that
  * first.
  */
 export function metricFilterMatches(pattern: string, line: string): boolean {
