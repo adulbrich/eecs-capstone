@@ -1,4 +1,7 @@
+import { fc, test } from "@fast-check/vitest";
 import { describe, expect, it } from "vitest";
+import { holderText, looseHolder } from "#/test/shared/arbitraries";
+import { normalizeEmailAddress } from "../email-address";
 import {
   formatHoldDetailed,
   formatHoldShort,
@@ -258,6 +261,78 @@ describe("holdToColumns", () => {
     expect(
       holdFromStoredRow(holdToColumns({ ...hold, email: "W@In.TEST" }))
     ).toEqual(hold);
+  });
+});
+
+describe("holdToColumns, for every hold holdFromInput builds", () => {
+  /**
+   * The hold as the columns can carry it back: the address folded by the
+   * write gate, and an account's name dropped, because the join supplies it.
+   */
+  function asStored(hold: Hold): Hold {
+    switch (hold.kind) {
+      case "account":
+        return {
+          ...hold,
+          email: normalizeEmailAddress(hold.email),
+          name: null,
+        };
+      case "walk_in":
+        return { ...hold, email: normalizeEmailAddress(hold.email) ?? "" };
+      default:
+        return hold;
+    }
+  }
+
+  /** The one hold the round trip loses; see the example below. */
+  function blankWalkIn(hold: Hold): boolean {
+    return (
+      hold.kind === "walk_in" && normalizeEmailAddress(hold.email) === null
+    );
+  }
+
+  test.prop([looseHolder, holderText])(
+    "stores a person or a thing, never both, and reads back what it stored",
+    ({ email, id, label, name, program }, accountName) => {
+      let hold: Hold;
+      try {
+        hold = holdFromInput(
+          { email, label, name, program },
+          {
+            accountId: id ?? null,
+            accountName: id ? (accountName ?? null) : null,
+          }
+        );
+      } catch {
+        fc.pre(false);
+        return;
+      }
+      const columns = holdToColumns(hold);
+      const onAPerson =
+        columns.currentHolderId !== null || columns.currentHolderEmail !== null;
+      expect(onAPerson && columns.currentHolderLabel !== null).toBe(false);
+      if (!blankWalkIn(hold)) {
+        expect(holdFromStoredRow(columns)).toEqual(asStored(hold));
+      }
+    }
+  );
+
+  it("loses a walk-in whose address is only whitespace, which no caller can send", () => {
+    // The shrunk counterexample from the property above (#845). The
+    // constructor reads " " as an address, matching the rules' raw
+    // truthiness, and the write gate trims it to null, so the row reads back
+    // as no hold. Unreachable today: `transitionSchema` runs `.email()` on
+    // `holderEmail`, which refuses any whitespace, and the id path takes its
+    // address from `user.email`. A new caller that skips the schema would
+    // store a reserved item with no holder.
+    const hold = holdFromInput({ email: " ", program: " " }, NO_ACCOUNT);
+    expect(hold).toEqual({
+      kind: "walk_in",
+      email: " ",
+      name: null,
+      program: " ",
+    });
+    expect(holdFromStoredRow(holdToColumns(hold))).toEqual({ kind: "none" });
   });
 });
 
