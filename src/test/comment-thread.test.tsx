@@ -659,11 +659,16 @@ describe("CommentThread reply form under any interleaving", () => {
       let expectedCalls = 0;
       const overlaps: number[] = [];
 
-      const server = s.scheduleFunction((n: number) =>
-        failures[n]
-          ? Promise.reject(new Error(`call ${n} failed`))
-          : Promise.resolve({ id: `reply-${n}` })
-      );
+      const server = s.scheduleFunction((n: number) => {
+        if (!failures[n]) {
+          return Promise.resolve({ id: `reply-${n}` });
+        }
+        const refusal = Promise.reject(new Error(`call ${n} failed`));
+        // The scheduler observes it only when it releases the call, and Node
+        // reports a rejection nobody observed by the next macrotask.
+        refusal.catch(() => undefined);
+        return refusal;
+      });
       addComment.mockImplementation(() => {
         const n = calls;
         calls += 1;
