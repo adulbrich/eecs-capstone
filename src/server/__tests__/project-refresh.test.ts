@@ -1,4 +1,3 @@
-import { readFileSync } from "node:fs";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { redactingAuthLogger } from "#/lib/_internal/redact-query-error";
 import type { RefreshOutcome } from "#/server/_internal/project-embeddings";
@@ -7,6 +6,11 @@ import {
   settleProjectRefreshes,
 } from "#/server/_internal/project-refresh";
 import type { SocialSummaryOutcome } from "#/server/_internal/project-social-summary";
+import {
+  expectAnchoredRegex,
+  metricFilterMatches,
+  metricFilterPattern,
+} from "#/test/shared/metric-filter";
 
 const calls: string[] = [];
 let releaseFirst: () => void = () => undefined;
@@ -116,40 +120,10 @@ describe("refreshProjectInBackground", () => {
   });
 });
 
-const FILTER_OPENER =
-  'resource "aws_cloudwatch_log_metric_filter" "ai_write_failures" {';
+const filterPattern = () => metricFilterPattern("ai_write_failures");
 
-/** The `pattern` on the metric filter in `infra/alarms.tf`, unescaped. */
-function filterPattern(): string {
-  const block =
-    readFileSync("infra/alarms.tf", "utf8")
-      .split(FILTER_OPENER)[1]
-      ?.split("\n}")[0] ?? "";
-  const line = block
-    .split("\n")
-    .find((candidate) => candidate.trim().startsWith("pattern "));
-  // An HCL string with only `\\` escapes is also a JSON string.
-  return JSON.parse(line?.slice(line.indexOf("=") + 1).trim() ?? '""');
-}
-
-/**
- * A `%regex%` pattern in the subset CloudWatch documents that JavaScript
- * reads the same way: letters, digits, space, its nine symbols, and its
- * operators other than parentheses, which it does not support. Every `|`
- * alternative starts with `^`, since a phrase matched anywhere in a line can
- * be text a stranger sent.
- */
-const ANCHORED_REGEX = /^%\^[\w :#=@/;,\-^$?[\]{}|\\*+.]+%$/u;
-
-/**
- * CloudWatch's match for a standalone `%regex%` pattern: the event matches
- * when the expression finds a match in it, case sensitive. The first test
- * below holds the pattern to `ANCHORED_REGEX`, since that is all this
- * imitates.
- */
-function filterMatches(line: string): boolean {
-  return new RegExp(filterPattern().slice(1, -1), "u").test(line);
-}
+const filterMatches = (line: string) =>
+  metricFilterMatches(filterPattern(), line);
 
 /** The line a real refresh logs for one pair of outcomes. */
 async function refreshLine(
@@ -208,11 +182,7 @@ const PROJECT_ROW = {
 
 describe("the ai_write_failures metric filter in infra/alarms.tf", () => {
   it("is an anchored regex in the subset filterMatches imitates", () => {
-    const pattern = filterPattern();
-    expect(pattern).toMatch(ANCHORED_REGEX);
-    for (const alternative of pattern.slice(1, -1).split("|")) {
-      expect(alternative).toMatch(/^\^/u);
-    }
+    expectAnchoredRegex(filterPattern());
   });
 
   it.each([

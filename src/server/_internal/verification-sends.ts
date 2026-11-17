@@ -91,7 +91,10 @@ export async function reserveVerificationMail(email: string): Promise<boolean> {
  * person already holds. But Better Auth still has checks of its own inside the
  * endpoint, after the reservation: its cross-site check, for one. A send it
  * refuses there rotates nothing and mails nothing, so without this, five of
- * them spent the recipient's whole hour in silence (#576).
+ * them spent the recipient's whole hour in silence (#576). A send whose mail
+ * failed in SES comes here too, though the endpoint answered it with success:
+ * five of those during an outage locked the person out for the hour after it
+ * (#892). `failedCodeMail` in `src/lib/auth.ts` says how the caller tells.
  *
  * One statement, and the row is taken with `SKIP LOCKED`, because refunds
  * arrive in bursts: every request in a burst Better Auth refuses gives one

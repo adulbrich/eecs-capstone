@@ -392,8 +392,8 @@ Interactive elements are `rounded-md` (8px), which is already the default inside
 
 Write the small-screen styles first, then add `md:` (768px and up) overrides. This is
 a deliberate two-tier system, mobile and desktop, so `sm:`, `lg:`, and `xl:` overrides
-are reserved for the rare case that genuinely needs a third tier. Two cases do, and
-any other `xl:` needs a reason neither gives:
+are reserved for the rare case that genuinely needs a third tier. Three cases do, and
+any other `xl:` needs a reason none of them gives:
 
 - A listing's filters. `ListingLayout` (see [Listing layout](#listing-layout)) puts
   them in a left aside from `xl` and in a `Sheet` below it. 288 (aside) + 32 (gap) +
@@ -406,6 +406,10 @@ any other `xl:` needs a reason neither gives:
   ([ADR-0054](./adr/0054-similar-projects-float-below-xl-and-sit-beside-from-it.md)).
   Its `xl:` classes live in `SimilarProjectsLayout`; below `xl` it floats (see
   [Floating panel](#floating-panel)).
+- The `/admin` hub's four link groups. In one row they need about 290px each to
+  keep a description to two lines: 4 x 290 + 3 x 16 (gaps) + 64 (padding) is 1272.
+  At `lg` each would be 228px, so the hub is two by two from `md` and four across,
+  at `max-w-7xl`, from `xl`.
 
 The listing cards (`project-card.tsx`, `inventory-card.tsx`) are one component at
 both widths, in a single column bounded to `max-w-4xl`: image on top at 16:9 below
@@ -434,7 +438,7 @@ Page width is chosen by content. Pick the narrowest that fits; a form at
 | `max-w-md` | one narrow form or card | `profile.tsx` |
 | `max-w-2xl` | forms, dashboards, prose | `projects/new.tsx`, `privacy.tsx` |
 | `max-w-3xl` | the long-form project page | `SimilarProjectsLayout`, widening to `xl:max-w-6xl` for its aside |
-| `max-w-4xl` | lists, two-column detail, grids of figures | `my/projects.tsx`, `inventory/$itemId.tsx`, `admin/analytics.tsx` |
+| `max-w-4xl` | lists, two-column detail, grids of figures | `my/projects.tsx`, `inventory/$itemId.tsx`, `admin/analytics.tsx`; `admin/index.tsx` widening to `xl:max-w-7xl` for its four groups |
 | none | admin tables that run full width | `/admin/projects`, `my/bookmarks.tsx` below its bounded title |
 
 ### Interactive element height
