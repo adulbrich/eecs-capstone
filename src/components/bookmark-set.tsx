@@ -168,7 +168,8 @@ export function BookmarkToggle({
 }) {
   const set = useContext(BookmarkSetContext);
   const writeBookmark = useWriteBookmark();
-  // The hook's ref, not `disabled`, refuses a second click in the same tick (#885).
+  // The hook's ref, not `disabled`, refuses a second click in the same tick
+  // (#885).
   const { busy, run } = useAction({
     fallback: "Could not save the bookmark",
     onError: toast.error,
