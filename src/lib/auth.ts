@@ -122,8 +122,10 @@ const claimSecret =
  * the hour after SES recovers. A refund WITH a claim would make a failed send
  * free and still redeemable, and the per-recipient cap is what bounds guessing
  * (ADR-0047): while sends failed, a stranger could rotate the record without
- * limit and spend three guesses on each code. With no claim, nobody can redeem
- * the code a failed send wrote, so it is free and worth nothing.
+ * limit and spend three guesses on each code. With no claim of its own, the
+ * code a failed send wrote is reachable only through a concurrent send for the
+ * same address that succeeded and paid: that send's after-hook reads the newest
+ * record, which may be the failed one's. Still one claim per charged send.
  *
  * Two costs, both accepted. A call that throws after SES accepted the message,
  * the 10 s timeout firing late, say, delivers a code nobody can redeem; asking
