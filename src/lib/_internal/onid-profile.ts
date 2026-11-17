@@ -113,22 +113,23 @@ const TENANT_ID =
   /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/giu;
 
 /**
- * The personal Microsoft account tenant. An `idp` naming it is a personal
- * account, never this tenant, whatever the configured issuer says.
+ * Every spelling of this tenant an `idp` may carry, lowercased: the configured
+ * issuer itself, and, when the issuer names exactly one tenant GUID, the v1
+ * (`https://sts.windows.net/<guid>/`) and v2
+ * (`https://login.microsoftonline.com/<guid>/v2.0`) STS URIs for it. Only the
+ * configured issuer is searched for a GUID; the token's `idp` is compared
+ * whole, because a provider that merely embeds this tenant's GUID somewhere
+ * in its name is still another provider.
  */
-const CONSUMER_TENANT_ID = "9188040d-6c67-4c5b-b112-36a304b66dad";
-
-/**
- * The one tenant GUID in an STS URI, lowercased, or null when there is not
- * exactly one. Entra writes the same tenant as
- * `https://sts.windows.net/<guid>/` in a v1 token and
- * `https://login.microsoftonline.com/<guid>/v2.0` in a v2 one, so the GUID is
- * what can be compared and the URI around it is not. Two GUIDs is ambiguous,
- * and an ambiguous tenant is no tenant.
- */
-function tenantIdOf(stsUri: string): string | null {
-  const matches = stsUri.match(TENANT_ID);
-  return matches?.length === 1 ? matches[0].toLowerCase() : null;
+function thisTenantIdps(expectedIssuer: string): Set<string> {
+  const issuer = expectedIssuer.trim().toLowerCase();
+  const spellings = new Set([issuer]);
+  const guids = issuer.match(TENANT_ID);
+  if (guids?.length === 1) {
+    spellings.add(`https://sts.windows.net/${guids[0]}/`);
+    spellings.add(`https://login.microsoftonline.com/${guids[0]}/v2.0`);
+  }
+  return spellings;
 }
 
 /**
@@ -137,12 +138,13 @@ function tenantIdOf(stsUri: string): string | null {
  * `idp` names the identity provider that authenticated the user. Microsoft's
  * claims reference says it is "identical to the value of the issuer claim
  * unless the user account isn't in the same tenant as the issuer", and that
- * when it is absent "the value of `iss` can be used instead". So absent is
- * this tenant, and present is compared by tenant GUID rather than by string,
- * because the two spellings above name the same tenant.
+ * when it is absent "the value of `iss` can be used instead". A member token
+ * from this tenant, decoded on 2026-11-17, carries no `idp` at all. So absent
+ * is this tenant, and present must be exactly one of this tenant's spellings.
  *
- * Present but not a string, blank, or carrying no single GUID is refused, not
- * read as absent: `live.com` and other non-Entra providers look like that.
+ * Present but anything else is refused, not read as absent: another tenant,
+ * a personal account (`live.com` or the consumer tenant's URI), a non-Entra
+ * provider, a non-string, or a URI that only contains this tenant's GUID.
  */
 function idpRejection(
   claims: Record<string, unknown>,
@@ -152,17 +154,13 @@ function idpRejection(
   if (idp === undefined || idp === null) {
     return null;
   }
-  const idpTenant = typeof idp === "string" ? tenantIdOf(idp) : null;
-  if (!idpTenant) {
-    return "the id_token idp claim carries no tenant id, so the token was refused";
-  }
   if (
-    idpTenant === CONSUMER_TENANT_ID ||
-    idpTenant !== tenantIdOf(expectedIssuer)
+    typeof idp === "string" &&
+    thisTenantIdps(expectedIssuer).has(idp.toLowerCase())
   ) {
-    return "the id_token idp claim names another tenant, so the token was refused";
+    return null;
   }
-  return null;
+  return "the id_token idp claim names another identity provider, so the token was refused";
 }
 
 /** Why a token was refused. Never carries a claim value, only a reason. */
@@ -173,7 +171,7 @@ export interface OnidRejection {
 /**
  * The mapping, with the reason for a refusal instead of a bare null.
  *
- * Eight different conditions reject a token and Better Auth collapses all of them
+ * Seven different conditions reject a token and Better Auth collapses all of them
  * into one `unable_to_get_user_info` redirect, so without a reason the first
  * real sign-in failure is a guessing game: wrong issuer, no `oid`, or a UPN
  * under a fourth claim name all look identical from the browser. Exported
@@ -292,7 +290,7 @@ export function onidProfileOrRejection(
     // itself, which Entra does not verify. The `iss` check holds the token to
     // this tenant's sign-in, and the `idp` check holds it to an account this
     // tenant authenticated, whose `mail` this tenant administers. A token
-    // whose `idp` names another tenant or provider is refused before here.
+    // whose `idp` names another identity provider is refused before here.
     //
     // Two things follow, both intended. It fires the project-claim hook in
     // `src/lib/auth.ts`, the same way a GitHub-verified email does. And it

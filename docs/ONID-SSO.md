@@ -20,7 +20,7 @@ plugin and not the `@better-auth/sso` package. The design reasoning lives in
 | Scopes requested | `openid profile email` |
 | Claims released | `email`, `given_name`, `family_name`, and a UPN claim UIT call `username` |
 | Tenancy | Single tenant, and pinned to it in code. See "Why single tenant". |
-| Audience | Any ONID holder (maintainer, 2026-09-22). The mapper refuses a token whose `idp` names another tenant. |
+| Audience | Any ONID holder (maintainer, 2026-09-22). The mapper refuses a token whose `idp` names another identity provider. |
 
 The client ID, tenant ID and discovery URL are public values. They appear in
 `.env.example` and `infra/variables.tf` on purpose; treating them as secrets
@@ -184,12 +184,13 @@ it is unconfigured rather than accepting tokens from anywhere.
 `iss` names the tenant the user signed in to, not the one that authenticated
 them; `idp` names that. Microsoft's claims reference says `idp` equals `iss`
 unless the account is homed outside the issuer's tenant, and that an absent
-`idp` means `iss`. So the mapper also accepts a token only when `idp` is absent
-or names this tenant, compared by tenant GUID because Entra spells the same
-tenant `https://sts.windows.net/<guid>/` or
-`https://login.microsoftonline.com/<guid>/v2.0`. An `idp` naming another tenant,
-the personal Microsoft account tenant, or no tenant at all, as `live.com` does,
-is refused.
+`idp` means `iss`. A member token from this tenant, decoded on 2026-11-17,
+carries no `idp`. So the mapper also accepts a token only when `idp` is absent
+or is, whole and ignoring case, one of this tenant's spellings: the configured
+issuer, `https://sts.windows.net/<guid>/` or
+`https://login.microsoftonline.com/<guid>/v2.0`. Anything else is refused:
+another tenant, the personal Microsoft account tenant, `live.com`, or a value
+that merely contains this tenant's GUID.
 
 Industry partners and outside faculty do not need any of this. They sign in
 with an emailed code, or GitHub. Since #576 removed the password, the code is

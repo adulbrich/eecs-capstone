@@ -170,7 +170,7 @@ describe("an ONID token whose idp names another tenant", () => {
 
     expect(callback.headers.get("location")).toContain("error");
     expect(refused).toHaveBeenCalledWith(
-      expect.stringContaining("idp claim names another tenant")
+      expect.stringContaining("idp claim names another identity provider")
     );
     expect(await providersOf(userId)).toEqual([]);
     expect(await sessionCount(userId)).toBe(0);

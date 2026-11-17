@@ -198,13 +198,6 @@ describe("onidProfileFromIdToken", () => {
         "the personal account tenant",
         `https://sts.windows.net/${CONSUMER_TENANT}/`,
       ],
-    ])("refuses an idp naming %s", (_label, idp) => {
-      expect(rejectionOf(idToken({ ...full, idp }))).toContain(
-        "names another tenant"
-      );
-    });
-
-    it.each([
       ["live.com", "live.com"],
       ["a provider name", "google.com"],
       ["a truncated tenant id", "https://sts.windows.net/ce6d05e1-3c5e/"],
@@ -212,8 +205,25 @@ describe("onidProfileFromIdToken", () => {
       ["a blank string", "   "],
       ["a number", 42],
       ["an object", { tenant: TENANT }],
+      // A provider that only embeds this tenant's GUID is another provider.
+      ["this tenant's GUID on another host", `https://idp.example/${TENANT}/`],
+      ["this tenant's GUID as a bare string", TENANT],
+      [
+        "this tenant's v1 URI with a suffix",
+        `https://sts.windows.net/${TENANT}/extra`,
+      ],
+      [
+        "this tenant's v2 URI with surrounding space",
+        ` https://login.microsoftonline.com/${TENANT}/v2.0 `,
+      ],
+      [
+        "this tenant's GUID under a look-alike host",
+        `https://sts.windows.net.example/${TENANT}/`,
+      ],
     ])("refuses an idp that is %s", (_label, idp) => {
-      expect(rejectionOf(idToken({ ...full, idp }))).toContain("no tenant id");
+      expect(rejectionOf(idToken({ ...full, idp }))).toContain(
+        "names another identity provider"
+      );
     });
 
     it("refuses an idp when the configured issuer names no tenant id", () => {
@@ -230,7 +240,7 @@ describe("onidProfileFromIdToken", () => {
           }),
           domainIssuer
         )
-      ).toContain("names another tenant");
+      ).toContain("names another identity provider");
     });
 
     it("never leaks the idp value into the reason", () => {
@@ -245,7 +255,7 @@ describe("onidProfileFromIdToken", () => {
     // Better Auth collapses every refusal into one `unable_to_get_user_info`
     // redirect, so the reason exists only in the server log. These assertions
     // are what keep the first live sign-in failure diagnosable rather than a
-    // guessing game between eight identical-looking outcomes.
+    // guessing game between seven identical-looking outcomes.
     it("names the wrong tenant", () => {
       const other = "https://login.microsoftonline.com/some-other-tenant/v2.0";
       expect(rejectionOf(idToken({ ...full, iss: other }))).toContain("issuer");
