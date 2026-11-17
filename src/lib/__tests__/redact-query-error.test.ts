@@ -168,6 +168,14 @@ describe("redactQueryError", () => {
   });
 });
 
+/** An address the app could send to, which is one `z.email()` accepts. */
+const zodAddress = fc
+  .emailAddress()
+  .filter((address) => z.email().safeParse(address).success);
+
+/** Anything still shaped like such an address after redaction. */
+const ANY_ADDRESS = /[A-Za-z0-9_'+.-]+@[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)+/u;
+
 describe("redactQueryError, on an address outside a query", () => {
   /** What a sandboxed SES account throws for an unverified recipient. */
   const SES_REJECTION =
@@ -198,15 +206,54 @@ describe("redactQueryError, on an address outside a query", () => {
     );
   });
 
-  it("stays linear on a long run with no address in it, which a stranger can send", () => {
-    // Quadratic before the lookbehind: 40,000 characters took a second, and
-    // this length about six.
-    const runs = ["a".repeat(100_000), "a.".repeat(50_000)];
-    const started = performance.now();
-    for (const run of runs) {
-      expect(redactQueryError(run)).toBe(run);
+  it.each([
+    ["+", "a@x.edu+b@y.edu"],
+    ["_", "a@x.edu_b@y.edu"],
+    ["/", "a@x.edu/b@y.edu"],
+    [".", "a@x.edu.b@y.edu"],
+  ])("redacts both of two addresses joined by %j", (_joiner, text) => {
+    // A regex anchored with a lookbehind could not start a match where the
+    // previous one ended, so the second address survived whole.
+    const line = redactQueryError(text);
+    expect(line).not.toContain("@");
+    expect(line).not.toContain("y.edu");
+  });
+
+  it.each([
+    ["a run with no @", "a".repeat(100_000)],
+    ["a dotted run with no @", "a.".repeat(50_000)],
+    ["a domain with no dot", `x@${"a".repeat(100_000)}`],
+    ["an @ after every character", "a@".repeat(50_000)],
+    ["a domain that never ends in a letter", `x@${"1.".repeat(50_000)}`],
+    ["a chain of addresses", "a@x.co+".repeat(14_000)],
+  ])("stays linear on %s, which a stranger can send", (_shape, input) => {
+    // An unanchored regex rescanned a run from every position: 40,000
+    // characters took a second, and 100,000 about six. The first call pays
+    // for compiling the patterns, which is not the cost under test.
+    redactQueryError(input);
+    let best = Number.POSITIVE_INFINITY;
+    for (let run = 0; run < 3; run++) {
+      const start = performance.now();
+      redactQueryError(input);
+      best = Math.min(best, performance.now() - start);
     }
-    expect(performance.now() - started).toBeLessThan(500);
+    expect(best).toBeLessThan(100);
+  });
+
+  it.each([
+    "installed @aws-sdk/client-sesv2@3.700.0",
+    "installed drizzle-orm@0.44.2",
+    "in .pnpm/@aws-sdk+client-sesv2@3.600.0/node_modules",
+  ])("leaves a versioned package alone: %j", (text) => {
+    expect(redactQueryError(text)).toBe(text);
+  });
+
+  it("keeps a URL's host and path when its query names an address", () => {
+    // A stranger chooses a logged callbackURL, so a match that ran back
+    // through the path would let them blank out where it pointed.
+    expect(
+      redactQueryError("Invalid callbackURL: https://evil.example/x?r=a@b.co")
+    ).toBe("Invalid callbackURL: https://evil.example/x?r=[address redacted]");
   });
 
   it("leaves a scoped package path alone", () => {
@@ -219,7 +266,7 @@ describe("redactQueryError, on an address outside a query", () => {
   // out as the marker and nothing else: no prefix of an odd local part, no
   // tail of a long domain.
   test.prop([
-    fc.emailAddress().filter((address) => z.email().safeParse(address).success),
+    zodAddress,
     fc.stringMatching(/^[A-Za-z ]{0,20}$/u),
     fc.stringMatching(/^[A-Za-z ]{0,20}$/u),
   ])(
@@ -230,6 +277,46 @@ describe("redactQueryError, on an address outside a query", () => {
       );
     }
   );
+
+  // A match has to be able to start where the previous one ended, whatever
+  // joins the two: a lookbehind-anchored regex left the second of
+  // `a@a.aa_a@a.aa` whole.
+  test.prop([
+    zodAddress,
+    zodAddress,
+    fc.constantFrom(..."_'+.-%!#$&*/=?^`{|}~,; <>\""),
+  ])(
+    "leaves no address in two joined by one character",
+    (first, second, joiner) => {
+      expect(redactQueryError(`${first}${joiner}${second}`)).not.toMatch(
+        ANY_ADDRESS
+      );
+    }
+  );
+
+  test.prop([
+    fc
+      .string({ unit: "binary" })
+      .filter((text) => !(text.includes("@") || text.includes("params"))),
+  ])("passes text with no @ through unchanged", (text) => {
+    expect(redactQueryError(text)).toBe(text);
+  });
+
+  test.prop([
+    fc
+      .string({ unit: "binary", maxLength: 40 })
+      .filter((text) => !text.includes("params")),
+  ])("reads an Error's message the way it reads a string", (text) => {
+    expect(redactQueryError(new Error(text))).toBe(
+      `Error: ${redactQueryError(text)}`
+    );
+  });
+
+  it("does not throw on an Error whose message is not a string", () => {
+    const odd = new Error("x");
+    (odd as { message: unknown }).message = 42;
+    expect(redactQueryError(odd)).toBe("Error: 42");
+  });
 });
 
 describe("redactingAuthLogger", () => {

@@ -22,7 +22,8 @@
  * data and is in this repository already, and the cause chain's messages,
  * which is where "Connection terminated due to connection timeout" lives and
  * is the whole diagnostic value of the line. Less any email address in them,
- * since an error message can name one outside a query too (`ADDRESS`).
+ * since an error message can name one outside a query too
+ * (`redactAddresses`).
  */
 
 /** How much of the failing SQL to keep. Enough to identify the query. */
@@ -111,23 +112,57 @@ function scrubQueryText(text: string): string {
  * email notifier logs that error after its line (#892), where on the sign-in
  * path the address is whatever a stranger typed.
  *
- * The local part takes every character `z.email()` admits and the other
- * RFC 5322 atext symbols, so no prefix of an odd address survives. The domain
- * needs a dot between its labels, which is what keeps a scoped package path
- * such as `node_modules/@aws-sdk/client-sesv2` intact: its label meets a `/`
- * before any dot.
+ * The local part takes exactly the characters `z.email()` admits, and every
+ * address the app sends to has passed it (the sign-in form, a mentor, an
+ * inventory holder), so no prefix of one survives. Not the wider RFC 5322
+ * set: with `/`, `=` and `?` in it, `https://site.edu/x?r=a@b.co` lost its
+ * host and path to the match, which let a stranger blank the target out of a
+ * logged callbackURL. The domain
+ * needs a dot between its labels and a last label that starts with a letter,
+ * as `z.email()` requires of a top-level domain. That keeps a scoped package
+ * intact, as a path (`node_modules/@aws-sdk/client-sesv2`, whose label meets
+ * a `/` first) and with a version (`@aws-sdk/client-sesv2@3.700.0`).
  *
- * The lookbehind is what keeps this linear. Without it a long run of
- * local-part characters with no `@` is rescanned from every position in it,
- * and this runs on text a stranger chooses (Better Auth logs a rejected
- * callbackURL word for word): 40,000 characters held the event loop for a
- * second. With it a match can start only where a run starts.
+ * A scan from each `@` rather than one regex, because this runs on text a
+ * stranger chooses (Better Auth logs a rejected callbackURL word for word)
+ * and both regex shapes failed. Unanchored, a long run of local-part
+ * characters with no `@` was rescanned from every position: 40,000 characters
+ * held the event loop for a second. Anchored with a lookbehind, a match could
+ * not start where the previous one ended, so the second of `a@x.edu+b@y.edu`
+ * survived. Here each `@` walks left only as far as the previous `@` or the
+ * end of the previous match, and right only to the end of its domain, so every
+ * character is visited a bounded number of times.
  */
-const ADDRESS =
-  /(?<![A-Za-z0-9_'+.%!#$&*/=?^`{|}~-])[A-Za-z0-9_'+.%!#$&*/=?^`{|}~-]+@[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)+/gu;
+const LOCAL_CHAR = /[A-Za-z0-9_'+.-]/u;
+const DOMAIN = /(?:[A-Za-z0-9-]+\.)+[A-Za-z][A-Za-z0-9-]*/uy;
+const ADDRESS_MARK = "[address redacted]";
 
 function redactAddresses(text: string): string {
-  return text.replace(ADDRESS, "[address redacted]");
+  let out = "";
+  let kept = 0;
+  for (let at = text.indexOf("@"); at !== -1; at = text.indexOf("@", at + 1)) {
+    if (at < kept) {
+      continue;
+    }
+    let start = at;
+    while (start > kept && LOCAL_CHAR.test(text.charAt(start - 1))) {
+      start -= 1;
+    }
+    // An empty local part is an address only where the previous match took
+    // its local part: `a@x.edu.b@y.edu` reads the first domain as `x.edu.b`.
+    const glued = start === at && at === kept && out !== "";
+    if (start === at && !glued) {
+      continue;
+    }
+    DOMAIN.lastIndex = at + 1;
+    const domain = DOMAIN.exec(text);
+    if (!domain) {
+      continue;
+    }
+    out += `${text.slice(kept, start)}${glued ? "" : ADDRESS_MARK}`;
+    kept = DOMAIN.lastIndex;
+  }
+  return out + text.slice(kept);
 }
 
 function truncate(sql: string): string {
@@ -149,7 +184,9 @@ function describe(value: unknown): string {
     return `query failed [params redacted]: ${truncate(value.query)}`;
   }
   if (value instanceof Error) {
-    return `${value.name}: ${redactAddresses(scrubQueryText(value.message))}`;
+    // `String` because a thrown Error's `message` is whatever was assigned to
+    // it, and a number here threw inside the caller's own `catch`.
+    return `${value.name}: ${redactAddresses(scrubQueryText(String(value.message)))}`;
   }
   if (typeof value === "string") {
     return redactAddresses(scrubQueryText(value));
