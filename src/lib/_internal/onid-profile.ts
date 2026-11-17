@@ -109,6 +109,60 @@ function decodePayload(idToken: string): Record<string, unknown> | null {
   }
 }
 
+const TENANT_ID =
+  /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/giu;
+
+/**
+ * Every spelling of this tenant an `idp` may carry, lowercased: the configured
+ * issuer itself, and, when the issuer names exactly one tenant GUID, the v1
+ * (`https://sts.windows.net/<guid>/`) and v2
+ * (`https://login.microsoftonline.com/<guid>/v2.0`) STS URIs for it. Only the
+ * configured issuer is searched for a GUID; the token's `idp` is compared
+ * whole, because a provider that merely embeds this tenant's GUID somewhere
+ * in its name is still another provider.
+ */
+function thisTenantIdps(expectedIssuer: string): Set<string> {
+  const issuer = expectedIssuer.trim().toLowerCase();
+  const spellings = new Set([issuer]);
+  const guids = issuer.match(TENANT_ID);
+  if (guids?.length === 1) {
+    spellings.add(`https://sts.windows.net/${guids[0]}/`);
+    spellings.add(`https://login.microsoftonline.com/${guids[0]}/v2.0`);
+  }
+  return spellings;
+}
+
+/**
+ * Why `idp` refuses a token, or null when it does not.
+ *
+ * `idp` names the identity provider that authenticated the user. Microsoft's
+ * ID token claims reference documents it as matching the issuer for an
+ * account homed in the issuer's tenant, and an absent `idp` as meaning the
+ * issuer. A member token from this tenant, decoded on 2026-11-17, carries no
+ * `idp` at all. So absent is this tenant, and present must be exactly one of
+ * this tenant's spellings.
+ *
+ * Present but anything else is refused, not read as absent: another tenant,
+ * a personal account (`live.com` or the consumer tenant's URI), a non-Entra
+ * provider, a non-string, or a URI that only contains this tenant's GUID.
+ */
+function idpRejection(
+  claims: Record<string, unknown>,
+  expectedIssuer: string
+): string | null {
+  const idp = claims.idp;
+  if (idp === undefined || idp === null) {
+    return null;
+  }
+  if (
+    typeof idp === "string" &&
+    thisTenantIdps(expectedIssuer).has(idp.toLowerCase())
+  ) {
+    return null;
+  }
+  return "the id_token idp claim names another identity provider, so the token was refused";
+}
+
 /** Why a token was refused. Never carries a claim value, only a reason. */
 export interface OnidRejection {
   rejected: string;
@@ -117,8 +171,8 @@ export interface OnidRejection {
 /**
  * The mapping, with the reason for a refusal instead of a bare null.
  *
- * Six different conditions reject a token and Better Auth collapses all of them
- * into one `unable_to_get_user_info` redirect, so without a reason the first
+ * Seven different conditions reject a token and Better Auth collapses all of
+ * them into one `unable_to_get_user_info` redirect, so without a reason the first
  * real sign-in failure is a guessing game: wrong issuer, no `oid`, or a UPN
  * under a fourth claim name all look identical from the browser. Exported
  * separately from the logging wrapper so tests can assert which guard fired.
@@ -163,6 +217,13 @@ export function onidProfileOrRejection(
       rejected:
         "the id_token issuer is not the configured tenant, so the token was refused",
     };
+  }
+
+  // `iss` names the tenant the user signed in to, and `idp` the one that
+  // authenticated them. Both must be this tenant; see `idpRejection`.
+  const idpRefusal = idpRejection(claims, expectedIssuer);
+  if (idpRefusal) {
+    return { rejected: idpRefusal };
   }
 
   // `oid` over `sub` on UIT's advice, and Microsoft's: both are immutable
@@ -225,12 +286,12 @@ export function onidProfileOrRejection(
     // university enforces. That is stronger proof of address control than the
     // sign-in code we mail ourselves.
     //
-    // What makes it sound is the issuer check above, not the email claim
-    // itself, which Entra does not verify. The check does not cover a guest
-    // invited into the OSU tenant, who would pass it while carrying a
-    // home-tenant email. Any ONID holder can sign in, and whether UIT publish
-    // this registration to guests too is unconfirmed: an open risk tracked in
-    // #578. `idp` differing from `iss` is the discriminator for a guest.
+    // What makes it sound is the pair of checks above, not the email claim
+    // itself, which Entra does not verify. The `iss` check holds the token to
+    // this tenant's sign-in, and the `idp` check refuses a token whose `idp`
+    // names another identity provider. Both key on who authenticated the
+    // user, not on the account's type, so the trust also rests on this tenant
+    // administering the accounts it authenticates.
     //
     // Two things follow, both intended. It fires the project-claim hook in
     // `src/lib/auth.ts`, the same way a GitHub-verified email does. And it

@@ -25,7 +25,7 @@ function idToken(payload: Record<string, unknown>): string {
  * Every case but the issuer tests runs against the configured tenant.
  *
  * These go through `onidProfileOrRejection` rather than the exported
- * `onidProfileFromIdToken` so that the ten refusal cases below do not each
+ * `onidProfileFromIdToken` so that the refusal cases below do not each
  * print a console error. The wrapper is a `console.error` and a `return null`
  * over this function, and `rejectionOf` covers the reasons it logs.
  */
@@ -158,11 +158,116 @@ describe("onidProfileFromIdToken", () => {
     });
   });
 
+  describe("identity provider pinning", () => {
+    // `idp` names the provider that authenticated the user. It is accepted
+    // when absent and when it names this tenant, in either STS spelling, and
+    // refused otherwise.
+    const OTHER_TENANT = "0b7a1c2d-3e4f-4a5b-8c6d-7e8f9a0b1c2d";
+    const CONSUMER_TENANT = "9188040d-6c67-4c5b-b112-36a304b66dad";
+
+    it("accepts a token with no idp claim", () => {
+      expect(rejectionOf(idToken(full))).toBeNull();
+    });
+
+    it("accepts a token whose idp is null, as if absent", () => {
+      expect(rejectionOf(idToken({ ...full, idp: null }))).toBeNull();
+    });
+
+    it.each([
+      ["equal to iss", ISSUER],
+      ["in the v1 STS form", `https://sts.windows.net/${TENANT}/`],
+      [
+        "in the v1 STS form, upper case",
+        `https://sts.windows.net/${TENANT.toUpperCase()}/`,
+      ],
+      [
+        "in the v2 form, upper case",
+        `https://login.microsoftonline.com/${TENANT.toUpperCase()}/v2.0`,
+      ],
+    ])("accepts an idp naming this tenant %s", (_label, idp) => {
+      expect(rejectionOf(idToken({ ...full, idp }))).toBeNull();
+    });
+
+    it.each([
+      ["another tenant, v1 form", `https://sts.windows.net/${OTHER_TENANT}/`],
+      [
+        "another tenant, v2 form",
+        `https://login.microsoftonline.com/${OTHER_TENANT}/v2.0`,
+      ],
+      [
+        "the personal account tenant",
+        `https://sts.windows.net/${CONSUMER_TENANT}/`,
+      ],
+      ["live.com", "live.com"],
+      ["a provider name", "google.com"],
+      ["a truncated tenant id", "https://sts.windows.net/ce6d05e1-3c5e/"],
+      ["two tenant ids", `https://sts.windows.net/${TENANT}/${OTHER_TENANT}/`],
+      ["a blank string", "   "],
+      ["a number", 42],
+      ["an object", { tenant: TENANT }],
+      // A provider that only embeds this tenant's GUID is another provider.
+      ["this tenant's GUID on another host", `https://idp.example/${TENANT}/`],
+      ["this tenant's GUID as a bare string", TENANT],
+      [
+        "this tenant's v1 URI with a suffix",
+        `https://sts.windows.net/${TENANT}/extra`,
+      ],
+      [
+        "this tenant's v2 URI with surrounding space",
+        ` https://login.microsoftonline.com/${TENANT}/v2.0 `,
+      ],
+      [
+        "this tenant's GUID under a look-alike host",
+        `https://sts.windows.net.example/${TENANT}/`,
+      ],
+    ])("refuses an idp that is %s", (_label, idp) => {
+      expect(rejectionOf(idToken({ ...full, idp }))).toContain(
+        "names another identity provider"
+      );
+    });
+
+    it("refuses an idp when the configured issuer names no tenant id", () => {
+      // The issuer check passes on string equality, so a configured issuer
+      // with no GUID leaves nothing to compare `idp` against.
+      const domainIssuer =
+        "https://login.microsoftonline.com/oregonstate.edu/v2.0";
+      expect(
+        rejectionOf(
+          idToken({
+            ...full,
+            iss: domainIssuer,
+            idp: `https://sts.windows.net/${TENANT}/`,
+          }),
+          domainIssuer
+        )
+      ).toContain("names another identity provider");
+    });
+
+    it("accepts only the issuer itself when the configured issuer names two tenant ids", () => {
+      // Two GUIDs leave no single tenant to spell, so the STS forms of either
+      // one are not this tenant's.
+      const twoGuidIssuer = `https://login.microsoftonline.com/${TENANT}/${OTHER_TENANT}/v2.0`;
+      const token = (idp: string) =>
+        idToken({ ...full, iss: twoGuidIssuer, idp });
+      expect(
+        rejectionOf(token(`https://sts.windows.net/${TENANT}/`), twoGuidIssuer)
+      ).toContain("names another identity provider");
+      expect(rejectionOf(token(twoGuidIssuer), twoGuidIssuer)).toBeNull();
+    });
+
+    it("never leaks the idp value into the reason", () => {
+      const idp = `https://sts.windows.net/${OTHER_TENANT}/`;
+      const reason = rejectionOf(idToken({ ...full, idp })) ?? "";
+      expect(reason).not.toContain(OTHER_TENANT);
+      expect(reason).not.toContain(full.email);
+    });
+  });
+
   describe("refusal reasons", () => {
     // Better Auth collapses every refusal into one `unable_to_get_user_info`
     // redirect, so the reason exists only in the server log. These assertions
     // are what keep the first live sign-in failure diagnosable rather than a
-    // guessing game between six identical-looking outcomes.
+    // guessing game between seven identical-looking outcomes.
     it("names the wrong tenant", () => {
       const other = "https://login.microsoftonline.com/some-other-tenant/v2.0";
       expect(rejectionOf(idToken({ ...full, iss: other }))).toContain("issuer");

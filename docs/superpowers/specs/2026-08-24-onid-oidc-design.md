@@ -96,11 +96,8 @@ the tenant GUID, rather than added as a fourth environment variable that can fal
 out of step. An empty discovery URL yields an empty issuer and the mapper refuses
 everything, so an unconfigured deployment fails closed.
 
-The check does not make the email trust self-sufficient. A guest invited into the
-OSU tenant carries this tenant's `iss` with a home-tenant email and passes. What
-makes the trust sound is the conjunction of the issuer pin and UIT publishing the
-registration only to engineering-account holders. `idp` differing from `iss` is
-the discriminator for a guest if that ever stops holding.
+The issuer pin alone does not make the email trust self-sufficient; the mapper
+also checks `idp`. `docs/ONID-SSO.md`, "Why single tenant", is current.
 
 Partners do not need multi-tenant anyway: email and password with verification,
 plus GitHub, is already the path for anyone without an ONID.
