@@ -219,6 +219,28 @@ export const holderText = fc.oneof(
 );
 
 /**
+ * Text that `trim()` strips to nothing, so `normalizeEmailAddress` reads it as
+ * no address (#884): the whitespace above and the rarer separators `trim()`
+ * also strips, the byte order mark, line and paragraph separators, ogham and
+ * em spaces, the narrow no-break space, vertical tab and form feed.
+ */
+export const blankText = fc.string({
+  maxLength: 4,
+  minLength: 1,
+  unit: fc.constantFrom(
+    ...WHITESPACE,
+    "\u{FEFF}",
+    "\u{2028}",
+    "\u{2029}",
+    "\u{1680}",
+    "\u{2003}",
+    "\u{202F}",
+    "\u{B}",
+    "\u{C}"
+  ),
+});
+
+/**
  * An address as staff could type it: any `holderText`, or a real address in
  * mixed case and padded, so the write gate's fold has something to fold.
  */

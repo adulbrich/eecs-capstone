@@ -1,17 +1,19 @@
 import { fc, test } from "@fast-check/vitest";
 import { describe, expect, it } from "vitest";
-import { holderText, looseHolder } from "#/test/shared/arbitraries";
+import { blankText, holderText, looseHolder } from "#/test/shared/arbitraries";
 import { normalizeEmailAddress } from "../email-address";
 import {
   formatHoldDetailed,
   formatHoldShort,
   type Hold,
+  type HoldInput,
   holdEmail,
   holdFromInput,
   holdFromJoinedRow,
   holdFromStoredRow,
   holdName,
   holdToColumns,
+  type ResolvedAccount,
 } from "../hold";
 import { assertTransitionAllowed } from "../inventory-workflow";
 
@@ -147,6 +149,28 @@ describe("holdFromInput", () => {
       holdFromInput({ email: "\t" }, { accountId: "u-1", accountName: "Sam" })
     ).toEqual({ kind: "account", accountId: "u-1", email: null, name: "Sam" });
   });
+
+  /** The hold, or the refusal's message, so two builds compare whole. */
+  function built(input: HoldInput, account: ResolvedAccount): Hold | string {
+    try {
+      return holdFromInput(input, account);
+    } catch (e) {
+      return (e as Error).message;
+    }
+  }
+
+  test.prop([looseHolder, holderText, blankText])(
+    "builds the same hold from a blank address as from none (#884)",
+    ({ id, label, name, program }, accountName, address) => {
+      const account = {
+        accountId: id ?? null,
+        accountName: id ? (accountName ?? null) : null,
+      };
+      expect(built({ email: address, label, name, program }, account)).toEqual(
+        built({ email: null, label, name, program }, account)
+      );
+    }
+  );
 
   it("keeps a padded address as typed, for the write gate to fold", () => {
     expect(holdFromInput({ email: " W@In.TEST " }, NO_ACCOUNT)).toEqual({

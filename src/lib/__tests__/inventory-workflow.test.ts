@@ -1,7 +1,7 @@
 import { fc, test } from "@fast-check/vitest";
 import { describe, expect, it } from "vitest";
 import { INVENTORY_ITEM_STATUSES } from "#/lib/vocabularies";
-import { looseHolder } from "#/test/shared/arbitraries";
+import { blankText, looseHolder } from "#/test/shared/arbitraries";
 import { holdFromInput } from "../hold";
 import {
   assertTransitionAllowed,
@@ -332,6 +332,46 @@ describe("assertTransitionAllowed: invariants per status", () => {
       expect(refusal({ holderEmail, nextStatus: "available" })).toBe("allowed");
     }
   });
+
+  test.prop([
+    fc.constantFrom(...ITEM_STATUSES),
+    fc.oneof(
+      looseHolder,
+      fc.constant({
+        email: null,
+        id: null,
+        label: null,
+        name: null,
+        program: null,
+      })
+    ),
+    fc.constantFrom(null, "line-1"),
+    fc.boolean(),
+    blankText,
+  ])(
+    "judges a blank address exactly as no address, on every status (#884)",
+    (nextStatus, {
+      id,
+      label,
+      name,
+      program,
+    }, requestItemId, dated, address) => {
+      // The empty holder is weighted in so each release arm's allowed case
+      // comes up, not only its refusals.
+      const base = {
+        holderId: id,
+        holderLabel: label,
+        holderName: name,
+        holderProgram: program,
+        nextStatus,
+        requestItemId,
+        ...(dated ? { dueAt: LATER } : {}),
+      };
+      expect(refusal({ ...base, holderEmail: address })).toBe(
+        refusal({ ...base, holderEmail: null })
+      );
+    }
+  );
 
   it("counts an id and an address as one person, and a name as neither", () => {
     // Two halves of one identity are one holder. A name and a program are

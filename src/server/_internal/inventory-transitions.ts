@@ -101,29 +101,31 @@ async function resolveHold(tx: Tx, input: TransitionInput): Promise<Hold> {
     name: input.holderName,
     program: input.holderProgram,
   };
-  // Judged trimmed, as the rules judge it: an id beside an address that is
-  // only whitespace is a hold on that account, not a lookup of " " (#884).
-  if (input.holderEmail && normalizeEmailAddress(input.holderEmail)) {
-    // Folded, because a hold staff type as Student@Oregonstate.edu belongs to
-    // the account at student@oregonstate.edu, and matching it exactly stored
-    // the hold as a walk-in beside an account that exists. Written as
-    // `lookupUserByEmailAs` writes it, which asks this same question from the
-    // staff HolderField; `heldByViewer` folds the read side of it.
+  // The address as the write gate stores it, so the branch, the lookup and
+  // the notice all judge it as the rules do (#884): an id beside an address
+  // that is only whitespace is a hold on that account, not a lookup of " ".
+  const address = normalizeEmailAddress(input.holderEmail);
+  if (address) {
+    // Folded and trimmed, because a hold staff type as
+    // Student@Oregonstate.edu belongs to the account at
+    // student@oregonstate.edu, and matching it exactly stored the hold as a
+    // walk-in beside an account that exists. Written as `lookupUserByEmailAs`
+    // writes it, which asks this same question from the staff HolderField;
+    // `heldByViewer` folds the read side of it.
     //
     // This cannot use the unique btree on `user.email`, the tradeoff
     // `claimProjectsForVerifiedUser` names: one seq scan of a table this size,
     // inside the transaction, against a hold that never resolves otherwise.
     //
-    // The typed address is still what gets stored. Normalizing on write is
-    // #249, the follow-up #196's triage said a third comparison site would
-    // open.
+    // The hold carries the folded address too, so the notice goes to the
+    // address that is stored (#249, ADR-0015) rather than to the typed one.
     const [match] = await tx
       .select({ id: user.id, name: user.name })
       .from(user)
-      .where(eq(sql`lower(${user.email})`, input.holderEmail.toLowerCase()))
+      .where(eq(sql`lower(${user.email})`, address))
       .limit(1);
     return holdFromInput(
-      { ...loose, email: input.holderEmail },
+      { ...loose, email: address },
       { accountId: match?.id ?? null, accountName: match?.name ?? null }
     );
   }
