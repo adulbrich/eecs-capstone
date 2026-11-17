@@ -6,6 +6,7 @@ import {
   ChartLine,
   FolderKanban,
   Handshake,
+  Inbox,
   Package,
   Shuffle,
   Tag,
@@ -64,26 +65,138 @@ function AlertCardBody({ label, value }: { label: string; value: number }) {
   );
 }
 
-interface NavCard {
+interface HubLink {
+  adminOnly?: boolean;
   description: string;
   icon: React.ElementType;
   label: string;
   to: string;
 }
 
-function NavCard({ to, icon: Icon, label, description }: NavCard) {
+interface HubGroup {
+  label: string;
+  links: HubLink[];
+}
+
+// Grouped by the work, not by the table: a term's project pipeline first,
+// then the shared inventory, then the setup that changes once a term, then
+// the site-wide reports and accounts. From `xl` the four groups sit in one
+// row, which is why this page widens to `max-w-7xl` there (UI-CONVENTIONS,
+// "Mobile-first layout").
+const GROUPS: HubGroup[] = [
+  {
+    label: "Projects",
+    links: [
+      {
+        description: "Review, approve, and manage all projects",
+        icon: FolderKanban,
+        label: "Projects",
+        to: "/admin/projects",
+      },
+      {
+        description: "Place students on project teams from their bids",
+        icon: Shuffle,
+        label: "Placement",
+        to: "/admin/placement",
+      },
+      {
+        description: "See who volunteered to mentor and set capacity",
+        icon: Handshake,
+        label: "Mentors",
+        to: "/admin/mentors",
+      },
+    ],
+  },
+  {
+    label: "Inventory",
+    links: [
+      {
+        description: "Add items and manage checkouts",
+        icon: Package,
+        label: "Items",
+        to: "/admin/inventory",
+      },
+      {
+        description: "Approve and hand out requested items",
+        icon: Inbox,
+        label: "Request queue",
+        to: "/admin/inventory/requests",
+      },
+    ],
+  },
+  {
+    label: "Setup",
+    links: [
+      {
+        description: "Manage course programs and instructors",
+        icon: BookOpen,
+        label: "Programs",
+        to: "/admin/programs",
+      },
+      {
+        description: "Add and edit project category tags",
+        icon: Tag,
+        label: "Categories",
+        to: "/admin/categories",
+      },
+    ],
+  },
+  {
+    label: "Site",
+    links: [
+      {
+        description: "Counts, waits and flows over the app's own data",
+        icon: BarChart3,
+        label: "Analytics",
+        to: "/admin/analytics",
+      },
+      {
+        description: "Page views and visits on the public pages",
+        icon: ChartLine,
+        label: "Traffic",
+        to: "/admin/traffic",
+      },
+      {
+        adminOnly: true,
+        description: "Manage roles, bans, and accounts",
+        icon: Users,
+        label: "Users",
+        to: "/admin/users",
+      },
+    ],
+  },
+];
+
+function HubGroupPanel({ group }: { group: HubGroup }) {
+  const headingId = `admin-group-${group.label.toLowerCase()}`;
   return (
-    <Card
-      asChild
-      className="hover:bg-secondary flex items-start gap-3 p-4 transition-colors"
-    >
-      <Link to={to}>
-        <Icon className="text-muted-foreground mt-0.5 h-5 w-5 shrink-0" />
-        <div>
-          <p className="text-sm font-medium">{label}</p>
-          <p className="text-muted-foreground mt-0.5 text-xs">{description}</p>
-        </div>
-      </Link>
+    <Card aria-labelledby={headingId} asChild className="overflow-hidden">
+      <section>
+        <h2
+          className="text-muted-foreground border-b px-4 py-2 text-xs font-medium tracking-wide uppercase"
+          id={headingId}
+        >
+          {group.label}
+        </h2>
+        <ul className="divide-y">
+          {group.links.map(({ to, icon: Icon, label, description }) => (
+            <li key={to}>
+              <Link
+                className="hover:bg-secondary flex items-start gap-3 px-4 py-3 transition-colors"
+                to={to}
+              >
+                <Icon className="text-muted-foreground mt-0.5 h-5 w-5 shrink-0" />
+                <div>
+                  <p className="text-sm font-medium">{label}</p>
+                  <p className="text-muted-foreground mt-0.5 text-xs">
+                    {description}
+                  </p>
+                </div>
+              </Link>
+            </li>
+          ))}
+        </ul>
+      </section>
     </Card>
   );
 }
@@ -92,20 +205,24 @@ function AdminHome() {
   const { submitted, pendingRequests } = Route.useLoaderData();
   const { user } = Route.useRouteContext();
   const viewerIsAdmin = isAdmin(user);
+  const groups = GROUPS.map((group) => ({
+    ...group,
+    links: group.links.filter((link) => viewerIsAdmin || !link.adminOnly),
+  })).filter((group) => group.links.length > 0);
 
   return (
-    <div className="mx-auto max-w-2xl px-4 py-6 md:p-8">
+    <div className="mx-auto max-w-4xl px-4 py-6 md:p-8 xl:max-w-7xl">
       <h1 className="text-2xl font-semibold">Admin</h1>
 
       {/* A work queue, not a statistic: the two cards turn coloured and link
           into a pre-filtered list when non-zero. The overview counts that
           used to sit above them moved to /admin/analytics, where a date
           range and a program selector make them mean something (#34). */}
-      <section className="mt-6">
-        <h2 className="text-muted-foreground text-xs font-medium tracking-wide uppercase">
+      <section aria-labelledby="admin-attention" className="mt-6">
+        <h2 className="sr-only" id="admin-attention">
           Needs attention
         </h2>
-        <div className="mt-2 grid gap-3 sm:grid-cols-2">
+        <div className="grid gap-3 md:grid-cols-2">
           {submitted > 0 ? (
             <Link
               className={ALERT_CARD_CLASS}
@@ -117,10 +234,13 @@ function AdminHome() {
               style={ALERT_CARD_STYLE}
               to="/admin/projects"
             >
-              <AlertCardBody label="Awaiting review" value={submitted} />
+              <AlertCardBody
+                label="Projects awaiting review"
+                value={submitted}
+              />
             </Link>
           ) : (
-            <StatCard label="Awaiting review" value={submitted} />
+            <StatCard label="Projects awaiting review" value={submitted} />
           )}
           {pendingRequests > 0 ? (
             <Link
@@ -140,69 +260,11 @@ function AdminHome() {
         </div>
       </section>
 
-      <section className="mt-8">
-        <h2 className="text-muted-foreground text-xs font-medium tracking-wide uppercase">
-          Manage
-        </h2>
-        <div className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-2">
-          <NavCard
-            description="Counts, waits and flows over the app's own data"
-            icon={BarChart3}
-            label="Analytics"
-            to="/admin/analytics"
-          />
-          <NavCard
-            description="Page views and visits on the public pages"
-            icon={ChartLine}
-            label="Traffic"
-            to="/admin/traffic"
-          />
-          <NavCard
-            description="Review, approve, and manage all projects"
-            icon={FolderKanban}
-            label="Projects"
-            to="/admin/projects"
-          />
-          <NavCard
-            description="Add and edit project category tags"
-            icon={Tag}
-            label="Categories"
-            to="/admin/categories"
-          />
-          <NavCard
-            description="Manage course programs and instructors"
-            icon={BookOpen}
-            label="Programs"
-            to="/admin/programs"
-          />
-          <NavCard
-            description="Place students on project teams from their bids"
-            icon={Shuffle}
-            label="Placement"
-            to="/admin/placement"
-          />
-          <NavCard
-            description="Add items, review requests, manage checkouts"
-            icon={Package}
-            label="Inventory"
-            to="/admin/inventory"
-          />
-          <NavCard
-            description="See who volunteered to mentor and set capacity"
-            icon={Handshake}
-            label="Mentors"
-            to="/admin/mentors"
-          />
-          {viewerIsAdmin && (
-            <NavCard
-              description="Manage roles, bans, and accounts"
-              icon={Users}
-              label="Users"
-              to="/admin/users"
-            />
-          )}
-        </div>
-      </section>
+      <div className="mt-8 grid items-start gap-4 md:grid-cols-2 xl:grid-cols-4">
+        {groups.map((group) => (
+          <HubGroupPanel group={group} key={group.label} />
+        ))}
+      </div>
     </div>
   );
 }
