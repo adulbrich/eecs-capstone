@@ -44,9 +44,10 @@
  * holder `" "` pass both rules and be stored with no holder at all.
  *
  * Judged, not rewritten: `holdFromInput` carries the address it is given,
- * and `holdToColumns` is the only place that folds it. The server path,
- * `resolveHold`, hands it the folded address already, so the lookup and the
- * notice use the form that is stored.
+ * and `holdToColumns` stays the write gate that folds it. When a caller
+ * supplies an address, `resolveHold` folds it first, so the account lookup
+ * and the notice use the form that is stored; on the id path the address is
+ * the account's own, as `user.email` holds it.
  *
  * Only the address, because only the address is folded on write. A label,
  * name or program is stored as typed, so a whitespace label is a value the
@@ -194,8 +195,8 @@ export function holdFromInput(
 /**
  * Flattens a hold back onto the five columns.
  *
- * The address is lowercased here and only here, which makes this the write
- * gate for the two holder columns: `transitionItemInTx` builds both the item
+ * The address is lowercased and trimmed here, whatever form the hold carries,
+ * which makes this the write gate for the two holder columns: `transitionItemInTx` builds both the item
  * update and the history row from what this returns, so neither can carry an
  * address the other does not (#249). The read constructors above deliberately
  * do not normalize, because an unjoined read must report what is stored.
