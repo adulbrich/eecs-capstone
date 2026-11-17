@@ -323,8 +323,10 @@ describe("asking for a new code on the code step", () => {
     expect(field.value).toBe("");
     expect(screen.queryByRole("status")).toBeNull();
     expect(countdown()?.textContent).toContain("in 1:00.");
-    // The button went with the restarted wait, so focus cannot stay on it.
+    // The button went with the restarted wait, so focus cannot stay on it,
+    // and the message is about the browser, not the code under it.
     expect(document.activeElement).toBe(field);
+    expect(document.getElementById("code-otp-error")).toBeNull();
   });
 
   it("counts down without announcing every second", async () => {

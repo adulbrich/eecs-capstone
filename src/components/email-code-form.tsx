@@ -108,9 +108,11 @@ export const RESEND_AFTER_SECONDS = 60;
  * Whole seconds until a new code may be asked for, given when the last send
  * succeeded and the latest tick, both in epoch milliseconds.
  *
- * Capped at the full wait, because the wall clock can step backward (an NTP
- * correction, a hand-set clock): uncapped, a step back of an hour read
- * "60:59" and hid the button for longer than the code lives.
+ * Capped at the full wait, so the countdown never reads more than `1:00`
+ * whatever the two clocks say. A wall clock that steps backward (an NTP
+ * correction, a hand-set clock) is handled by the tick, which pulls `sentAt`
+ * back to it; the cap alone would hold the button back until the clock
+ * caught up.
  */
 export function resendWaitLeft(sentAt: number, lastTick: number): number {
   return Math.min(
@@ -126,6 +128,17 @@ export function resendWaitLeft(sentAt: number, lastTick: number): number {
 export function minutesAndSeconds(seconds: number): string {
   return `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, "0")}`;
 }
+
+/** When a send was refused with no message of its own. */
+const SEND_FAILED = "Could not send a code. Try again.";
+
+/**
+ * What asking for a code came to. A refusal with nothing sent stops the form
+ * where it is; one after a send (the cookie check) still restarted the wait.
+ */
+type CodeRequest =
+  | { sent: false; refusal: string }
+  | { sent: true; refusal: string | null };
 
 /** Written and read back to find out whether this browser keeps cookies. */
 const COOKIE_PROBE = "capstone_cookie_probe";
@@ -217,12 +230,13 @@ export function EmailCodeForm({
   const codeField = useRef<HTMLInputElement>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
-  // "We sent a new code", after a resend, through `SavedNote`: a result the
-  // reader asked for, announced politely rather than as an alert.
+  // "We asked for a new code", after a resend, through `SavedNote`: a result
+  // the reader asked for, announced politely rather than as an alert.
   const [notice, setNotice] = useState<string | null>(null);
-  // Its refusal renders under its own button through `resend.error`, not in
-  // `error`, which would mark the code field invalid when the code is fine.
-  const resend = useAction({ fallback: "Could not send a code. Try again." });
+  // Its refusals, the cookie check's included, render under its button
+  // through `resend.error`, not in `error`, which would mark the code field
+  // invalid when nothing is wrong with the code.
+  const resend = useAction({ fallback: SEND_FAILED });
   // Either request locks the step: an answer about this address must not land
   // on the next one's, and a new code must not wipe a draft typed meanwhile.
   const busy = loading || resend.busy;
@@ -262,6 +276,15 @@ export function EmailCodeForm({
       codeField.current?.focus();
     }
   }, [error, notice]);
+  // A resend refused after it went out (the cookie check) restarted the wait,
+  // so the button that had focus is gone too. A refusal before a send leaves
+  // the wait over and the button, and focus, where they were.
+  const refusedAfterSend = resend.error !== null && waiting;
+  useEffect(() => {
+    if (refusedAfterSend) {
+      codeField.current?.focus();
+    }
+  }, [refusedAfterSend]);
 
   async function sendCode(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -286,10 +309,10 @@ export function EmailCodeForm({
    *
    * A refusal (a rate limit) leaves the wait where it was and keeps the
    * draft: the server refuses before it replaces the code, so the old one
-   * still works. A send that never answered may have
-   * replaced it, and this cannot tell; Confirm then says so and the button is
-   * still there. A send that went out empties the draft and restarts the wait
-   * even when the cookie check then fails, because the earlier code is dead.
+   * still works. A send that never answered may have replaced it, and this
+   * cannot tell; Confirm then says so and the button is still there. A send
+   * that went out empties the draft and restarts the wait even when the
+   * cookie check then fails, because the earlier code is dead.
    */
   function resendCode() {
     // `run` holds the ref guard, so a second click in the same tick returns
@@ -297,18 +320,12 @@ export function EmailCodeForm({
     return resend.run(async () => {
       setError(null);
       setNotice(null);
-      const { sent, refusal } = await requestCode(email);
-      if (sent) {
+      const request = await requestCode(email);
+      if (request.sent) {
         setDraft("");
       }
-      if (refusal && sent) {
-        // About this browser, not this send, and the button that had focus
-        // is gone with the restarted wait: the form's own error slot.
-        setError(refusal);
-        return;
-      }
-      if (refusal) {
-        throw new Error(refusal);
+      if (request.refusal) {
+        throw new Error(request.refusal);
       }
       // Hedged, because a send past the hourly cap (ADR-0046) answers
       // success without sending or replacing anything, so that the answer
@@ -325,9 +342,7 @@ export function EmailCodeForm({
    * stop. Restarts the wait for a send that went out, whatever the cookie
    * check then says.
    */
-  async function requestCode(
-    address: string
-  ): Promise<{ sent: boolean; refusal: string | null }> {
+  async function requestCode(address: string): Promise<CodeRequest> {
     const { error: sendError } = await reach(
       authClient.emailOtp.sendVerificationOtp({
         email: address,
@@ -340,7 +355,7 @@ export function EmailCodeForm({
       // rate limit) rather than "no such account".
       return {
         sent: false,
-        refusal: sendError.message || "Could not send a code. Try again.",
+        refusal: sendError.message || SEND_FAILED,
       };
     }
     startWait();
