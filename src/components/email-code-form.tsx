@@ -233,9 +233,9 @@ export function EmailCodeForm({
   // "We asked for a new code", after a resend, through `SavedNote`: a result
   // the reader asked for, announced politely rather than as an alert.
   const [notice, setNotice] = useState<string | null>(null);
-  // Its refusals, the cookie check's included, render under its button
-  // through `resend.error`, not in `error`, which would mark the code field
-  // invalid when nothing is wrong with the code.
+  // Its refusals, the cookie check's included, render in the resend slot
+  // below Confirm through `resend.error`, not in `error`, which would mark
+  // the code field invalid when nothing is wrong with the code.
   const resend = useAction({ fallback: SEND_FAILED });
   // Either request locks the step: an answer about this address must not land
   // on the next one's, and a new code must not wipe a draft typed meanwhile.
