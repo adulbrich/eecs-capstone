@@ -284,8 +284,12 @@ describe("holdToColumns, for every hold holdFromInput builds", () => {
     }
   }
 
-  /** The one hold the round trip loses; see the example below. */
-  function blankWalkIn(hold: Hold): boolean {
+  /**
+   * The one hold the round trip loses: a walk-in whose address is whitespace
+   * only, any of it `trim()` strips, the no-break and ideographic spaces
+   * included. See the example below.
+   */
+  function unstorableWalkIn(hold: Hold): boolean {
     return (
       hold.kind === "walk_in" && normalizeEmailAddress(hold.email) === null
     );
@@ -303,7 +307,10 @@ describe("holdToColumns, for every hold holdFromInput builds", () => {
             accountName: id ? (accountName ?? null) : null,
           }
         );
-      } catch {
+      } catch (e) {
+        // A person and a label together, which has no hold to store. Any
+        // other throw is a bug in the constructor, not a skipped run.
+        expect((e as Error).message).toMatch(/on a person or on a thing/u);
         fc.pre(false);
         return;
       }
@@ -311,7 +318,7 @@ describe("holdToColumns, for every hold holdFromInput builds", () => {
       const onAPerson =
         columns.currentHolderId !== null || columns.currentHolderEmail !== null;
       expect(onAPerson && columns.currentHolderLabel !== null).toBe(false);
-      if (!blankWalkIn(hold)) {
+      if (!unstorableWalkIn(hold)) {
         expect(holdFromStoredRow(columns)).toEqual(asStored(hold));
       }
     }
