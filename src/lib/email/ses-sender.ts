@@ -78,8 +78,9 @@ export class SesEmailSender implements EmailSender {
  * so 10 s is generous headroom over any plausible healthy send.
  *
  * The bound is per send, not per request. `approveRequestLinesAs` emails once
- * per line in sequence, so approving six lines during an SES stall reaches
- * the ALB's 60 s idle timeout and answers 504 after the approvals committed.
+ * per line in sequence, so approving six or more lines during an SES stall
+ * meets the ALB's 60 s idle timeout and answers 504 after the approvals
+ * committed.
  */
 export const SES_SEND_TIMEOUT_MS = 10_000;
 
