@@ -613,7 +613,7 @@ describe("CommentThread reply form under any interleaving", () => {
     owner: number | null;
   }
 
-  /** Steps in a run, and so the most submits that can reach the server. */
+  /** Steps in a run, and so at most this many submits reach the server. */
   const MAX_STEPS = 6;
 
   const step = fc.constantFrom<Step>("submit", "cancel", "reopen");
