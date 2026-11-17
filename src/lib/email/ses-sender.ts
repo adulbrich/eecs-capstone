@@ -58,6 +58,26 @@ export class SesEmailSender implements EmailSender {
 }
 
 /**
+ * The SDK's default handler sets no request timeout, so without this a stalled
+ * SES call holds whatever awaits it for as long as the socket stays open: the
+ * sign-in code form, or a save that has already committed and is waiting on
+ * its notice, the shape #618 fixed for Bedrock and #621 for S3 (#708). The
+ * signal is shared by every attempt, so a stall costs the bound plus the SDK's
+ * retry backoff rather than a fresh bound per retry. A timed-out send rejects
+ * like any other SES error, and every caller already catches and logs that.
+ *
+ * Too tight is the worse mistake here. The sign-in send answers success
+ * whether or not the mail went, so a send cut off that would have landed is a
+ * code that never arrives, with nothing on the page to say so. The bound also
+ * covers resolving the task role's credentials and the TLS handshake on a
+ * cold client, not just the call. `SendEmail` is one in-region request with a
+ * body of a few kilobytes, normally well under a second, so 10 s is ample
+ * headroom and still well inside the ALB's 60 s idle timeout. Each notifier
+ * sends one email, so one request waits on at most one bound.
+ */
+export const SES_SEND_TIMEOUT_MS = 10_000;
+
+/**
  * One client per region, for the life of the process.
  *
  * Keyed rather than a single slot because the key is the whole point: an
@@ -92,8 +112,13 @@ export function createSesEmailSender(config: SesSenderConfig): SesEmailSender {
   if (!config.from) {
     throw new Error("EMAIL_FROM must be set when EMAIL_TRANSPORT=ses");
   }
+  // A fresh signal per send: `auth.ts` builds this sender once at module
+  // scope, so a signal made out here would time out once and then abort every
+  // later send before it started.
   const sendCommand: SesSendFn = (input) =>
-    getSesClient(config.region).send(new SendEmailCommand(input));
+    getSesClient(config.region).send(new SendEmailCommand(input), {
+      abortSignal: AbortSignal.timeout(SES_SEND_TIMEOUT_MS),
+    });
   // Deliberately not required: the ECS task definition always passes
   // EMAIL_REPLY_TO, as an empty string until an address is decided, and email
   // must not stop working for want of one.
