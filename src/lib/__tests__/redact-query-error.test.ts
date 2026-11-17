@@ -198,6 +198,17 @@ describe("redactQueryError, on an address outside a query", () => {
     );
   });
 
+  it("stays linear on a long run with no address in it, which a stranger can send", () => {
+    // Quadratic before the lookbehind: 40,000 characters took a second, and
+    // this length about six.
+    const runs = ["a".repeat(100_000), "a.".repeat(50_000)];
+    const started = performance.now();
+    for (const run of runs) {
+      expect(redactQueryError(run)).toBe(run);
+    }
+    expect(performance.now() - started).toBeLessThan(500);
+  });
+
   it("leaves a scoped package path alone", () => {
     const text =
       "Cannot find module '/app/node_modules/@aws-sdk/client-sesv2/dist/index.js'";

@@ -116,9 +116,15 @@ function scrubQueryText(text: string): string {
  * needs a dot between its labels, which is what keeps a scoped package path
  * such as `node_modules/@aws-sdk/client-sesv2` intact: its label meets a `/`
  * before any dot.
+ *
+ * The lookbehind is what keeps this linear. Without it a long run of
+ * local-part characters with no `@` is rescanned from every position in it,
+ * and this runs on text a stranger chooses (Better Auth logs a rejected
+ * callbackURL word for word): 40,000 characters held the event loop for a
+ * second. With it a match can start only where a run starts.
  */
 const ADDRESS =
-  /[A-Za-z0-9_'+.%!#$&*/=?^`{|}~-]+@[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)+/gu;
+  /(?<![A-Za-z0-9_'+.%!#$&*/=?^`{|}~-])[A-Za-z0-9_'+.%!#$&*/=?^`{|}~-]+@[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)+/gu;
 
 function redactAddresses(text: string): string {
   return text.replace(ADDRESS, "[address redacted]");
