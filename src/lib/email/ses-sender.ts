@@ -58,6 +58,44 @@ export class SesEmailSender implements EmailSender {
 }
 
 /**
+ * The SDK's default handler sets no request timeout, so without this a stalled
+ * SES call holds whatever awaits it for as long as the socket stays open: the
+ * sign-in code form, or a save that has already committed and is waiting on
+ * its notice, the shape #618 fixed for Bedrock and #621 for S3 (#708). The
+ * signal is shared by every attempt, and the SDK races its retry backoff
+ * against it and never retries the abort, so a stall costs the bound once.
+ * A timed-out send rejects like any other SES error, and every caller already
+ * catches and logs that through `redactQueryError`. A send cut off mid-flight
+ * logs "AbortError: Request aborted <- TimeoutError: The operation was aborted
+ * due to timeout"; one cut off during a retry's backoff logs the first half
+ * only.
+ *
+ * Too tight is the worse mistake here. The sign-in send answers success
+ * whether or not the mail went, so a send cut off that would have landed is a
+ * code that never arrives, with nothing on the page to say so. Time spent
+ * resolving the task role's credentials counts against the bound, though the
+ * bound does not cut a stalled credential fetch short; the provider's own
+ * timeouts do.
+ *
+ * Sized from the production ALB logs, September to 17 November 2026, since
+ * SES publishes no latency metric: the eight requests that each sent one
+ * email (a sign-in code, three cart submissions, three line approvals, a
+ * project submission) took 0.15 s to 0.34 s end to end, database work
+ * included. None is known to be a task's first send, which pays for the TLS
+ * handshake and the credential fetch, and a cold task runs several times
+ * slower than a warm one (docs/load-tests/2026-09-21-post-fix-verification.md).
+ * 10 s is thirty times the slowest warm-or-unknown send, chosen over a
+ * tighter 5 s because a cut-off sign-in code fails silently while a longer
+ * bound costs only during an SES outage.
+ *
+ * The bound is per send, not per request. `approveRequestLinesAs` emails once
+ * per line in sequence, so approving about six or more lines during an SES
+ * stall meets the ALB's 60 s idle timeout and answers 504 after the approvals
+ * committed.
+ */
+export const SES_SEND_TIMEOUT_MS = 10_000;
+
+/**
  * One client per region, for the life of the process.
  *
  * Keyed rather than a single slot because the key is the whole point: an
@@ -92,8 +130,13 @@ export function createSesEmailSender(config: SesSenderConfig): SesEmailSender {
   if (!config.from) {
     throw new Error("EMAIL_FROM must be set when EMAIL_TRANSPORT=ses");
   }
+  // A fresh signal per send: `auth.ts` builds this sender once at module
+  // scope, so a signal made out here would time out once and then abort every
+  // later send before it started.
   const sendCommand: SesSendFn = (input) =>
-    getSesClient(config.region).send(new SendEmailCommand(input));
+    getSesClient(config.region).send(new SendEmailCommand(input), {
+      abortSignal: AbortSignal.timeout(SES_SEND_TIMEOUT_MS),
+    });
   // Deliberately not required: the ECS task definition always passes
   // EMAIL_REPLY_TO, as an empty string until an address is decided, and email
   // must not stop working for want of one.
