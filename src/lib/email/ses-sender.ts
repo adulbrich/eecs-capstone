@@ -79,15 +79,19 @@ export class SesEmailSender implements EmailSender {
  * SES publishes no latency metric: the eight requests that each sent one
  * email (a sign-in code, three cart submissions, three line approvals, a
  * project submission) took 0.15 s to 0.34 s end to end, database work
- * included. 5 s is fifteen times the slowest, the same bound as an S3 delete,
- * which is the same shape of call.
+ * included. None is known to be a task's first send, which pays for the TLS
+ * handshake and the credential fetch, and a cold task runs several times
+ * slower than a warm one (docs/load-tests/2026-09-21-post-fix-verification.md).
+ * 10 s is thirty times the slowest warm-or-unknown send, chosen over a
+ * tighter 5 s because a cut-off sign-in code fails silently while a longer
+ * bound costs only during an SES outage.
  *
  * The bound is per send, not per request. `approveRequestLinesAs` emails once
- * per line in sequence, so approving twelve or more lines during an SES stall
- * meets the ALB's 60 s idle timeout and answers 504 after the approvals
+ * per line in sequence, so approving about six or more lines during an SES
+ * stall meets the ALB's 60 s idle timeout and answers 504 after the approvals
  * committed.
  */
-export const SES_SEND_TIMEOUT_MS = 5000;
+export const SES_SEND_TIMEOUT_MS = 10_000;
 
 /**
  * One client per region, for the life of the process.
