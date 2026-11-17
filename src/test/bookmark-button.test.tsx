@@ -318,9 +318,18 @@ describe("BookmarkButton under any interleaving", () => {
     { maxLength: MAX_STEPS, size: "max" }
   );
 
-  /** Lets a settled call reach the button: Query notifies on a macrotask. */
+  const macrotask = () => new Promise((resolve) => setTimeout(resolve, 0));
+
+  /**
+   * Lets a settled call reach the button. Two macrotasks: Query notifies its
+   * observers on a timer of its own, which the click's microtasks register
+   * after the first one here.
+   */
   async function flush() {
-    await act(() => new Promise((resolve) => setTimeout(resolve, 0)));
+    await act(async () => {
+      await macrotask();
+      await macrotask();
+    });
   }
 
   const showsSet = (button: HTMLElement) =>
