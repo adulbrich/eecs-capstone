@@ -350,6 +350,9 @@ Semantic aliases adapt to dark mode; raw palette classes do not.
 | `dark:bg-neutral-900` | `dark:bg-card` |
 | `dark:border-neutral-800` | `dark:border-border` |
 
+Biome's `noTailwindRawColors` fails every raw palette class in the table, but lets
+`bg-white` and `text-black` through by design, so those two stay review's job.
+
 A brand-colored link uses `text-brand-dark`, not `text-brand`. Beaver Orange on
 white is 4.56:1, a margin of 0.06 over AA, so a row hover, a selected state or a
 status background under it fails, and on the page surface it is already 4.27:1;
@@ -1320,11 +1323,13 @@ belonging to something else.
 **Query invalidation names its keys.** A bare `queryClient.invalidateQueries()`
 refetches every query on the page, including the ones the mutation cannot have
 touched, which is slow and hides which key actually mattered.
+`biome-plugins/query-cache.grit` fails a bare call.
 
 **`router.invalidate()` is awaited inside the busy window**, not fired and
 forgotten. Loader data is what the control is about to be re-enabled over; a
 fire-and-forget invalidate re-enables it over the stale copy, and the reader
-sees the old value with a live button beside it.
+sees the old value with a live button beside it. The same plugin fails a
+`void router.invalidate()`.
 
 **A refresh a component takes as a prop returns a promise, and the child awaits
 it.** `onChanged`, `onDone` and their kin are typed `() => Promise<void>`, never

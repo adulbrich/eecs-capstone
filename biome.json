@@ -1,6 +1,7 @@
 {
   "$schema": "./node_modules/@biomejs/biome/configuration_schema.json",
   "extends": ["ultracite/biome/core", "ultracite/biome/react"],
+  "plugins": ["./biome-plugins/query-cache.grit"],
   "vcs": {
     "enabled": true,
     "clientKind": "git",
@@ -38,14 +39,13 @@
           }
         }
       },
-      "complexity": {
-        "noVoid": "off"
-      },
       "correctness": {
         "useImageSize": "off"
       },
+      "nursery": {
+        "noTailwindRawColors": "error"
+      },
       "suspicious": {
-        "noAlert": "on",
         "noLeakedRender": "off"
       },
       "performance": {
@@ -100,6 +100,21 @@
       }
     },
     {
+      "includes": [
+        "**/src/test/e2e/**",
+        "**/src/test/a11y/**",
+        "**/src/test/shared/**"
+      ],
+      "linter": {
+        "rules": {
+          "suspicious": {
+            "noPlaywrightNetworkidle": "error",
+            "noPlaywrightWaitForTimeout": "error"
+          }
+        }
+      }
+    },
+    {
       "includes": ["**/src/components/institution-logo.tsx"],
       "linter": {
         "rules": {
@@ -111,12 +126,6 @@
     }
   ],
   "assist": {
-    "enabled": true,
-    "actions": {
-      "source": {
-        "useSortedKeys": "off",
-        "useSortedTypeFields": "off"
-      }
-    }
+    "enabled": true
   }
 }

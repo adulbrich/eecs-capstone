@@ -292,7 +292,7 @@ async function transitionItemInTx(
 
   let closed: ClosedLine | null = null;
   if (input.requestItemId) {
-    await syncRequestItem(tx, input);
+    await syncRequestItem(tx, input.requestItemId, input);
   } else if (current.currentRequestItemId) {
     // Item is leaving a hold context; close the line.
     closed = await closeRequestItemOnRelease(
@@ -319,9 +319,7 @@ async function transitionItemInTx(
   return notice;
 }
 
-async function syncRequestItem(tx: Tx, input: TransitionInput) {
-  // biome-ignore lint/style/noNonNullAssertion: syncRequestItem only runs for request-linked transitions
-  const id = input.requestItemId!;
+async function syncRequestItem(tx: Tx, id: string, input: TransitionInput) {
   switch (input.nextStatus) {
     case "reserved":
       await tx
