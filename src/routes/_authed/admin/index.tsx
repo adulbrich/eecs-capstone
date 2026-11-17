@@ -12,6 +12,7 @@ import {
   Tag,
   Users,
 } from "lucide-react";
+import { useId } from "react";
 import { Card } from "#/components/ui/card";
 import { requireStaff } from "#/lib/access-denied";
 import { pageTitle } from "#/lib/page-title";
@@ -83,7 +84,7 @@ interface HubGroup {
 // the site-wide reports and accounts. From `xl` the four groups sit in one
 // row, which is why this page widens to `max-w-7xl` there (UI-CONVENTIONS,
 // "Mobile-first layout").
-const GROUPS: HubGroup[] = [
+const HUB_GROUPS: HubGroup[] = [
   {
     label: "Projects",
     links: [
@@ -168,7 +169,7 @@ const GROUPS: HubGroup[] = [
 ];
 
 function HubGroupPanel({ group }: { group: HubGroup }) {
-  const headingId = `admin-group-${group.label.toLowerCase()}`;
+  const headingId = useId();
   return (
     <Card aria-labelledby={headingId} asChild className="overflow-hidden">
       <section>
@@ -205,7 +206,7 @@ function AdminHome() {
   const { submitted, pendingRequests } = Route.useLoaderData();
   const { user } = Route.useRouteContext();
   const viewerIsAdmin = isAdmin(user);
-  const groups = GROUPS.map((group) => ({
+  const groups = HUB_GROUPS.map((group) => ({
     ...group,
     links: group.links.filter((link) => viewerIsAdmin || !link.adminOnly),
   })).filter((group) => group.links.length > 0);
