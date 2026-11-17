@@ -226,6 +226,8 @@ describe("redactQueryError, on an address outside a query", () => {
     ["an @ after every character", "a@".repeat(50_000)],
     ["a domain that never ends in a letter", `x@${"1.".repeat(50_000)}`],
     ["a chain of addresses", "a@x.co+".repeat(14_000)],
+    ["one URL authority full of @", `//a@${"b@".repeat(50_000)}`],
+    ["URLs with userinfo", "//a@b.co/".repeat(11_000)],
   ])("stays linear on %s, which a stranger can send", (_shape, input) => {
     // An unanchored regex rescanned a run from every position: 40,000
     // characters took a second, and 100,000 about six. The first call pays
@@ -243,9 +245,27 @@ describe("redactQueryError, on an address outside a query", () => {
   it.each([
     "installed @aws-sdk/client-sesv2@3.700.0",
     "installed drizzle-orm@0.44.2",
+    "installed react@18.x and @types/node@20.x",
     "in .pnpm/@aws-sdk+client-sesv2@3.600.0/node_modules",
   ])("leaves a versioned package alone: %j", (text) => {
     expect(redactQueryError(text)).toBe(text);
+  });
+
+  it.each([
+    ["https://x@evil.com/cb", "https://[address redacted]@evil.com/cb"],
+    [
+      "https://capstone.oregonstate.edu@evil.com/",
+      "https://[address redacted]@evil.com/",
+    ],
+    ["https://a@b.co@evil.com/cb", "https://[address redacted]@evil.com/cb"],
+    [
+      "postgres://u:p@db.internal:5432/x",
+      "postgres://[address redacted]@db.internal:5432/x",
+    ],
+    ["mailto:a@b.co", "mailto:[address redacted]"],
+  ])("redacts a URL's userinfo and keeps its host: %j", (text, expected) => {
+    // Userinfo in a callbackURL is how a stranger would hide where it points.
+    expect(redactQueryError(text)).toBe(expected);
   });
 
   it("keeps a URL's host and path when its query names an address", () => {

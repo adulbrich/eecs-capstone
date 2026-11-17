@@ -118,10 +118,14 @@ function scrubQueryText(text: string): string {
  * set: with `/`, `=` and `?` in it, `https://site.edu/x?r=a@b.co` lost its
  * host and path to the match, which let a stranger blank the target out of a
  * logged callbackURL. The domain
- * needs a dot between its labels and a last label that starts with a letter,
- * as `z.email()` requires of a top-level domain. That keeps a scoped package
- * intact, as a path (`node_modules/@aws-sdk/client-sesv2`, whose label meets
- * a `/` first) and with a version (`@aws-sdk/client-sesv2@3.700.0`).
+ * needs a dot between its labels and ends, as `z.email()` requires, in a
+ * label of two or more letters. That keeps a package intact, as a scoped path
+ * (`node_modules/@aws-sdk/client-sesv2`, whose label meets a `/` first) and
+ * with a numeric version (`@aws-sdk/client-sesv2@3.700.0`, `react@18.x`). A
+ * version that ends in a word, `1.0.0-alpha.beta`, reads as a domain and is
+ * redacted, as is a dotted word straight after an address: without a list of
+ * top-level domains there is no telling them apart, and more redaction is the
+ * safe way to be wrong.
  *
  * A scan from each `@` rather than one regex, because this runs on text a
  * stranger chooses (Better Auth logs a rejected callbackURL word for word)
@@ -134,8 +138,25 @@ function scrubQueryText(text: string): string {
  * character is visited a bounded number of times.
  */
 const LOCAL_CHAR = /[A-Za-z0-9_'+.-]/u;
-const DOMAIN = /(?:[A-Za-z0-9-]+\.)+[A-Za-z][A-Za-z0-9-]*/uy;
+const DOMAIN = /(?:[A-Za-z0-9-]+\.)+[A-Za-z]{2,}(?![A-Za-z0-9-])/uy;
 const ADDRESS_MARK = "[address redacted]";
+/** What may sit between a URL's `//` and its host: user, password and `@`s. */
+const USERINFO_CHAR = /[^\s/?#@]/u;
+const AUTHORITY_END = /[\s/?#]/gu;
+
+/**
+ * Where a URL's userinfo starts, when the address ending at `start` is one:
+ * `https://u:p@host`, or `https://a@b.co@evil.com`, which a stranger sends as
+ * a callbackURL to hide where it points. -1 for an ordinary address. Walks
+ * back only to the previous `@` or `kept`, so no character is walked twice.
+ */
+function userinfoStart(text: string, start: number, kept: number): number {
+  let from = start;
+  while (from > kept && USERINFO_CHAR.test(text.charAt(from - 1))) {
+    from -= 1;
+  }
+  return from >= 2 && text.startsWith("//", from - 2) ? from : -1;
+}
 
 function redactAddresses(text: string): string {
   let out = "";
@@ -147,6 +168,18 @@ function redactAddresses(text: string): string {
     let start = at;
     while (start > kept && LOCAL_CHAR.test(text.charAt(start - 1))) {
       start -= 1;
+    }
+    // A URL's userinfo goes, through the authority's last `@`, and its host
+    // stays: the host is where the URL points, and hiding it was the reason a
+    // stranger would put an address there.
+    const userinfo = start === at ? -1 : userinfoStart(text, start, kept);
+    if (userinfo !== -1) {
+      AUTHORITY_END.lastIndex = at;
+      const end = AUTHORITY_END.exec(text)?.index ?? text.length;
+      out += `${text.slice(kept, userinfo)}${ADDRESS_MARK}`;
+      at = text.lastIndexOf("@", end - 1);
+      kept = at;
+      continue;
     }
     // An empty local part is an address only where the previous match took
     // its local part: `a@x.edu.b@y.edu` reads the first domain as `x.edu.b`.
