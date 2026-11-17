@@ -119,6 +119,18 @@ async function answer(bookmarked: boolean) {
   });
 }
 
+/**
+ * Two clicks inside one tick, before React can render the button disabled.
+ * Two `fireEvent.click` calls would render between them, as two real clicks do.
+ */
+function doubleClickInOneTick(button: HTMLElement) {
+  for (const _ of [1, 2]) {
+    button.dispatchEvent(
+      new MouseEvent("click", { bubbles: true, cancelable: true })
+    );
+  }
+}
+
 /** Click and let the write settle, so the assertion reads a final label. */
 async function click(button: HTMLElement) {
   await act(async () => {
@@ -250,8 +262,8 @@ describe("BookmarkButton", () => {
 
   it("writes once for a double click inside one tick", async () => {
     // The scheduler property's shrunk counterexample (#846). Both clicks run
-    // before React renders the button disabled, so `loading` cannot refuse
-    // the second; it read the same value and wrote it again.
+    // before React renders the button disabled, so the disabled prop cannot
+    // refuse the second, which read the same value and wrote it again.
     session = { user: { id: "u1" } };
     const { findByRole, getByRole } = renderButton();
     await findByRole("button", { name: "Bookmark" });
@@ -259,12 +271,7 @@ describe("BookmarkButton", () => {
 
     const button = getByRole("button", { name: "Bookmark" });
     await act(() => {
-      button.dispatchEvent(
-        new MouseEvent("click", { bubbles: true, cancelable: true })
-      );
-      button.dispatchEvent(
-        new MouseEvent("click", { bubbles: true, cancelable: true })
-      );
+      doubleClickInOneTick(button);
       return settle();
     });
 
@@ -296,18 +303,12 @@ describe("BookmarkButton", () => {
  * The orders the tests above name, and the ones nobody wrote down: clicks
  * interleaved with the `isBookmarked` read and the writes, each answered
  * whenever the scheduler lets it, and a write stored or refused (#846). A
- * double click inside one tick is one of the steps, because `loading` is
- * state: the second click's handler runs before React renders the button
- * disabled.
+ * double click inside one tick is one of the steps: the second click's
+ * handler runs before React renders the button disabled, so only a ref
+ * refuses it.
  */
 describe("BookmarkButton under any interleaving", () => {
   type Click = "click" | "doubleClick";
-
-  /** A click the button took, and what it showed before and after. */
-  interface Taken {
-    before: boolean;
-    next: boolean;
-  }
 
   /** Steps in a run, and so at most this many writes the button should send. */
   const MAX_STEPS = 6;
@@ -361,7 +362,8 @@ describe("BookmarkButton under any interleaving", () => {
       session = { user: { id: "u1" } };
       let stored = storedAtLoad;
       let writeCount = 0;
-      const taken: Taken[] = [];
+      /** What the button showed before each click it took; the nth sent write n. */
+      const shownBefore: boolean[] = [];
 
       const answerWrite = s.scheduleFunction((value: boolean, n: number) => {
         if (refusals[n]) {
@@ -397,18 +399,13 @@ describe("BookmarkButton under any interleaving", () => {
         for (const [gesture, release] of plan) {
           const button = screen.getByRole("button") as HTMLButtonElement;
           if (!button.disabled) {
-            const before = showsSet(button);
-            taken.push({ before, next: !before });
+            shownBefore.push(showsSet(button));
           }
           if (gesture === "click") {
             fireEvent.click(button);
           } else {
             await act(() => {
-              for (const _ of [1, 2]) {
-                button.dispatchEvent(
-                  new MouseEvent("click", { bubbles: true, cancelable: true })
-                );
-              }
+              doubleClickInOneTick(button);
               return Promise.resolve();
             });
           }
@@ -419,9 +416,9 @@ describe("BookmarkButton under any interleaving", () => {
           }
           // While a click's write is out, the button holds that click's
           // value whatever read lands meanwhile.
-          const latest = taken.at(-1);
-          if (button.disabled && latest) {
-            expect(showsSet(button)).toBe(latest.next);
+          const latest = shownBefore.at(-1);
+          if (button.disabled && latest !== undefined) {
+            expect(showsSet(button)).toBe(!latest);
           }
         }
         // A stored write refetches on a macrotask, after `waitIdle` has
@@ -431,17 +428,20 @@ describe("BookmarkButton under any interleaving", () => {
           await flush();
         } while (s.count() > 0);
 
-        expect(writeCount).toBe(taken.length);
+        expect(writeCount).toBe(shownBefore.length);
         const button = screen.getByRole("button") as HTMLButtonElement;
         expect(button.disabled).toBe(false);
-        const last = taken.at(-1);
-        if (!last) {
+        const last = shownBefore.length - 1;
+        if (last >= 0 && refusals[last]) {
+          // A refused click puts back what it replaced.
+          expect(showsSet(button)).toBe(shownBefore[last]);
+        } else if (last >= 0) {
+          // A stored click wrote the value it showed.
+          expect(stored).toBe(!shownBefore[last]);
+        }
+        if (last < 0 || shownBefore.some((_, n) => !refusals[n])) {
+          // The row as the read at load or the last stored write left it.
           expect(showsSet(button)).toBe(stored);
-        } else if (refusals[taken.length - 1]) {
-          expect(showsSet(button)).toBe(last.before);
-        } else {
-          expect(showsSet(button)).toBe(last.next);
-          expect(stored).toBe(last.next);
         }
       } finally {
         cleanup();

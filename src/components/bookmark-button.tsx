@@ -20,7 +20,7 @@ export function BookmarkButton({ projectId }: { projectId: string }) {
   // read the same value and wrote it again (#846).
   const { busy, run } = useAction({
     fallback: "Could not save the bookmark",
-    onError: (message) => toast.error(message),
+    onError: toast.error,
   });
   // Under the `["bookmarks"]` prefix every writer invalidates, and keyed on
   // the viewer and the project, so a read for the previous project or
