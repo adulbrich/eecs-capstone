@@ -1,4 +1,5 @@
 // @vitest-environment jsdom
+import { fc, test } from "@fast-check/vitest";
 import {
   act,
   cleanup,
@@ -592,6 +593,170 @@ describe("CommentThread forms while a post is in flight", () => {
     );
     expect(box.disabled).toBe(false);
   });
+});
+
+/**
+ * The orders the tests above name, and the ones nobody wrote down: Post,
+ * Cancel and Reply in any sequence, with each request resolving or failing
+ * whenever the scheduler lets it (#846). The model is the contract the reply
+ * form's comments make (#188, #247, #443): one request in flight per open
+ * form, and only the attempt that still owns the form may close it, fail it or
+ * re-enable it.
+ */
+describe("CommentThread reply form under any interleaving", () => {
+  type Step = "submit" | "cancel" | "reopen";
+
+  interface ReplyModel {
+    error: string | null;
+    open: boolean;
+    /** The request that owns the form, or null when none is in flight. */
+    owner: number | null;
+  }
+
+  /** Steps in a run, and so at most this many submits reach the server. */
+  const MAX_STEPS = 6;
+
+  const step = fc.constantFrom<Step>("submit", "cancel", "reopen");
+
+  // The race needs a request still out across Post, Cancel and Reply. With a
+  // release after every other step and fast-check's bias toward short arrays,
+  // a third of 100-run seeds never reached it with the attempt check removed,
+  // so a run takes at least three steps and releases after one in four.
+  const oneInFour = fc.nat({ max: 3 }).map((n) => n === 0);
+  const stepPlan = fc.array(fc.tuple(step, oneInFour), {
+    minLength: 3,
+    maxLength: MAX_STEPS,
+    size: "max",
+  });
+
+  /**
+   * Everything a settled request sets off, up to the attempt's `finally`. A
+   * macrotask drains however many awaits that chain takes.
+   */
+  async function flush() {
+    await act(() => new Promise((resolve) => setTimeout(resolve, 0)));
+  }
+
+  const replyOpen = () => screen.queryByPlaceholderText("Reply") !== null;
+
+  test.prop([
+    // Awaited inside an async function rather than handed over as is. React's
+    // `act` returns a thenable that pops its scope once per `then`, and
+    // `waitNext` attaches two, which React reports as overlapping act calls.
+    fc.scheduler({
+      act: async (f) => {
+        await act(f);
+      },
+    }),
+    // Each step, then whether the scheduler releases one pending request.
+    stepPlan,
+    // Whether the nth request fails.
+    fc.array(fc.boolean(), { minLength: MAX_STEPS, maxLength: MAX_STEPS }),
+  ])(
+    "posts once per attempt, ends idle, and shows only the owning attempt's failure",
+    async (s, plan, failures) => {
+      // `afterEach` and `beforeEach` run once per property, not once per run.
+      cleanup();
+      addComment.mockReset();
+      const model: ReplyModel = { open: true, owner: null, error: null };
+      // Read through a function after idle: the settle callbacks below move
+      // the model where control-flow narrowing cannot see them.
+      const snapshot = (): ReplyModel => ({ ...model });
+      let calls = 0;
+      let expectedCalls = 0;
+      const overlaps: number[] = [];
+
+      const server = s.scheduleFunction((n: number) => {
+        if (!failures[n]) {
+          return Promise.resolve({ id: `reply-${n}` });
+        }
+        const refusal = Promise.reject(new Error(`call ${n} failed`));
+        // The scheduler observes it only when it releases the call, and Node
+        // reports a rejection nobody observed by the next macrotask.
+        refusal.catch(() => undefined);
+        return refusal;
+      });
+      addComment.mockImplementation(() => {
+        const n = calls;
+        calls += 1;
+        if (model.owner !== null) {
+          overlaps.push(n);
+        }
+        model.owner = n;
+        model.error = null;
+        const answer = server(n);
+        // Attached before the component's own continuation, so the model
+        // moves first and the component has to agree with it after idle.
+        answer.then(
+          () => {
+            if (model.owner === n) {
+              model.owner = null;
+              model.open = false;
+            }
+          },
+          (err: Error) => {
+            if (model.owner === n) {
+              model.owner = null;
+              model.error = err.message;
+            }
+          }
+        );
+        return answer;
+      });
+
+      try {
+        renderThread([comment({})]);
+        openReplyAndType("a reply");
+
+        for (const [action, release] of plan) {
+          expect(replyOpen()).toBe(model.open);
+          if (action === "submit" && model.open) {
+            if (model.owner === null) {
+              expectedCalls += 1;
+            }
+            fireEvent.submit(
+              screen.getByPlaceholderText("Reply").closest("form") as Element
+            );
+          } else if (action === "cancel" && model.open) {
+            fireEvent.click(
+              replyForm().getByRole("button", { name: "Cancel" })
+            );
+            model.open = false;
+            model.owner = null;
+          } else if (action === "reopen" && !model.open) {
+            fireEvent.click(screen.getByRole("button", { name: "Reply" }));
+            model.open = true;
+            model.error = null;
+          }
+          if (release && s.count() > 0) {
+            await s.waitNext(1);
+            await flush();
+          }
+        }
+        await s.waitIdle();
+        await flush();
+
+        expect(overlaps).toEqual([]);
+        expect(addComment).toHaveBeenCalledTimes(expectedCalls);
+        const end = snapshot();
+        expect(replyOpen()).toBe(end.open);
+        const shown = screen.queryByText(/^call \d+ failed$/u);
+        expect(shown?.textContent ?? null).toBe(end.open ? end.error : null);
+        if (!end.open) {
+          fireEvent.click(screen.getByRole("button", { name: "Reply" }));
+        }
+        const box = screen.getByPlaceholderText("Reply") as HTMLTextAreaElement;
+        expect(box.disabled).toBe(false);
+        expect(
+          replyForm()
+            .getByRole("button", { name: "Post" })
+            .hasAttribute("disabled")
+        ).toBe(false);
+      } finally {
+        cleanup();
+      }
+    }
+  );
 });
 
 describe("CommentThread editing", () => {
