@@ -1,7 +1,11 @@
+import { statSync } from "node:fs";
+import { join } from "node:path";
 import { fc, test } from "@fast-check/vitest";
 import { describe, expect, it } from "vitest";
 import {
   SITE_DESCRIPTION,
+  SOCIAL_CARD_ALT,
+  SOCIAL_CARD_PATH,
   SOCIAL_DESCRIPTION_MAX_LENGTH,
   socialDescription,
   truncateOnWordBoundary,
@@ -245,6 +249,17 @@ describe("socialDescription", () => {
     // Not `toBe(SITE_DESCRIPTION)`: that holds even when the constant itself
     // is empty, which is the case the promise is about.
     expect(socialDescription({})).toMatch(/\S/u);
+  });
+});
+
+describe("the social card", () => {
+  it("names a file committed under public/", () => {
+    const file = join(process.cwd(), "public", SOCIAL_CARD_PATH);
+    expect(statSync(file).isFile()).toBe(true);
+  });
+
+  it("has alt text that is not blank", () => {
+    expect(SOCIAL_CARD_ALT).toMatch(/\S/u);
   });
 });
 
