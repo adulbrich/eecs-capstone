@@ -376,7 +376,7 @@ React's `act` returns a thenable that pops its scope once per `then`, and `waitN
 fc.scheduler({ act: async (f) => { await act(f); } })
 ```
 
-A scheduled function that refuses attaches `.catch(() => undefined)` to its `Promise.reject(...)` before returning it. The scheduler observes the rejection only when it releases the call, and Node reports it unhandled first, which Vitest prints as an error under a green run. After a release, flush with a macrotask inside `act`, not a count of microtask turns; a component on TanStack Query needs two, since Query notifies observers on a timer of its own. `src/test/comment-thread.test.tsx` and `src/test/bookmark-button.test.tsx` have the pattern (#846).
+A scheduled function that refuses attaches `.catch(() => undefined)` to its `Promise.reject(...)` before returning it. The scheduler observes the rejection only when it releases the call, and Node reports it unhandled first, which Vitest prints as an error under a green run. After a release, flush with a macrotask inside `act`, not a count of microtask turns; a component on TanStack Query needs two, since Query notifies observers on a timer of its own. `src/test/bookmark-button.test.tsx` has the pattern (#846).
 
 ### Override `@babel/core` per package, never at the root
 
