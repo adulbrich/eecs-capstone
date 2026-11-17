@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 import {
+  act,
   cleanup,
   fireEvent,
   render,
@@ -37,26 +38,44 @@ vi.mock("#/lib/auth-client", () => ({
   },
 }));
 // The slots are drawing over one real input; a plain one is enough to type a
-// code into.
+// code into. `ref` and `disabled` pass through, so focus and the lock during a
+// request reach the input a test reads.
 vi.mock("#/components/ui/input-otp", () => ({
   InputOTP: ({
+    disabled,
     id,
     onChange,
+    ref,
     value,
   }: {
+    disabled?: boolean;
     id: string;
     onChange: (next: string) => void;
+    ref?: React.Ref<HTMLInputElement>;
     value: string;
   }) => (
-    <input id={id} onChange={(e) => onChange(e.target.value)} value={value} />
+    <input
+      disabled={disabled}
+      id={id}
+      onChange={(e) => onChange(e.target.value)}
+      ref={ref}
+      value={value}
+    />
   ),
   InputOTPGroup: () => null,
   InputOTPSlot: () => null,
 }));
 
-import { EmailCodeForm } from "#/components/email-code-form";
+import {
+  EmailCodeForm,
+  RESEND_AFTER_SECONDS,
+} from "#/components/email-code-form";
+import { doubleClickInOneTick } from "#/test/shared/double-click";
 
-afterEach(cleanup);
+afterEach(() => {
+  cleanup();
+  vi.useRealTimers();
+});
 beforeEach(() => {
   for (const mock of [
     checkVerificationOtp,
@@ -108,5 +127,178 @@ describe("a code sign-in", () => {
     expect(await screen.findByText(/Invalid code/u)).toBeTruthy();
     expect(clearCache).not.toHaveBeenCalled();
     expect(navigate).not.toHaveBeenCalled();
+  });
+});
+
+/**
+ * Runs the faked clock forward and lets every promise it releases settle.
+ * `findBy` and `waitFor` poll on the timers these tests fake, so a failure
+ * under them would hang rather than fail.
+ */
+async function advance(ms: number) {
+  await act(async () => {
+    await vi.advanceTimersByTimeAsync(ms);
+  });
+}
+
+/** The code step for staff@example.com, reached on a faked clock. */
+async function codeStep() {
+  vi.useFakeTimers({
+    toFake: [
+      "setTimeout",
+      "clearTimeout",
+      "setInterval",
+      "clearInterval",
+      "Date",
+    ],
+  });
+  render(<EmailCodeForm redirectTo="/projects" />);
+  fireEvent.change(screen.getByLabelText("Email"), {
+    target: { value: "staff@example.com" },
+  });
+  fireEvent.click(screen.getByRole("button", { name: "Email me a code" }));
+  await advance(0);
+  return screen.getByLabelText("Code") as HTMLInputElement;
+}
+
+const WAIT_MS = RESEND_AFTER_SECONDS * 1000;
+
+function resendButton() {
+  return screen.queryByRole("button", { name: "Send a new code" });
+}
+
+function countdown() {
+  return screen.queryByText(/You can ask for a new code in/u);
+}
+
+/**
+ * A code that never arrives (#893): the send failed, a stranger rotated it
+ * first, or the inbox is slow. The wait outlasts a normal delivery, because a
+ * new code kills the one before it.
+ */
+describe("asking for a new code on the code step", () => {
+  it("offers no new code until the wait ends, and counts it down", async () => {
+    await codeStep();
+
+    expect(resendButton()).toBeNull();
+    expect(countdown()?.textContent).toBe(
+      "Didn't get it? Check your spam folder. You can ask for a new code in 1:00."
+    );
+
+    await advance(15_000);
+    expect(countdown()?.textContent).toContain("in 0:45.");
+
+    await advance(WAIT_MS - 15_000 - 1);
+    expect(resendButton()).toBeNull();
+
+    await advance(1);
+    expect(resendButton()).not.toBeNull();
+    expect(countdown()).toBeNull();
+  });
+
+  it("sends to the same address, empties the slots and waits again", async () => {
+    const field = await codeStep();
+    await advance(WAIT_MS);
+    fireEvent.change(field, { target: { value: "12" } });
+
+    fireEvent.click(resendButton() as HTMLElement);
+    await advance(0);
+
+    expect(sendVerificationOtp).toHaveBeenCalledTimes(2);
+    expect(sendVerificationOtp).toHaveBeenLastCalledWith({
+      email: "staff@example.com",
+      type: "sign-in",
+    });
+    expect(field.value).toBe("");
+    expect(screen.getByRole("status").textContent).toBe(
+      "We sent a new code to staff@example.com. The earlier one no longer works."
+    );
+    // The button that had focus is gone; the field is where the new code goes.
+    expect(document.activeElement).toBe(field);
+    expect(resendButton()).toBeNull();
+    expect(countdown()?.textContent).toContain("in 1:00.");
+
+    await advance(WAIT_MS - 1);
+    expect(resendButton()).toBeNull();
+    await advance(1);
+    expect(resendButton()).not.toBeNull();
+  });
+
+  it("shows a refusal and keeps the offer open", async () => {
+    const field = await codeStep();
+    await advance(WAIT_MS);
+    fireEvent.change(field, { target: { value: "12" } });
+    sendVerificationOtp.mockResolvedValueOnce({
+      error: { message: "Too many requests. Try again later." },
+    });
+
+    fireEvent.click(resendButton() as HTMLElement);
+    await advance(0);
+
+    expect(screen.getByRole("alert").textContent).toBe(
+      "Too many requests. Try again later."
+    );
+    // The earlier code was never replaced, so what was typed still counts.
+    expect(field.value).toBe("12");
+    expect(screen.queryByRole("status")).toBeNull();
+    expect(resendButton()).not.toBeNull();
+    expect(countdown()).toBeNull();
+  });
+
+  it("locks the step while the new code is on its way", async () => {
+    await codeStep();
+    await advance(WAIT_MS);
+    let answer: (value: { error: null }) => void = () => undefined;
+    sendVerificationOtp.mockReturnValueOnce(
+      new Promise((resolve) => {
+        answer = resolve;
+      })
+    );
+
+    fireEvent.click(resendButton() as HTMLElement);
+    await advance(0);
+
+    expect(screen.getByRole("button", { name: "Sending..." })).toHaveProperty(
+      "disabled",
+      true
+    );
+    expect(screen.getByRole("button", { name: "Confirm code" })).toHaveProperty(
+      "disabled",
+      true
+    );
+    expect(
+      screen.getByRole("button", { name: "Use a different address" })
+    ).toHaveProperty("disabled", true);
+    expect(screen.getByLabelText("Code")).toHaveProperty("disabled", true);
+
+    answer({ error: null });
+    await advance(0);
+    expect(screen.getByRole("status")).not.toBeNull();
+  });
+
+  it("sends once for a double click inside one tick", async () => {
+    await codeStep();
+    await advance(WAIT_MS);
+
+    await act(async () => {
+      doubleClickInOneTick(resendButton() as HTMLElement);
+      await vi.advanceTimersByTimeAsync(0);
+    });
+
+    expect(sendVerificationOtp).toHaveBeenCalledTimes(2);
+  });
+
+  it("counts down without announcing every second", async () => {
+    await codeStep();
+
+    const line = countdown() as HTMLElement;
+    expect(line.closest("[aria-live], [role]")).toBeNull();
+    // Nor read out with the field's description every time it takes focus.
+    const described = (
+      screen.getByLabelText("Code").getAttribute("aria-describedby") ?? ""
+    )
+      .split(" ")
+      .map((id) => document.getElementById(id));
+    expect(described.some((element) => element?.contains(line))).toBe(false);
   });
 });

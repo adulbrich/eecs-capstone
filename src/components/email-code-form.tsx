@@ -11,6 +11,7 @@ import {
 } from "#/components/ui/input-otp";
 import { Label } from "#/components/ui/label";
 import { authClient } from "#/lib/auth-client";
+import { useAction } from "#/lib/use-action";
 
 /**
  * Sign in, or create an account, with a code mailed to the address (#576).
@@ -32,6 +33,11 @@ import { authClient } from "#/lib/auth-client";
  *    call reports `USER_NOT_FOUND` for an address with no row, which is safe to
  *    act on precisely because it is only ever reached by somebody who already
  *    holds the code, and Better Auth's own comment on that branch says so.
+ *
+ * The code step also offers a new code for the same address once
+ * `RESEND_AFTER_SECONDS` have passed since the last send (#893), for a code
+ * that never arrives: the send failed, a stranger rotated it first, or the
+ * inbox is slow. Before that it only counts down.
  *
  * It renders on one page, `/sign-in`, which is also where accounts are created
  * (#586). A second page would have had to answer every address exactly as this
@@ -77,6 +83,30 @@ const CODE_EXPIRY_ID = "code-otp-expiry";
  */
 function digitsOnly(pasted: string): string {
   return pasted.replace(NON_DIGITS, "");
+}
+
+/**
+ * How long the code step waits after a send before it offers another.
+ *
+ * `resendStrategy` is `rotate` (the `emailOTP` options in `src/lib/auth.ts`),
+ * so a new code kills the one before it. A code that was only slow then
+ * arrives dead, and the person types a code that cannot work. The wait has to
+ * outlast a normal delivery, campus mail filtering included, which can take
+ * tens of seconds: under 30 kills slow codes, and over about 90 leaves
+ * somebody whose send failed waiting with no reason given.
+ *
+ * It costs little. The per-recipient cap is 5 sends an hour
+ * (`SIGN_IN_CODE_LIMIT`, ADR-0046), so a minute between sends spends nobody a
+ * send they could have used, and a code lives five minutes, so one minute
+ * leaves four for the new one. A convenience, not a control: the server
+ * bounds sends on its own, and a reload skips it by landing on the address
+ * step.
+ */
+export const RESEND_AFTER_SECONDS = 60;
+
+/** `0:45` for 45 seconds, `1:00` for 60. */
+function minutesAndSeconds(seconds: number): string {
+  return `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, "0")}`;
 }
 
 /** Written and read back to find out whether this browser keeps cookies. */
@@ -169,48 +199,121 @@ export function EmailCodeForm({
   const codeField = useRef<HTMLInputElement>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  // "We sent a new code", after a resend. Its own slot rather than `error`,
+  // which marks the code field invalid and is read as an alert.
+  const [notice, setNotice] = useState<string | null>(null);
+  const resend = useAction();
+  // Either request locks the step: an answer about this address must not land
+  // on the next one's, and a new code must not wipe a draft typed meanwhile.
+  const busy = loading || resend.busy;
+
+  // When this browser's last send succeeded, and a clock that only moves while
+  // the wait runs. Remaining time comes from the two, not from counting ticks,
+  // because a phone that switches to its mail app suspends the timer.
+  const [sentAt, setSentAt] = useState(0);
+  const [now, setNow] = useState(0);
+  const waitLeft = Math.max(
+    0,
+    Math.ceil((sentAt + RESEND_AFTER_SECONDS * 1000 - now) / 1000)
+  );
+  const waiting = waitLeft > 0;
+  function startWait() {
+    const sent = Date.now();
+    setSentAt(sent);
+    setNow(sent);
+  }
+  useEffect(() => {
+    if (step !== "code" || !waiting) {
+      return;
+    }
+    const tick = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(tick);
+  }, [step, waiting]);
 
   // Focus after the render that re-enables the field, not inside `refuse`:
   // the field is disabled while its check is in flight, and a disabled input
   // takes no focus. On any other step the ref is empty and this does nothing.
+  // A notice moves it too: the resend button that had it is gone.
   useEffect(() => {
-    if (error !== null) {
+    if (error !== null || notice !== null) {
       codeField.current?.focus();
     }
-  }, [error]);
+  }, [error, notice]);
 
   async function sendCode(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setError(null);
     setLoading(true);
     const address = formValue(e, "email");
+    const refusal = await send(address);
+    setLoading(false);
+    if (refusal) {
+      setError(refusal);
+      return;
+    }
+    setEmail(address);
+    setDraft("");
+    setNotice(null);
+    goToStep("code");
+  }
+
+  /**
+   * A new code to the address already on the code step (#893).
+   *
+   * A refusal (a rate limit, the hourly cap spent) leaves the wait where it
+   * was, so the button stays, and keeps the draft: no new code went out, so
+   * the old one still works. A send that went out restarts the wait even when
+   * the cookie check then fails, because the earlier code is already dead.
+   */
+  async function resendCode() {
+    // Widened, or the checks below narrow it to the `null` it starts as and
+    // miss the assignment inside the callback.
+    let refusal = null as string | null;
+    const ran = await resend.run(async () => {
+      setError(null);
+      setNotice(null);
+      refusal = await send(email);
+    });
+    // A second click while the first is in flight: that one answers.
+    if (!ran) {
+      return;
+    }
+    if (refusal) {
+      setError(refusal);
+      return;
+    }
+    setDraft("");
+    setNotice(
+      `We sent a new code to ${email}. The earlier one no longer works.`
+    );
+  }
+
+  /**
+   * Asks for a code and answers why not, or `null` once it went out. Restarts
+   * the wait for a send that went out, whatever the cookie check then says.
+   */
+  async function send(address: string): Promise<string | null> {
     const { error: sendError } = await reach(
       authClient.emailOtp.sendVerificationOtp({
         email: address,
         type: "sign-in",
       })
     );
-    setLoading(false);
     if (sendError) {
       // The endpoint answers the same for a known and an unknown address, so
       // anything that reaches here is a real failure (a malformed address, a
       // rate limit) rather than "no such account".
-      setError(sendError.message || "Could not send a code. Try again.");
-      return;
+      return sendError.message || "Could not send a code. Try again.";
     }
+    startWait();
     if (!browserKeepsCookies()) {
       // Stopping here rather than sending them to their inbox for a code
       // that cannot work. The server cannot say this: a browser that
       // dropped the claim and a stranger who never had one look identical
       // to it, and both have to get the same answer.
-      setError(
-        "Your browser is not keeping cookies for this site, and signing in with a code needs one. Allow cookies for this site and try again, or sign in with ONID."
-      );
-      return;
+      return "Your browser is not keeping cookies for this site, and signing in with a code needs one. Allow cookies for this site and try again, or sign in with ONID.";
     }
-    setEmail(address);
-    setDraft("");
-    goToStep("code");
+    return null;
   }
 
   /**
@@ -248,6 +351,7 @@ export function EmailCodeForm({
   async function checkCode(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setError(null);
+    setNotice(null);
     setLoading(true);
     const entered = draft;
     const { error: checkError } = await reach(
@@ -384,7 +488,7 @@ export function EmailCodeForm({
             // message rather than making the person retype it.
             autoComplete="one-time-code"
             containerClassName="justify-center"
-            disabled={loading}
+            disabled={busy}
             id="code-otp"
             inputMode="numeric"
             maxLength={CODE_LENGTH}
@@ -408,20 +512,48 @@ export function EmailCodeForm({
             </InputOTPGroup>
           </InputOTP>
           <FieldError id={CODE_ERROR_ID} message={error} />
+          {notice !== null && (
+            <p className="text-sm" role="status">
+              {notice}
+            </p>
+          )}
           <p className="text-muted-foreground text-sm" id={CODE_EXPIRY_ID}>
             It expires in five minutes.
           </p>
+          {/* No `aria-live` and outside `aria-describedby`: a screen reader
+              would read it out every second. The button below appearing is
+              the news, and this line already said when it comes. */}
+          <p className="text-muted-foreground text-sm">
+            {waiting
+              ? `Didn't get it? Check your spam folder. You can ask for a new code in ${minutesAndSeconds(waitLeft)}.`
+              : "Didn't get it? Check your spam folder, or ask for a new code."}
+          </p>
         </div>
-        <Button className="w-full" disabled={loading} type="submit">
+        <Button className="w-full" disabled={busy} type="submit">
           {loading ? "Checking..." : "Confirm code"}
         </Button>
+        {/* Hidden rather than disabled through the wait: a disabled button
+            whose label ticked every second would be noise for a screen
+            reader, and the line above says when it comes. */}
+        {!waiting && (
+          <Button
+            className="w-full"
+            disabled={busy}
+            onClick={() => void resendCode()}
+            type="button"
+            variant="outline"
+          >
+            {resend.busy ? "Sending..." : "Send a new code"}
+          </Button>
+        )}
         {/* Disabled mid-check as well, so an answer about this address cannot
             land on the next one's step. */}
         <Button
           className="w-full"
-          disabled={loading}
+          disabled={busy}
           onClick={() => {
             setError(null);
+            setNotice(null);
             goToStep("address");
           }}
           type="button"
