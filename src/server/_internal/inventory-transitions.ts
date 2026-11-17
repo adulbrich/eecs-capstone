@@ -11,6 +11,7 @@ import {
 } from "#/db/schema";
 import { requireUser } from "#/lib/_internal/auth-guards";
 import { buildNotificationConfig } from "#/lib/email/config";
+import { normalizeEmailAddress } from "#/lib/email-address";
 import { type Hold, holdFromInput, holdToColumns } from "#/lib/hold";
 import { checkoutFloorDay, dueAtForDay } from "#/lib/inventory-deadlines";
 import {
@@ -100,7 +101,9 @@ async function resolveHold(tx: Tx, input: TransitionInput): Promise<Hold> {
     name: input.holderName,
     program: input.holderProgram,
   };
-  if (input.holderEmail) {
+  // Judged trimmed, as the rules judge it: an id beside an address that is
+  // only whitespace is a hold on that account, not a lookup of " " (#884).
+  if (input.holderEmail && normalizeEmailAddress(input.holderEmail)) {
     // Folded, because a hold staff type as Student@Oregonstate.edu belongs to
     // the account at student@oregonstate.edu, and matching it exactly stored
     // the hold as a walk-in beside an account that exists. Written as

@@ -34,18 +34,23 @@
  * - **A walk-in is identified by its address.** The `walk_in` case requires an
  *   `email`, because nothing else identifies that person.
  *
- * ## Whitespace is not trimmed, but an empty string is not a value
+ * ## The address is judged trimmed; the other fields are not
  *
- * One exception, added by #249: `holdToColumns` lowercases and trims the
- * address, because the two holder columns are normalized on write. That is
- * the write gate, not the constructor, so a `Hold` in flight still carries
- * the address as typed and only the stored copy is folded.
+ * `holdToColumns` lowercases and trims the address, because the two holder
+ * columns are normalized on write (#249). An address that is only whitespace
+ * therefore stores as null, so it is no address, and this module and the
+ * rules in `inventory-workflow.ts` both judge it through
+ * `normalizeEmailAddress` (#884). Judging it raw let a reserved item with
+ * holder `" "` pass both rules and be stored with no holder at all.
  *
- * `inventory-workflow.ts` decides person-versus-thing on raw truthiness, and
- * `transitionItemInTx` stores the raw strings. This module matches both on
- * whitespace, so a caller cannot pass a guard on one rule and then be
- * re-judged by a stricter one. Trimming is the input layer's job, and
- * `holderFields` in the lifecycle panel already does it before submitting.
+ * Judged, not rewritten: a `Hold` in flight still carries the address as
+ * typed, and only the stored copy is folded.
+ *
+ * Only the address, because only the address is folded on write. A label,
+ * name or program is stored as typed, so a whitespace label is a value the
+ * columns carry back, and the rules and this module both take it on raw
+ * truthiness. Trimming those is the input layer's job, and `holderFields` in
+ * the lifecycle panel already does it before submitting.
  *
  * An empty string is different, and is deliberately normalized to null. The
  * previous write path stored `""` verbatim, which is not a value any reader
@@ -154,7 +159,10 @@ export function holdFromInput(
   // `||`, not `??`, on all four: an empty string is not a value. See the
   // empty-string note in the module docblock, whose worked example is
   // precisely an empty `current_holder_name` blanking the admin Holder cell.
-  const email = input.email || null;
+  // The address is judged as the write gate will store it, so whitespace
+  // alone is no address, but carried as typed (#884).
+  const email =
+    input.email && normalizeEmailAddress(input.email) ? input.email : null;
   const label = input.label || null;
   const name = input.name || null;
   const program = input.program || null;
