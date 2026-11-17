@@ -13,6 +13,9 @@ const EMAIL = {
   text: "Your code is 123456",
 };
 
+/** `send` is overloaded, so the spy's recorded arguments need naming. */
+type SendCall = [unknown, { abortSignal: AbortSignal }];
+
 const CONFIG = {
   from: "noreply@example.edu",
   region: "us-west-2",
@@ -33,10 +36,7 @@ describe("createSesEmailSender bounds the send", () => {
     await createSesEmailSender(CONFIG).send("a@b.com", EMAIL);
 
     expect(timeout).toHaveBeenCalledWith(SES_SEND_TIMEOUT_MS);
-    const [command, options] = send.mock.calls[0] as unknown as [
-      unknown,
-      { abortSignal: AbortSignal },
-    ];
+    const [command, options] = send.mock.calls[0] as unknown as SendCall;
     expect(command).toBeInstanceOf(SendEmailCommand);
     expect(options.abortSignal).toBe(timeout.mock.results[0]?.value);
   });
@@ -53,7 +53,7 @@ describe("createSesEmailSender bounds the send", () => {
     await sender.send("c@d.com", EMAIL);
 
     const signals = send.mock.calls.map(
-      (call) => (call[1] as { abortSignal: AbortSignal }).abortSignal
+      (call) => (call as unknown as SendCall)[1].abortSignal
     );
     expect(signals).toHaveLength(2);
     expect(signals[0]).not.toBe(signals[1]);

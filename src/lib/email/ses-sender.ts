@@ -62,18 +62,24 @@ export class SesEmailSender implements EmailSender {
  * SES call holds whatever awaits it for as long as the socket stays open: the
  * sign-in code form, or a save that has already committed and is waiting on
  * its notice, the shape #618 fixed for Bedrock and #621 for S3 (#708). The
- * signal is shared by every attempt, so a stall costs the bound plus the SDK's
- * retry backoff rather than a fresh bound per retry. A timed-out send rejects
- * like any other SES error, and every caller already catches and logs that.
+ * signal is shared by every attempt, and the SDK races its retry backoff
+ * against it and never retries the abort, so a stall costs the bound once.
+ * A timed-out send rejects like any other SES error, and every caller already
+ * catches and logs that; the line reads "AbortError: Request aborted", with
+ * nothing saying it was this bound.
  *
  * Too tight is the worse mistake here. The sign-in send answers success
  * whether or not the mail went, so a send cut off that would have landed is a
- * code that never arrives, with nothing on the page to say so. The bound also
- * covers resolving the task role's credentials and the TLS handshake on a
- * cold client, not just the call. `SendEmail` is one in-region request with a
- * body of a few kilobytes, normally well under a second, so 10 s is ample
- * headroom and still well inside the ALB's 60 s idle timeout. Each notifier
- * sends one email, so one request waits on at most one bound.
+ * code that never arrives, with nothing on the page to say so. Time spent
+ * resolving the task role's credentials counts against the bound, though the
+ * bound does not cut a stalled credential fetch short; the provider's own
+ * timeouts do. No measured SES latency backs the number: SES publishes none,
+ * and `SendEmail` is one in-region request with a body of a few kilobytes,
+ * so 10 s is generous headroom over any plausible healthy send.
+ *
+ * The bound is per send, not per request. `approveRequestLinesAs` emails once
+ * per line in sequence, so approving six lines during an SES stall reaches
+ * the ALB's 60 s idle timeout and answers 504 after the approvals committed.
  */
 export const SES_SEND_TIMEOUT_MS = 10_000;
 
