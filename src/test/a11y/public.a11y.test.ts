@@ -155,7 +155,7 @@ test("@smoke sign-in page, the emailed code form", async ({ page }) => {
   );
   await resend.click();
   await expect(page.locator("form").getByRole("status")).toContainText(
-    "We sent a new code"
+    "We asked for a new code"
   );
   await checkA11y(page);
   await page.unroute(send);

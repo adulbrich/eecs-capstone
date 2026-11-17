@@ -284,9 +284,9 @@ export function EmailCodeForm({
   /**
    * A new code to the address already on the code step (#893).
    *
-   * A refusal (a rate limit, the hourly cap spent) leaves the wait where it
-   * was and keeps the draft: the server refuses those before it replaces the
-   * code, so the old one still works. A send that never answered may have
+   * A refusal (a rate limit) leaves the wait where it was and keeps the
+   * draft: the server refuses before it replaces the code, so the old one
+   * still works. A send that never answered may have
    * replaced it, and this cannot tell; Confirm then says so and the button is
    * still there. A send that went out empties the draft and restarts the wait
    * even when the cookie check then fails, because the earlier code is dead.
@@ -310,8 +310,12 @@ export function EmailCodeForm({
       if (refusal) {
         throw new Error(refusal);
       }
+      // Hedged, because a send past the hourly cap (ADR-0046) answers
+      // success without sending or replacing anything, so that the answer
+      // never says what state an address is in. "We sent a new code" would be
+      // false then, and the earlier code would still be the one that works.
       setNotice(
-        `We sent a new code to ${email}. The earlier one no longer works.`
+        `We asked for a new code for ${email}. Use the newest code that arrives: each one replaces the one before.`
       );
     });
   }

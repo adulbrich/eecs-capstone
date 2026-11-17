@@ -214,7 +214,7 @@ describe("asking for a new code on the code step", () => {
     });
     expect(field.value).toBe("");
     expect(screen.getByRole("status").textContent).toBe(
-      "We sent a new code to staff@example.com. The earlier one no longer works."
+      "We asked for a new code for staff@example.com. Use the newest code that arrives: each one replaces the one before."
     );
     // The button that had focus is gone; the field is where the new code goes.
     expect(document.activeElement).toBe(field);
