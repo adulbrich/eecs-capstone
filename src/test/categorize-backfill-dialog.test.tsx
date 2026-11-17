@@ -30,6 +30,7 @@ beforeEach(() => {
   server.categorizeNextProject.mockReset();
   server.countUncategorizedProjects.mockReset();
   invalidate.mockReset();
+  invalidate.mockResolvedValue(undefined);
   server.countUncategorizedProjects.mockResolvedValue({ count: 3 });
 });
 
@@ -90,6 +91,17 @@ describe("the categorization backfill dialog", () => {
     expect(screen.getByRole("button", { name: "Stop" })).toBeTruthy();
     refresh.resolve(undefined);
     expect(await screen.findByRole("button", { name: "Start" })).toBeTruthy();
+  });
+
+  it("gives the controls back when the refresh behind it fails", async () => {
+    invalidate.mockRejectedValueOnce(new Error("loader failed"));
+    server.categorizeNextProject.mockResolvedValueOnce({ done: true });
+    await openDialog();
+
+    fireEvent.click(screen.getByRole("button", { name: "Start" }));
+
+    expect(await screen.findByRole("button", { name: "Start" })).toBeTruthy();
+    expect(screen.getByText("Done. 0 categorized, 0 failed.")).toBeTruthy();
   });
 
   it("stops after the project in flight when Stop is pressed", async () => {

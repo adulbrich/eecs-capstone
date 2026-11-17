@@ -126,8 +126,10 @@ export function CategorizeBackfillDialog() {
       }
     } finally {
       // The Projects column on the table behind the dialog, refreshed before
-      // the controls come back.
-      await router.invalidate();
+      // the controls come back. A failed refresh only leaves that column stale
+      // until the next load; the run's own outcome is already on screen, so the
+      // controls come back either way.
+      await router.invalidate().catch(() => undefined);
       if (current() || run.current === null) {
         setRunning(false);
       }
