@@ -1,8 +1,7 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { isRedirect } from "@tanstack/react-router";
-import { useState } from "react";
 import { toast } from "sonner";
-import { errorMessage } from "#/lib/error-message";
+import { useAction } from "#/lib/use-action";
 import { useSignedInUserId } from "#/lib/use-signed-in";
 import { isBookmarked } from "#/server/bookmarks";
 import { BookmarkIcon, bookmarkLabel, useWriteBookmark } from "./bookmark-set";
@@ -16,7 +15,13 @@ export function BookmarkButton({ projectId }: { projectId: string }) {
   const userId = useSignedInUserId();
   const queryClient = useQueryClient();
   const writeBookmark = useWriteBookmark();
-  const [loading, setLoading] = useState(false);
+  // The hook's ref is the guard, not the disabled prop: two clicks inside one
+  // tick both run before React renders the button disabled, and the second
+  // read the same value and wrote it again (#846).
+  const { busy, run } = useAction({
+    fallback: "Could not save the bookmark",
+    onError: toast.error,
+  });
   // Under the `["bookmarks"]` prefix every writer invalidates, and keyed on
   // the viewer and the project, so a read for the previous project or
   // session never lands on this one.
@@ -43,32 +48,29 @@ export function BookmarkButton({ projectId }: { projectId: string }) {
     return null;
   }
 
-  async function toggle() {
-    // A click decides the value outright. A read still in flight was computed
-    // before the write, so its answer would put the button back to the state
-    // the viewer just left and the page would contradict the database (#444):
-    // cancel it before the optimistic value goes in.
-    // Disabled first, synchronously, so a second click in the await below
-    // cannot toggle again from the same value.
-    setLoading(true);
-    await queryClient.cancelQueries({ queryKey });
-    const next = !bookmarked;
-    queryClient.setQueryData(queryKey, next);
-    try {
-      await writeBookmark(projectId, next);
-    } catch (err) {
-      queryClient.setQueryData(queryKey, !next);
-      toast.error(errorMessage(err, "Could not save the bookmark"));
-    } finally {
-      setLoading(false);
-    }
+  function toggle() {
+    return run(async () => {
+      // A click decides the value outright. A read still in flight was
+      // computed before the write, so its answer would put the button back to
+      // the state the viewer just left and the page would contradict the
+      // database (#444): cancel it before the optimistic value goes in.
+      await queryClient.cancelQueries({ queryKey });
+      const next = !bookmarked;
+      queryClient.setQueryData(queryKey, next);
+      try {
+        await writeBookmark(projectId, next);
+      } catch (err) {
+        queryClient.setQueryData(queryKey, !next);
+        throw err;
+      }
+    });
   }
 
   const label = bookmarkLabel(bookmarked);
   return (
     <Button
       aria-label={label}
-      disabled={loading}
+      disabled={busy}
       onClick={() => void toggle()}
       size="sm"
       title={label}

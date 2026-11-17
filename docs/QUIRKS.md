@@ -368,6 +368,16 @@ test.prop([trickyText()], { endOnFailure: true, path: "4:1:0", seed: 1_188_394_6
 
 The shared arbitrary and `isWellFormed` are in `src/test/shared/arbitraries.ts`; the generated projects for the hashed builders are in `src/test/shared/project-arbitraries.ts`.
 
+### `fc.scheduler` takes `act` behind an `await`, and a refusal it holds must be observed
+
+React's `act` returns a thenable that pops its scope once per `then`, and `waitNext` attaches two, so passing `act` itself logs "overlapping act() calls" on every release. Wrap it:
+
+```ts
+fc.scheduler({ act: async (f) => { await act(f); } })
+```
+
+A scheduled function that refuses attaches `.catch(() => undefined)` to its `Promise.reject(...)` before returning it. The scheduler observes the rejection only when it releases the call, and Node reports it unhandled first, which Vitest prints as an error under a green run. After a release, flush with a macrotask inside `act`, not a count of microtask turns; a component on TanStack Query needs two, since Query notifies observers on a timer of its own. `src/test/bookmark-button.test.tsx` has the pattern (#846).
+
 ### Override `@babel/core` per package, never at the root
 
 The tree runs two Babel majors: the TanStack build plugins declare Babel 7 and cannot run on 8 (`start-plugin-core` default-imports `@babel/core`, and Babel 8 has none), and Stryker's instrumenter declares Babel 8. A root override replaces every consumer's range at once. A Babel 7 cap hands the instrumenter a Babel 7 core beside its own Babel 8 parser, and `npm run test:mutation` dies with `Cannot read properties of undefined (reading 'length')`. A floor with no cap would resolve the build plugins to Babel 8 on the next fresh install, and the build would fail at config load. Answer a Babel advisory with an override nested under the package that resolves the vulnerable version. Nothing on the pull-request path runs Stryker, so a break on its side shows only at the next dispatch.

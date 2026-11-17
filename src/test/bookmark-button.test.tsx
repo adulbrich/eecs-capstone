@@ -1,6 +1,13 @@
 // @vitest-environment jsdom
+import { fc, test } from "@fast-check/vitest";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { act, cleanup, fireEvent, render } from "@testing-library/react";
+import {
+  act,
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+} from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 let session: { user: { id: string } } | null = null;
@@ -25,8 +32,19 @@ let writes = 0;
 let holdWrite = false;
 let finishWrite: (() => void) | null = null;
 
+interface Server {
+  addBookmark: () => Promise<{ ok: true }>;
+  isBookmarked: () => Promise<{ bookmarked: boolean }>;
+  removeBookmark: () => Promise<{ ok: true }>;
+}
+/** Set by the scheduler property, which answers every call itself. */
+let server: Server | null = null;
+
 vi.mock("#/server/bookmarks", () => ({
   addBookmark: ({ data }: { data: { projectId: string } }) => {
+    if (server) {
+      return server.addBookmark();
+    }
     writes += 1;
     rows.add(data.projectId);
     if (holdWrite) {
@@ -37,6 +55,9 @@ vi.mock("#/server/bookmarks", () => ({
     return Promise.resolve({ ok: true });
   },
   isBookmarked: ({ data }: { data: { projectId: string } }) => {
+    if (server) {
+      return server.isBookmarked();
+    }
     reads += 1;
     if (held.has(data.projectId)) {
       return Promise.resolve({ bookmarked: rows.has(data.projectId) });
@@ -48,6 +69,9 @@ vi.mock("#/server/bookmarks", () => ({
   },
   listMyBookmarkIds: () => Promise.resolve({ ids: [...rows] }),
   removeBookmark: ({ data }: { data: { projectId: string } }) => {
+    if (server) {
+      return server.removeBookmark();
+    }
     rows.delete(data.projectId);
     return Promise.resolve({ ok: true });
   },
@@ -58,6 +82,7 @@ vi.mock("#/lib/auth-client", () => ({
 }));
 
 import { BookmarkButton } from "#/components/bookmark-button";
+import { bookmarkLabel } from "#/components/bookmark-set";
 
 afterEach(() => {
   cleanup();
@@ -69,6 +94,7 @@ afterEach(() => {
   writes = 0;
   holdWrite = false;
   finishWrite = null;
+  server = null;
 });
 
 function renderButton(projectId = "p1") {
@@ -91,6 +117,18 @@ async function answer(bookmarked: boolean) {
     answerRead?.(bookmarked);
     await settle();
   });
+}
+
+/**
+ * Two clicks inside one tick, before React can render the button disabled.
+ * Two `fireEvent.click` calls would render between them, as two real clicks do.
+ */
+function doubleClickInOneTick(button: HTMLElement) {
+  for (const _ of [1, 2]) {
+    button.dispatchEvent(
+      new MouseEvent("click", { bubbles: true, cancelable: true })
+    );
+  }
 }
 
 /** Click and let the write settle, so the assertion reads a final label. */
@@ -222,6 +260,27 @@ describe("BookmarkButton", () => {
     ).toBeTruthy();
   });
 
+  it("writes once for a double click inside one tick", async () => {
+    // The scheduler property's shrunk counterexample (#846). Both clicks run
+    // before React renders the button disabled, so the disabled prop cannot
+    // refuse the second, which read the same value and wrote it again.
+    session = { user: { id: "u1" } };
+    const { findByRole, getByRole } = renderButton();
+    await findByRole("button", { name: "Bookmark" });
+    await answer(false);
+
+    const button = getByRole("button", { name: "Bookmark" });
+    await act(() => {
+      doubleClickInOneTick(button);
+      return settle();
+    });
+
+    expect(writes).toBe(1);
+    expect(
+      getByRole("button", { name: "Bookmarked, remove bookmark" })
+    ).toBeTruthy();
+  });
+
   it("still toggles on a settled page", async () => {
     session = { user: { id: "u1" } };
     const { findByRole, getByRole } = renderButton();
@@ -238,4 +297,156 @@ describe("BookmarkButton", () => {
     // mount, once after the toggle.
     expect(reads).toBe(2);
   });
+});
+
+/**
+ * The orders the tests above name, and the ones nobody wrote down: clicks
+ * interleaved with the `isBookmarked` read and the writes, each answered
+ * whenever the scheduler lets it, and a write stored or refused (#846). A
+ * double click inside one tick is one of the steps: the second click's
+ * handler runs before React renders the button disabled, so only a ref
+ * refuses it.
+ */
+describe("BookmarkButton under any interleaving", () => {
+  type Click = "click" | "doubleClick";
+
+  /** Steps in a run, and so at most this many writes the button should send. */
+  const MAX_STEPS = 6;
+
+  const oneInFour = fc.nat({ max: 3 }).map((n) => n === 0);
+  const stepPlan = fc.array(
+    fc.tuple(fc.constantFrom<Click>("click", "doubleClick"), oneInFour),
+    { maxLength: MAX_STEPS, size: "max" }
+  );
+
+  const macrotask = () => new Promise((resolve) => setTimeout(resolve, 0));
+
+  /**
+   * Lets a settled call reach the button. Two macrotasks: Query notifies its
+   * observers on a timer of its own, which the click's microtasks register
+   * after the first one here.
+   */
+  async function flush() {
+    await act(async () => {
+      await macrotask();
+      await macrotask();
+    });
+  }
+
+  const showsSet = (button: HTMLElement) =>
+    button.getAttribute("aria-label") === bookmarkLabel(true);
+
+  test.prop([
+    // Awaited inside an async function: React's `act` returns a thenable that
+    // pops its scope once per `then`, and `waitNext` attaches two.
+    fc.scheduler({
+      act: async (f) => {
+        await act(f);
+      },
+    }),
+    // Whether the row exists before the page loads.
+    fc.boolean(),
+    // Each step, then whether the scheduler releases one pending call.
+    stepPlan,
+    // Whether the nth write is refused. Twice the steps, so a double click
+    // that writes twice still finds an answer.
+    fc.array(fc.boolean(), {
+      minLength: 2 * MAX_STEPS,
+      maxLength: 2 * MAX_STEPS,
+    }),
+  ])(
+    "writes once per click it takes, never lets a read from before a click land, and restores a refused click",
+    async (s, storedAtLoad, plan, refusals) => {
+      // `afterEach` runs once per property, not once per run.
+      cleanup();
+      session = { user: { id: "u1" } };
+      let stored = storedAtLoad;
+      let writeCount = 0;
+      /** What the button showed before each click it took; the nth sent write n. */
+      const shownBefore: boolean[] = [];
+
+      const answerWrite = s.scheduleFunction((value: boolean, n: number) => {
+        if (refusals[n]) {
+          const refusal = Promise.reject(new Error(`write ${n} refused`));
+          // The scheduler observes it only when it releases the call, and
+          // Node reports a rejection nobody observed by the next macrotask.
+          refusal.catch(() => undefined);
+          return refusal;
+        }
+        stored = value;
+        return Promise.resolve({ ok: true as const });
+      });
+      // The server reads the row when the request arrives, not when the
+      // answer does: that gap is what makes a read stale.
+      const readStored = s.scheduleFunction(() =>
+        Promise.resolve({ bookmarked: stored })
+      );
+      const write = (value: boolean) => {
+        const n = writeCount;
+        writeCount += 1;
+        return answerWrite(value, n);
+      };
+      server = {
+        addBookmark: () => write(true),
+        isBookmarked: () => readStored(),
+        removeBookmark: () => write(false),
+      };
+
+      try {
+        renderButton();
+        await screen.findByRole("button");
+
+        for (const [gesture, release] of plan) {
+          const button = screen.getByRole("button") as HTMLButtonElement;
+          if (!button.disabled) {
+            shownBefore.push(showsSet(button));
+          }
+          if (gesture === "click") {
+            fireEvent.click(button);
+          } else {
+            await act(() => {
+              doubleClickInOneTick(button);
+              return Promise.resolve();
+            });
+          }
+          await flush();
+          if (release && s.count() > 0) {
+            await s.waitNext(1);
+            await flush();
+          }
+          // While a click's write is out, the button holds that click's
+          // value whatever read lands meanwhile.
+          const latest = shownBefore.at(-1);
+          if (button.disabled && latest !== undefined) {
+            expect(showsSet(button)).toBe(!latest);
+          }
+        }
+        // A stored write refetches on a macrotask, after `waitIdle` has
+        // already found nothing left to release.
+        do {
+          await s.waitIdle();
+          await flush();
+        } while (s.count() > 0);
+
+        expect(writeCount).toBe(shownBefore.length);
+        const button = screen.getByRole("button") as HTMLButtonElement;
+        expect(button.disabled).toBe(false);
+        const last = shownBefore.length - 1;
+        if (last >= 0 && refusals[last]) {
+          // A refused click puts back what it replaced.
+          expect(showsSet(button)).toBe(shownBefore[last]);
+        } else if (last >= 0) {
+          // A stored click wrote the value it showed.
+          expect(stored).toBe(!shownBefore[last]);
+        }
+        if (last < 0 || shownBefore.some((_, n) => !refusals[n])) {
+          // The row as the read at load or the last stored write left it.
+          expect(showsSet(button)).toBe(stored);
+        }
+      } finally {
+        cleanup();
+        server = null;
+      }
+    }
+  );
 });
