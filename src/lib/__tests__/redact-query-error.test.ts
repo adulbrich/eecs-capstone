@@ -228,6 +228,8 @@ describe("redactQueryError, on an address outside a query", () => {
     ["a chain of addresses", "a@x.co+".repeat(14_000)],
     ["one URL authority full of @", `//a@${"b@".repeat(50_000)}`],
     ["URLs with userinfo", "//a@b.co/".repeat(11_000)],
+    ["many authorities, one @ at the end", `${"//x".repeat(70_000)}@`],
+    ["one @, then many authorities", `@${"//x".repeat(70_000)}`],
   ])("stays linear on %s, which a stranger can send", (_shape, input) => {
     // An unanchored regex rescanned a run from every position: 40,000
     // characters took a second, and 100,000 about six. The first call pays

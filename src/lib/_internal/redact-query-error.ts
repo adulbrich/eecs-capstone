@@ -139,10 +139,14 @@ const DOMAIN = /(?:[A-Za-z0-9-]+\.)+[A-Za-z]{2,}/uy;
 const ADDRESS_MARK = "[address redacted]";
 
 /**
- * What ends a URL's authority for the WHATWG URL parser, which Better Auth's
- * origin check uses, plus a quote and angle brackets so a stranger cannot
- * stretch one across a JSON key. Not RFC 3986's narrower userinfo set: the
- * parser percent-encodes `{`, `|` and `^` and still reads the host after them.
+ * What ends a URL's authority: the WHATWG parser's own `/`, `?`, `#` and `\`,
+ * and also whitespace, a quote and angle brackets, which the parser would
+ * percent-encode inside userinfo instead. Ending there keeps prose and JSON
+ * around a URL from being read as its userinfo (`fetch https://api.x.edu
+ * failed for bob@x.edu` would otherwise lose the URL), at the cost that a URL
+ * with one of them inside its userinfo can still have its host taken with an
+ * address. Not RFC 3986's narrower set: the parser percent-encodes `{`, `|`
+ * and `^` and still reads the host after them.
  */
 const AUTHORITY_END = /[\s/?#\\"<>]/gu;
 
@@ -166,9 +170,10 @@ function redactUserinfo(text: string): string {
     const from = slashes + 2;
     AUTHORITY_END.lastIndex = from;
     const end = AUTHORITY_END.exec(text)?.index ?? text.length;
-    const firstAt = text.indexOf("@", from);
-    const lastAt =
-      firstAt !== -1 && firstAt < end ? text.lastIndexOf("@", end - 1) : -1;
+    // Searched inside the authority only: `indexOf` from here could run to
+    // the end of the text for every `//` in it.
+    const inside = text.slice(from, end).lastIndexOf("@");
+    const lastAt = inside === -1 ? -1 : from + inside;
     // `//@host` has no userinfo to take.
     if (lastAt > from) {
       out += `${text.slice(kept, from)}${ADDRESS_MARK}`;
