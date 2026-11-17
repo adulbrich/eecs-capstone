@@ -66,9 +66,12 @@ vi.mock("#/components/ui/input-otp", () => ({
   InputOTPSlot: () => null,
 }));
 
+import { fc, test } from "@fast-check/vitest";
 import {
   EmailCodeForm,
+  minutesAndSeconds,
   RESEND_AFTER_SECONDS,
+  resendWaitLeft,
 } from "#/components/email-code-form";
 import { doubleClickInOneTick } from "#/test/shared/double-click";
 
@@ -238,8 +241,10 @@ describe("asking for a new code on the code step", () => {
     expect(screen.getByRole("alert").textContent).toBe(
       "Too many requests. Try again later."
     );
-    // The earlier code was never replaced, so what was typed still counts.
+    // The earlier code was never replaced, so what was typed still counts,
+    // and the code field is neither blamed nor handed the focus.
     expect(field.value).toBe("12");
+    expect(document.activeElement).not.toBe(field);
     expect(screen.queryByRole("status")).toBeNull();
     expect(resendButton()).not.toBeNull();
     expect(countdown()).toBeNull();
@@ -288,6 +293,40 @@ describe("asking for a new code on the code step", () => {
     expect(sendVerificationOtp).toHaveBeenCalledTimes(2);
   });
 
+  it("keeps the wait to one wait when the clock steps backward", async () => {
+    await codeStep();
+    await advance(10_000);
+
+    vi.setSystemTime(Date.now() - 3_600_000);
+    await advance(1000);
+
+    expect(countdown()?.textContent).toContain("in 1:00.");
+    await advance(WAIT_MS);
+    expect(resendButton()).not.toBeNull();
+  });
+
+  it("empties a dead code's draft when the cookie check fails after a resend", async () => {
+    const field = await codeStep();
+    await advance(WAIT_MS);
+    fireEvent.change(field, { target: { value: "12" } });
+    const cookie = vi
+      .spyOn(Document.prototype, "cookie", "get")
+      .mockReturnValue("");
+
+    fireEvent.click(resendButton() as HTMLElement);
+    await advance(0);
+    cookie.mockRestore();
+
+    expect(screen.getByRole("alert").textContent).toContain(
+      "not keeping cookies"
+    );
+    expect(field.value).toBe("");
+    expect(screen.queryByRole("status")).toBeNull();
+    expect(countdown()?.textContent).toContain("in 1:00.");
+    // The button went with the restarted wait, so focus cannot stay on it.
+    expect(document.activeElement).toBe(field);
+  });
+
   it("counts down without announcing every second", async () => {
     await codeStep();
 
@@ -301,4 +340,59 @@ describe("asking for a new code on the code step", () => {
       .map((id) => document.getElementById(id));
     expect(described.some((element) => element?.contains(line))).toBe(false);
   });
+});
+
+const BOUND_MS = RESEND_AFTER_SECONDS * 1000;
+const seconds = fc.oneof(
+  fc.constantFrom(0, 1, 9, 10, 59, 60, 61, 599, 600, 3599, 3600),
+  fc.integer({ min: 0, max: 3600 })
+);
+const sentAt = fc.integer({ min: 1_500_000_000_000, max: 2_500_000_000_000 });
+const elapsed = fc.oneof(
+  fc.constantFrom(0, 1, 999, 1000, 1001, BOUND_MS - 1, BOUND_MS, BOUND_MS + 1),
+  fc.integer({ min: 0, max: 10 * BOUND_MS })
+);
+
+describe("minutesAndSeconds", () => {
+  test.prop([seconds])("is m:ss and round-trips to its input", (s) => {
+    const shown = minutesAndSeconds(s);
+    expect(shown).toMatch(/^\d+:[0-5]\d$/u);
+    const [m, ss] = shown.split(":").map(Number);
+    expect(m * 60 + ss).toBe(s);
+  });
+});
+
+describe("resendWaitLeft", () => {
+  test.prop([sentAt])("is the full wait at elapsed 0", (t) => {
+    expect(resendWaitLeft(t, t)).toBe(RESEND_AFTER_SECONDS);
+  });
+
+  test.prop([sentAt, elapsed])(
+    "is 0 at and after the bound, positive before it",
+    (t, e) => {
+      const left = resendWaitLeft(t, t + e);
+      if (e >= BOUND_MS) {
+        expect(left).toBe(0);
+      } else {
+        expect(left).toBeGreaterThan(0);
+      }
+    }
+  );
+
+  test.prop([sentAt, elapsed, elapsed])(
+    "never rises as the clock moves on",
+    (t, a, b) => {
+      const [early, late] = a <= b ? [a, b] : [b, a];
+      expect(resendWaitLeft(t, t + late)).toBeLessThanOrEqual(
+        resendWaitLeft(t, t + early)
+      );
+    }
+  );
+
+  test.prop([sentAt, fc.integer({ min: 1, max: 24 * 3600 * 1000 })])(
+    "never exceeds the wait for a clock that steps back",
+    (t, back) => {
+      expect(resendWaitLeft(t, t - back)).toBe(RESEND_AFTER_SECONDS);
+    }
+  );
 });

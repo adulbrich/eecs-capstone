@@ -2,7 +2,7 @@ import { Link, useNavigate, useRouter } from "@tanstack/react-router";
 import { REGEXP_ONLY_DIGITS } from "input-otp";
 import { useEffect, useRef, useState } from "react";
 import { Button } from "#/components/ui/button";
-import { FieldError } from "#/components/ui/field";
+import { FieldError, SavedNote } from "#/components/ui/field";
 import { Input } from "#/components/ui/input";
 import {
   InputOTP,
@@ -104,8 +104,26 @@ function digitsOnly(pasted: string): string {
  */
 export const RESEND_AFTER_SECONDS = 60;
 
+/**
+ * Whole seconds until a new code may be asked for, given when the last send
+ * succeeded and the latest tick, both in epoch milliseconds.
+ *
+ * Capped at the full wait, because the wall clock can step backward (an NTP
+ * correction, a hand-set clock): uncapped, a step back of an hour read
+ * "60:59" and hid the button for longer than the code lives.
+ */
+export function resendWaitLeft(sentAt: number, lastTick: number): number {
+  return Math.min(
+    RESEND_AFTER_SECONDS,
+    Math.max(
+      0,
+      Math.ceil((sentAt + RESEND_AFTER_SECONDS * 1000 - lastTick) / 1000)
+    )
+  );
+}
+
 /** `0:45` for 45 seconds, `1:00` for 60. */
-function minutesAndSeconds(seconds: number): string {
+export function minutesAndSeconds(seconds: number): string {
   return `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, "0")}`;
 }
 
@@ -199,35 +217,40 @@ export function EmailCodeForm({
   const codeField = useRef<HTMLInputElement>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
-  // "We sent a new code", after a resend. Its own slot rather than `error`,
-  // which marks the code field invalid and is read as an alert.
+  // "We sent a new code", after a resend, through `SavedNote`: a result the
+  // reader asked for, announced politely rather than as an alert.
   const [notice, setNotice] = useState<string | null>(null);
-  const resend = useAction();
+  // Its refusal renders under its own button through `resend.error`, not in
+  // `error`, which would mark the code field invalid when the code is fine.
+  const resend = useAction({ fallback: "Could not send a code. Try again." });
   // Either request locks the step: an answer about this address must not land
   // on the next one's, and a new code must not wipe a draft typed meanwhile.
   const busy = loading || resend.busy;
 
-  // When this browser's last send succeeded, and a clock that only moves while
-  // the wait runs. Remaining time comes from the two, not from counting ticks,
+  // When this browser's last send succeeded, and the clock as of the last tick
+  // of the wait. Remaining time comes from the two, not from counting ticks,
   // because a phone that switches to its mail app suspends the timer.
   const [sentAt, setSentAt] = useState(0);
-  const [now, setNow] = useState(0);
-  const waitLeft = Math.max(
-    0,
-    Math.ceil((sentAt + RESEND_AFTER_SECONDS * 1000 - now) / 1000)
-  );
+  const [lastTick, setLastTick] = useState(0);
+  const waitLeft = resendWaitLeft(sentAt, lastTick);
   const waiting = waitLeft > 0;
   function startWait() {
     const sent = Date.now();
     setSentAt(sent);
-    setNow(sent);
+    setLastTick(sent);
   }
   useEffect(() => {
     if (step !== "code" || !waiting) {
       return;
     }
-    const tick = setInterval(() => setNow(Date.now()), 1000);
-    return () => clearInterval(tick);
+    const timer = setInterval(() => {
+      const tick = Date.now();
+      setLastTick(tick);
+      // A clock that stepped backward restarts the wait from now, so it
+      // costs at most one more wait rather than the size of the step.
+      setSentAt((sent) => Math.min(sent, tick));
+    }, 1000);
+    return () => clearInterval(timer);
   }, [step, waiting]);
 
   // Focus after the render that re-enables the field, not inside `refuse`:
@@ -245,7 +268,7 @@ export function EmailCodeForm({
     setError(null);
     setLoading(true);
     const address = formValue(e, "email");
-    const refusal = await send(address);
+    const { refusal } = await requestCode(address);
     setLoading(false);
     if (refusal) {
       setError(refusal);
@@ -254,6 +277,7 @@ export function EmailCodeForm({
     setEmail(address);
     setDraft("");
     setNotice(null);
+    resend.setError(null);
     goToStep("code");
   }
 
@@ -261,38 +285,45 @@ export function EmailCodeForm({
    * A new code to the address already on the code step (#893).
    *
    * A refusal (a rate limit, the hourly cap spent) leaves the wait where it
-   * was, so the button stays, and keeps the draft: no new code went out, so
-   * the old one still works. A send that went out restarts the wait even when
-   * the cookie check then fails, because the earlier code is already dead.
+   * was and keeps the draft: the server refuses those before it replaces the
+   * code, so the old one still works. A send that never answered may have
+   * replaced it, and this cannot tell; Confirm then says so and the button is
+   * still there. A send that went out empties the draft and restarts the wait
+   * even when the cookie check then fails, because the earlier code is dead.
    */
-  async function resendCode() {
-    // Widened, or the checks below narrow it to the `null` it starts as and
-    // miss the assignment inside the callback.
-    let refusal = null as string | null;
-    const ran = await resend.run(async () => {
+  function resendCode() {
+    // `run` holds the ref guard, so a second click in the same tick returns
+    // before it reaches the server.
+    return resend.run(async () => {
       setError(null);
       setNotice(null);
-      refusal = await send(email);
+      const { sent, refusal } = await requestCode(email);
+      if (sent) {
+        setDraft("");
+      }
+      if (refusal && sent) {
+        // About this browser, not this send, and the button that had focus
+        // is gone with the restarted wait: the form's own error slot.
+        setError(refusal);
+        return;
+      }
+      if (refusal) {
+        throw new Error(refusal);
+      }
+      setNotice(
+        `We sent a new code to ${email}. The earlier one no longer works.`
+      );
     });
-    // A second click while the first is in flight: that one answers.
-    if (!ran) {
-      return;
-    }
-    if (refusal) {
-      setError(refusal);
-      return;
-    }
-    setDraft("");
-    setNotice(
-      `We sent a new code to ${email}. The earlier one no longer works.`
-    );
   }
 
   /**
-   * Asks for a code and answers why not, or `null` once it went out. Restarts
-   * the wait for a send that went out, whatever the cookie check then says.
+   * Asks for a code: whether one went out, and why not if this form should
+   * stop. Restarts the wait for a send that went out, whatever the cookie
+   * check then says.
    */
-  async function send(address: string): Promise<string | null> {
+  async function requestCode(
+    address: string
+  ): Promise<{ sent: boolean; refusal: string | null }> {
     const { error: sendError } = await reach(
       authClient.emailOtp.sendVerificationOtp({
         email: address,
@@ -303,7 +334,10 @@ export function EmailCodeForm({
       // The endpoint answers the same for a known and an unknown address, so
       // anything that reaches here is a real failure (a malformed address, a
       // rate limit) rather than "no such account".
-      return sendError.message || "Could not send a code. Try again.";
+      return {
+        sent: false,
+        refusal: sendError.message || "Could not send a code. Try again.",
+      };
     }
     startWait();
     if (!browserKeepsCookies()) {
@@ -311,9 +345,13 @@ export function EmailCodeForm({
       // that cannot work. The server cannot say this: a browser that
       // dropped the claim and a stranger who never had one look identical
       // to it, and both have to get the same answer.
-      return "Your browser is not keeping cookies for this site, and signing in with a code needs one. Allow cookies for this site and try again, or sign in with ONID.";
+      return {
+        sent: true,
+        refusal:
+          "Your browser is not keeping cookies for this site, and signing in with a code needs one. Allow cookies for this site and try again, or sign in with ONID.",
+      };
     }
-    return null;
+    return { sent: true, refusal: null };
   }
 
   /**
@@ -352,6 +390,7 @@ export function EmailCodeForm({
     e.preventDefault();
     setError(null);
     setNotice(null);
+    resend.setError(null);
     setLoading(true);
     const entered = draft;
     const { error: checkError } = await reach(
@@ -512,11 +551,7 @@ export function EmailCodeForm({
             </InputOTPGroup>
           </InputOTP>
           <FieldError id={CODE_ERROR_ID} message={error} />
-          {notice !== null && (
-            <p className="text-sm" role="status">
-              {notice}
-            </p>
-          )}
+          <SavedNote message={notice} />
           <p className="text-muted-foreground text-sm" id={CODE_EXPIRY_ID}>
             It expires in five minutes.
           </p>
@@ -546,6 +581,7 @@ export function EmailCodeForm({
             {resend.busy ? "Sending..." : "Send a new code"}
           </Button>
         )}
+        <FieldError message={resend.error} />
         {/* Disabled mid-check as well, so an answer about this address cannot
             land on the next one's step. */}
         <Button
@@ -554,6 +590,7 @@ export function EmailCodeForm({
           onClick={() => {
             setError(null);
             setNotice(null);
+            resend.setError(null);
             goToStep("address");
           }}
           type="button"
