@@ -112,6 +112,24 @@ const claimSecret =
   process.env.BETTER_AUTH_SECRET ?? crypto.randomUUID() + crypto.randomUUID();
 
 /**
+ * The sends whose mail failed, by the per-request context Better Auth hands
+ * both `sendVerificationOTP` and the after-hook (#892).
+ *
+ * The endpoint answers `{success: true}` whether the mail went or not, so this
+ * is the only way the after-hook can tell. It treats a failed mail as no send:
+ * it gives the reservation back and hands out no claim. Both halves matter.
+ * Without the refund an SES outage of five attempts locks the person out for
+ * the hour after SES recovers. A refund WITH a claim would make a failed send
+ * free and still redeemable, and the per-recipient cap is what bounds guessing
+ * (ADR-0047): while sends failed, a stranger could rotate the record without
+ * limit and spend three guesses on each code. With no claim, nobody can redeem
+ * the code a failed send wrote, so it is free and worth nothing.
+ *
+ * Weak, so a request's entry goes with its context.
+ */
+const failedCodeMail = new WeakSet<object>();
+
+/**
  * The shape of the request both code guards read. Structural rather than Better
  * Auth's own middleware context type, so these stay callable from a test.
  */
@@ -488,10 +506,11 @@ export const auth = betterAuth({
         }
         const sent =
           (ctx.context.returned as { success?: unknown } | null)?.success ===
-          true;
+            true && !failedCodeMail.has(ctx.context);
         if (!sent) {
           // Refused inside the endpoint after the reservation, by a check of
-          // Better Auth's own; see `refundVerificationMail`.
+          // Better Auth's own, or answered `{success: true}` over mail that
+          // failed (`failedCodeMail`); see `refundVerificationMail`.
           try {
             await refundVerificationMail(address);
           } catch (error) {
@@ -718,7 +737,7 @@ export const auth = betterAuth({
       // secret, which is not in the database, and unlike `hashed` it does not
       // disable `resendStrategy: "reuse"` should we ever want it.
       storeOTP: "encrypted",
-      sendVerificationOTP: async ({ email, otp, type }) => {
+      sendVerificationOTP: async ({ email, otp, type }, ctx) => {
         // Belt and braces with `disabledPaths`: the only reachable caller is
         // the sign-in send, and a code of any other type must never be mailed
         // even if a path is re-enabled without revisiting this.
@@ -737,10 +756,16 @@ export const auth = betterAuth({
           // It must stay `{success: true}` either way: the response is the same
           // for an address with an account and one without, and that is what
           // keeps the send endpoint from answering "does this person exist".
+          // The after-hook gives the reservation back and withholds the claim;
+          // `failedCodeMail` says why both. The `email_failures` alarm in
+          // `infra/alarms.tf` counts this line, so reword it there too.
           console.error(
             "Sending a sign-in code failed",
             redactQueryError(error)
           );
+          if (ctx) {
+            failedCodeMail.add(ctx.context);
+          }
         }
       },
     }),

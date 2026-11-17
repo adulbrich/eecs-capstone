@@ -14,7 +14,7 @@
 # named for produced, which is the most that can be said before the first time
 # one fires. Retune them in place; nothing else reads these numbers.
 
-# One topic for all seven. Splitting by severity would be premature: there is
+# One topic for all eight. Splitting by severity would be premature: there is
 # one recipient and every alarm below means somebody should look.
 resource "aws_sns_topic" "alarms" {
   name = "${var.project}-alarms"
@@ -371,4 +371,81 @@ resource "aws_cloudwatch_metric_alarm" "ai_write_failures" {
   ok_actions    = local.alarm_notifications
 
   tags = { Name = "${var.project}-ai-write-failures" }
+}
+
+# A failed email, counted from the app's own log because nothing else records
+# one. Every notifier catches its own send failure, logs one line and returns:
+# nothing retries and nothing queues (#708), so an SES outage, a revoked
+# identity or a sandboxed account was first heard of as people saying their
+# codes never came (#892). Some of these mails are the only channel: a walk-in
+# inventory holder has no account, a named mentor or an account-less proposer
+# has no bell, and a sign-in code exists nowhere else.
+#
+# Each alternative names one line rather than matching a word, because the
+# lines share none: `Request notice failed for request` carries no "email".
+# Anchored with `^` on each for the reason the filter above gives, and with no
+# parentheses because the syntax has none, which is why the inventory line
+# stops before its `(<type>)`. The lines, and who prints them:
+#
+# - `Sending a sign-in code failed`: `sendVerificationOTP`, `src/lib/auth.ts`.
+# - `Review`, `Comment`, `Delete`, `Reassignment` and `Mentor email failed for
+#   project`: `src/server/_internal/project-emails.ts`.
+# - `Inventory email failed` and `Request notice failed for request`:
+#   `inventory-emails.ts` beside it.
+# - `Role change email failed` and `Ban email failed`: `account-emails.ts`.
+#
+# Left out on purpose: `Refunding a sign-in code send failed` and
+# `Verification mail counter failed` are the per-recipient counter failing,
+# not mail being lost. `email-failures.test.ts` drives each notifier to its
+# failure and runs this pattern on what it prints, and
+# `email-otp-send-failure.integration.test.ts` does the same for the sign-in
+# line, so rewording either side fails a test instead of zeroing the metric.
+# The `aws logs tail` recipe in DEPLOYMENT.md matches the same phrases and no
+# test checks it, so change it in the same commit.
+#
+# No `default_value`, as above: the metric exists only when something failed.
+resource "aws_cloudwatch_log_metric_filter" "email_failures" {
+  name           = "${var.project}-email-failures"
+  log_group_name = aws_cloudwatch_log_group.app.name
+  pattern        = "%^Sending a sign-in code failed|^Review email failed for project|^Comment email failed for project|^Delete email failed for project|^Reassignment email failed for project|^Mentor email failed for project|^Inventory email failed|^Request notice failed for request|^Role change email failed|^Ban email failed%"
+
+  metric_transformation {
+    name      = "EmailFailures"
+    namespace = "${var.project}/email"
+    value     = "1"
+    unit      = "Count"
+  }
+}
+
+# One failure in an hour, unlike the AI writes' two in three. Mail is rare
+# (eight one-email requests in two months, per #890) and none of these lines
+# appeared in the 30 days `/ecs/eecs-capstone` retains on 2026-11-17, so a
+# single failure is not background noise, and the mail it was carrying is gone
+# for good: no save or sweep sends it again. One SES outage fails every send
+# in it and still mails once, since the alarm stays in ALARM until an hour
+# passes without a failure.
+#
+# `notBreaching` for the reason the AI alarm gives, and its OK means the same
+# thing: an hour with no failed send, which while mail is this sparse can be
+# an hour in which nothing tried to send. Send a sign-in code to yourself
+# before reading an OK as SES recovered.
+resource "aws_cloudwatch_metric_alarm" "email_failures" {
+  alarm_name        = "${var.project}-email-failures"
+  alarm_description = "An email the app tried to send failed (a sign-in code, a project, inventory or account notice). Nothing retries it, so the person it was for has not been told."
+
+  namespace   = aws_cloudwatch_log_metric_filter.email_failures.metric_transformation[0].namespace
+  metric_name = aws_cloudwatch_log_metric_filter.email_failures.metric_transformation[0].name
+  statistic   = "Sum"
+
+  comparison_operator = "GreaterThanOrEqualToThreshold"
+  threshold           = 1
+  period              = 3600
+  evaluation_periods  = 1
+  datapoints_to_alarm = 1
+  treat_missing_data  = "notBreaching"
+
+  alarm_actions = local.alarm_notifications
+  ok_actions    = local.alarm_notifications
+
+  tags = { Name = "${var.project}-email-failures" }
 }

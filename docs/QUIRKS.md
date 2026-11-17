@@ -195,6 +195,10 @@ Better Auth generates `text` primary keys and we keep the default, so every FK t
 
 `EMAIL_TRANSPORT=console` writes every email the app sends to stderr, which is where a local sign-in code arrives. `EMAIL_TRANSPORT=ses` needs `EMAIL_FROM`, and `getEmailSender()` runs at import in `src/lib/auth.ts`, so a missing one takes down the app, not just mail. All email markup comes from `src/lib/email/templates.ts`, which owns the escaping.
 
+### A sign-in code whose mail failed answers success, and the after-hook undoes the send
+
+The send endpoint answers `{success: true}` whatever SES does, so `sendVerificationOTP` marks the request's `ctx.context` in `failedCodeMail`, and the after-hook in `src/lib/auth.ts` refunds the send and withholds the claim (#892). That relies on Better Auth handing both the same per-request context object; `email-otp-send-failure.integration.test.ts` fails if an upgrade stops it. Every email failure line, this one included, is counted by the `email_failures` alarm, so rewording one means changing the pattern in `infra/alarms.tf` and the `DEPLOYMENT.md` recipe; `email-failures.test.ts` catches a missed pattern.
+
 ### `trustHost` is enabled in non-development
 
 `trustHost` is `NODE_ENV !== "development"` while `useSecureCookies` is `=== "production"`. The gap is residue, not a decision; `buildAuthConfig` in `src/lib/_internal/auth-config.ts` says why nothing rides on it, and `auth-config.test.ts` pins it.
