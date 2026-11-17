@@ -125,11 +125,12 @@ export function CategorizeBackfillDialog() {
         setError(errorMessage(e, "The run stopped on an error."));
       }
     } finally {
+      // The Projects column on the table behind the dialog, refreshed before
+      // the controls come back.
+      await router.invalidate();
       if (current() || run.current === null) {
         setRunning(false);
       }
-      // The Projects column on the table behind the dialog.
-      void router.invalidate();
     }
   }
 

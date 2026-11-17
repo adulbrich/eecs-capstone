@@ -76,6 +76,22 @@ describe("the categorization backfill dialog", () => {
     expect(invalidate).toHaveBeenCalled();
   });
 
+  it("keeps the run busy until the table behind it has refreshed", async () => {
+    const refresh = deferred<undefined>();
+    invalidate.mockReturnValueOnce(refresh.promise);
+    server.categorizeNextProject.mockResolvedValueOnce({ done: true });
+    await openDialog();
+
+    fireEvent.click(screen.getByRole("button", { name: "Start" }));
+
+    expect(
+      await screen.findByText("Done. 0 categorized, 0 failed.")
+    ).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Stop" })).toBeTruthy();
+    refresh.resolve(undefined);
+    expect(await screen.findByRole("button", { name: "Start" })).toBeTruthy();
+  });
+
   it("stops after the project in flight when Stop is pressed", async () => {
     const second = deferred<ReturnType<typeof step>>();
     server.categorizeNextProject

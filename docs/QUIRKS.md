@@ -422,7 +422,7 @@ Locally both use the dev database as `user@example.com`, and the end-to-end swee
 
 ### One hydrated button does not mean a hydrated page
 
-Route chunks hydrate after the root layout, so a click on a route's button can land before its handler exists: the click succeeds and nothing happens, and the route's first server calls fire after it. `waitForHydration` in `src/test/shared/playwright.ts` waits for every match, and skips the Solid-rendered TanStack Devtools.
+Route chunks hydrate after the root layout, so a click on a route's button can land before its handler exists: the click succeeds and nothing happens, and the route's first server calls fire after it. `waitForHydration` in `src/test/shared/playwright.ts` waits for every match, and skips the Solid-rendered TanStack Devtools. Biome refuses `waitForTimeout` and `networkidle` in the browser suites: a fixed sleep once stood in for this guard because `networkidle` never fires while Vite's HMR holds connections open.
 
 ### The devtools trigger is hidden whenever an automated browser drives the page
 
@@ -497,6 +497,10 @@ vi.mock("@tanstack/react-router", async (importOriginal) => ({
 
 `biome.json` extends Ultracite's core and React presets. `npm run check` runs `ultracite check`; `npm run format` runs `ultracite fix`.
 
+A rule set to `"on"` takes Biome's default severity, which for many rules is `info` and does not fail `npm run check`, so a rule this repo wants enforced is written `"error"`. A `nursery` rule can change or leave the nursery in any Biome release, so when a Dependabot bump fails `npm run check` on one, look there first.
+
+GritQL plugins live in `biome-plugins/` and are listed under `plugins` in `biome.json`; `npx biome lint --only=plugin` runs them alone. `query-cache.grit` fails a bare `invalidateQueries()` and a `void router.invalidate()` (`docs/UI-CONVENTIONS.md`, "Cache").
+
 ### Hard rules
 
 Biome owns the formatting (2-space indent, double quotes) and the import order; do not fight either. `biome.json` excludes `src/routeTree.gen.ts`, `src/styles.css`, `scripts/`, `drizzle/` and `**/*.svg`, so an autofix never reaches a `scripts/` copy that a parity test pins to its `src/` twin; change both by hand. The YAML formatter keeps `bracketSpacing` off, matching the existing flow lists.
@@ -509,15 +513,15 @@ Biome owns the formatting (2-space indent, double quotes) and the import order; 
 
 `biome.json` turns these off on purpose:
 
-- `noVoid`: fire-and-forget `void promise()` is intended.
 - `useFilenamingConvention` under `src/routes/**`: TanStack's `$param` and `__root` names.
 - `useImageSize`: off everywhere except `institution-logo.tsx`.
 - `noJsxPropsBind` and `noLeakedRender`: inline arrows and `cond && <X />` are the idiom here.
 - `noAwaitInLoops`: the seeds, migrations and Bedrock callers await in sequence on purpose.
 - `noIncrementDecrement` and `useDestructuring`: style with no defect behind it.
-- The assists `useSortedKeys` and `useSortedTypeFields`: object literals here are ordered by meaning.
 - `useNamedCaptureGroup`: a name on a group read once as `$1` is noise.
-- `useThisInClassMethods`: the storage and email classes implement an interface, and test stubs fake DOM globals, so a method without `this` is the shape required.
+- `useThisInClassMethods`: the console email sender implements an interface, and test stubs fake DOM globals, so a method without `this` is the shape required.
+
+Ultracite already turns off `noVoid` (fire-and-forget `void promise()` is intended) and the `useSortedKeys` assist (object literals are ordered by meaning), and the repo relies on that rather than repeating it.
 
 ### Rules relaxed in tests
 
@@ -539,7 +543,7 @@ Its unsafe fixes changed behaviour here: `viewer!.id` became `viewer?.id`, and a
 
 ### Soft rules / project conventions
 
-Component files are `kebab-case.tsx`, and cross-directory imports inside `src/` use the `#/` alias. The prose and commit rules are in [`../AGENTS.md`](../AGENTS.md).
+Component files are `kebab-case.tsx`, and cross-directory imports inside `src/` use the `#/` alias, except an impl's type-only back-import from its wrapper (`import type { XInput } from "../x"`, see "An impl imports its input types back from its domain's wrapper, type-only"). The prose and commit rules are in [`../AGENTS.md`](../AGENTS.md).
 
 ---
 

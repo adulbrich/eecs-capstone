@@ -1,0 +1,10 @@
+language js
+
+or {
+  `$qc.invalidateQueries()` as $call where {
+    register_diagnostic(span=$call, message="Name the keys: a bare invalidateQueries() refetches every query. See docs/UI-CONVENTIONS.md, Cache.", severity="error")
+  },
+  `void router.invalidate()` as $call where {
+    register_diagnostic(span=$call, message="Await router.invalidate() inside the busy window. See docs/UI-CONVENTIONS.md, Cache.", severity="error")
+  }
+}
