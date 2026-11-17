@@ -9,6 +9,7 @@ import {
   screen,
 } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { doubleClickInOneTick } from "./shared/double-click";
 
 let session: { user: { id: string } } | null = null;
 let rows = new Set<string>();
@@ -117,18 +118,6 @@ async function answer(bookmarked: boolean) {
     answerRead?.(bookmarked);
     await settle();
   });
-}
-
-/**
- * Two clicks inside one tick, before React can render the button disabled.
- * Two `fireEvent.click` calls would render between them, as two real clicks do.
- */
-function doubleClickInOneTick(button: HTMLElement) {
-  for (const _ of [1, 2]) {
-    button.dispatchEvent(
-      new MouseEvent("click", { bubbles: true, cancelable: true })
-    );
-  }
 }
 
 /** Click and let the write settle, so the assertion reads a final label. */
