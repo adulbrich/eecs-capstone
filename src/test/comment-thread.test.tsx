@@ -615,6 +615,17 @@ describe("CommentThread reply form under any interleaving", () => {
 
   const step = fc.constantFrom<Step>("submit", "cancel", "reopen");
 
+  // The race needs a request still out across Post, Cancel and Reply. With a
+  // release after every other step and fast-check's bias toward short arrays,
+  // a third of 100-run seeds never reached it with the attempt check removed,
+  // so a run takes at least three steps and releases after one in four.
+  const oneInFour = fc.nat({ max: 3 }).map((n) => n === 0);
+  const stepPlan = fc.array(fc.tuple(step, oneInFour), {
+    minLength: 3,
+    maxLength: 6,
+    size: "max",
+  });
+
   /** The microtasks between a settled request and the attempt's `finally`. */
   async function flush() {
     await act(async () => {
@@ -627,19 +638,19 @@ describe("CommentThread reply form under any interleaving", () => {
   test.prop([
     // Awaited inside an async function rather than handed over as is. React's
     // `act` returns a thenable that pops its scope once per `then`, and
-    // `waitNext` can attach two, which React reports as overlapping act calls.
+    // `waitNext` attaches two, which React reports as overlapping act calls.
     fc.scheduler({
       act: async (f) => {
         await act(f);
       },
     }),
-    // Whether the scheduler releases one pending request after each step.
-    fc.array(fc.tuple(step, fc.boolean()), { maxLength: 6 }),
+    // Each step, then whether the scheduler releases one pending request.
+    stepPlan,
     // Whether the nth request fails; at most six submits reach the server.
     fc.array(fc.boolean(), { minLength: 6, maxLength: 6 }),
   ])(
     "posts once per attempt, ends idle, and shows only the owning attempt's failure",
-    async (s, steps, failures) => {
+    async (s, plan, failures) => {
       cleanup();
       addComment.mockReset();
       const model: ReplyModel = { open: true, owner: null, error: null };
@@ -685,7 +696,7 @@ describe("CommentThread reply form under any interleaving", () => {
         renderThread([comment({})]);
         openReplyAndType("a reply");
 
-        for (const [action, release] of steps) {
+        for (const [action, release] of plan) {
           const isOpen = screen.queryByPlaceholderText("Reply") !== null;
           expect(isOpen).toBe(model.open);
           if (action === "submit" && model.open) {
