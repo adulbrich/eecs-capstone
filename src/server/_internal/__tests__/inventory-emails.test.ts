@@ -84,6 +84,27 @@ describe("notifyInventoryByEmail", () => {
     expect(error).toHaveBeenCalledOnce();
     error.mockRestore();
   });
+
+  it("logs no address when SES names the recipient in its error (#559)", async () => {
+    const error = vi
+      .spyOn(console, "error")
+      .mockImplementation(() => undefined);
+    const rejected = new Error(
+      "Email address is not verified. The following identities failed the check in region US-WEST-2: walkin@x.edu"
+    );
+    rejected.name = "MessageRejected";
+
+    await notifyInventoryByEmail(
+      { ...approved, recipient: { accountId: null, email: "walkin@x.edu" } },
+      { send: vi.fn().mockRejectedValue(rejected) },
+      CONFIG
+    );
+
+    const line = error.mock.calls.map((call) => call.join(" ")).join("\n");
+    expect(line).toContain("MessageRejected");
+    expect(line).not.toContain("@");
+    error.mockRestore();
+  });
 });
 
 describe("notifyRequestSubmittedByEmail", () => {

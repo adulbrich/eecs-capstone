@@ -1374,8 +1374,9 @@ aws --profile aws-capstone1 logs tail /ecs/eecs-capstone --since 3h --region us-
 
 The app puts no address in any of them (#559); the project or request id is
 there, and the inventory line names the notice type. SES's own error text,
-which follows, can name one: in the sandbox, a `MessageRejected` lists the
-unverified recipient. Nothing retries a failed mail, so each
+which follows, can name one (in the sandbox, a `MessageRejected` lists the
+unverified recipient); `redactQueryError` prints it as `[address redacted]`
+(#898). Nothing retries a failed mail, so each
 line is somebody who was not told and will not be unless someone tells them.
 A failed sign-in code costs the person none of their hourly sends (#892), so
 asking for a new code works once SES does. A run of failures with the same

@@ -21,7 +21,9 @@
  * What survives: the failing query's SQL, which is schema rather than user
  * data and is in this repository already, and the cause chain's messages,
  * which is where "Connection terminated due to connection timeout" lives and
- * is the whole diagnostic value of the line.
+ * is the whole diagnostic value of the line. Less any email address in them,
+ * since an error message can name one outside a query too
+ * (`redactAddresses`).
  */
 
 /** How much of the failing SQL to keep. Enough to identify the query. */
@@ -100,6 +102,127 @@ function scrubQueryText(text: string): string {
   return `${text.slice(0, marker).trimEnd()} [params redacted]`;
 }
 
+/**
+ * An email address anywhere in a message, which #559 keeps out of the log
+ * group whoever wrote the message.
+ *
+ * Not only a query's parameters carry one. SES puts the recipient in its own
+ * error text (a sandboxed account's `MessageRejected` ends "The following
+ * identities failed the check in region US-WEST-2: <address>"), and every
+ * email notifier logs that error after its line (#892), where on the sign-in
+ * path the address is whatever a stranger typed.
+ *
+ * The local part takes exactly the characters `z.email()` admits, and every
+ * address the app sends to has passed it (the sign-in form, a mentor, an
+ * inventory holder), so no prefix of one survives. Not the wider RFC 5322
+ * set: with `/`, `=` and `?` in it, `https://site.edu/x?r=a@b.co` lost its
+ * host and path to the match, which let a stranger blank the target out of a
+ * logged callbackURL. The domain
+ * needs a dot between its labels and ends, as `z.email()` requires, in a
+ * label of two or more letters. That keeps a package intact, as a scoped path
+ * (`node_modules/@aws-sdk/client-sesv2`, whose label meets a `/` first) and
+ * with a numeric version (`@aws-sdk/client-sesv2@3.700.0`, `react@18.x`). A
+ * version that ends in a word, `1.0.0-alpha.beta`, reads as a domain and is
+ * redacted, as is a dotted word straight after an address: without a list of
+ * top-level domains there is no telling them apart, and more redaction is the
+ * safe way to be wrong.
+ *
+ * Scans rather than one regex, because this runs on text a stranger chooses
+ * (Better Auth logs a rejected callbackURL word for word) and both regex
+ * shapes failed. Unanchored, a long run of local-part characters with no `@`
+ * was rescanned from every position: 40,000 characters held the event loop
+ * for a second. Anchored with a lookbehind, a match could not start where the
+ * previous one ended, so the second of `a@x.edu+b@y.edu` survived.
+ */
+const LOCAL_CHAR = /[A-Za-z0-9_'+.-]/u;
+const DOMAIN = /(?:[A-Za-z0-9-]+\.)+[A-Za-z]{2,}/uy;
+const ADDRESS_MARK = "[address redacted]";
+
+/**
+ * What ends a URL's authority: the WHATWG parser's own `/`, `?`, `#` and `\`,
+ * and also whitespace, a quote and angle brackets, which the parser would
+ * delete (a tab or a newline) or percent-encode inside userinfo instead. Ending there keeps prose and JSON
+ * around a URL from being read as its userinfo (`fetch https://api.x.edu
+ * failed for bob@x.edu` would otherwise lose the URL), at the cost that a URL
+ * with one of them inside its userinfo can still have its host taken with an
+ * address. Not RFC 3986's narrower set: the parser percent-encodes `{`, `|`
+ * and `^` and still reads the host after them.
+ */
+const AUTHORITY_END = /[\s/?#\\"<>]/gu;
+
+/**
+ * A URL's userinfo, everything between `//` and the authority's last `@`,
+ * becomes the mark and the host stays. The host is where the URL points, and a
+ * stranger's reason to put an address in a callbackURL is to hide it:
+ * `https://a@b.co@evil.com`, `https://@x@evil.com` and `https://a{b@evil.com`
+ * all point at evil.com. A pass of its own, before the address scan, because
+ * guessing from inside that scan which `@` was the last missed one shape per
+ * review round. Linear: each authority is read once and they do not overlap.
+ */
+function redactUserinfo(text: string): string {
+  let out = "";
+  let kept = 0;
+  for (
+    let slashes = text.indexOf("//");
+    slashes !== -1;
+    slashes = text.indexOf("//", kept)
+  ) {
+    const from = slashes + 2;
+    AUTHORITY_END.lastIndex = from;
+    const end = AUTHORITY_END.exec(text)?.index ?? text.length;
+    // Searched inside the authority only: `indexOf` from here could run to
+    // the end of the text for every `//` in it.
+    const inside = text.slice(from, end).lastIndexOf("@");
+    const lastAt = inside === -1 ? -1 : from + inside;
+    // `//@host` has no userinfo to take.
+    if (lastAt > from) {
+      out += `${text.slice(kept, from)}${ADDRESS_MARK}`;
+      kept = lastAt;
+    } else {
+      out += text.slice(kept, from);
+      kept = from;
+    }
+  }
+  return out + text.slice(kept);
+}
+
+/**
+ * Each `@` walks left only as far as the previous `@` or the end of the
+ * previous match, and right only to the end of its domain, so every character
+ * is visited a bounded number of times.
+ */
+function redactBareAddresses(text: string): string {
+  let out = "";
+  let kept = 0;
+  for (let at = text.indexOf("@"); at !== -1; at = text.indexOf("@", at + 1)) {
+    if (at < kept) {
+      continue;
+    }
+    let start = at;
+    while (start > kept && LOCAL_CHAR.test(text.charAt(start - 1))) {
+      start -= 1;
+    }
+    // An empty local part is an address only where the previous match took
+    // its local part: `a@x.edu.b@y.edu` reads the first domain as `x.edu.b`.
+    const glued = start === at && at === kept && out !== "";
+    if (start === at && !glued) {
+      continue;
+    }
+    DOMAIN.lastIndex = at + 1;
+    const domain = DOMAIN.exec(text);
+    if (!domain) {
+      continue;
+    }
+    out += `${text.slice(kept, start)}${glued ? "" : ADDRESS_MARK}`;
+    kept = DOMAIN.lastIndex;
+  }
+  return out + text.slice(kept);
+}
+
+function redactAddresses(text: string): string {
+  return redactBareAddresses(redactUserinfo(text));
+}
+
 function truncate(sql: string): string {
   const collapsed = sql.replace(/\s+/gu, " ").trim();
   return collapsed.length > QUERY_LIMIT
@@ -119,10 +242,12 @@ function describe(value: unknown): string {
     return `query failed [params redacted]: ${truncate(value.query)}`;
   }
   if (value instanceof Error) {
-    return `${value.name}: ${scrubQueryText(value.message)}`;
+    // `String` because a thrown Error's `message` is whatever was assigned to
+    // it, and a number here threw inside the caller's own `catch`.
+    return `${value.name}: ${redactAddresses(scrubQueryText(String(value.message)))}`;
   }
   if (typeof value === "string") {
-    return scrubQueryText(value);
+    return redactAddresses(scrubQueryText(value));
   }
   return Object.prototype.toString.call(value);
 }

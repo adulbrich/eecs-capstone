@@ -1,6 +1,8 @@
 import { inspect } from "node:util";
+import { fc, test } from "@fast-check/vitest";
 import { DrizzleQueryError } from "drizzle-orm/errors";
 import { describe, expect, it } from "vitest";
+import { z } from "zod";
 import {
   redactingAuthLogger,
   redactQueryError,
@@ -163,6 +165,216 @@ describe("redactQueryError", () => {
       undefined
     );
     expect(redactQueryError(long).length).toBeLessThan(400);
+  });
+});
+
+/** An address the app could send to, which is one `z.email()` accepts. */
+const zodAddress = fc
+  .emailAddress()
+  .filter((address) => z.email().safeParse(address).success);
+
+/** Anything still shaped like such an address after redaction. */
+const ANY_ADDRESS = /[A-Za-z0-9_'+.-]+@[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)+/u;
+
+describe("redactQueryError, on an address outside a query", () => {
+  /** What a sandboxed SES account throws for an unverified recipient. */
+  const SES_REJECTION =
+    "Email address is not verified. The following identities failed the check in region US-WEST-2: alice.o'brien+cap@oregonstate.edu";
+
+  function sesRejection(): Error {
+    const error = new Error(SES_REJECTION);
+    error.name = "MessageRejected";
+    return error;
+  }
+
+  it("keeps the recipient SES names out of the line, and keeps the reason", () => {
+    expect(redactQueryError(sesRejection())).toBe(
+      "MessageRejected: Email address is not verified. The following identities failed the check in region US-WEST-2: [address redacted]"
+    );
+  });
+
+  it("redacts an address further down the cause chain", () => {
+    const wrapped = new Error("send failed", { cause: sesRejection() });
+    expect(redactQueryError(wrapped)).not.toContain("@");
+  });
+
+  it("redacts every address in a list, and in a bare string", () => {
+    expect(
+      redactQueryError("rejected: a@x.edu, B.Two@sub.example.co.uk; c-3@y.io.")
+    ).toBe(
+      "rejected: [address redacted], [address redacted]; [address redacted]."
+    );
+  });
+
+  it.each([
+    ["+", "a@x.edu+b@y.edu"],
+    ["_", "a@x.edu_b@y.edu"],
+    ["/", "a@x.edu/b@y.edu"],
+    [".", "a@x.edu.b@y.edu"],
+  ])("redacts both of two addresses joined by %j", (_joiner, text) => {
+    // A regex anchored with a lookbehind could not start a match where the
+    // previous one ended, so the second address survived whole.
+    const line = redactQueryError(text);
+    expect(line).not.toContain("@");
+    expect(line).not.toContain("y.edu");
+  });
+
+  it.each([
+    ["a run with no @", "a".repeat(100_000)],
+    ["a dotted run with no @", "a.".repeat(50_000)],
+    ["a domain with no dot", `x@${"a".repeat(100_000)}`],
+    ["an @ after every character", "a@".repeat(50_000)],
+    ["a domain that never ends in a letter", `x@${"1.".repeat(50_000)}`],
+    ["a chain of addresses", "a@x.co+".repeat(14_000)],
+    ["one URL authority full of @", `//a@${"b@".repeat(50_000)}`],
+    ["URLs with userinfo", "//a@b.co/".repeat(11_000)],
+    ["many authorities, one @ at the end", `${"//x".repeat(70_000)}@`],
+    ["one @, then many authorities", `@${"//x".repeat(70_000)}`],
+  ])("stays linear on %s, which a stranger can send", (_shape, input) => {
+    // An unanchored regex rescanned a run from every position: 40,000
+    // characters took a second, and 100,000 about six. The first call pays
+    // for compiling the patterns, which is not the cost under test.
+    redactQueryError(input);
+    let best = Number.POSITIVE_INFINITY;
+    for (let run = 0; run < 3; run++) {
+      const start = performance.now();
+      redactQueryError(input);
+      best = Math.min(best, performance.now() - start);
+    }
+    expect(best).toBeLessThan(100);
+  });
+
+  it.each([
+    "installed @aws-sdk/client-sesv2@3.700.0",
+    "installed drizzle-orm@0.44.2",
+    "installed react@18.x and @types/node@20.x",
+    "in .pnpm/@aws-sdk+client-sesv2@3.600.0/node_modules",
+  ])("leaves a versioned package alone: %j", (text) => {
+    expect(redactQueryError(text)).toBe(text);
+  });
+
+  it.each([
+    ["https://x@evil.com/cb", "https://[address redacted]@evil.com/cb"],
+    [
+      "https://capstone.oregonstate.edu@evil.com/",
+      "https://[address redacted]@evil.com/",
+    ],
+    ["https://a@b.co@evil.com/cb", "https://[address redacted]@evil.com/cb"],
+    [
+      "postgres://u:p@db.internal:5432/x",
+      "postgres://[address redacted]@db.internal:5432/x",
+    ],
+    ["mailto:a@b.co", "mailto:[address redacted]"],
+    ["https://%@x@evil.com/cb", "https://[address redacted]@evil.com/cb"],
+    ["https://u:p!@x@evil.com/cb", "https://[address redacted]@evil.com/cb"],
+    ["https://a{b@evil.com/cb", "https://[address redacted]@evil.com/cb"],
+    ["https://a|b@evil.com/cb", "https://[address redacted]@evil.com/cb"],
+    ["https://a^b@evil.com\\cb", "https://[address redacted]@evil.com\\cb"],
+    ["//@host.example/x", "//@host.example/x"],
+    ["https://@x@evil.com/cb", "https://[address redacted]@evil.com/cb"],
+    ["https://@@x@evil.com/cb", "https://[address redacted]@evil.com/cb"],
+    [
+      '{"url":"//x","email":"a@b.co"}',
+      '{"url":"//x","email":"[address redacted]"}',
+    ],
+  ])("redacts a URL's userinfo and keeps its host: %j", (text, expected) => {
+    // Userinfo in a callbackURL is how a stranger would hide where it points.
+    expect(redactQueryError(text)).toBe(expected);
+  });
+
+  it.each([
+    ["a@b.co-", "[address redacted]-"],
+    ["alice@oregonstate.edu-2024", "[address redacted]-2024"],
+    ["a@b.co1", "[address redacted]1"],
+  ])(
+    "redacts an address with a word character straight after it: %j",
+    (text, expected) => {
+      // A lookahead for the end of the label let all three through whole.
+      expect(redactQueryError(text)).toBe(expected);
+    }
+  );
+
+  // Whatever a stranger puts before the last `@` of an authority, the host
+  // after it stays. Each review round found one more shape (`a@b.co@`, `%@`,
+  // `a{b@`, `@x@`) that hid it; this draws them all.
+  test.prop([
+    fc
+      .string({ minLength: 1, unit: "binary" })
+      .filter((userinfo) => !/[\s/?#\\"<>]/u.test(userinfo)),
+  ])("keeps the host after any userinfo", (userinfo) => {
+    expect(redactQueryError(`https://${userinfo}@evil.com/cb`)).toBe(
+      "https://[address redacted]@evil.com/cb"
+    );
+  });
+
+  it("keeps a URL's host and path when its query names an address", () => {
+    // A stranger chooses a logged callbackURL, so a match that ran back
+    // through the path would let them blank out where it pointed.
+    expect(
+      redactQueryError("Invalid callbackURL: https://evil.example/x?r=a@b.co")
+    ).toBe("Invalid callbackURL: https://evil.example/x?r=[address redacted]");
+  });
+
+  it("leaves a scoped package path alone", () => {
+    const text =
+      "Cannot find module '/app/node_modules/@aws-sdk/client-sesv2/dist/index.js'";
+    expect(redactQueryError(new Error(text))).toBe(`Error: ${text}`);
+  });
+
+  // Every address the sign-in form accepts, between ordinary words, comes
+  // out as the marker and nothing else: no prefix of an odd local part, no
+  // tail of a long domain.
+  test.prop([
+    zodAddress,
+    fc.stringMatching(/^[A-Za-z ]{0,20}$/u),
+    fc.stringMatching(/^[A-Za-z ]{0,20}$/u),
+  ])(
+    "redacts every address z.email() accepts, whole",
+    (address, before, after) => {
+      expect(redactQueryError(new Error(`${before} ${address} ${after}`))).toBe(
+        `Error: ${before} [address redacted] ${after}`
+      );
+    }
+  );
+
+  // A match has to be able to start where the previous one ended, whatever
+  // joins the two: a lookbehind-anchored regex left the second of
+  // `a@a.aa_a@a.aa` whole.
+  test.prop([
+    zodAddress,
+    zodAddress,
+    fc.constantFrom(..."_'+.-%!#$&*/=?^`{|}~,; <>\""),
+  ])(
+    "leaves no address in two joined by one character",
+    (first, second, joiner) => {
+      expect(redactQueryError(`${first}${joiner}${second}`)).not.toMatch(
+        ANY_ADDRESS
+      );
+    }
+  );
+
+  test.prop([
+    fc
+      .string({ unit: "binary" })
+      .filter((text) => !(text.includes("@") || text.includes("params"))),
+  ])("passes text with no @ through unchanged", (text) => {
+    expect(redactQueryError(text)).toBe(text);
+  });
+
+  test.prop([
+    fc
+      .string({ unit: "binary", maxLength: 40 })
+      .filter((text) => !text.includes("params")),
+  ])("reads an Error's message the way it reads a string", (text) => {
+    expect(redactQueryError(new Error(text))).toBe(
+      `Error: ${redactQueryError(text)}`
+    );
+  });
+
+  it("does not throw on an Error whose message is not a string", () => {
+    const odd = new Error("x");
+    (odd as { message: unknown }).message = 42;
+    expect(redactQueryError(odd)).toBe("Error: 42");
   });
 });
 
