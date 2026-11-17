@@ -2,6 +2,7 @@ import { fc, test } from "@fast-check/vitest";
 import { describe, expect, it } from "vitest";
 import {
   type CsvColumn,
+  defineCsvColumns,
   orderBySortedIds,
   toCsv,
   unguardCell,
@@ -59,6 +60,13 @@ describe("toCsv", () => {
   it("renders nulls as empty", () => {
     const csv = toCsv(COLUMNS, [row({ count: null, when: null })]);
     expect(csv.split("\r\n")[1]).toBe("Widget,,true,,a; b");
+  });
+
+  it("renders undefined as empty, like null", () => {
+    const columns: CsvColumn<Row>[] = [
+      { header: "Missing", value: () => undefined },
+    ];
+    expect(toCsv(columns, [row()])).toBe("Missing\r\n");
   });
 
   it("joins arrays with a semicolon and a space", () => {
@@ -132,6 +140,15 @@ describe("orderBySortedIds", () => {
 
   it("skips an id that names no row", () => {
     expect(orderBySortedIds([a], ["gone", "a"], getId)).toEqual([a]);
+  });
+});
+
+describe("defineCsvColumns", () => {
+  it("hands back columns toCsv can write", () => {
+    const columns = defineCsvColumns<{ name: string }>()([
+      { key: "name", header: "Name", value: (r) => r.name },
+    ]);
+    expect(toCsv(columns, [{ name: "Ada" }])).toBe("Name\r\nAda");
   });
 });
 
