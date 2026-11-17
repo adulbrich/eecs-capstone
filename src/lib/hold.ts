@@ -43,8 +43,10 @@
  * `normalizeEmailAddress` (#884). Judging it raw let a reserved item with
  * holder `" "` pass both rules and be stored with no holder at all.
  *
- * Judged, not rewritten: a `Hold` in flight still carries the address as
- * typed, and only the stored copy is folded.
+ * Judged, not rewritten: `holdFromInput` carries the address it is given,
+ * and `holdToColumns` is the only place that folds it. The server path,
+ * `resolveHold`, hands it the folded address already, so the lookup and the
+ * notice use the form that is stored.
  *
  * Only the address, because only the address is folded on write. A label,
  * name or program is stored as typed, so a whitespace label is a value the

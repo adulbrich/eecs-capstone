@@ -42,10 +42,9 @@ describe("lookupUserByEmail", () => {
   });
 
   it("matches regardless of the case typed", async () => {
-    // Scoped to this endpoint, which answers "does an account exist". The
-    // write path's own resolution in resolveHold still compares the
-    // address exactly, so a differently-cased address that reads as matched
-    // here is stored without an account id.
+    // Scoped to this endpoint, which answers "does an account exist".
+    // resolveHold folds and trims the same way, so the write path finds the
+    // same account (#884).
     const stamp = Date.now();
     const staff = await makeUser(`case-staff-${stamp}@x.com`, "admin");
     const account = await makeUser(`case-target-${stamp}@x.com`, "user");

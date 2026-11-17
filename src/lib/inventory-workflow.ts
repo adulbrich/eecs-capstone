@@ -187,7 +187,7 @@ function assertAuthorized(viewer: TransitionActor, input: TransitionInput) {
   // self-service caller supplies an address (submitCartAs passes its own id,
   // cancel passes neither), so refusing it outright costs nothing. Judged
   // raw, unlike the invariants below (#884): a self-service caller has no
-  // reason to send the field at all, blank or not.
+  // reason to send the field at all, whitespace or not.
   if (input.holderId && input.holderId !== viewer.id) {
     throw new Error("A self-service transition may only act on its own viewer");
   }
