@@ -24,6 +24,7 @@
  * why reversing it deadlocks.
  */
 
+import { normalizeEmailAddress } from "./email-address";
 import { assertStaff, type Viewer } from "./viewer";
 import type {
   InventoryRequestItemStatus,
@@ -184,7 +185,9 @@ function assertAuthorized(viewer: TransitionActor, input: TransitionInput) {
   // `holderEmail` FIRST and derives the account from it, so guarding only the
   // id would leave the field the resolver actually prefers wide open. No
   // self-service caller supplies an address (submitCartAs passes its own id,
-  // cancel passes neither), so refusing it outright costs nothing.
+  // cancel passes neither), so refusing it outright costs nothing. Judged
+  // raw, unlike the invariants below (#884): a self-service caller has no
+  // reason to send the field at all, whitespace or not.
   if (input.holderId && input.holderId !== viewer.id) {
     throw new Error("A self-service transition may only act on its own viewer");
   }
@@ -284,6 +287,11 @@ function validateStatusInvariants(input: TransitionInput) {
     pickupNote,
     dueAt,
   } = input;
+  // The address as the write gate will store it. Whitespace alone trims to
+  // null there, so every arm below counts it as no address, matching
+  // `holdFromInput` (#884). The other holder fields are stored as typed and
+  // judged raw.
+  const address = normalizeEmailAddress(holderEmail);
 
   switch (nextStatus) {
     case "available":
@@ -291,7 +299,7 @@ function validateStatusInvariants(input: TransitionInput) {
     case "retired":
       if (
         holderId ||
-        holderEmail ||
+        address ||
         holderLabel ||
         holderName ||
         holderProgram ||
@@ -315,7 +323,7 @@ function validateStatusInvariants(input: TransitionInput) {
       // one caller that reaches this arm, under the self_request authority,
       // once per surviving cart line. The lifecycle panel does not offer
       // "requested" as a direct target, so staff never land here.
-      if (!(requestItemId && (holderId || holderEmail)) || holderLabel) {
+      if (!(requestItemId && (holderId || address)) || holderLabel) {
         throw new Error(
           "requested status requires requestItemId and a holder account or address, no label"
         );
@@ -336,8 +344,9 @@ function validateStatusInvariants(input: TransitionInput) {
       //    sees a status. `{ kind: "none" }` is a legal hold for an available
       //    item. Only this arm knows that it is not a legal one for a
       //    checkout, so without it a checkout with no holder saves silently.
-      // 2. `inventory-workflow.test.ts` asserts this exact wording.
-      const onAPerson = Boolean(holderId || holderEmail);
+      // 2. `inventory-workflow.test.ts` and `hold.test.ts` assert this exact
+      //    wording.
+      const onAPerson = Boolean(holderId || address);
       const onAThing = Boolean(holderLabel);
       if (onAPerson === onAThing) {
         throw new Error(

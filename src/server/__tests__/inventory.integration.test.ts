@@ -244,6 +244,49 @@ describe("transitionItem", () => {
     );
   });
 
+  it("holds for the account when the address beside its id is only whitespace (#884)", async () => {
+    // The rules pass this on the id. An address branch taken on raw
+    // truthiness would look up " ", find nobody, and store a hold on nobody.
+    const admin = await makeUser(`a-${Date.now()}@x.com`, "admin");
+    const studentEmail = `s-${Date.now()}@x.com`;
+    const student = await makeUser(studentEmail, "user");
+    const item = await makeItem();
+    await transitionItem(admin, {
+      itemId: item.id,
+      nextStatus: "reserved",
+      holderId: student.id,
+      holderEmail: " ",
+      pickupBy: new Date(Date.now() + 86_400_000),
+    });
+    const [after] = await db
+      .select()
+      .from(inventoryItems)
+      .where(eq(inventoryItems.id, item.id));
+    expect(after.currentHolderId).toBe(student.id);
+    expect(after.currentHolderEmail).toBe(studentEmail);
+  });
+
+  it("finds the account behind a padded, mixed-case address (#884)", async () => {
+    // The rules judge the address trimmed, so the lookup must too, or the
+    // hold stores as a walk-in beside the account it names.
+    const admin = await makeUser(`a-${Date.now()}@x.com`, "admin");
+    const studentEmail = `s-${Date.now()}@x.com`;
+    const student = await makeUser(studentEmail, "user");
+    const item = await makeItem();
+    await transitionItem(admin, {
+      itemId: item.id,
+      nextStatus: "reserved",
+      holderEmail: ` ${studentEmail.toUpperCase()}\t`,
+      pickupBy: new Date(Date.now() + 86_400_000),
+    });
+    const [after] = await db
+      .select()
+      .from(inventoryItems)
+      .where(eq(inventoryItems.id, item.id));
+    expect(after.currentHolderId).toBe(student.id);
+    expect(after.currentHolderEmail).toBe(studentEmail);
+  });
+
   it("ad-hoc label: checked_out with holderLabel and no holderId", async () => {
     const admin = await makeUser(`a-${Date.now()}@x.com`, "admin");
     const student = await makeUser(`s-${Date.now()}@x.com`, "user");

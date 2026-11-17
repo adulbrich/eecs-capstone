@@ -208,14 +208,37 @@ export const wallTime = fc
 
 /**
  * One holder field as a caller could supply it: absent either way, empty,
- * whitespace only, or text. The two modules agree on raw truthiness, so the
- * cases worth generating are the ones that sit on either side of it.
+ * whitespace only, or text. The two modules take a label, name or program on
+ * raw truthiness and an address trimmed (#884), so the cases worth generating
+ * are the ones that sit on either side of both.
  */
 export const holderText = fc.oneof(
   { arbitrary: fc.constantFrom(null, undefined, ""), weight: 2 },
   { arbitrary: fc.constantFrom(...WHITESPACE), weight: 1 },
   { arbitrary: trickyText({ maxLength: 8, minLength: 1 }), weight: 1 }
 );
+
+/**
+ * Text that `trim()` strips to nothing, so `normalizeEmailAddress` reads it as
+ * no address (#884): the whitespace above and the rarer separators `trim()`
+ * also strips, the byte order mark, line and paragraph separators, ogham and
+ * em spaces, the narrow no-break space, vertical tab and form feed.
+ */
+export const blankText = fc.string({
+  maxLength: 4,
+  minLength: 1,
+  unit: fc.constantFrom(
+    ...WHITESPACE,
+    "\u{FEFF}",
+    "\u{2028}",
+    "\u{2029}",
+    "\u{1680}",
+    "\u{2003}",
+    "\u{202F}",
+    "\u{B}",
+    "\u{C}"
+  ),
+});
 
 /**
  * An address as staff could type it: any `holderText`, or a real address in

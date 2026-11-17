@@ -1,18 +1,21 @@
 import { fc, test } from "@fast-check/vitest";
 import { describe, expect, it } from "vitest";
-import { holderText, looseHolder } from "#/test/shared/arbitraries";
+import { blankText, holderText, looseHolder } from "#/test/shared/arbitraries";
 import { normalizeEmailAddress } from "../email-address";
 import {
   formatHoldDetailed,
   formatHoldShort,
   type Hold,
+  type HoldInput,
   holdEmail,
   holdFromInput,
   holdFromJoinedRow,
   holdFromStoredRow,
   holdName,
   holdToColumns,
+  type ResolvedAccount,
 } from "../hold";
+import { assertTransitionAllowed } from "../inventory-workflow";
 
 const NO_ACCOUNT = { accountId: null, accountName: null };
 
@@ -132,10 +135,47 @@ describe("holdFromInput", () => {
     });
   });
 
-  it("does not trim a whitespace-only address into no hold at all", () => {
+  it("reads a whitespace-only address as no address (#884)", () => {
+    // The write gate trims the address to null, so a walk-in built from one
+    // would be stored as a hold on nobody. The rules judge it the same way,
+    // so a reserved item cannot get that far.
     expect(holdFromInput({ email: "   " }, NO_ACCOUNT)).toEqual({
+      kind: "none",
+    });
+    expect(
+      holdFromInput({ email: "\u{A0}", label: "Cart 3" }, NO_ACCOUNT)
+    ).toEqual({ kind: "thing", label: "Cart 3", name: null, program: null });
+    expect(
+      holdFromInput({ email: "\t" }, { accountId: "u-1", accountName: "Sam" })
+    ).toEqual({ kind: "account", accountId: "u-1", email: null, name: "Sam" });
+  });
+
+  /** The hold, or the refusal's message, so two builds compare whole. */
+  function built(input: HoldInput, account: ResolvedAccount): Hold | string {
+    try {
+      return holdFromInput(input, account);
+    } catch (e) {
+      return (e as Error).message;
+    }
+  }
+
+  test.prop([looseHolder, holderText, blankText])(
+    "builds the same hold from a blank address as from none (#884)",
+    ({ id, label, name, program }, accountName, address) => {
+      const account = {
+        accountId: id ?? null,
+        accountName: id ? (accountName ?? null) : null,
+      };
+      expect(built({ email: address, label, name, program }, account)).toEqual(
+        built({ email: null, label, name, program }, account)
+      );
+    }
+  );
+
+  it("keeps a padded address as typed, for the write gate to fold", () => {
+    expect(holdFromInput({ email: " W@In.TEST " }, NO_ACCOUNT)).toEqual({
       kind: "walk_in",
-      email: "   ",
+      email: " W@In.TEST ",
       name: null,
       program: null,
     });
@@ -284,17 +324,6 @@ describe("holdToColumns, for every hold holdFromInput builds", () => {
     }
   }
 
-  /**
-   * The one hold the round trip loses: a walk-in whose address is whitespace
-   * only, any of it `trim()` strips, the no-break and ideographic spaces
-   * included. See the example below.
-   */
-  function unstorableWalkIn(hold: Hold): boolean {
-    return (
-      hold.kind === "walk_in" && normalizeEmailAddress(hold.email) === null
-    );
-  }
-
   test.prop([looseHolder, holderText])(
     "stores a person or a thing, never both, and reads back what it stored",
     ({ email, id, label, name, program }, accountName) => {
@@ -318,28 +347,30 @@ describe("holdToColumns, for every hold holdFromInput builds", () => {
       const onAPerson =
         columns.currentHolderId !== null || columns.currentHolderEmail !== null;
       expect(onAPerson && columns.currentHolderLabel !== null).toBe(false);
-      if (!unstorableWalkIn(hold)) {
-        expect(holdFromStoredRow(columns)).toEqual(asStored(hold));
-      }
+      expect(holdFromStoredRow(columns)).toEqual(asStored(hold));
     }
   );
 
-  it("loses a walk-in whose address is only whitespace, which no caller can send", () => {
-    // The shrunk counterexample from the property above (#845). The
-    // constructor reads " " as an address, matching the rules' raw
-    // truthiness, and the write gate trims it to null, so the row reads back
-    // as no hold. Unreachable today: `transitionSchema` runs `.email()` on
-    // `holderEmail`, which refuses any whitespace, and the id path takes its
-    // address from `user.email`. A new caller that skips the schema would
-    // store a reserved item with no holder.
+  it("builds no walk-in from an address that is only whitespace, so a hold refuses it", () => {
+    // The shrunk counterexample from the property above (#845), which used to
+    // build a walk-in the write gate then trimmed to a hold on nobody (#884).
+    // Now the constructor sees no person, and `assertTransitionAllowed`
+    // refuses a reserved or checked-out transition carrying only this.
     const hold = holdFromInput({ email: " ", program: " " }, NO_ACCOUNT);
-    expect(hold).toEqual({
-      kind: "walk_in",
-      email: " ",
-      name: null,
-      program: " ",
-    });
-    expect(holdFromStoredRow(holdToColumns(hold))).toEqual({ kind: "none" });
+    expect(hold).toEqual({ kind: "none" });
+    expect(() =>
+      assertTransitionAllowed(
+        { id: "staff-1", role: "admin" },
+        {
+          holderEmail: " ",
+          holderProgram: " ",
+          itemId: "item-1",
+          nextStatus: "reserved",
+        }
+      )
+    ).toThrow(
+      "reserved requires either a holder email or a holder label, not both and not neither"
+    );
   });
 });
 
