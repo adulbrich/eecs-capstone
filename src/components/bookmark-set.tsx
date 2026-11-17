@@ -11,7 +11,7 @@ import {
 } from "react";
 import { toast } from "sonner";
 import { authClient } from "#/lib/auth-client";
-import { errorMessage } from "#/lib/error-message";
+import { useAction } from "#/lib/use-action";
 import { useHasMounted } from "#/lib/use-has-mounted";
 import {
   addBookmark,
@@ -168,35 +168,41 @@ export function BookmarkToggle({
 }) {
   const set = useContext(BookmarkSetContext);
   const writeBookmark = useWriteBookmark();
-  const [loading, setLoading] = useState(false);
+  // The hook's ref is the guard, not the disabled prop: two clicks inside one
+  // tick both run before React renders the button disabled, and the second
+  // read the same value and wrote it again (#885, as #846 found on
+  // `BookmarkButton`).
+  const { busy, run } = useAction({
+    fallback: "Could not save the bookmark",
+    onError: toast.error,
+  });
   if (!set) {
     return null;
   }
   const bookmarked = set.has(projectId);
   const label = bookmarkLabel(bookmarked);
 
-  async function toggle() {
-    if (!set) {
-      return;
-    }
-    const next = !bookmarked;
-    setLoading(true);
-    set.set(projectId, next);
-    try {
-      await writeBookmark(projectId, next);
-    } catch (err) {
-      set.set(projectId, !next);
-      toast.error(errorMessage(err, "Could not save the bookmark"));
-    } finally {
-      setLoading(false);
-    }
+  function toggle() {
+    return run(async () => {
+      if (!set) {
+        return;
+      }
+      const next = !bookmarked;
+      set.set(projectId, next);
+      try {
+        await writeBookmark(projectId, next);
+      } catch (err) {
+        set.set(projectId, !next);
+        throw err;
+      }
+    });
   }
 
   return (
     <Button
       aria-label={label}
       className={className}
-      disabled={loading}
+      disabled={busy}
       onClick={() => void toggle()}
       size="icon-sm"
       title={label}
