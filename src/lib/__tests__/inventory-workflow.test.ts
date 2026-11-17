@@ -304,6 +304,35 @@ describe("assertTransitionAllowed: invariants per status", () => {
     }
   });
 
+  it("judges the address trimmed, so whitespace alone is no holder (#884)", () => {
+    // The write gate trims the address to null, so a hold on " " would store
+    // a reserved or checked-out item with nobody to chase for it.
+    for (const holderEmail of [" ", "\t", "\u{A0}", "\u{3000}"]) {
+      expect(refusal({ holderEmail, nextStatus: "reserved" })).toBe(
+        "reserved requires either a holder email or a holder label, not both and not neither"
+      );
+      expect(
+        refusal({ dueAt: LATER, holderEmail, nextStatus: "checked_out" })
+      ).toBe(
+        "checked_out requires either a holder email or a holder label, not both and not neither"
+      );
+      // Not a second identity beside a label either.
+      expect(
+        refusal({ holderEmail, holderLabel: "Bench 3", nextStatus: "reserved" })
+      ).toBe("allowed");
+      expect(
+        refusal({
+          holderEmail,
+          nextStatus: "requested",
+          requestItemId: "line-1",
+        })
+      ).toBe(
+        "requested status requires requestItemId and a holder account or address, no label"
+      );
+      expect(refusal({ holderEmail, nextStatus: "available" })).toBe("allowed");
+    }
+  });
+
   it("counts an id and an address as one person, and a name as neither", () => {
     // Two halves of one identity are one holder. A name and a program are
     // attributes of that person, so they cannot stand in for one.
