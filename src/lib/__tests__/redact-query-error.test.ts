@@ -265,7 +265,12 @@ describe("redactQueryError, on an address outside a query", () => {
     ["mailto:a@b.co", "mailto:[address redacted]"],
     ["https://%@x@evil.com/cb", "https://[address redacted]@evil.com/cb"],
     ["https://u:p!@x@evil.com/cb", "https://[address redacted]@evil.com/cb"],
+    ["https://a{b@evil.com/cb", "https://[address redacted]@evil.com/cb"],
+    ["https://a|b@evil.com/cb", "https://[address redacted]@evil.com/cb"],
+    ["https://a^b@evil.com\\cb", "https://[address redacted]@evil.com\\cb"],
     ["//@host.example/x", "//@host.example/x"],
+    ["https://@x@evil.com/cb", "https://[address redacted]@evil.com/cb"],
+    ["https://@@x@evil.com/cb", "https://[address redacted]@evil.com/cb"],
     [
       '{"url":"//x","email":"a@b.co"}',
       '{"url":"//x","email":"[address redacted]"}',
@@ -286,6 +291,19 @@ describe("redactQueryError, on an address outside a query", () => {
       expect(redactQueryError(text)).toBe(expected);
     }
   );
+
+  // Whatever a stranger puts before the last `@` of an authority, the host
+  // after it stays. Each review round found one more shape (`a@b.co@`, `%@`,
+  // `a{b@`, `@x@`) that hid it; this draws them all.
+  test.prop([
+    fc
+      .string({ minLength: 1, unit: "binary" })
+      .filter((userinfo) => !/[\s/?#\\"<>]/u.test(userinfo)),
+  ])("keeps the host after any userinfo", (userinfo) => {
+    expect(redactQueryError(`https://${userinfo}@evil.com/cb`)).toBe(
+      "https://[address redacted]@evil.com/cb"
+    );
+  });
 
   it("keeps a URL's host and path when its query names an address", () => {
     // A stranger chooses a logged callbackURL, so a match that ran back

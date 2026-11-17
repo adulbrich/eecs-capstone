@@ -127,45 +127,66 @@ function scrubQueryText(text: string): string {
  * top-level domains there is no telling them apart, and more redaction is the
  * safe way to be wrong.
  *
- * A scan from each `@` rather than one regex, because this runs on text a
- * stranger chooses (Better Auth logs a rejected callbackURL word for word)
- * and both regex shapes failed. Unanchored, a long run of local-part
- * characters with no `@` was rescanned from every position: 40,000 characters
- * held the event loop for a second. Anchored with a lookbehind, a match could
- * not start where the previous one ended, so the second of `a@x.edu+b@y.edu`
- * survived. Here each `@` walks left only as far as the previous `@` or the
- * end of the previous match, and right only to the end of its domain, so every
- * character is visited a bounded number of times.
+ * Scans rather than one regex, because this runs on text a stranger chooses
+ * (Better Auth logs a rejected callbackURL word for word) and both regex
+ * shapes failed. Unanchored, a long run of local-part characters with no `@`
+ * was rescanned from every position: 40,000 characters held the event loop
+ * for a second. Anchored with a lookbehind, a match could not start where the
+ * previous one ended, so the second of `a@x.edu+b@y.edu` survived.
  */
 const LOCAL_CHAR = /[A-Za-z0-9_'+.-]/u;
 const DOMAIN = /(?:[A-Za-z0-9-]+\.)+[A-Za-z]{2,}/uy;
 const ADDRESS_MARK = "[address redacted]";
-/**
- * RFC 3986's userinfo characters, which may sit between a URL's `//` and its
- * host. Not "anything but a delimiter": a quote or a space ends it, so a
- * stranger cannot stretch an authority across a JSON key to blank it out.
- */
-const USERINFO_CHAR = /[A-Za-z0-9._~%!$&'()*+,;=:-]/u;
-const AUTHORITY_END = /[^A-Za-z0-9._~%!$&'()*+,;=:@-]/gu;
 
 /**
- * Where a URL's userinfo starts, when the address ending at `start` is one:
- * `https://u:p@host`, or `https://a@b.co@evil.com`, which a stranger sends as
- * a callbackURL to hide where it points. -1 for an ordinary address. Walks
- * back only to the previous `@` or `kept`, so a character is walked at most
- * twice, here and by the local part's own walk.
+ * What ends a URL's authority for the WHATWG URL parser, which Better Auth's
+ * origin check uses, plus a quote and angle brackets so a stranger cannot
+ * stretch one across a JSON key. Not RFC 3986's narrower userinfo set: the
+ * parser percent-encodes `{`, `|` and `^` and still reads the host after them.
  */
-function userinfoStart(text: string, start: number, kept: number): number {
-  let from = start;
-  while (from > kept && USERINFO_CHAR.test(text.charAt(from - 1))) {
-    from -= 1;
+const AUTHORITY_END = /[\s/?#\\"<>]/gu;
+
+/**
+ * A URL's userinfo, everything between `//` and the authority's last `@`,
+ * becomes the mark and the host stays. The host is where the URL points, and a
+ * stranger's reason to put an address in a callbackURL is to hide it:
+ * `https://a@b.co@evil.com`, `https://@x@evil.com` and `https://a{b@evil.com`
+ * all point at evil.com. A pass of its own, before the address scan, because
+ * guessing from inside that scan which `@` was the last missed one shape per
+ * review round. Linear: each authority is read once and they do not overlap.
+ */
+function redactUserinfo(text: string): string {
+  let out = "";
+  let kept = 0;
+  for (
+    let slashes = text.indexOf("//");
+    slashes !== -1;
+    slashes = text.indexOf("//", kept)
+  ) {
+    const from = slashes + 2;
+    AUTHORITY_END.lastIndex = from;
+    const end = AUTHORITY_END.exec(text)?.index ?? text.length;
+    const firstAt = text.indexOf("@", from);
+    const lastAt =
+      firstAt !== -1 && firstAt < end ? text.lastIndexOf("@", end - 1) : -1;
+    // `//@host` has no userinfo to take.
+    if (lastAt > from) {
+      out += `${text.slice(kept, from)}${ADDRESS_MARK}`;
+      kept = lastAt;
+    } else {
+      out += text.slice(kept, from);
+      kept = from;
+    }
   }
-  return from !== start && from >= 2 && text.startsWith("//", from - 2)
-    ? from
-    : -1;
+  return out + text.slice(kept);
 }
 
-function redactAddresses(text: string): string {
+/**
+ * Each `@` walks left only as far as the previous `@` or the end of the
+ * previous match, and right only to the end of its domain, so every character
+ * is visited a bounded number of times.
+ */
+function redactBareAddresses(text: string): string {
   let out = "";
   let kept = 0;
   for (let at = text.indexOf("@"); at !== -1; at = text.indexOf("@", at + 1)) {
@@ -175,20 +196,6 @@ function redactAddresses(text: string): string {
     let start = at;
     while (start > kept && LOCAL_CHAR.test(text.charAt(start - 1))) {
       start -= 1;
-    }
-    // A URL's userinfo goes, through the authority's last `@`, and its host
-    // stays: the host is where the URL points, and hiding it was the reason a
-    // stranger would put an address there.
-    // Asked whatever precedes the `@`: `https://%@x@evil.com` has no local
-    // part before its first `@`, and its host still has to stay.
-    const userinfo = userinfoStart(text, at, kept);
-    if (userinfo !== -1) {
-      AUTHORITY_END.lastIndex = at;
-      const end = AUTHORITY_END.exec(text)?.index ?? text.length;
-      out += `${text.slice(kept, userinfo)}${ADDRESS_MARK}`;
-      at = text.lastIndexOf("@", end - 1);
-      kept = at;
-      continue;
     }
     // An empty local part is an address only where the previous match took
     // its local part: `a@x.edu.b@y.edu` reads the first domain as `x.edu.b`.
@@ -205,6 +212,10 @@ function redactAddresses(text: string): string {
     kept = DOMAIN.lastIndex;
   }
   return out + text.slice(kept);
+}
+
+function redactAddresses(text: string): string {
+  return redactBareAddresses(redactUserinfo(text));
 }
 
 function truncate(sql: string): string {
