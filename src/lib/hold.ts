@@ -196,10 +196,11 @@ export function holdFromInput(
  * Flattens a hold back onto the five columns.
  *
  * The address is lowercased and trimmed here, whatever form the hold carries,
- * which makes this the write gate for the two holder columns: `transitionItemInTx` builds both the item
- * update and the history row from what this returns, so neither can carry an
- * address the other does not (#249). The read constructors above deliberately
- * do not normalize, because an unjoined read must report what is stored.
+ * which makes this the write gate for the two holder columns:
+ * `transitionItemInTx` builds both the item update and the history row from
+ * what this returns, so neither can carry an address the other does not
+ * (#249). The read constructors above deliberately do not normalize, because
+ * an unjoined read must report what is stored.
  */
 export function holdToColumns(hold: Hold): HoldColumns {
   switch (hold.kind) {
