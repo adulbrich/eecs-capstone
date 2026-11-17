@@ -73,16 +73,21 @@ export class SesEmailSender implements EmailSender {
  * code that never arrives, with nothing on the page to say so. Time spent
  * resolving the task role's credentials counts against the bound, though the
  * bound does not cut a stalled credential fetch short; the provider's own
- * timeouts do. No measured SES latency backs the number: SES publishes none,
- * and `SendEmail` is one in-region request with a body of a few kilobytes,
- * so 10 s is generous headroom over any plausible healthy send.
+ * timeouts do.
+ *
+ * Sized from the production ALB logs, September to 17 November 2026, since
+ * SES publishes no latency metric: the eight requests that each sent one
+ * email (a sign-in code, three cart submissions, three line approvals, a
+ * project submission) took 0.15 s to 0.34 s end to end, database work
+ * included. 5 s is fifteen times the slowest, the same bound as an S3 delete,
+ * which is the same shape of call.
  *
  * The bound is per send, not per request. `approveRequestLinesAs` emails once
- * per line in sequence, so approving six or more lines during an SES stall
+ * per line in sequence, so approving twelve or more lines during an SES stall
  * meets the ALB's 60 s idle timeout and answers 504 after the approvals
  * committed.
  */
-export const SES_SEND_TIMEOUT_MS = 10_000;
+export const SES_SEND_TIMEOUT_MS = 5000;
 
 /**
  * One client per region, for the life of the process.
