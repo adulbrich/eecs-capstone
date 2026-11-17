@@ -137,9 +137,8 @@ export interface SocialDescriptionSource {
 }
 
 function usable(value: string | null | undefined): string | null {
-  if (!value) {
-    return null;
-  }
+  // No guard for a missing value: `stripMarkdown` returns "" for null,
+  // undefined and "", so the check below covers them.
   const plain = stripMarkdown(value);
   return plain ? truncateOnWordBoundary(plain) : null;
 }
