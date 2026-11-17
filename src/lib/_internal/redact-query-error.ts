@@ -141,7 +141,7 @@ const ADDRESS_MARK = "[address redacted]";
 /**
  * What ends a URL's authority: the WHATWG parser's own `/`, `?`, `#` and `\`,
  * and also whitespace, a quote and angle brackets, which the parser would
- * percent-encode inside userinfo instead. Ending there keeps prose and JSON
+ * delete (a tab or a newline) or percent-encode inside userinfo instead. Ending there keeps prose and JSON
  * around a URL from being read as its userinfo (`fetch https://api.x.edu
  * failed for bob@x.edu` would otherwise lose the URL), at the cost that a URL
  * with one of them inside its userinfo can still have its host taken with an
