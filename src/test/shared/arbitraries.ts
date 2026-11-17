@@ -199,3 +199,62 @@ export const wallTime = fc
     fc.integer({ max: 59, min: 0 })
   )
   .map(([hour, minute]) => `${pad(hour)}:${pad(minute)}`);
+
+/*
+ * The loose holder fields a transition carries, for `hold.ts` and the rules in
+ * `inventory-workflow.ts` that spell the person-versus-thing test a second time
+ * (#845).
+ */
+
+/**
+ * One holder field as a caller could supply it: absent either way, empty,
+ * whitespace only, or text. The two modules agree on raw truthiness, so the
+ * cases worth generating are the ones that sit on either side of it.
+ */
+export const holderText = fc.oneof(
+  { arbitrary: fc.constantFrom(null, undefined, ""), weight: 2 },
+  { arbitrary: fc.constantFrom(...WHITESPACE), weight: 1 },
+  { arbitrary: trickyText({ maxLength: 8, minLength: 1 }), weight: 1 }
+);
+
+/**
+ * An address as staff could type it: any `holderText`, or a real address in
+ * mixed case and padded, so the write gate's fold has something to fold.
+ */
+export const holderAddress = fc.oneof(
+  { arbitrary: holderText, weight: 2 },
+  {
+    arbitrary: fc
+      .tuple(
+        fc.emailAddress(),
+        fc.boolean(),
+        fc.constantFrom("", " ", "\t", "  ")
+      )
+      .map(
+        ([address, shout, padding]) =>
+          `${padding}${shout ? address.toUpperCase() : address}${padding}`
+      ),
+    weight: 1,
+  }
+);
+
+/**
+ * Every field that decides who holds an item, each drawn on its own. The
+ * weights put about four runs in ten on a person and a label together, two
+ * each on an account and a walk-in, and one each on a thing and on neither, so
+ * every case comes up in a default run. An id is absent more often than not,
+ * or it would make nearly every hold an account. `id` stands for the resolved
+ * account's id; the two modules name it `holderId` and
+ * `ResolvedAccount.accountId`.
+ */
+export const looseHolder = fc.record({
+  email: holderAddress,
+  id: fc.oneof(
+    { arbitrary: fc.constantFrom(null, undefined, ""), weight: 2 },
+    { arbitrary: holderText, weight: 1 },
+    { arbitrary: fc.uuid(), weight: 1 }
+  ),
+  label: holderText,
+  name: holderText,
+  program: holderText,
+});

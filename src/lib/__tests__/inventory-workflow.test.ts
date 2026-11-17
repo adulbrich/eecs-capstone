@@ -1,5 +1,8 @@
+import { fc, test } from "@fast-check/vitest";
 import { describe, expect, it } from "vitest";
 import { INVENTORY_ITEM_STATUSES } from "#/lib/vocabularies";
+import { looseHolder } from "#/test/shared/arbitraries";
+import { holdFromInput } from "../hold";
 import {
   assertTransitionAllowed,
   needsDueAt,
@@ -20,6 +23,16 @@ const ITEM_STATUSES = INVENTORY_ITEM_STATUSES;
 
 function input(over: Partial<TransitionInput> = {}): TransitionInput {
   return { itemId: "item-1", nextStatus: "available", ...over };
+}
+
+/** What the rules say to a staff transition: "allowed", or the refusal. */
+function refusal(over: Partial<TransitionInput>): string {
+  try {
+    assertTransitionAllowed(ADMIN, input(over));
+    return "allowed";
+  } catch (e) {
+    return (e as Error).message;
+  }
 }
 
 describe("assertTransitionAllowed: the staff gate", () => {
@@ -385,15 +398,6 @@ describe("the form predicates agree with the rules", () => {
   // to the request queue, so it is not a status these predicates answer for.
   const PANEL_STATUSES = ITEM_STATUSES.filter((s) => s !== "requested");
 
-  function refusal(over: Partial<TransitionInput>): string {
-    try {
-      assertTransitionAllowed(ADMIN, input(over));
-      return "allowed";
-    } catch (e) {
-      return (e as Error).message;
-    }
-  }
-
   it("needsHolder is true exactly when a holderless transition is refused", () => {
     for (const nextStatus of PANEL_STATUSES) {
       const message = refusal({
@@ -427,6 +431,50 @@ describe("the form predicates agree with the rules", () => {
       );
     }
   });
+});
+
+describe("hold.ts agrees with the rules on the holder pair", () => {
+  // `holdFromInput` and the `reserved`/`checked_out` arm of the rules each
+  // spell the person-versus-thing test, and #87 is what two spellings with
+  // nothing linking them produced. The rules refuse a hold on both or on
+  // neither; the constructor throws on both and returns `none` on neither,
+  // which is legal for it because it never sees a status. So for the two
+  // statuses that need a holder, one refuses exactly when the other does.
+  //
+  // Everything but the holder is held fixed, a staff viewer and a due date
+  // for a checkout, so the only refusal the rules can give is the holder one.
+  test.prop([fc.constantFrom("reserved", "checked_out"), looseHolder])(
+    "the rules refuse the holder exactly when holdFromInput throws or builds none",
+    (nextStatus, { email, id, label, name, program }) => {
+      const verdict = refusal({
+        nextStatus,
+        holderId: id,
+        holderEmail: email,
+        holderLabel: label,
+        holderName: name,
+        holderProgram: program,
+        ...(needsDueAt(nextStatus) ? { dueAt: LATER } : {}),
+      });
+      expect([
+        "allowed",
+        `${nextStatus} requires either a holder email or a holder label, not both and not neither`,
+      ]).toContain(verdict);
+
+      let built: string;
+      try {
+        built = holdFromInput(
+          { email, label, name, program },
+          { accountId: id ?? null, accountName: null }
+        ).kind;
+      } catch (e) {
+        expect((e as Error).message).toMatch(/on a person or on a thing/u);
+        built = "refused";
+      }
+      expect(verdict === "allowed", `holdFromInput built ${built}`).toBe(
+        built !== "refused" && built !== "none"
+      );
+    }
+  );
 });
 
 describe("resolveLineOutcome", () => {
