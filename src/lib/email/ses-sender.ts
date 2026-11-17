@@ -65,8 +65,10 @@ export class SesEmailSender implements EmailSender {
  * signal is shared by every attempt, and the SDK races its retry backoff
  * against it and never retries the abort, so a stall costs the bound once.
  * A timed-out send rejects like any other SES error, and every caller already
- * catches and logs that; the line reads "AbortError: Request aborted", with
- * nothing saying it was this bound.
+ * catches and logs that through `redactQueryError`. A send cut off mid-flight
+ * logs "AbortError: Request aborted <- TimeoutError: The operation was aborted
+ * due to timeout"; one cut off during a retry's backoff logs the first half
+ * only.
  *
  * Too tight is the worse mistake here. The sign-in send answers success
  * whether or not the mail went, so a send cut off that would have landed is a
