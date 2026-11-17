@@ -613,6 +613,9 @@ describe("CommentThread reply form under any interleaving", () => {
     owner: number | null;
   }
 
+  /** Steps in a run, and so the most submits that can reach the server. */
+  const MAX_STEPS = 6;
+
   const step = fc.constantFrom<Step>("submit", "cancel", "reopen");
 
   // The race needs a request still out across Post, Cancel and Reply. With a
@@ -622,18 +625,19 @@ describe("CommentThread reply form under any interleaving", () => {
   const oneInFour = fc.nat({ max: 3 }).map((n) => n === 0);
   const stepPlan = fc.array(fc.tuple(step, oneInFour), {
     minLength: 3,
-    maxLength: 6,
+    maxLength: MAX_STEPS,
     size: "max",
   });
 
-  /** The microtasks between a settled request and the attempt's `finally`. */
+  /**
+   * Everything a settled request sets off, up to the attempt's `finally`. A
+   * macrotask drains however many awaits that chain takes.
+   */
   async function flush() {
-    await act(async () => {
-      for (let i = 0; i < 5; i += 1) {
-        await Promise.resolve();
-      }
-    });
+    await act(() => new Promise((resolve) => setTimeout(resolve, 0)));
   }
+
+  const replyOpen = () => screen.queryByPlaceholderText("Reply") !== null;
 
   test.prop([
     // Awaited inside an async function rather than handed over as is. React's
@@ -646,15 +650,18 @@ describe("CommentThread reply form under any interleaving", () => {
     }),
     // Each step, then whether the scheduler releases one pending request.
     stepPlan,
-    // Whether the nth request fails; at most six submits reach the server.
-    fc.array(fc.boolean(), { minLength: 6, maxLength: 6 }),
+    // Whether the nth request fails.
+    fc.array(fc.boolean(), { minLength: MAX_STEPS, maxLength: MAX_STEPS }),
   ])(
     "posts once per attempt, ends idle, and shows only the owning attempt's failure",
     async (s, plan, failures) => {
+      // `afterEach` and `beforeEach` run once per property, not once per run.
       cleanup();
       addComment.mockReset();
       const model: ReplyModel = { open: true, owner: null, error: null };
-      const settled = (): ReplyModel => ({ ...model });
+      // Read through a function after idle: the settle callbacks below move
+      // the model where control-flow narrowing cannot see them.
+      const snapshot = (): ReplyModel => ({ ...model });
       let calls = 0;
       let expectedCalls = 0;
       const overlaps: number[] = [];
@@ -702,8 +709,7 @@ describe("CommentThread reply form under any interleaving", () => {
         openReplyAndType("a reply");
 
         for (const [action, release] of plan) {
-          const isOpen = screen.queryByPlaceholderText("Reply") !== null;
-          expect(isOpen).toBe(model.open);
+          expect(replyOpen()).toBe(model.open);
           if (action === "submit" && model.open) {
             if (model.owner === null) {
               expectedCalls += 1;
@@ -732,10 +738,8 @@ describe("CommentThread reply form under any interleaving", () => {
 
         expect(overlaps).toEqual([]);
         expect(addComment).toHaveBeenCalledTimes(expectedCalls);
-        // Read through a function: the settle callbacks above move the model
-        // where control-flow narrowing cannot see them.
-        const end = settled();
-        expect(screen.queryByPlaceholderText("Reply") !== null).toBe(end.open);
+        const end = snapshot();
+        expect(replyOpen()).toBe(end.open);
         const shown = screen.queryByText(/^call \d+ failed$/u);
         expect(shown?.textContent ?? null).toBe(end.open ? end.error : null);
         if (!end.open) {
