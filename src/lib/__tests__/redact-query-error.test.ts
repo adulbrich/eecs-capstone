@@ -1,6 +1,8 @@
 import { inspect } from "node:util";
+import { fc, test } from "@fast-check/vitest";
 import { DrizzleQueryError } from "drizzle-orm/errors";
 import { describe, expect, it } from "vitest";
+import { z } from "zod";
 import {
   redactingAuthLogger,
   redactQueryError,
@@ -164,6 +166,59 @@ describe("redactQueryError", () => {
     );
     expect(redactQueryError(long).length).toBeLessThan(400);
   });
+});
+
+describe("redactQueryError, on an address outside a query", () => {
+  /** What a sandboxed SES account throws for an unverified recipient. */
+  const SES_REJECTION =
+    "Email address is not verified. The following identities failed the check in region US-WEST-2: alice.o'brien+cap@oregonstate.edu";
+
+  function sesRejection(): Error {
+    const error = new Error(SES_REJECTION);
+    error.name = "MessageRejected";
+    return error;
+  }
+
+  it("keeps the recipient SES names out of the line, and keeps the reason", () => {
+    expect(redactQueryError(sesRejection())).toBe(
+      "MessageRejected: Email address is not verified. The following identities failed the check in region US-WEST-2: [address redacted]"
+    );
+  });
+
+  it("redacts an address further down the cause chain", () => {
+    const wrapped = new Error("send failed", { cause: sesRejection() });
+    expect(redactQueryError(wrapped)).not.toContain("@");
+  });
+
+  it("redacts every address in a list, and in a bare string", () => {
+    expect(
+      redactQueryError("rejected: a@x.edu, B.Two@sub.example.co.uk; c-3@y.io.")
+    ).toBe(
+      "rejected: [address redacted], [address redacted]; [address redacted]."
+    );
+  });
+
+  it("leaves a scoped package path alone", () => {
+    const text =
+      "Cannot find module '/app/node_modules/@aws-sdk/client-sesv2/dist/index.js'";
+    expect(redactQueryError(new Error(text))).toBe(`Error: ${text}`);
+  });
+
+  // Every address the sign-in form accepts, between ordinary words, comes
+  // out as the marker and nothing else: no prefix of an odd local part, no
+  // tail of a long domain.
+  test.prop([
+    fc.emailAddress().filter((address) => z.email().safeParse(address).success),
+    fc.stringMatching(/^[A-Za-z ]{0,20}$/u),
+    fc.stringMatching(/^[A-Za-z ]{0,20}$/u),
+  ])(
+    "redacts every address z.email() accepts, whole",
+    (address, before, after) => {
+      expect(redactQueryError(new Error(`${before} ${address} ${after}`))).toBe(
+        `Error: ${before} [address redacted] ${after}`
+      );
+    }
+  );
 });
 
 describe("redactingAuthLogger", () => {

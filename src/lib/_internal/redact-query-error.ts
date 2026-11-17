@@ -21,7 +21,8 @@
  * What survives: the failing query's SQL, which is schema rather than user
  * data and is in this repository already, and the cause chain's messages,
  * which is where "Connection terminated due to connection timeout" lives and
- * is the whole diagnostic value of the line.
+ * is the whole diagnostic value of the line. Less any email address in them,
+ * since an error message can name one outside a query too (`ADDRESS`).
  */
 
 /** How much of the failing SQL to keep. Enough to identify the query. */
@@ -100,6 +101,29 @@ function scrubQueryText(text: string): string {
   return `${text.slice(0, marker).trimEnd()} [params redacted]`;
 }
 
+/**
+ * An email address anywhere in a message, which #559 keeps out of the log
+ * group whoever wrote the message.
+ *
+ * Not only a query's parameters carry one. SES puts the recipient in its own
+ * error text (a sandboxed account's `MessageRejected` ends "The following
+ * identities failed the check in region US-WEST-2: <address>"), and every
+ * email notifier logs that error after its line (#892), where on the sign-in
+ * path the address is whatever a stranger typed.
+ *
+ * The local part takes every character `z.email()` admits and the other
+ * RFC 5322 atext symbols, so no prefix of an odd address survives. The domain
+ * needs a dot between its labels, which is what keeps a scoped package path
+ * such as `node_modules/@aws-sdk/client-sesv2` intact: its label meets a `/`
+ * before any dot.
+ */
+const ADDRESS =
+  /[A-Za-z0-9_'+.%!#$&*/=?^`{|}~-]+@[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)+/gu;
+
+function redactAddresses(text: string): string {
+  return text.replace(ADDRESS, "[address redacted]");
+}
+
 function truncate(sql: string): string {
   const collapsed = sql.replace(/\s+/gu, " ").trim();
   return collapsed.length > QUERY_LIMIT
@@ -119,10 +143,10 @@ function describe(value: unknown): string {
     return `query failed [params redacted]: ${truncate(value.query)}`;
   }
   if (value instanceof Error) {
-    return `${value.name}: ${scrubQueryText(value.message)}`;
+    return `${value.name}: ${redactAddresses(scrubQueryText(value.message))}`;
   }
   if (typeof value === "string") {
-    return scrubQueryText(value);
+    return redactAddresses(scrubQueryText(value));
   }
   return Object.prototype.toString.call(value);
 }
