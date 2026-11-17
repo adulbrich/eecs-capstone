@@ -263,10 +263,29 @@ describe("redactQueryError, on an address outside a query", () => {
       "postgres://[address redacted]@db.internal:5432/x",
     ],
     ["mailto:a@b.co", "mailto:[address redacted]"],
+    ["https://%@x@evil.com/cb", "https://[address redacted]@evil.com/cb"],
+    ["https://u:p!@x@evil.com/cb", "https://[address redacted]@evil.com/cb"],
+    ["//@host.example/x", "//@host.example/x"],
+    [
+      '{"url":"//x","email":"a@b.co"}',
+      '{"url":"//x","email":"[address redacted]"}',
+    ],
   ])("redacts a URL's userinfo and keeps its host: %j", (text, expected) => {
     // Userinfo in a callbackURL is how a stranger would hide where it points.
     expect(redactQueryError(text)).toBe(expected);
   });
+
+  it.each([
+    ["a@b.co-", "[address redacted]-"],
+    ["alice@oregonstate.edu-2024", "[address redacted]-2024"],
+    ["a@b.co1", "[address redacted]1"],
+  ])(
+    "redacts an address with a word character straight after it: %j",
+    (text, expected) => {
+      // A lookahead for the end of the label let all three through whole.
+      expect(redactQueryError(text)).toBe(expected);
+    }
+  );
 
   it("keeps a URL's host and path when its query names an address", () => {
     // A stranger chooses a logged callbackURL, so a match that ran back

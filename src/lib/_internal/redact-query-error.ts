@@ -138,24 +138,31 @@ function scrubQueryText(text: string): string {
  * character is visited a bounded number of times.
  */
 const LOCAL_CHAR = /[A-Za-z0-9_'+.-]/u;
-const DOMAIN = /(?:[A-Za-z0-9-]+\.)+[A-Za-z]{2,}(?![A-Za-z0-9-])/uy;
+const DOMAIN = /(?:[A-Za-z0-9-]+\.)+[A-Za-z]{2,}/uy;
 const ADDRESS_MARK = "[address redacted]";
-/** What may sit between a URL's `//` and its host: user, password and `@`s. */
-const USERINFO_CHAR = /[^\s/?#@]/u;
-const AUTHORITY_END = /[\s/?#]/gu;
+/**
+ * RFC 3986's userinfo characters, which may sit between a URL's `//` and its
+ * host. Not "anything but a delimiter": a quote or a space ends it, so a
+ * stranger cannot stretch an authority across a JSON key to blank it out.
+ */
+const USERINFO_CHAR = /[A-Za-z0-9._~%!$&'()*+,;=:-]/u;
+const AUTHORITY_END = /[^A-Za-z0-9._~%!$&'()*+,;=:@-]/gu;
 
 /**
  * Where a URL's userinfo starts, when the address ending at `start` is one:
  * `https://u:p@host`, or `https://a@b.co@evil.com`, which a stranger sends as
  * a callbackURL to hide where it points. -1 for an ordinary address. Walks
- * back only to the previous `@` or `kept`, so no character is walked twice.
+ * back only to the previous `@` or `kept`, so a character is walked at most
+ * twice, here and by the local part's own walk.
  */
 function userinfoStart(text: string, start: number, kept: number): number {
   let from = start;
   while (from > kept && USERINFO_CHAR.test(text.charAt(from - 1))) {
     from -= 1;
   }
-  return from >= 2 && text.startsWith("//", from - 2) ? from : -1;
+  return from !== start && from >= 2 && text.startsWith("//", from - 2)
+    ? from
+    : -1;
 }
 
 function redactAddresses(text: string): string {
@@ -172,7 +179,9 @@ function redactAddresses(text: string): string {
     // A URL's userinfo goes, through the authority's last `@`, and its host
     // stays: the host is where the URL points, and hiding it was the reason a
     // stranger would put an address there.
-    const userinfo = start === at ? -1 : userinfoStart(text, start, kept);
+    // Asked whatever precedes the `@`: `https://%@x@evil.com` has no local
+    // part before its first `@`, and its host still has to stay.
+    const userinfo = userinfoStart(text, at, kept);
     if (userinfo !== -1) {
       AUTHORITY_END.lastIndex = at;
       const end = AUTHORITY_END.exec(text)?.index ?? text.length;
