@@ -1,6 +1,11 @@
 import { fc, test } from "@fast-check/vitest";
 import { describe, expect, it } from "vitest";
-import { type CsvColumn, toCsv, unguardCell } from "#/lib/csv";
+import {
+  type CsvColumn,
+  orderBySortedIds,
+  toCsv,
+  unguardCell,
+} from "#/lib/csv";
 import { trickyText } from "#/test/shared/arbitraries";
 
 interface Row {
@@ -112,6 +117,21 @@ describe("toCsv", () => {
       [row({ name: "Widget" })]
     );
     expect(csv.split("\r\n")[1]).toBe("Widget");
+  });
+});
+
+describe("orderBySortedIds", () => {
+  const a = { id: "a" };
+  const b = { id: "b" };
+  const c = { id: "c" };
+  const getId = (r: { id: string }) => r.id;
+
+  it("keeps the rows a stale id sequence leaves out, after it, in their own order", () => {
+    expect(orderBySortedIds([a, b, c], ["b"], getId)).toEqual([b, a, c]);
+  });
+
+  it("skips an id that names no row", () => {
+    expect(orderBySortedIds([a], ["gone", "a"], getId)).toEqual([a]);
   });
 });
 

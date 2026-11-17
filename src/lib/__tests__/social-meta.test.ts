@@ -46,6 +46,15 @@ describe("truncateOnWordBoundary", () => {
     );
   });
 
+  it("drops a run of trailing punctuation, not just its last character", () => {
+    expect(
+      truncateOnWordBoundary(
+        "Build a robot arm for the lab?! With a gripper, a camera and a mount",
+        36
+      )
+    ).toBe(`Build a robot arm for the lab${ELLIPSIS}`);
+  });
+
   it("never splits a surrogate pair at the cut", () => {
     // Slicing by code unit can cut an emoji in half, leaving a lone high
     // surrogate that UTF-8 encoding turns into a replacement character in a
@@ -230,6 +239,12 @@ describe("socialDescription", () => {
         })
       ).toBe(SITE_DESCRIPTION);
     }
+  });
+
+  it("falls back to a sentence that is not blank when given nothing at all", () => {
+    // Not `toBe(SITE_DESCRIPTION)`: that holds even when the constant itself
+    // is empty, which is the case the promise is about.
+    expect(socialDescription({})).toMatch(/\S/u);
   });
 });
 
