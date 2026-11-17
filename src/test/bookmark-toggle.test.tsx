@@ -1,7 +1,8 @@
 // @vitest-environment jsdom
-import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, render, screen, waitFor } from "@testing-library/react";
 import type * as React from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { doubleClickInOneTick } from "./shared/double-click";
 
 const { server, session } = vi.hoisted(() => ({
   server: {
@@ -121,6 +122,31 @@ describe("BookmarkToggle", () => {
     expect(
       await screen.findByRole("button", { name: "Bookmarked, remove bookmark" })
     ).toBeTruthy();
+  });
+
+  it("writes once for a double click inside one tick", async () => {
+    // Both clicks run before React renders the button disabled, so the
+    // disabled prop cannot refuse the second, which read the same value and
+    // sent the same write (#885, the toggle's twin of #846).
+    render(<Listing />);
+    const remove = await screen.findByRole("button", {
+      name: "Bookmarked, remove bookmark",
+    });
+
+    await act(() => {
+      doubleClickInOneTick(remove);
+      return Promise.resolve();
+    });
+
+    expect(server.removeBookmark).toHaveBeenCalledTimes(1);
+    // A fix that let the second click read the first's value would add the
+    // bookmark straight back.
+    expect(server.addBookmark).not.toHaveBeenCalled();
+    await waitFor(() =>
+      expect(screen.getAllByRole("button", { name: "Bookmark" })).toHaveLength(
+        2
+      )
+    );
   });
 
   it("sits beside a card's link, never inside it", async () => {
