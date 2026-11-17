@@ -243,6 +243,18 @@ describe("onidProfileFromIdToken", () => {
       ).toContain("names another identity provider");
     });
 
+    it("accepts only the issuer itself when the configured issuer names two tenant ids", () => {
+      // Two GUIDs leave no single tenant to spell, so the STS forms of either
+      // one are not this tenant's.
+      const twoGuidIssuer = `https://login.microsoftonline.com/${TENANT}/${OTHER_TENANT}/v2.0`;
+      const token = (idp: string) =>
+        idToken({ ...full, iss: twoGuidIssuer, idp });
+      expect(
+        rejectionOf(token(`https://sts.windows.net/${TENANT}/`), twoGuidIssuer)
+      ).toContain("names another identity provider");
+      expect(rejectionOf(token(twoGuidIssuer), twoGuidIssuer)).toBeNull();
+    });
+
     it("never leaks the idp value into the reason", () => {
       const idp = `https://sts.windows.net/${OTHER_TENANT}/`;
       const reason = rejectionOf(idToken({ ...full, idp })) ?? "";

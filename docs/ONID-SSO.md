@@ -190,7 +190,9 @@ or is, whole and ignoring case, one of this tenant's spellings: the configured
 issuer, `https://sts.windows.net/<guid>/` or
 `https://login.microsoftonline.com/<guid>/v2.0`. Anything else is refused:
 another tenant, the personal Microsoft account tenant, `live.com`, or a value
-that merely contains this tenant's GUID.
+that merely contains this tenant's GUID. The check keys on who authenticated
+the user, not on the account's type in the tenant, so the email trust also
+rests on the tenant administering the accounts it authenticates.
 
 Industry partners and outside faculty do not need any of this. They sign in
 with an emailed code, or GitHub. Since #576 removed the password, the code is

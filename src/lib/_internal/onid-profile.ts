@@ -136,11 +136,11 @@ function thisTenantIdps(expectedIssuer: string): Set<string> {
  * Why `idp` refuses a token, or null when it does not.
  *
  * `idp` names the identity provider that authenticated the user. Microsoft's
- * claims reference says it is "identical to the value of the issuer claim
- * unless the user account isn't in the same tenant as the issuer", and that
- * when it is absent "the value of `iss` can be used instead". A member token
- * from this tenant, decoded on 2026-11-17, carries no `idp` at all. So absent
- * is this tenant, and present must be exactly one of this tenant's spellings.
+ * ID token claims reference documents it as matching the issuer for an
+ * account homed in the issuer's tenant, and an absent `idp` as meaning the
+ * issuer. A member token from this tenant, decoded on 2026-11-17, carries no
+ * `idp` at all. So absent is this tenant, and present must be exactly one of
+ * this tenant's spellings.
  *
  * Present but anything else is refused, not read as absent: another tenant,
  * a personal account (`live.com` or the consumer tenant's URI), a non-Entra
@@ -171,8 +171,8 @@ export interface OnidRejection {
 /**
  * The mapping, with the reason for a refusal instead of a bare null.
  *
- * Seven different conditions reject a token and Better Auth collapses all of them
- * into one `unable_to_get_user_info` redirect, so without a reason the first
+ * Seven different conditions reject a token and Better Auth collapses all of
+ * them into one `unable_to_get_user_info` redirect, so without a reason the first
  * real sign-in failure is a guessing game: wrong issuer, no `oid`, or a UPN
  * under a fourth claim name all look identical from the browser. Exported
  * separately from the logging wrapper so tests can assert which guard fired.
@@ -288,9 +288,10 @@ export function onidProfileOrRejection(
     //
     // What makes it sound is the pair of checks above, not the email claim
     // itself, which Entra does not verify. The `iss` check holds the token to
-    // this tenant's sign-in, and the `idp` check holds it to an account this
-    // tenant authenticated, whose `mail` this tenant administers. A token
-    // whose `idp` names another identity provider is refused before here.
+    // this tenant's sign-in, and the `idp` check refuses a token whose `idp`
+    // names another identity provider. Both key on who authenticated the
+    // user, not on the account's type, so the trust also rests on this tenant
+    // administering the accounts it authenticates.
     //
     // Two things follow, both intended. It fires the project-claim hook in
     // `src/lib/auth.ts`, the same way a GitHub-verified email does. And it
