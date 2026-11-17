@@ -168,10 +168,7 @@ export function BookmarkToggle({
 }) {
   const set = useContext(BookmarkSetContext);
   const writeBookmark = useWriteBookmark();
-  // The hook's ref is the guard, not the disabled prop: two clicks inside one
-  // tick both run before React renders the button disabled, and the second
-  // read the same value and wrote it again (#885, as #846 found on
-  // `BookmarkButton`).
+  // The hook's ref, not `disabled`, refuses a second click in the same tick (#885).
   const { busy, run } = useAction({
     fallback: "Could not save the bookmark",
     onError: toast.error,
@@ -182,11 +179,8 @@ export function BookmarkToggle({
   const bookmarked = set.has(projectId);
   const label = bookmarkLabel(bookmarked);
 
-  function toggle() {
-    return run(async () => {
-      if (!set) {
-        return;
-      }
+  const toggle = () =>
+    run(async () => {
       const next = !bookmarked;
       set.set(projectId, next);
       try {
@@ -196,7 +190,6 @@ export function BookmarkToggle({
         throw err;
       }
     });
-  }
 
   return (
     <Button

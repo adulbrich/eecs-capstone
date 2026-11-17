@@ -139,6 +139,9 @@ describe("BookmarkToggle", () => {
     });
 
     expect(server.removeBookmark).toHaveBeenCalledTimes(1);
+    // A fix that let the second click read the first's value would add the
+    // bookmark straight back.
+    expect(server.addBookmark).not.toHaveBeenCalled();
     await waitFor(() =>
       expect(screen.getAllByRole("button", { name: "Bookmark" })).toHaveLength(
         2
