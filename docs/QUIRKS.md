@@ -199,6 +199,10 @@ Better Auth generates `text` primary keys and we keep the default, so every FK t
 
 `EMAIL_TRANSPORT=console` writes every email the app sends to stderr, which is where a local sign-in code arrives. `EMAIL_TRANSPORT=ses` needs `EMAIL_FROM`, and `getEmailSender()` runs at import in `src/lib/auth.ts`, so a missing one takes down the app, not just mail. All email markup comes from `src/lib/email/templates.ts`, which owns the escaping.
 
+### A person's text reaches an email only through `oneLine` or a `Quote`
+
+A title, a name or a short value inside a sentence goes through `oneLine`. A description, a comment, a note or a reason goes in as a `Quote`, which `layout` renders as `> ` lines below the email's own link. Passed as a raw string, a line break in either starts a line of the plain-text part that reads as the app's, its call to action included, and the staff inbox reads what proposers write. `templates.test.ts` checks both for every template that takes one. Bell messages (`notificationEmail`) are composed by the app and carry only staff notes and the requester's own line names, so they stay paragraphs.
+
 ### A sign-in code whose mail failed answers success, and the after-hook undoes the send
 
 The send endpoint answers `{success: true}` whatever SES does, so `sendVerificationOTP` marks the request's `ctx.context` in `failedCodeMail`, and the after-hook in `src/lib/auth.ts` refunds the send and sets no claim cookie (#892). That relies on Better Auth handing both the same per-request context object and awaiting the sender before the after-hook; setting `advanced.backgroundTasks` breaks the second. `email-otp-send-failure.integration.test.ts` fails if either stops.

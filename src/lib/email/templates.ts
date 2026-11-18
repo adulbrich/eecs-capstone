@@ -55,7 +55,7 @@ function oneLineOrNull(text: string | null): string | null {
  */
 interface Quote {
   label: string;
-  quote: string;
+  prose: string;
 }
 
 type Paragraph = string | Quote;
@@ -68,15 +68,15 @@ const LINE_BREAK = /\r\n|[\n\v\f\r\u{85}\u{2028}\u{2029}]/u;
 // space included) as blank, and leaves the next paragraph's indent alone.
 const BLANK_LINE = /\r?\n(?:[^\S\r\n]*\r?\n)+/u;
 
-function quoteText({ label, quote }: Quote): string {
-  const lines = quote
+function quoteText({ label, prose }: Quote): string {
+  const lines = prose
     .split(LINE_BREAK)
     .map((line) => (line.trim() === "" ? ">" : `> ${line}`));
   return [label, ...lines].join("\n");
 }
 
-function quoteHtml({ label, quote }: Quote): string {
-  const paragraphs = quote
+function quoteHtml({ label, prose }: Quote): string {
+  const paragraphs = prose
     .split(BLANK_LINE)
     .map((p) => `<p>${escapeHtml(p)}</p>`)
     .join("");
@@ -92,10 +92,10 @@ function excerpt(
   truncationNote: string
 ): Paragraph[] {
   if (text.length <= EXCERPT_LIMIT) {
-    return [{ label, quote: text }];
+    return [{ label, prose: text }];
   }
   return [
-    { label, quote: `${text.slice(0, EXCERPT_LIMIT)}...` },
+    { label, prose: `${text.slice(0, EXCERPT_LIMIT)}...` },
     truncationNote,
   ];
 }
@@ -216,7 +216,7 @@ export function projectApprovedEmail(input: {
   ];
   const note = input.comment?.trim();
   if (note) {
-    paragraphs.push({ label: "Note from the reviewer:", quote: note });
+    paragraphs.push({ label: "Note from the reviewer:", prose: note });
   }
   return {
     subject: `Your project was approved: ${title}`,
@@ -308,7 +308,7 @@ export function accountSuspendedEmail(input: {
     ...layout(
       [
         `An administrator suspended your capstone account ${until}.`,
-        { label: "Reason:", quote: input.reason.trim() },
+        { label: "Reason:", prose: input.reason.trim() },
         "Reply to this email if you think this is a mistake.",
       ],
       null
@@ -451,15 +451,16 @@ export function proposerEditsEmail(input: {
     .map((e) => describeProposer(e.name, e.email))
     .join(" and ");
   const title = oneLine(input.title);
-  // The values arrive on one line: `staffEditEmail` compares them that way.
+  // `staffEditEmail` puts the values on one line to compare them; doing it
+  // again costs nothing and keeps this template safe without it.
   const quotedLines = input.changes.flatMap((c) => {
     if (!c.values) {
       return [];
     }
-    const line = `${c.label}: ${c.values.before} to ${c.values.after}.`;
+    const line = `${c.label}: ${oneLine(c.values.before)} to ${oneLine(c.values.after)}.`;
     return [
       c.movedOn
-        ? `${line} It has changed since and is now ${c.values.live}.`
+        ? `${line} It has changed since and is now ${oneLine(c.values.live)}.`
         : line,
     ];
   });
@@ -499,7 +500,7 @@ export function projectReturnedToDraftEmail(input: {
   ];
   const note = input.comment?.trim();
   if (note) {
-    paragraphs.push({ label: "Why:", quote: note });
+    paragraphs.push({ label: "Why:", prose: note });
   }
   paragraphs.push("Update the project and submit it again when it is ready.");
   return {
@@ -519,7 +520,7 @@ export function projectChangesRequestedEmail(input: {
     ...layout(
       [
         `Your project "${title}" needs changes before it can be approved.`,
-        { label: "What needs to change:", quote: input.comment.trim() },
+        { label: "What needs to change:", prose: input.comment.trim() },
         "Update the project and submit it again for review.",
       ],
       { label: "Revise your project", url: input.url }

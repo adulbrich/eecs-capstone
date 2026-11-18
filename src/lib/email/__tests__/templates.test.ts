@@ -440,6 +440,36 @@ describe("a person's prose, quoted", () => {
     expect(email.html).toBe(
       '<p>Staff made you the proposer of &quot;Robot arm&quot;.</p><p>You can edit it, follow its review, and reply to staff comments from the project page.</p><p><a href="https://app/projects/p1">View the project</a></p>'
     );
+
+    const deleted = projectDeletedEmail({ title: "T" });
+    expect(deleted.text).toBe(
+      'Your draft project "T" was deleted by staff.\n\nDrafts are deleted outright rather than archived, so it cannot be restored. Reply to this email if that was a mistake.\n'
+    );
+    expect(deleted.html).toBe(
+      "<p>Your draft project &quot;T&quot; was deleted by staff.</p><p>Drafts are deleted outright rather than archived, so it cannot be restored. Reply to this email if that was a mistake.</p>"
+    );
+  });
+
+  it("keeps a proposer edit notice's values on one line by itself", () => {
+    const email = proposerEditsEmail({
+      changes: [
+        {
+          label: "Title",
+          movedOn: true,
+          values: {
+            after: `"x\n\n${FORGED}"`,
+            before: '"A"',
+            live: `"y\r${FORGED}"`,
+          },
+        },
+      ],
+      editors: [{ email: null, name: "Alex" }],
+      span: "1 save at Nov 18, 2026, 2:00 PM",
+      title: "T",
+      url,
+    });
+    const lines = email.text.split(LINE_SPLIT);
+    expect(lines.filter((line) => line.startsWith(FORGED))).toEqual([]);
   });
 
   it("keeps the truncation note outside the quote", () => {
@@ -855,11 +885,15 @@ describe.each(PROSED)(
 
     if (ctaLabel) {
       test.prop([hostileProse])("comes after the email's own link", (prose) => {
-        const lines = render(prose).text.split(LINE_SPLIT);
+        const email = render(prose);
+        const lines = email.text.split(LINE_SPLIT);
         const link = lines.findIndex((l) => l.startsWith(`${ctaLabel}: `));
         const quote = lines.findIndex((l) => l.startsWith(">"));
         expect(link).toBeGreaterThan(-1);
         expect(link).toBeLessThan(quote);
+        expect(email.html.indexOf("<a href=")).toBeLessThan(
+          email.html.indexOf("<blockquote>")
+        );
       });
     }
   }
