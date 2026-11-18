@@ -714,8 +714,9 @@ export async function getProposerForEditImpl(data: {
  *
  * `oldValues` and `newValues` are deliberately not selected, matching
  * `listInventoryItemEditLogAs`. They hold the before and after of every
- * changed field, notes included, and nothing renders them, so selecting them
- * would ship staff-private strings to a browser with no reader for them.
+ * changed field, notes and whole markdown fields included, so the list stays
+ * flat and `getProjectEditLogValuesAs` loads one row's values when staff open
+ * it (#839).
  */
 export async function listProjectEditLogAs(
   viewer: Viewer,
@@ -739,6 +740,48 @@ export async function listProjectEditLogAs(
 
 export async function listProjectEditLogImpl(data: { id: string }) {
   return listProjectEditLogAs(await getViewer(), data);
+}
+
+/** A stored value, as `jsonb` hands it back. */
+type EditLogValue =
+  | string
+  | number
+  | boolean
+  | null
+  | EditLogValue[]
+  | { [key: string]: EditLogValue };
+
+/**
+ * One edit log row's before and after, for the staff panel's per-row
+ * disclosure (#839). Staff only, by the same rule as the list: the values
+ * hold private notes and whole markdown fields. Loaded one row at a time, on
+ * demand, so the list's payload stays the five columns it was (#467).
+ */
+export async function getProjectEditLogValuesAs(
+  viewer: Viewer,
+  data: { id: string }
+) {
+  assertStaff(viewer);
+  const [row] = await db
+    .select({
+      changedFields: projectEditLog.changedFields,
+      newValues: projectEditLog.newValues,
+      oldValues: projectEditLog.oldValues,
+    })
+    .from(projectEditLog)
+    .where(eq(projectEditLog.id, data.id));
+  if (!row) {
+    throw new Error("Edit log entry not found");
+  }
+  return {
+    changedFields: row.changedFields,
+    newValues: row.newValues as Record<string, EditLogValue>,
+    oldValues: row.oldValues as Record<string, EditLogValue>,
+  };
+}
+
+export async function getProjectEditLogValuesImpl(data: { id: string }) {
+  return getProjectEditLogValuesAs(await getViewer(), data);
 }
 
 export async function listProjectCommentsAs(

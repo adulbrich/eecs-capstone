@@ -1369,7 +1369,7 @@ the alarm counted:
 
 ```bash
 aws --profile aws-capstone1 logs tail /ecs/eecs-capstone --since 3h --region us-west-2 \
-  --filter-pattern '%^Sending a sign-in code failed|^Review email failed for project|^Comment email failed for project|^Delete email failed for project|^Reassignment email failed for project|^Mentor email failed for project|^Inventory email failed|^Request notice failed for request|^Role change email failed|^Ban email failed%'
+  --filter-pattern '%^Sending a sign-in code failed|^Review email failed for project|^Comment email failed for project|^Delete email failed for project|^Reassignment email failed for project|^Mentor email failed for project|^Inventory email failed|^Request notice failed for request|^Role change email failed|^Ban email failed|^Staff edit email failed for project|^Staff edit email sweep failed%'
 ```
 
 The app puts no address in any of them (#559); the project or request id is
@@ -1378,6 +1378,8 @@ which follows, can name one (in the sandbox, a `MessageRejected` lists the
 unverified recipient); `redactQueryError` prints it as `[address redacted]`
 (#898). Nothing retries a failed mail, so each
 line is somebody who was not told and will not be unless someone tells them.
+The two `Staff edit email` lines are the exception: the proposer edit notice's
+rows stay claimed, and a sweep ten minutes later sends them again (#839).
 A failed sign-in code costs the person none of their hourly sends (#892), so
 asking for a new code works once SES does. A run of failures with the same
 error is SES itself. These show a paused or sandboxed account and a revoked

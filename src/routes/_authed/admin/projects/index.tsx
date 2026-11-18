@@ -400,6 +400,23 @@ const COLUMNS = defineAdminColumns<Row>()([
     sortUndefined: "last",
   },
   {
+    accessorFn: (row) => row.proposerEditedAt ?? undefined,
+    cell: ({ row }) =>
+      row.original.proposerEditedAt ? (
+        <LocalTime dateOnly value={row.original.proposerEditedAt} />
+      ) : (
+        "-"
+      ),
+    header: "Proposer edit",
+    // Sort on it to find what proposers changed after approval (#839). An
+    // edit from before the column existed carries no mark, hence the date.
+    headerHint:
+      "The proposer's latest edit while approved or published, from November 2026 on.",
+    id: "proposerEditedAt",
+    sortFn: "datetime",
+    sortUndefined: "last",
+  },
+  {
     cell: ({ row }) => (
       <Link
         className="hover:underline"
@@ -520,6 +537,11 @@ const EXPORT_COLUMNS = defineCsvColumns<ExportRow>()([
   },
   { header: "Created", key: "createdAt", value: (row) => row.createdAt },
   { header: "Published", key: "publishedAt", value: (row) => row.publishedAt },
+  {
+    header: "Proposer edited after approval",
+    key: "proposerEditedAt",
+    value: (row) => row.proposerEditedAt,
+  },
   { header: "Archived", key: "archivedAt", value: (row) => row.archivedAt },
   { header: "Soft deleted", key: "deletedAt", value: (row) => row.deletedAt },
   { header: "Updated", key: "updatedAt", value: (row) => row.updatedAt },

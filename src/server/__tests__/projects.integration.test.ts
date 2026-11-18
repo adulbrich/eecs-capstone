@@ -635,10 +635,9 @@ describe("updateProjectProgramsAs", () => {
     expect(await programsOf(id)).toEqual([a]);
   });
 
-  // Nothing renders these two columns (`EditLogEntry` carries four fields,
-  // and #467 kept the values out of both payloads), so they are for whoever
-  // reads the table. Labels, and ordered, or two saves of the same set
-  // would differ on nothing.
+  // The staff panel renders these two columns when a row is opened (#839).
+  // Labels, and ordered, or two saves of the same set would differ on
+  // nothing.
   it("logs the old and new sets as ordered label arrays", async () => {
     const admin = await makeUser(`pr-l-${Date.now()}@x.com`, "admin");
     const stamp = Date.now();
@@ -1037,9 +1036,10 @@ describe("private notes", () => {
 
   it("names the editor and ships no before-and-after values", async () => {
     // The projection is pinned by name, not just spot-checked: oldValues and
-    // newValues hold every changed field including notes, nothing renders
-    // them, and a later widening of this select would ship them to a browser
-    // unnoticed (#467).
+    // newValues hold every changed field including notes, they load one row
+    // at a time through getProjectEditLogValuesAs (#839), and a later
+    // widening of this select would ship every row's to a browser unnoticed
+    // (#467).
     const admin = await makeUser(`pcol-a-${Date.now()}@x.com`, "admin");
     const owner = await makeUser(`pcol-o-${Date.now()}@x.com`, "user");
     const { id } = await createProjectAs(owner, baseProject());

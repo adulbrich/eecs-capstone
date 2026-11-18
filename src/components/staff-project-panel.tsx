@@ -26,11 +26,12 @@ import {
   softDeleteProject,
 } from "#/server/projects";
 import {
+  getProjectEditLogValues,
   getProposerForEdit,
   listProjectEditLog,
 } from "#/server/projects-queries";
 import { ConfirmDialog } from "./confirm-dialog";
-import { EditLogList } from "./edit-log-list";
+import { EditLogList, type EditLogValuesSource } from "./edit-log-list";
 import { Panel, PanelHeader, PanelNote, PanelSection } from "./panel";
 import { ScopeAssessmentSection } from "./scope-assessment-section";
 import { EMAIL_SKIP_HINT, SendEmailCheckbox } from "./send-email-checkbox";
@@ -139,6 +140,12 @@ export function StaffProjectPanel({
       }),
     ...STAFF_READ_OPTIONS,
   });
+  // One row's before and after, loaded when staff open it (#839).
+  const editLogValues: EditLogValuesSource = {
+    load: (rowId) =>
+      staffRead(() => getProjectEditLogValues({ data: { id: rowId } })),
+    queryKey: (rowId) => staffProjectKeys.editLogValues(project.id, rowId),
+  };
   const [sendEmail, setSendEmail] = useState(true);
   const [deleteEmail, setDeleteEmail] = useState(true);
   // A publish, archive or restore starts the summary's background refresh
@@ -489,8 +496,9 @@ export function StaffProjectPanel({
         <SimilaritySection projectId={project.id} />
       </PanelSection>
 
-      <PanelSection title="Edit log">
-        <EditLogList rows={editLog} />
+      {/* `edit-log` is the fragment the proposer edit notice links to. */}
+      <PanelSection id="edit-log" title="Edit log">
+        <EditLogList rows={editLog} values={editLogValues} />
       </PanelSection>
 
       {/* Last, as on the item page: the irreversible actions sit at the far

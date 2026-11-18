@@ -16,6 +16,10 @@ export const staffProjectKeys = {
     [...staffProjectKeys.all(projectId), "categorization"] as const,
   editLog: (projectId: string) =>
     [...staffProjectKeys.all(projectId), "edit-log"] as const,
+  // Beside `editLog`, not under it: a save refreshes the list, and one row's
+  // values never change once written (#839).
+  editLogValues: (projectId: string, rowId: string) =>
+    [...staffProjectKeys.all(projectId), "edit-log-values", rowId] as const,
   mentorship: (projectId: string) =>
     [...staffProjectKeys.all(projectId), "mentorship"] as const,
   programs: (projectId: string) =>

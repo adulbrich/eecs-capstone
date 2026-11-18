@@ -491,8 +491,19 @@ catalogue that decided the matrix below; #288 shipped it.
   the skip suppresses the email alone, and the server ignores that flag from
   a non-staff actor (#379).
 - [x] One shared staff inbox for every staff-facing message: project submitted
-  or resubmitted, a borrow list or custom request submitted, and a comment
-  from the proposer. No per-staff fan-out.
+  or resubmitted, a borrow list or custom request submitted, a comment from
+  the proposer, and a burst of proposer edits to an approved or published
+  project. No per-staff fan-out.
+- [x] A proposer's edit to an approved or published project is live at once,
+  and staff are told afterwards (#839): one email per project once the
+  proposer has stopped saving for 30 minutes, or 3 hours after the first
+  save, with the net change. Short fields carry old and new values; the long
+  markdown fields and private notes carry only their names and the edit log
+  link, because the inbox is shared and forwarded. A save and its undo send
+  nothing. The staff panel's edit log shows any row's old and new values on
+  demand, and the admin projects list has the latest such edit's date as a
+  sortable column. Sent by a sweep a request starts
+  (ADR-0071), so delivery is at least once.
 - [x] The proposer address is the linked account's email, else the stored
   proposer email, else nothing is sent. An inventory holder with an address
   and no account receives the pickup and due emails at that address, which is
@@ -523,6 +534,7 @@ catalogue that decided the matrix below; #288 shipped it.
   | Staff inbox | Borrow list submitted | tile | yes |
   | Staff inbox | Custom request submitted | tile | yes |
   | Staff inbox | Comment from the proposer | no | yes |
+  | Staff inbox | Proposer edited an approved or published project | admin list column | yes, one per burst of saves, after they stop (ADR-0071) |
   | Staff inbox | New account | no | no |
   | Holder | Request approved, pickup window, place and note | yes | yes |
   | Requester | Request rejected | yes | yes |
@@ -565,6 +577,8 @@ catalogue that decided the matrix below; #288 shipped it.
   why overdue is lazy and there is no cron.
 - [`docs/adr/0019-every-email-is-mandatory-and-staff-share-one-inbox.md`](./docs/adr/0019-every-email-is-mandatory-and-staff-share-one-inbox.md):
   why there are no preferences and no per-staff fan-out.
+- [`docs/adr/0071-a-request-starts-the-sweep-that-sends-batched-staff-email.md`](./docs/adr/0071-a-request-starts-the-sweep-that-sends-batched-staff-email.md):
+  how the proposer edit notice is sent with no scheduler.
 
 ## 14. User Administration
 

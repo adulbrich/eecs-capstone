@@ -26,6 +26,7 @@ import {
   type BatchTarget,
   splitBatchCandidates,
 } from "#/lib/project-workflow";
+import { isOwedStaffEditEmail } from "#/lib/staff-edit-email";
 import { assertStaff, isStaff, type Viewer } from "#/lib/viewer";
 import type { ProjectStatus } from "#/lib/vocabularies";
 import type {
@@ -248,16 +249,29 @@ export async function updateProjectAs(
   }
 
   await db.transaction(async (tx) => {
-    await tx
+    // The status as this write found it, not as `existing` read it before
+    // the transaction: a staff approval landing in between would otherwise
+    // leave a live edit to an approved project unflagged.
+    const [written] = await tx
       .update(projects)
       .set({ ...newValues, updatedAt: new Date() })
-      .where(eq(projects.id, existing.id));
+      .where(eq(projects.id, existing.id))
+      .returning({ status: projects.status });
+    // Hard deleted since the load: roll back rather than log against nothing.
+    if (!written) {
+      throw new Error("Project not found");
+    }
     await tx.insert(projectEditLog).values({
       projectId: existing.id,
       editorId: viewer.id,
       changedFields,
       oldValues: oldDiff,
       newValues: newDiff,
+      // A proposer's edit to an approved or published project is live at
+      // once and owes the staff inbox an email, which the sweep in
+      // `staff-edit-emails.ts` sends once the proposer stops saving (#839).
+      // Nothing here waits on it.
+      staffEmailDue: isOwedStaffEditEmail(written.status, isStaff(viewer)),
     });
   });
 
@@ -595,11 +609,10 @@ export async function updateProjectProgramsAs(
           }))
         );
       }
-      // Nothing renders these two columns: `EditLogEntry` carries four fields
-      // and #467 kept the values out of both payloads. They are for whoever
-      // reads `project_edit_log` in the database, which is why they are
-      // labels and why they are ordered: an unordered array would differ on
-      // nothing and make two identical sets look like a change.
+      // The staff panel renders these two columns when a row is opened
+      // (#839), which is why they are labels and why they are ordered: an
+      // unordered array would differ on nothing and make two identical sets
+      // look like a change.
       await tx.insert(projectEditLog).values({
         projectId: existing.id,
         editorId: viewer.id,

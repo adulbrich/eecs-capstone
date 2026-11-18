@@ -309,6 +309,13 @@
       "when": 1794530446148,
       "tag": "0043_default_categories",
       "breakpoints": true
+    },
+    {
+      "idx": 44,
+      "version": "7",
+      "when": 1795024972748,
+      "tag": "0044_staff_edit_email",
+      "breakpoints": true
     }
   ]
 }

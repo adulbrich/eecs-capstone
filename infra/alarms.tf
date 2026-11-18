@@ -393,6 +393,11 @@ resource "aws_cloudwatch_metric_alarm" "ai_write_failures" {
 # - `Inventory email failed` and `Request notice failed for request`:
 #   `inventory-emails.ts` beside it.
 # - `Role change email failed` and `Ban email failed`: `account-emails.ts`.
+# - `Staff edit email failed for project` and `Staff edit email sweep failed`:
+#   the proposer edit notice's sweep, `staff-edit-emails.ts` (#839). The one
+#   exception to "nothing retries": its rows stay claimed and a sweep ten
+#   minutes on sends them again, so a line here is late mail, not lost mail,
+#   unless it repeats.
 #
 # Left out on purpose: `Refunding a sign-in code send failed` and
 # `Verification mail counter failed` are the per-recipient counter failing,
@@ -407,7 +412,7 @@ resource "aws_cloudwatch_metric_alarm" "ai_write_failures" {
 resource "aws_cloudwatch_log_metric_filter" "email_failures" {
   name           = "${var.project}-email-failures"
   log_group_name = aws_cloudwatch_log_group.app.name
-  pattern        = "%^Sending a sign-in code failed|^Review email failed for project|^Comment email failed for project|^Delete email failed for project|^Reassignment email failed for project|^Mentor email failed for project|^Inventory email failed|^Request notice failed for request|^Role change email failed|^Ban email failed%"
+  pattern        = "%^Sending a sign-in code failed|^Review email failed for project|^Comment email failed for project|^Delete email failed for project|^Reassignment email failed for project|^Mentor email failed for project|^Inventory email failed|^Request notice failed for request|^Role change email failed|^Ban email failed|^Staff edit email failed for project|^Staff edit email sweep failed%"
 
   metric_transformation {
     name      = "EmailFailures"
@@ -431,7 +436,7 @@ resource "aws_cloudwatch_log_metric_filter" "email_failures" {
 # before reading an OK as SES recovered.
 resource "aws_cloudwatch_metric_alarm" "email_failures" {
   alarm_name        = "${var.project}-email-failures"
-  alarm_description = "An email the app tried to send failed (a sign-in code, a project, inventory or account notice). Nothing retries it, so the person it was for has not been told."
+  alarm_description = "An email the app tried to send failed (a sign-in code, a project, inventory or account notice). Nothing retries it but the proposer edit notice, which a sweep sends again in ten minutes, so the person it was for has not been told."
 
   namespace   = aws_cloudwatch_log_metric_filter.email_failures.metric_transformation[0].namespace
   metric_name = aws_cloudwatch_log_metric_filter.email_failures.metric_transformation[0].name
