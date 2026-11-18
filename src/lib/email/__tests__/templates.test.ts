@@ -19,6 +19,7 @@ import {
   projectReturnedToDraftEmail,
   projectSubmittedEmail,
   proposerCommentEmail,
+  proposerEditsEmail,
   type RenderedEmail,
   signInCodeEmail,
 } from "../templates";
@@ -597,6 +598,23 @@ const QUOTING: [string, (f: Fields) => RenderedEmail][] = [
     (f) => mentorNamedEmail({ title: f.title, url: propertyUrl }),
   ],
   ["projectDeletedEmail", (f) => projectDeletedEmail({ title: f.title })],
+  [
+    "proposerEditsEmail",
+    (f) =>
+      proposerEditsEmail({
+        changes: [
+          {
+            label: "Title",
+            movedOn: false,
+            values: { after: '"B"', before: '"A"', live: '"B"' },
+          },
+        ],
+        editors: [{ email: f.email, name: f.name }],
+        span: "1 save at Nov 18, 2026, 2:00 PM",
+        title: f.title,
+        url: propertyUrl,
+      }),
+  ],
 ];
 
 /** The bell title reaches only the subject, so it is checked there alone. */

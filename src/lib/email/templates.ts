@@ -388,6 +388,8 @@ export function proposerEditsEmail(input: {
   const who = input.editors
     .map((e) => describeProposer(e.name, e.email))
     .join(" and ");
+  const title = oneLine(input.title);
+  // The values arrive on one line: `staffEditEmail` compares them that way.
   const quotedLines = input.changes.flatMap((c) => {
     if (!c.values) {
       return [];
@@ -403,7 +405,7 @@ export function proposerEditsEmail(input: {
     .filter((c) => !c.values)
     .map((c) => (c.movedOn ? `${c.label} (changed again since)` : c.label));
   const paragraphs = [
-    `${who} edited "${input.title}" after staff approved it: ${input.span}. The edits are already saved. What changed, from before the first save to after the last:`,
+    `${who} edited "${title}" after staff approved it: ${input.span}. The edits are already saved. What changed, from before the first save to after the last:`,
     ...quotedLines,
   ];
   if (named.length > 0) {
@@ -413,7 +415,7 @@ export function proposerEditsEmail(input: {
     );
   }
   return {
-    subject: `Proposer edited a project: ${input.title}`,
+    subject: `Proposer edited a project: ${title}`,
     ...layout(paragraphs, { label: "Open the edit log", url: input.url }),
   };
 }
