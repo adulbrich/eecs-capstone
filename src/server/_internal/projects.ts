@@ -26,6 +26,7 @@ import {
   type BatchTarget,
   splitBatchCandidates,
 } from "#/lib/project-workflow";
+import { isOwedStaffEditEmail } from "#/lib/staff-edit-email";
 import { assertStaff, isStaff, type Viewer } from "#/lib/viewer";
 import type { ProjectStatus } from "#/lib/vocabularies";
 import type {
@@ -258,6 +259,11 @@ export async function updateProjectAs(
       changedFields,
       oldValues: oldDiff,
       newValues: newDiff,
+      // A proposer's edit to an approved or published project is live at
+      // once and owes the staff inbox an email, which the sweep in
+      // `staff-edit-emails.ts` sends once the proposer stops saving (#839).
+      // Nothing here waits on it.
+      staffEmailDue: isOwedStaffEditEmail(existing.status, isStaff(viewer)),
     });
   });
 

@@ -326,6 +326,62 @@ export function proposerCommentEmail(input: {
 }
 
 /**
+ * One field's line in `proposerEditsEmail`. `values` is null for a field the
+ * email names without quoting; `src/lib/staff-edit-email.ts` decides which.
+ */
+export interface ProposerEditChange {
+  label: string;
+  /** The live value differs from the proposer's last save. */
+  movedOn: boolean;
+  values: { after: string; before: string; live: string } | null;
+}
+
+/**
+ * A burst of proposer edits to an approved or published project (#839), to
+ * the staff inbox. The edits are live already; this tells staff afterwards,
+ * once per burst, with the net change. The fields named without a value say
+ * why, so a reader of a forwarded copy knows where the rest is.
+ */
+export function proposerEditsEmail(input: {
+  changes: readonly ProposerEditChange[];
+  proposerEmail: string | null;
+  proposerName: string | null;
+  span: string;
+  title: string;
+  url: string;
+}): RenderedEmail {
+  const who = describeProposer(input.proposerName, input.proposerEmail);
+  const quotedLines = input.changes.flatMap((c) => {
+    if (!c.values) {
+      return [];
+    }
+    const line = `${c.label}: ${c.values.before} to ${c.values.after}.`;
+    return [
+      c.movedOn
+        ? `${line} It has changed since and is now ${c.values.live}.`
+        : line,
+    ];
+  });
+  const named = input.changes
+    .filter((c) => !c.values)
+    .map((c) => (c.movedOn ? `${c.label} (changed again since)` : c.label));
+  const paragraphs = [
+    `${who} edited "${input.title}" after staff approved it: ${input.span}. The edits are already saved. What changed, from before the first save to after the last:`,
+    ...quotedLines,
+  ];
+  if (named.length > 0) {
+    const lead = quotedLines.length > 0 ? "Also changed" : "Changed";
+    paragraphs.push(
+      `${lead}: ${named.join(", ")}. The edit log has the text, which this email leaves out because the staff inbox is shared.`
+    );
+  }
+  return {
+    subject: `Proposer edited a project: ${input.title}`,
+    ...layout(paragraphs, { label: "Open the edit log", url: input.url }),
+  };
+}
+
+/**
  * Staff sent a submission back to draft. Unlike changes requested, the project
  * leaves review entirely, so the message says what to do next rather than what
  * to fix, and carries the staff comment when there is one (the server requires

@@ -160,7 +160,7 @@ export function formatPickupWindow(
   if (!pickupFrom) {
     return date;
   }
-  return `${date}, ${timeOf(new Date(pickupFrom))} to ${timeOf(by)}`;
+  return `${date}, ${formatOfficeTime(new Date(pickupFrom))} to ${formatOfficeTime(by)}`;
 }
 
 /**
@@ -209,8 +209,11 @@ function partsOf(format: Intl.DateTimeFormat, d: Date) {
   );
 }
 
-/** "2:00 PM", with a plain space whatever the ICU version. */
-function timeOf(d: Date): string {
+/**
+ * "2:00 PM" in the office zone, with a plain space whatever the ICU version.
+ * Exported for the proposer edit notice (#839), which states a span of saves.
+ */
+export function formatOfficeTime(d: Date): string {
   const p = partsOf(TIME_FORMAT, d);
   return `${p.hour}:${p.minute} ${p.dayPeriod}`;
 }
