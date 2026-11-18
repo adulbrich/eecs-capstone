@@ -679,14 +679,15 @@ export interface TransitionResult {
  * be in it.
  *
  * Takes `actorId` rather than a viewer on purpose. The caller's
- * `assertAllowed` settles authorization, so there is no role left for this to consult.
+ * `assertAllowed` settles authorization, so there is no role left for this
+ * to consult.
  *
  * The row is read once, locked (`FOR UPDATE`) inside the transaction, and
- * `assertAllowed` runs on that locked row rather than on a read made before it. Two
- * transitions of one project, or one racing a batch, therefore queue on the
- * row: the second sees the first's committed status and is refused when the
- * workflow no longer allows its move, instead of writing over it with a
- * history row naming a status the project had already left.
+ * `assertAllowed` runs on that locked row rather than on a read made before
+ * it. Two transitions of one project, or one racing a batch, therefore queue
+ * on the row: the second sees the first's committed status and is refused
+ * when the workflow no longer allows its move, instead of writing over it
+ * with a history row naming a status the project had already left.
  */
 async function commitTransition(
   actorId: string,
