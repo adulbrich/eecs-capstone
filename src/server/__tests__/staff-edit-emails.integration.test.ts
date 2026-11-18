@@ -1,4 +1,4 @@
-import { and, eq } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { db } from "#/db";
 import { projectEditLog, projects, user } from "#/db/schema";
@@ -178,7 +178,7 @@ describe("runStaffEditEmailSweep", () => {
     expect(email.text).toContain(`${proposer.name} (${proposer.email})`);
     expect(email.text).toContain("2 saves between");
     expect(email.text).toContain('Title: "Fish ladder" to "Fish ladder v2".');
-    expect(email.text).toContain('Contact Name: (empty) to "Sam".');
+    expect(email.text).toContain('Contact name: (empty) to "Sam".');
     expect(email.text).toContain("Also changed: Description.");
     expect(email.text).not.toContain("A private rewrite");
     expect(email.text).toContain(`https://app.test/projects/${id}#edit-log`);
@@ -248,6 +248,74 @@ describe("runStaffEditEmailSweep", () => {
     expect(sent).toHaveLength(1);
     rows = await logRows(id);
     expect(rows.every((r) => r.staffEmailedAt !== null)).toBe(true);
+  });
+
+  it("claims nothing while another sweep holds the claim lock, and sends once it is free", async () => {
+    // The same lock key the claim takes. Holding it from a second connection
+    // is the other task mid-claim; the two-sweeps test above passes without
+    // the lock, so this is what shows the claim defers to it.
+    await editedTwice();
+    const { send, sent } = inbox();
+    await db.transaction(async (tx) => {
+      await tx.execute(
+        sql`SELECT pg_advisory_xact_lock(hashtext('staff_edit_email_claim'))`
+      );
+      const held = await runStaffEditEmailSweep({
+        config: CONFIG,
+        now: afterQuiet(),
+        send,
+      });
+      expect(held.claimed).toBe(0);
+    });
+    expect(sent).toEqual([]);
+    await runStaffEditEmailSweep({ config: CONFIG, now: afterQuiet(), send });
+    expect(sent).toHaveLength(1);
+  });
+
+  it("leaves a save made while the email was sending unsent, for the next burst", async () => {
+    const { id, proposer } = await editedTwice();
+    const sent: RenderedEmail[] = [];
+    await runStaffEditEmailSweep({
+      config: CONFIG,
+      now: afterQuiet(),
+      send: async (_to, email) => {
+        sent.push(email);
+        await updateProjectAs(proposer, {
+          ...form("Fish ladder v3"),
+          contactName: "Sam",
+          description: "A private rewrite",
+          id,
+        });
+      },
+    });
+    expect(sent).toHaveLength(1);
+    const rows = await logRows(id);
+    expect(rows).toHaveLength(3);
+    expect(rows.slice(0, 2).every((r) => r.staffEmailedAt !== null)).toBe(true);
+    expect(rows[2].staffEmailClaimedAt).toBeNull();
+    expect(rows[2].staffEmailedAt).toBeNull();
+  });
+
+  it("leaves the rows claimed and logs the failure line when no base URL is set", async () => {
+    const { id } = await editedTwice();
+    const logged = vi.spyOn(console, "error").mockImplementation(() => {
+      /* asserted below */
+    });
+    const { send, sent } = inbox();
+    await runStaffEditEmailSweep({
+      config: { ...CONFIG, appBaseUrl: null },
+      now: afterQuiet(),
+      send,
+    });
+    expect(sent).toEqual([]);
+    expect(logged).toHaveBeenCalledWith(
+      `Staff edit email failed for project ${id}`,
+      expect.stringContaining("BETTER_AUTH_URL")
+    );
+    const rows = await logRows(id);
+    expect(
+      rows.every((r) => r.staffEmailClaimedAt !== null && !r.staffEmailedAt)
+    ).toBe(true);
   });
 
   it("stamps a soft-deleted project's rows and sends nothing", async () => {

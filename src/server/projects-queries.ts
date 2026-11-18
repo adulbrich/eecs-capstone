@@ -175,9 +175,11 @@ export const listProjectEditLog = createServerFn({ method: "GET" })
     return listProjectEditLogImpl(data);
   });
 
-// The id is one edit log row's, not a project's (#839).
+/** One edit log row's id, not a project's (#839). */
+const editLogRowIdSchema = z.object({ id: z.string().uuid() });
+
 export const getProjectEditLogValues = createServerFn({ method: "GET" })
-  .validator((data: unknown) => projectIdSchema.parse(data))
+  .validator((data: unknown) => editLogRowIdSchema.parse(data))
   .handler(async ({ data }) => {
     const { getProjectEditLogValuesImpl } = await import(
       "./_internal/projects-queries"

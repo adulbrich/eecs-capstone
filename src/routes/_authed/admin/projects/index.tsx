@@ -121,11 +121,12 @@ const WITHOUT_MENTOR_LABEL = "have no mentor recorded";
  * The other one (#839): a project its proposer edited after staff approved
  * it, which the staff inbox is also emailed about. The hint states the two
  * things the label cannot: which statuses count, and that an edit from
- * before the feature carries no mark and so never matches.
+ * before the feature carries no mark and so never matches. The column's
+ * header hint says the same.
  */
 const EDITED_BY_PROPOSER_LABEL = "were edited by the proposer after approval";
-const EDITED_BY_PROPOSER_HINT =
-  "Edits saved while approved or published, from November 2026 on.";
+const EDITS_MARKED_SINCE = "from November 2026 on";
+const EDITED_BY_PROPOSER_HINT = `Edits saved while approved or published, ${EDITS_MARKED_SINCE}.`;
 
 export const searchSchema = z.object({
   cols: z.string().optional().catch(undefined),
@@ -425,8 +426,7 @@ const COLUMNS = defineAdminColumns<Row>()([
         "-"
       ),
     header: "Proposer edit",
-    headerHint:
-      "The proposer's latest edit after approval, from November 2026 on. The staff inbox is emailed about it once the proposer stops saving.",
+    headerHint: `The proposer's latest edit while approved or published, ${EDITS_MARKED_SINCE}.`,
     id: "proposerEditedAt",
     sortFn: "datetime",
     sortUndefined: "last",

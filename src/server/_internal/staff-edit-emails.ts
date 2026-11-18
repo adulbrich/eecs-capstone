@@ -45,10 +45,13 @@ import {
 import { emailDispatch, type SendEmailFn } from "./email-dispatch";
 import { warnNoStaffInbox } from "./project-emails";
 
-/** One project's claimed rows, which become one email. */
-interface ClaimedBurst {
-  projectId: string;
-  rowIds: string[];
+/**
+ * The two lines the `email_failures` metric filter in `infra/alarms.tf`
+ * counts, spelled once: reworded, the alarm goes quiet (docs/QUIRKS.md).
+ */
+export const SWEEP_FAILED = "Staff edit email sweep failed";
+function emailFailedFor(projectId: string): string {
+  return `Staff edit email failed for project ${projectId}`;
 }
 
 /** `Map.groupBy`, which the ES2022 lib this project targets does not type. */
@@ -85,12 +88,26 @@ function claimable(now: Date): SQL {
 }
 
 /**
- * Claims every ready burst in one short transaction and commits, so the send
- * that follows holds no lock and no pooled connection. A second sweep that
- * cannot take the lock returns nothing: the first is claiming everything
- * there is.
+ * The rows this sweep claimed for one project. The claim's own timestamp is
+ * the token, so loading and stamping bind three values however many saves
+ * the burst holds, and neither touches a save made since the claim (not
+ * claimed yet) or rows a later sweep reclaimed (a newer timestamp).
  */
-async function claimReadyBursts(now: Date): Promise<ClaimedBurst[]> {
+function claimedBy(projectId: string, claimedAt: Date): SQL {
+  return and(
+    eq(projectEditLog.projectId, projectId),
+    eq(projectEditLog.staffEmailClaimedAt, claimedAt),
+    isNull(projectEditLog.staffEmailedAt)
+  ) as SQL;
+}
+
+/**
+ * Claims every ready burst in one short transaction and commits, so the send
+ * that follows holds no lock and no pooled connection, and returns the
+ * projects claimed. A second sweep that cannot take the lock returns nothing:
+ * the first is claiming everything there is.
+ */
+async function claimReadyBursts(now: Date): Promise<string[]> {
   return await db.transaction(async (tx) => {
     const [lock] = (
       await tx.execute<{ locked: boolean }>(
@@ -103,45 +120,40 @@ async function claimReadyBursts(now: Date): Promise<ClaimedBurst[]> {
     const rows = await tx
       .select({
         createdAt: projectEditLog.createdAt,
-        id: projectEditLog.id,
         projectId: projectEditLog.projectId,
       })
       .from(projectEditLog)
       .where(claimable(now));
-    const readyIds = [...groupByProject(rows).values()]
-      .filter((burst) =>
+    const ready = [...groupByProject(rows)]
+      .filter(([, burst]) =>
         isBurstReady(
           burst.map((r) => r.createdAt),
           now
         )
       )
-      .flatMap((burst) => burst.map((r) => r.id));
-    if (readyIds.length === 0) {
+      .map(([projectId]) => projectId);
+    if (ready.length === 0) {
       return [];
     }
-    // The predicate again, not only the ids, so a row this select read is
-    // still claimable when it is claimed.
+    // By project, not by row id: how many saves a burst holds is the
+    // proposer's to choose, and past 65,535 bound ids Postgres refuses the
+    // statement, which would fail every sweep for every project. The
+    // predicate again, so a row the select read is still claimable.
     const claimed = await tx
       .update(projectEditLog)
       .set({ staffEmailClaimedAt: now })
-      .where(and(inArray(projectEditLog.id, readyIds), claimable(now)))
-      .returning({
-        id: projectEditLog.id,
-        projectId: projectEditLog.projectId,
-      });
-    return [...groupByProject(claimed)].map(([projectId, burst]) => ({
-      projectId,
-      rowIds: burst.map((r) => r.id),
-    }));
+      .where(and(inArray(projectEditLog.projectId, ready), claimable(now)))
+      .returning({ projectId: projectEditLog.projectId });
+    return [...new Set(claimed.map((r) => r.projectId))];
   });
 }
 
-/** Stamps exactly the rows claimed, so a save since the claim stays unsent. */
-async function stampEmailed(rowIds: string[], now: Date): Promise<void> {
+/** Stamps the rows this sweep claimed, so a save since the claim stays unsent. */
+async function stampEmailed(projectId: string, claimedAt: Date): Promise<void> {
   await db
     .update(projectEditLog)
-    .set({ staffEmailedAt: now })
-    .where(inArray(projectEditLog.id, rowIds));
+    .set({ staffEmailedAt: claimedAt })
+    .where(claimedBy(projectId, claimedAt));
 }
 
 /**
@@ -160,10 +172,7 @@ export async function deliverStaffEditEmail(
     await emailDispatch(send)(staffInbox, email);
     return true;
   } catch (error) {
-    console.error(
-      `Staff edit email failed for project ${projectId}`,
-      redactQueryError(error)
-    );
+    console.error(emailFailedFor(projectId), redactQueryError(error));
     return false;
   }
 }
@@ -174,7 +183,7 @@ export async function deliverStaffEditEmail(
  * one that did not.
  */
 async function settleBurst(
-  burst: ClaimedBurst,
+  projectId: string,
   now: Date,
   config: NotificationConfig,
   send?: SendEmailFn
@@ -182,18 +191,19 @@ async function settleBurst(
   const [project] = await db
     .select()
     .from(projects)
-    .where(eq(projects.id, burst.projectId));
+    .where(eq(projects.id, projectId));
   // Hard delete cascades the rows away, so a missing project is a race with
-  // one; a soft-deleted project is staff's own doing and nobody to tell.
+  // one. A soft-deleted project is staff's own doing; restoring it later
+  // does not send what was stamped here, and the edit log still has it.
   if (!project || project.deletedAt) {
-    await stampEmailed(burst.rowIds, now);
+    await stampEmailed(projectId, now);
     return;
   }
   // Once per burst, not once a minute: the stamp is what stops the warning
   // repeating, and the edit log still has every save.
   if (!config.staffInbox) {
     warnNoStaffInbox("proposer edit notice", project.id);
-    await stampEmailed(burst.rowIds, now);
+    await stampEmailed(projectId, now);
     return;
   }
   // Retried rather than stamped: the link is the email's whole point, and
@@ -201,7 +211,7 @@ async function settleBurst(
   // dev or staging box, which the failure line names every ten minutes.
   if (!config.appBaseUrl) {
     console.error(
-      `Staff edit email failed for project ${project.id}`,
+      emailFailedFor(project.id),
       "BETTER_AUTH_URL is not set, so no proposer edit notice could be addressed"
     );
     return;
@@ -217,32 +227,40 @@ async function settleBurst(
     })
     .from(projectEditLog)
     .innerJoin(user, eq(projectEditLog.editorId, user.id))
-    .where(inArray(projectEditLog.id, burst.rowIds))
+    .where(claimedBy(projectId, now))
     .orderBy(asc(projectEditLog.createdAt));
-  const last = saves.at(-1);
-  const email = last
-    ? staffEditEmail({
-        editLogUrl: `${config.appBaseUrl}/projects/${project.id}#edit-log`,
-        live: project,
-        // The person who made the edits, not whoever the project names now:
-        // staff may have reassigned it since.
-        proposer: { email: last.editorEmail, name: last.editorName },
-        saves: saves.map((s) => ({
-          changedFields: s.changedFields,
-          createdAt: s.createdAt,
-          newValues: s.newValues as Record<string, unknown>,
-          oldValues: s.oldValues as Record<string, unknown>,
-        })),
-        title: project.title,
-      })
-    : null;
+  // The people who made the edits, not whoever the project names now: staff
+  // may have reassigned it, mid-burst included.
+  const editors = [
+    ...new Map(
+      saves.map((s) => [
+        s.editorEmail,
+        { email: s.editorEmail, name: s.editorName },
+      ])
+    ).values(),
+  ];
+  const email =
+    saves.length > 0
+      ? staffEditEmail({
+          editLogUrl: `${config.appBaseUrl}/projects/${project.id}#edit-log`,
+          editors,
+          live: project,
+          saves: saves.map((s) => ({
+            changedFields: s.changedFields,
+            createdAt: s.createdAt,
+            newValues: s.newValues as Record<string, unknown>,
+            oldValues: s.oldValues as Record<string, unknown>,
+          })),
+          title: project.title,
+        })
+      : null;
   // Save then undo: no net change, no email. The edit log keeps both rows.
   if (!email) {
-    await stampEmailed(burst.rowIds, now);
+    await stampEmailed(projectId, now);
     return;
   }
   if (await deliverStaffEditEmail(project.id, email, config.staffInbox, send)) {
-    await stampEmailed(burst.rowIds, now);
+    await stampEmailed(projectId, now);
   }
 }
 
@@ -265,22 +283,19 @@ export async function runStaffEditEmailSweep(
 ): Promise<{ claimed: number }> {
   const now = opts.now ?? new Date();
   const config = opts.config ?? buildNotificationConfig();
-  let bursts: ClaimedBurst[];
+  let claimed: string[];
   try {
-    bursts = await claimReadyBursts(now);
+    claimed = await claimReadyBursts(now);
   } catch (error) {
-    console.error("Staff edit email sweep failed", redactQueryError(error));
+    console.error(SWEEP_FAILED, redactQueryError(error));
     return { claimed: 0 };
   }
-  for (const burst of bursts) {
+  for (const projectId of claimed) {
     try {
-      await settleBurst(burst, now, config, opts.send);
+      await settleBurst(projectId, now, config, opts.send);
     } catch (error) {
-      console.error(
-        `Staff edit email failed for project ${burst.projectId}`,
-        redactQueryError(error)
-      );
+      console.error(emailFailedFor(projectId), redactQueryError(error));
     }
   }
-  return { claimed: bursts.length };
+  return { claimed: claimed.length };
 }

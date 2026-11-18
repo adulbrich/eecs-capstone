@@ -249,10 +249,14 @@ export async function updateProjectAs(
   }
 
   await db.transaction(async (tx) => {
-    await tx
+    // The status as this write found it, not as `existing` read it before
+    // the transaction: a staff approval landing in between would otherwise
+    // leave a live edit to an approved project unflagged.
+    const [written] = await tx
       .update(projects)
       .set({ ...newValues, updatedAt: new Date() })
-      .where(eq(projects.id, existing.id));
+      .where(eq(projects.id, existing.id))
+      .returning({ status: projects.status });
     await tx.insert(projectEditLog).values({
       projectId: existing.id,
       editorId: viewer.id,
@@ -263,7 +267,10 @@ export async function updateProjectAs(
       // once and owes the staff inbox an email, which the sweep in
       // `staff-edit-emails.ts` sends once the proposer stops saving (#839).
       // Nothing here waits on it.
-      staffEmailDue: isOwedStaffEditEmail(existing.status, isStaff(viewer)),
+      staffEmailDue: isOwedStaffEditEmail(
+        written?.status ?? existing.status,
+        isStaff(viewer)
+      ),
     });
   });
 

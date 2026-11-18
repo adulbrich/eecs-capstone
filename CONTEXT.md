@@ -393,6 +393,13 @@ The record of every edit to a project or an item: which fields changed, from wha
 to what, by whom. Staff-only, in both domains.
 _Avoid_: history (that is status history), changelog, audit trail
 
+**Proposer edit notice**:
+The one staff inbox email a burst of a proposer's edits to an approved or published
+project owes, sent once they stop saving, with the net change (ADR-0071). A burst is
+one project's saves not yet emailed. The code says "staff edit email" for the same
+thing, after the issue that built it (#839).
+_Avoid_: edit digest, change summary, edit alert
+
 **Notification**:
 An in-app message to one user, rendered by the bell. Projects notify the proposer of
 transitions, deletions, comments and reassignment; inventory notifies requesters and

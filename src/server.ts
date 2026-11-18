@@ -22,7 +22,10 @@ import {
 } from "#/lib/_internal/render-failure";
 import { createSweepTrigger } from "#/lib/_internal/sweep-trigger";
 import { SWEEP_EVERY_MS } from "#/lib/staff-edit-email";
-import { runStaffEditEmailSweep } from "#/server/_internal/staff-edit-emails";
+import {
+  runStaffEditEmailSweep,
+  SWEEP_FAILED,
+} from "#/server/_internal/staff-edit-emails";
 
 // Imported for its side effect, the pool's warm-up, so that it runs on a new
 // task's first request, the load balancer's health check (ADR-0052).
@@ -55,8 +58,7 @@ const startHandler = createStartHandler(handler);
  */
 const startStaffEditEmailSweep = createSweepTrigger({
   everyMs: SWEEP_EVERY_MS,
-  onError: (error) =>
-    console.error("Staff edit email sweep failed", redactQueryError(error)),
+  onError: (error) => console.error(SWEEP_FAILED, redactQueryError(error)),
   run: () => runStaffEditEmailSweep(),
 });
 

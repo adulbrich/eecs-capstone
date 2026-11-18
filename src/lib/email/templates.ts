@@ -340,17 +340,19 @@ export interface ProposerEditChange {
  * A burst of proposer edits to an approved or published project (#839), to
  * the staff inbox. The edits are live already; this tells staff afterwards,
  * once per burst, with the net change. The fields named without a value say
- * why, so a reader of a forwarded copy knows where the rest is.
+ * why, so a reader of a forwarded copy knows where the rest is. `editors` is
+ * more than one person only when staff reassigned the project mid-burst.
  */
 export function proposerEditsEmail(input: {
   changes: readonly ProposerEditChange[];
-  proposerEmail: string | null;
-  proposerName: string | null;
+  editors: readonly { email: string | null; name: string | null }[];
   span: string;
   title: string;
   url: string;
 }): RenderedEmail {
-  const who = describeProposer(input.proposerName, input.proposerEmail);
+  const who = input.editors
+    .map((e) => describeProposer(e.name, e.email))
+    .join(" and ");
   const quotedLines = input.changes.flatMap((c) => {
     if (!c.values) {
       return [];

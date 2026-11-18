@@ -1,36 +1,40 @@
-import { PRIVATE_NOTES_FIELD_LABEL } from "./private-notes";
-import { FIELD_LABELS } from "./project-review-fields";
+import { FIELD_HEADINGS } from "./project-review-fields";
 
 /**
  * What the project edit log's field names read as, for the staff panel's
- * values view and the proposer edit notice (#839). The form's own labels
- * where the form has the field, so the log and the form use the same words;
- * the staff panel's writers' fields get Title Case to match.
+ * values view and the proposer edit notice (#839). Sentence case, because
+ * Title Case belongs to the two long forms alone (docs/UI-CONVENTIONS.md);
+ * the prose fields take the project page's own headings, so the log and the
+ * page use the same words.
  *
  * Every name a writer in `src/server/_internal/projects.ts` can put in
  * `changed_fields`. A name missing here reads as itself rather than failing,
  * because the log is history and an old row may name a column since removed.
  */
 const PROJECT_EDIT_FIELD_LABEL: Record<string, string> = {
-  ...FIELD_LABELS,
+  ...FIELD_HEADINGS,
   url: "URL",
-  contactName: "Contact Name",
-  contactEmail: "Contact Email",
+  contactName: "Contact name",
+  contactEmail: "Contact email",
   imageUrl: "Image",
-  requiresNdaIp: "Requires an NDA or IP Agreement",
+  requiresNdaIp: "Requires an NDA or IP agreement",
   isSponsored: "Sponsored",
   teamsSupported: "Teams",
-  notes: PRIVATE_NOTES_FIELD_LABEL,
-  proposerEmail: "Proposer Email",
-  proposerId: "Proposer Account",
-  studentProposed: "Student Proposed",
-  mentorEmail: "Mentor Email",
+  notes: "Private notes",
+  proposerEmail: "Proposer email",
+  proposerId: "Proposer account",
+  studentProposed: "Student proposed",
+  mentorEmail: "Mentor email",
   programs: "Programs",
-  acceptingApplicants: "Accepting Applicants",
+  acceptingApplicants: "Accepting applicants",
 };
 
 export function projectEditFieldLabel(field: string): string {
-  return PROJECT_EDIT_FIELD_LABEL[field] ?? field;
+  // Own keys only, so `constructor` or `toString` read as themselves rather
+  // than as what `Object.prototype` holds under those names.
+  return Object.hasOwn(PROJECT_EDIT_FIELD_LABEL, field)
+    ? (PROJECT_EDIT_FIELD_LABEL[field] as string)
+    : field;
 }
 
 /**

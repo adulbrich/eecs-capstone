@@ -31,7 +31,9 @@ const HOUR_MS = 60 * MINUTE_MS;
  * How long a proposer must stop saving before their burst is sent, and the
  * longest a burst waits after its first save however they keep saving. Both
  * are guesses until the production gate query reports the gaps between one
- * proposer's saves (#839), so each stays a one-line change.
+ * proposer's saves (#839), so each stays a one-line change here. README,
+ * PRD section 13, ADR-0071 and the admin page's sentence state the numbers
+ * in words; change those in the same commit.
  */
 export const STAFF_EDIT_QUIET_MS = 30 * MINUTE_MS;
 export const STAFF_EDIT_CAP_MS = 3 * HOUR_MS;
@@ -42,7 +44,9 @@ export const SWEEP_EVERY_MS = MINUTE_MS;
 /**
  * How old a claim with no emailed stamp must be before another sweep may take
  * it. Long past the SES send's own bound (#708), so a claim this old is a
- * task that died or a send that threw, never one still in flight.
+ * task that died or a send that threw, unless one sweep had about sixty
+ * bursts to settle one after another, which is the rare duplicate ADR-0071
+ * accepts.
  */
 export const CLAIM_RECLAIM_MS = 10 * MINUTE_MS;
 
@@ -104,6 +108,12 @@ function sameValue(a: unknown, b: unknown): boolean {
  * What changed from before the first save to after the last, per field, in
  * the order the fields were first changed. A field changed and changed back
  * drops out, so a save followed by its undo is no change at all.
+ *
+ * Unless someone else changed the field in between: a save whose old value is
+ * not the previous save's new value starts the field over from that old
+ * value. Otherwise a proposer who changes A to B, sees staff correct it to C,
+ * and sets it back to A would net to no change, and staff would never hear
+ * that their correction was undone.
  */
 export function netChange(saves: readonly BurstSave[]): NetChange[] {
   const ordered = [...saves].sort(
@@ -112,16 +122,16 @@ export function netChange(saves: readonly BurstSave[]): NetChange[] {
   const byField = new Map<string, NetChange>();
   for (const save of ordered) {
     for (const field of save.changedFields) {
+      const before = save.oldValues[field] ?? null;
       const after = save.newValues[field] ?? null;
       const seen = byField.get(field);
-      if (seen) {
+      if (seen && sameValue(seen.after, before)) {
         seen.after = after;
       } else {
-        byField.set(field, {
-          after,
-          before: save.oldValues[field] ?? null,
-          field,
-        });
+        // A first change, or a run another editor broke: either way it
+        // starts here. `set` on a key already present keeps its place, so
+        // the order stays the order of first change.
+        byField.set(field, { after, before, field });
       }
     }
   }
@@ -149,9 +159,20 @@ export function emailCarriesValue(field: string): boolean {
   return VALUE_FIELDS.has(field);
 }
 
+const LINE_BREAKS = /\s+/gu;
+
+/**
+ * A proposer's text on one line. The title and the contact name accept line
+ * breaks, and one in the plain-text body could fake a line of the email's own,
+ * its link included; a subject is one line anyway.
+ */
+function oneLine(text: string): string {
+  return text.replace(LINE_BREAKS, " ").trim();
+}
+
 /** A value as the email quotes it: strings in quotes, the rest as words. */
 function quoted(value: unknown): string {
-  const text = formatEditValue(value);
+  const text = oneLine(formatEditValue(value));
   return typeof value === "string" && value !== "" ? `"${text}"` : text;
 }
 
@@ -178,9 +199,13 @@ export function describeSaveSpan(savedAt: readonly Date[]): string {
 export interface StaffEditEmailInput {
   /** Where the email's link goes: the project's edit log. */
   editLogUrl: string;
+  /**
+   * Who made the saves, once each in the order they first saved. Usually one
+   * proposer; two when staff reassigned the project during the burst.
+   */
+  editors: readonly { email: string | null; name: string | null }[];
   /** The project as it stands now, to say where a field has moved on since. */
   live: Readonly<Record<string, unknown>>;
-  proposer: { email: string | null; name: string | null };
   saves: readonly BurstSave[];
   title: string;
 }
@@ -193,31 +218,38 @@ export interface StaffEditEmailInput {
 export function staffEditEmail(
   input: StaffEditEmailInput
 ): RenderedEmail | null {
-  const changes = netChange(input.saves);
-  if (changes.length === 0) {
+  const lines = netChange(input.saves).flatMap((c): ProposerEditChange[] => {
+    const label = projectEditFieldLabel(c.field);
+    if (!emailCarriesValue(c.field)) {
+      const movedOn = !sameValue(input.live[c.field], c.after);
+      return [{ label, movedOn, values: null }];
+    }
+    // Compared as the email prints them: "" and null both read "(empty)",
+    // and one-lining folds a trailing space, so a change no reader could see
+    // is no line at all.
+    const before = quoted(c.before);
+    const after = quoted(c.after);
+    if (before === after) {
+      return [];
+    }
+    const live = quoted(input.live[c.field]);
+    return [
+      { label, movedOn: live !== after, values: { after, before, live } },
+    ];
+  });
+  if (lines.length === 0) {
     return null;
   }
-  const lines: ProposerEditChange[] = changes.map((c) => {
-    const movedOn = !sameValue(input.live[c.field], c.after);
-    if (!emailCarriesValue(c.field)) {
-      return { label: projectEditFieldLabel(c.field), movedOn, values: null };
-    }
-    return {
-      label: projectEditFieldLabel(c.field),
-      movedOn,
-      values: {
-        after: quoted(c.after),
-        before: quoted(c.before),
-        live: quoted(input.live[c.field]),
-      },
-    };
-  });
   return proposerEditsEmail({
     changes: lines,
-    proposerEmail: input.proposer.email,
-    proposerName: input.proposer.name,
+    // A blank name falls back to the address, and a blank address to
+    // "Unknown proposer", rather than opening the email with a space.
+    editors: input.editors.map((e) => ({
+      email: e.email === null ? null : oneLine(e.email) || null,
+      name: e.name === null ? null : oneLine(e.name) || null,
+    })),
     span: describeSaveSpan(input.saves.map((s) => s.createdAt)),
-    title: input.title,
+    title: oneLine(input.title),
     url: input.editLogUrl,
   });
 }
