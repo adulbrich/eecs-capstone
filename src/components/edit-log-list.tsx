@@ -7,6 +7,7 @@ import {
 } from "#/lib/project-edit-fields";
 import { LocalTime } from "./local-time";
 import { Button } from "./ui/button";
+import { FieldError } from "./ui/field";
 
 /**
  * The rows either edit log renders.
@@ -146,9 +147,10 @@ function ValuesDetail({
   }
   if (query.isError) {
     return (
-      <p className="text-destructive mt-1 text-xs" id={id} role="alert">
-        {errorMessage(query.error, "The values could not be loaded.")}
-      </p>
+      <FieldError
+        id={id}
+        message={errorMessage(query.error, "The values could not be loaded.")}
+      />
     );
   }
   const { changedFields, newValues, oldValues } = query.data;
