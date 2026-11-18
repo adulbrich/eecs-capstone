@@ -54,7 +54,7 @@ async function withBatchSlot(work: () => Promise<void>): Promise<void> {
     await work();
   } finally {
     // A waiter inherits the slot rather than the count dropping and rising,
-    // so a refresh started outside a batch cannot slip between the two.
+    // so a job from a batch started later cannot overtake the waiters.
     const next = batchSlotWaiters.shift();
     if (next) {
       next();

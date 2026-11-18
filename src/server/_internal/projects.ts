@@ -1050,9 +1050,11 @@ export async function batchTransitionAs(
     return eligible.map((row) => row.id);
   });
 
-  // After the commit, never inside it, as `commitTransition` does. Both
-  // targets are embeddable, so every project gets one.
-  refreshProjectsInBackground(moved, deps);
+  // After the commit, never inside it, and behind the same gate as
+  // `commitTransition`, so the two paths cannot drift if a target is added.
+  if (isEmbeddableStatus(target)) {
+    refreshProjectsInBackground(moved, deps);
+  }
   return { ids: moved, status: target };
 }
 

@@ -7,6 +7,7 @@ import {
   screen,
   waitFor,
 } from "@testing-library/react";
+import { toast } from "sonner";
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import {
   type BatchRow,
@@ -17,7 +18,7 @@ import { batchTransitionProjects } from "#/server/projects";
 import { deferred } from "./shared/deferred";
 
 vi.mock("#/server/projects", () => ({ batchTransitionProjects: vi.fn() }));
-vi.mock("sonner", () => ({ toast: { success: vi.fn() } }));
+vi.mock("sonner", () => ({ toast: { error: vi.fn(), success: vi.fn() } }));
 
 // Radix Dialog reads a few DOM APIs jsdom omits. Same stub set as
 // approve-dialog.test.tsx.
@@ -179,5 +180,66 @@ describe("BatchTransitionDialog", () => {
     );
     await waitFor(() => expect(onDone).toHaveBeenCalledTimes(1));
     expect(onOpenChange).not.toHaveBeenCalledWith(false);
+  });
+
+  it("keeps the refusal on screen when the reload leaves nothing eligible", async () => {
+    vi.mocked(batchTransitionProjects).mockRejectedValue(
+      new Error(
+        "Nothing was archived. These changed since the list loaded: Rover, Drone."
+      )
+    );
+    const onOpenChange = vi.fn();
+    const props = {
+      onDone: () => Promise.resolve(),
+      onOpenChange,
+      open: true,
+      target: "archived" as const,
+    };
+    const { rerender } = render(
+      <BatchTransitionDialog {...props} rows={rows} />
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Archive 2 projects" }));
+    await screen.findByRole("alert");
+    // The reload: both published rows were archived elsewhere.
+    rerender(
+      <BatchTransitionDialog
+        {...props}
+        rows={rows.map((row) => ({ ...row, status: "archived" as const }))}
+      />
+    );
+    expect(
+      screen.getByRole("heading", {
+        name: "No published projects in this view",
+      })
+    ).toBeTruthy();
+    expect(screen.getByRole("alert").textContent).toContain("Rover, Drone.");
+  });
+
+  it("reports a batch that landed as landed even when the reload fails", async () => {
+    vi.mocked(batchTransitionProjects).mockResolvedValue({
+      ids: ["id-a", "id-b"],
+      status: "archived",
+    });
+    const onDone = vi.fn(() => Promise.reject(new Error("loader down")));
+    const { onOpenChange } = renderDialog("archived", rows, onDone);
+    fireEvent.click(screen.getByRole("button", { name: "Archive 2 projects" }));
+    await waitFor(() => expect(onOpenChange).toHaveBeenCalledWith(false));
+    expect(toast.success).toHaveBeenCalledWith("2 projects archived.");
+    await waitFor(() =>
+      expect(toast.error).toHaveBeenCalledWith(
+        "The list did not reload. Refresh the page to see it."
+      )
+    );
+    expect(screen.queryByRole("alert")).toBeNull();
+  });
+
+  it("drops the comment on Cancel, so it never rides into the next batch", () => {
+    const { onOpenChange } = renderDialog("archived");
+    const box = () =>
+      screen.getByLabelText("Comment (optional)") as HTMLTextAreaElement;
+    fireEvent.change(box(), { target: { value: "End of term." } });
+    fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+    expect(onOpenChange).toHaveBeenCalledWith(false);
+    expect(box().value).toBe("");
   });
 });

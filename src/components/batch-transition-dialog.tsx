@@ -1,4 +1,4 @@
-import { useId, useState } from "react";
+import { useId, useRef, useState } from "react";
 import { toast } from "sonner";
 import {
   BATCH_TRANSITIONS,
@@ -100,54 +100,68 @@ export function BatchTransitionDialog({
   const { busy, error, run, setError } = useAction({
     fallback: `Could not ${COPY[target].verb} the projects`,
   });
+  // The rows as they were when the dialog last stood open. Live while it is
+  // open, so a reload after a refusal redraws the list; frozen once it
+  // closes, so the reload after a success does not turn the closing dialog
+  // into "No published projects in this view" while Radix animates it out.
+  const shownRows = useRef(rows);
+  if (open) {
+    shownRows.current = rows;
+  }
   const { eligible, otherStatus, softDeleted } = splitBatchCandidates(
-    rows,
+    shownRows.current,
     target
   );
   const source = PROJECT_STATUS_LABEL[BATCH_TRANSITIONS[target]].toLowerCase();
   const copy = COPY[target];
   const count = eligible.length;
 
+  // Outside `run`, so a reload that fails after the batch committed is never
+  // reported as the batch failing.
+  async function reload() {
+    try {
+      await onDone();
+    } catch {
+      toast.error("The list did not reload. Refresh the page to see it.");
+    }
+  }
+
   async function onConfirm() {
     const ids = eligible.map((row) => row.id);
     if (ids.length === 0) {
       return;
     }
-    let refused = false;
-    const ok = await run(async () => {
-      try {
-        await batchTransitionProjects({
-          data: {
-            ids: ids as [string, ...string[]],
-            target,
-            comment: comment.trim() || undefined,
-          },
-        });
-      } catch (err) {
-        refused = true;
-        throw err;
-      }
-      await onDone();
-    });
+    const ok = await run(() =>
+      batchTransitionProjects({
+        data: {
+          // Non-empty by the return above, which the schema's `.nonempty()`
+          // cannot see through.
+          ids: ids as [string, ...string[]],
+          target,
+          comment: comment.trim() || undefined,
+        },
+      })
+    );
     if (ok) {
       toast.success(`${projects(ids.length)} ${copy.done}.`);
       setComment("");
       onOpenChange(false);
-    } else if (refused) {
-      // The refusal says which rows changed; the reload draws the list
-      // without them, so the next confirm sends what is true now.
-      await onDone();
     }
+    // After a refusal too: it names the rows that changed, and the reload
+    // draws the list without them, so the next confirm sends what is true now.
+    await reload();
   }
 
   // Every dismissal route Radix offers funnels through here, so a write in
-  // flight cannot be closed out from under itself (#426).
+  // flight cannot be closed out from under itself (#426). Closing drops the
+  // comment, so one typed for an archive never rides into a publish.
   function onDialogOpenChange(next: boolean) {
     if (!next && busy) {
       return;
     }
     if (!next) {
       setError(null);
+      setComment("");
     }
     onOpenChange(next);
   }
@@ -178,7 +192,12 @@ export function BatchTransitionDialog({
                 {`There is nothing here to ${copy.verb}. Change the filters to show the ${source} projects you mean.`}
               </DialogDescription>
             </DialogHeader>
-            <DialogBody>{leftAlone}</DialogBody>
+            {/* The error too: a refusal that leaves nothing eligible lands
+                here after the reload, and still has to say what changed. */}
+            <DialogBody>
+              {leftAlone}
+              <FieldError message={error} />
+            </DialogBody>
             <DialogFooter>
               <Button
                 onClick={() => onDialogOpenChange(false)}
