@@ -131,8 +131,12 @@ export function BatchTransitionDialog({
     if (ids.length === 0) {
       return;
     }
-    const ok = await run(() =>
-      batchTransitionProjects({
+    // Set only when this call got past the in-flight guard, so a second
+    // click while the first is writing reloads nothing.
+    let sent = false;
+    const ok = await run(() => {
+      sent = true;
+      return batchTransitionProjects({
         data: {
           // Non-empty by the return above, which the schema's `.nonempty()`
           // cannot see through.
@@ -140,8 +144,11 @@ export function BatchTransitionDialog({
           target,
           comment: comment.trim() || undefined,
         },
-      })
-    );
+      });
+    });
+    if (!sent) {
+      return;
+    }
     if (ok) {
       toast.success(`${projects(ids.length)} ${copy.done}.`);
       setComment("");
