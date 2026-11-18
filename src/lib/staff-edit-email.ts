@@ -16,6 +16,7 @@
 
 import { formatOfficeDay } from "./day-range";
 import {
+  oneLine,
   type ProposerEditChange,
   proposerEditsEmail,
   type RenderedEmail,
@@ -159,19 +160,10 @@ export function emailCarriesValue(field: string): boolean {
   return VALUE_FIELDS.has(field);
 }
 
-// `\s` leaves out U+0085 (NEL), which some mail clients still break a line on.
-const LINE_BREAKS = /[\s\u{85}]+/gu;
-
 /**
- * A proposer's text on one line. The title and the contact name accept line
- * breaks, and one in the plain-text body could fake a line of the email's own,
- * its link included; a subject is one line anyway.
+ * A value as the email quotes it: strings in quotes, the rest as words, on
+ * one line, since a value with a line break could fake a line of the email.
  */
-function oneLine(text: string): string {
-  return text.replace(LINE_BREAKS, " ").trim();
-}
-
-/** A value as the email quotes it: strings in quotes, the rest as words. */
 function quoted(value: unknown): string {
   const text = oneLine(formatEditValue(value));
   return typeof value === "string" && value !== "" ? `"${text}"` : text;
@@ -247,16 +239,12 @@ export function staffEditEmail(
   if (lines.length === 0) {
     return null;
   }
+  // The template puts the title and each editor's name on one line itself.
   return proposerEditsEmail({
     changes: lines,
-    // A blank name falls back to the address, and a blank address to
-    // "Unknown proposer", rather than opening the email with a space.
-    editors: input.editors.map((e) => ({
-      email: e.email === null ? null : oneLine(e.email) || null,
-      name: e.name === null ? null : oneLine(e.name) || null,
-    })),
+    editors: input.editors,
     span: describeSaveSpan(input.saves.map((s) => s.createdAt)),
-    title: oneLine(input.title),
+    title: input.title,
     url: input.editLogUrl,
   });
 }

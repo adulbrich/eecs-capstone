@@ -24,6 +24,26 @@ export function escapeHtml(value: string): string {
   return value.replace(HTML_UNSAFE, (char) => HTML_ESCAPES[char] ?? char);
 }
 
+// `\s` takes CR, LF, U+2028 and U+2029 as well as spaces, tabs and a no-break
+// space, but not U+0085 (next line), which Unicode also counts as a line break.
+const WHITESPACE_RUN = /[\s\u{85}]+/gu;
+
+/**
+ * Text that must stay on one line: a subject, or a value the body quotes
+ * inside a sentence. A title, an account name and a custom line's name all
+ * accept line breaks, and one in the plain-text body would start a line of
+ * the email's own, a fake call to action and its link included. Prose (a
+ * description, a comment) keeps its paragraphs and does not come through here.
+ */
+export function oneLine(text: string): string {
+  return text.replace(WHITESPACE_RUN, " ").trim();
+}
+
+/** A name or address on one line, or null when only whitespace was left. */
+function oneLineOrNull(text: string | null): string | null {
+  return text === null ? null : oneLine(text) || null;
+}
+
 const EXCERPT_LIMIT = 600;
 
 /** The first part of a long text, with a pointer at the rest. */
@@ -44,11 +64,17 @@ function summarize(description: string | null): string {
   return excerpt(trimmed, "Open the project to read the full proposal.");
 }
 
+/**
+ * "Name (address)" on one line. A blank name falls back to the address, and a
+ * blank address to "Unknown proposer", rather than opening with a space.
+ */
 function describeProposer(name: string | null, email: string | null): string {
-  if (name && email) {
-    return `${name} (${email})`;
+  const shownName = oneLineOrNull(name);
+  const shownEmail = oneLineOrNull(email);
+  if (shownName && shownEmail) {
+    return `${shownName} (${shownEmail})`;
   }
-  return name ?? email ?? "Unknown proposer";
+  return shownName ?? shownEmail ?? "Unknown proposer";
 }
 
 /**
@@ -106,12 +132,13 @@ export function projectSubmittedEmail(input: {
   url: string;
 }): RenderedEmail {
   const who = describeProposer(input.proposerName, input.proposerEmail);
+  const title = oneLine(input.title);
   return {
-    subject: `New project submitted: ${input.title}`,
+    subject: `New project submitted: ${title}`,
     ...layout(
       [
         `${who} submitted a project for review.`,
-        `Title: ${input.title}`,
+        `Title: ${title}`,
         `Description: ${summarize(input.description)}`,
       ],
       { label: "Review the project", url: input.url }
@@ -124,8 +151,9 @@ export function projectApprovedEmail(input: {
   title: string;
   url: string;
 }): RenderedEmail {
+  const title = oneLine(input.title);
   const paragraphs = [
-    `Your project "${input.title}" has been approved.`,
+    `Your project "${title}" has been approved.`,
     "It will be published to the project list later. You will not receive another email when that happens.",
   ];
   const note = input.comment?.trim();
@@ -133,7 +161,7 @@ export function projectApprovedEmail(input: {
     paragraphs.push(`Note from the reviewer: ${note}`);
   }
   return {
-    subject: `Your project was approved: ${input.title}`,
+    subject: `Your project was approved: ${title}`,
     ...layout(paragraphs, { label: "View your project", url: input.url }),
   };
 }
@@ -156,7 +184,7 @@ export function notificationEmail(input: {
   url: string;
 }): RenderedEmail {
   return {
-    subject: input.title,
+    subject: oneLine(input.title),
     ...layout(input.message.trim().split(BLANK_LINE), {
       label: "Open in the capstone app",
       url: input.url,
@@ -177,14 +205,16 @@ export function inventoryRequestSubmittedEmail(input: {
 }): RenderedEmail {
   const who = describeProposer(input.requesterName, input.requesterEmail);
   const shortName =
-    input.requesterName ?? input.requesterEmail ?? "Unknown requester";
+    oneLineOrNull(input.requesterName) ??
+    oneLineOrNull(input.requesterEmail) ??
+    "Unknown requester";
   const what = input.kind === "cart" ? "Borrow list" : "Custom request";
   return {
     subject: `${what} submitted: ${shortName}`,
     ...layout(
       [
         `${who} submitted a ${what.toLowerCase()}:`,
-        input.lines.map((line) => `- ${line}`).join("\n"),
+        input.lines.map((line) => `- ${oneLine(line)}`).join("\n"),
       ],
       { label: "Open the request queue", url: input.url }
     ),
@@ -237,11 +267,12 @@ export function projectReassignedEmail(input: {
   title: string;
   url: string;
 }): RenderedEmail {
+  const title = oneLine(input.title);
   return {
-    subject: `A project was assigned to you: ${input.title}`,
+    subject: `A project was assigned to you: ${title}`,
     ...layout(
       [
-        `Staff made you the proposer of "${input.title}".`,
+        `Staff made you the proposer of "${title}".`,
         "You can edit it, follow its review, and reply to staff comments from the project page.",
       ],
       { label: "View the project", url: input.url }
@@ -257,11 +288,12 @@ export function mentorNamedEmail(input: {
   title: string;
   url: string;
 }): RenderedEmail {
+  const title = oneLine(input.title);
   return {
-    subject: `You were named as a mentor: ${input.title}`,
+    subject: `You were named as a mentor: ${title}`,
     ...layout(
       [
-        `Capstone staff listed you as the mentor for "${input.title}".`,
+        `Capstone staff listed you as the mentor for "${title}".`,
         "If that is right, nothing is needed from you now; the team will be in touch once the project is assigned. If it is a mistake, reply to this email.",
       ],
       { label: "View the project", url: input.url }
@@ -271,11 +303,12 @@ export function mentorNamedEmail(input: {
 
 /** Staff hard-deleted a draft. No link: the row is gone. */
 export function projectDeletedEmail(input: { title: string }): RenderedEmail {
+  const title = oneLine(input.title);
   return {
-    subject: `Your draft was deleted: ${input.title}`,
+    subject: `Your draft was deleted: ${title}`,
     ...layout(
       [
-        `Your draft project "${input.title}" was deleted by staff.`,
+        `Your draft project "${title}" was deleted by staff.`,
         "Drafts are deleted outright rather than archived, so it cannot be restored. Reply to this email if that was a mistake.",
       ],
       null
@@ -288,11 +321,12 @@ export function projectCommentEmail(input: {
   title: string;
   url: string;
 }): RenderedEmail {
+  const title = oneLine(input.title);
   return {
-    subject: `New comment on your project: ${input.title}`,
+    subject: `New comment on your project: ${title}`,
     ...layout(
       [
-        `Staff commented on "${input.title}":`,
+        `Staff commented on "${title}":`,
         excerpt(input.content.trim(), "Open the project to read the rest."),
       ],
       { label: "Read and reply", url: input.url }
@@ -313,11 +347,12 @@ export function proposerCommentEmail(input: {
   url: string;
 }): RenderedEmail {
   const who = describeProposer(input.proposerName, input.proposerEmail);
+  const title = oneLine(input.title);
   return {
-    subject: `Comment from the proposer: ${input.title}`,
+    subject: `Comment from the proposer: ${title}`,
     ...layout(
       [
-        `${who} commented on "${input.title}":`,
+        `${who} commented on "${title}":`,
         excerpt(input.content.trim(), "Open the project to read the rest."),
       ],
       { label: "Read and reply", url: input.url }
@@ -353,6 +388,8 @@ export function proposerEditsEmail(input: {
   const who = input.editors
     .map((e) => describeProposer(e.name, e.email))
     .join(" and ");
+  const title = oneLine(input.title);
+  // The values arrive on one line: `staffEditEmail` compares them that way.
   const quotedLines = input.changes.flatMap((c) => {
     if (!c.values) {
       return [];
@@ -368,7 +405,7 @@ export function proposerEditsEmail(input: {
     .filter((c) => !c.values)
     .map((c) => (c.movedOn ? `${c.label} (changed again since)` : c.label));
   const paragraphs = [
-    `${who} edited "${input.title}" after staff approved it: ${input.span}. The edits are already saved. What changed, from before the first save to after the last:`,
+    `${who} edited "${title}" after staff approved it: ${input.span}. The edits are already saved. What changed, from before the first save to after the last:`,
     ...quotedLines,
   ];
   if (named.length > 0) {
@@ -378,7 +415,7 @@ export function proposerEditsEmail(input: {
     );
   }
   return {
-    subject: `Proposer edited a project: ${input.title}`,
+    subject: `Proposer edited a project: ${title}`,
     ...layout(paragraphs, { label: "Open the edit log", url: input.url }),
   };
 }
@@ -394,8 +431,9 @@ export function projectReturnedToDraftEmail(input: {
   title: string;
   url: string;
 }): RenderedEmail {
+  const title = oneLine(input.title);
   const paragraphs = [
-    `Your project "${input.title}" was returned to draft by staff.`,
+    `Your project "${title}" was returned to draft by staff.`,
   ];
   const note = input.comment?.trim();
   if (note) {
@@ -403,7 +441,7 @@ export function projectReturnedToDraftEmail(input: {
   }
   paragraphs.push("Update the project and submit it again when it is ready.");
   return {
-    subject: `Returned to draft: ${input.title}`,
+    subject: `Returned to draft: ${title}`,
     ...layout(paragraphs, { label: "Revise your project", url: input.url }),
   };
 }
@@ -413,11 +451,12 @@ export function projectChangesRequestedEmail(input: {
   title: string;
   url: string;
 }): RenderedEmail {
+  const title = oneLine(input.title);
   return {
-    subject: `Changes requested: ${input.title}`,
+    subject: `Changes requested: ${title}`,
     ...layout(
       [
-        `Your project "${input.title}" needs changes before it can be approved.`,
+        `Your project "${title}" needs changes before it can be approved.`,
         `What needs to change: ${input.comment}`,
         "Update the project and submit it again for review.",
       ],
