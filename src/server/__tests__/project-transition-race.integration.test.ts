@@ -6,6 +6,7 @@ import { auth } from "#/lib/auth";
 import type { ProjectStatus } from "#/lib/vocabularies";
 import { settleProjectRefreshes } from "#/server/_internal/project-refresh";
 import {
+  batchTransitionAs,
   forceTransitionAs,
   performTransitionAs,
 } from "#/server/_internal/projects";
@@ -167,6 +168,58 @@ describe("a status transition racing another", () => {
     expect(history.map((h) => [h.oldStatus, h.newStatus])).toEqual([
       ["submitted", "draft"],
     ]);
+  });
+});
+
+describe("a status transition racing a batch publish", () => {
+  it("refuses the batch when the panel's request for changes lands first", async () => {
+    const a = await makeUser("admin");
+    const b = await makeUser("admin");
+    const project = await makeProject("approved");
+
+    const results = await raceWhileHeld(
+      project.id,
+      () =>
+        performTransitionAs(
+          a,
+          project.id,
+          "changes_requested",
+          "Fix X.",
+          quiet
+        ),
+      () => batchTransitionAs(b, [project.id], "published", null, quiet)
+    );
+
+    expect(results.map((r) => r.status)).toEqual(["fulfilled", "rejected"]);
+    expect(String((results[1] as PromiseRejectedResult).reason)).toContain(
+      "Nothing was published."
+    );
+    expect(await statusOf(project.id)).toBe("changes_requested");
+    expect(
+      (await historyFor(project.id)).map((h) => [h.oldStatus, h.newStatus])
+    ).toEqual([["approved", "changes_requested"]]);
+  });
+
+  it("refuses the panel's request for changes when the batch lands first", async () => {
+    const a = await makeUser("admin");
+    const b = await makeUser("admin");
+    const project = await makeProject("approved");
+
+    const results = await raceWhileHeld(
+      project.id,
+      () => batchTransitionAs(b, [project.id], "published", null, quiet),
+      () =>
+        performTransitionAs(a, project.id, "changes_requested", "Fix X.", quiet)
+    );
+
+    expect(results.map((r) => r.status)).toEqual(["fulfilled", "rejected"]);
+    expect(String((results[1] as PromiseRejectedResult).reason)).toContain(
+      "not allowed"
+    );
+    expect(await statusOf(project.id)).toBe("published");
+    expect(
+      (await historyFor(project.id)).map((h) => [h.oldStatus, h.newStatus])
+    ).toEqual([["approved", "published"]]);
   });
 });
 

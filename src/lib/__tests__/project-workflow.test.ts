@@ -3,11 +3,14 @@ import { PROJECT_STATUSES, type ProjectStatus } from "#/lib/vocabularies";
 import {
   type ActorRole,
   assertTransitionAllowed,
+  BATCH_TARGETS,
+  BATCH_TRANSITIONS,
   canTransition,
   PROJECT_STATUS_DESCRIPTION,
   PROJECT_STATUS_DISPLAY_RANK,
   PROJECT_STATUS_LABEL,
   PROJECT_STATUSES_IN_DISPLAY_ORDER,
+  splitBatchCandidates,
 } from "../project-workflow";
 
 const allowedCases: [ProjectStatus, ProjectStatus, ActorRole][] = [
@@ -99,6 +102,57 @@ describe("status copy", () => {
     for (const s of PROJECT_STATUSES) {
       expect(PROJECT_STATUS_DISPLAY_RANK[s]).toBe(
         PROJECT_STATUSES_IN_DISPLAY_ORDER.indexOf(s)
+      );
+    }
+  });
+});
+
+describe("splitBatchCandidates", () => {
+  const row = (status: ProjectStatus, deletedAt: Date | null = null) => ({
+    deletedAt,
+    status,
+  });
+
+  it("puts a published row in archive's eligible set and an approved row in publish's", () => {
+    expect(
+      splitBatchCandidates([row("published")], "archived").eligible
+    ).toHaveLength(1);
+    expect(
+      splitBatchCandidates([row("approved")], "published").eligible
+    ).toHaveLength(1);
+  });
+
+  it("puts every other status in other status", () => {
+    for (const target of BATCH_TARGETS) {
+      const source = BATCH_TRANSITIONS[target];
+      const others = PROJECT_STATUSES.filter((s) => s !== source).map((s) =>
+        row(s)
+      );
+      const split = splitBatchCandidates(others, target);
+      expect(split.eligible).toEqual([]);
+      expect(split.softDeleted).toEqual([]);
+      expect(split.otherStatus).toEqual(others);
+    }
+  });
+
+  it("puts a soft-deleted row of any status in soft-deleted, eligible status included", () => {
+    const deleted = PROJECT_STATUSES.map((s) => row(s, new Date()));
+    for (const target of BATCH_TARGETS) {
+      const split = splitBatchCandidates(deleted, target);
+      expect(split.softDeleted).toEqual(deleted);
+      expect(split.eligible).toEqual([]);
+      expect(split.otherStatus).toEqual([]);
+    }
+  });
+
+  it("offers only archive published and publish approved, each a transition staff may make", () => {
+    expect(BATCH_TRANSITIONS).toEqual({
+      archived: "published",
+      published: "approved",
+    });
+    for (const target of BATCH_TARGETS) {
+      expect(canTransition(BATCH_TRANSITIONS[target], target, "staff")).toBe(
+        true
       );
     }
   });
