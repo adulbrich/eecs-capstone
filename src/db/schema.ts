@@ -832,8 +832,31 @@ export const projectEditLog = pgTable(
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
       .defaultNow(),
+    /**
+     * The row is the staff inbox's queue as well as the log (#839). Due is set
+     * once, at insert, and only for a proposer's edit to an approved or
+     * published project (`isOwedStaffEditEmail`); it is never cleared, so it
+     * also answers "edited by the proposer after approval" on the admin list.
+     * Claimed and emailed are the sweep's: `staff-edit-emails.ts` claims a
+     * project's due rows, sends one email for them, then stamps them emailed.
+     * Rows from before #839 default to not due, so the deploy sent nothing.
+     */
+    staffEmailDue: boolean("staff_email_due").notNull().default(false),
+    staffEmailClaimedAt: timestamp("staff_email_claimed_at", {
+      withTimezone: true,
+    }),
+    staffEmailedAt: timestamp("staff_emailed_at", { withTimezone: true }),
   },
-  (t) => [index("project_edit_log_project_idx").on(t.projectId, t.createdAt)]
+  (t) => [
+    index("project_edit_log_project_idx").on(t.projectId, t.createdAt),
+    // The sweep's whole read set, which is a handful of rows at most: every
+    // due row is stamped within the quiet period and the cap of its save. The
+    // predicate is literal SQL so the planner can prove the sweep's WHERE
+    // implies it; a bound parameter would not.
+    index("project_edit_log_staff_email_unsent_idx")
+      .on(t.projectId, t.createdAt)
+      .where(sql`staff_email_due and staff_emailed_at is null`),
+  ]
 );
 
 /**

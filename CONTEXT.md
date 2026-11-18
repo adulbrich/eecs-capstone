@@ -235,7 +235,8 @@ _Avoid_: embedding (in copy), vector, matching, semantic index
 **Staff inbox**:
 The one staff mailbox every email addressed to staff goes to, set by
 `EMAIL_STAFF_INBOX`: a project submitted or resubmitted, a borrow list or custom
-request submitted, and a comment from a proposer. Never fanned out per staff member
+request submitted, a comment from a proposer, and a proposer's burst of edits to an
+approved or published project (ADR-0071). Never fanned out per staff member
 (ADR-0019). Every other staff signal is an in-app count.
 _Avoid_: review inbox (its old name), admin email, notifications address
 
@@ -391,6 +392,13 @@ _Avoid_: notes (unqualified), internal notes, staff notes, comments
 The record of every edit to a project or an item: which fields changed, from what,
 to what, by whom. Staff-only, in both domains.
 _Avoid_: history (that is status history), changelog, audit trail
+
+**Proposer edit notice**:
+The one staff inbox email a burst of a proposer's edits to an approved or published
+project owes, sent once they stop saving, with the net change (ADR-0071). A burst is
+one project's saves not yet emailed. The code says "staff edit email" for the same
+thing, after the issue that built it (#839).
+_Avoid_: edit digest, change summary, edit alert
 
 **Notification**:
 An in-app message to one user, rendered by the bell. Projects notify the proposer of

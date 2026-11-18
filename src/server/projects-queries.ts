@@ -173,6 +173,18 @@ export const listProjectEditLog = createServerFn({ method: "GET" })
     return listProjectEditLogImpl(data);
   });
 
+/** One edit log row's id, not a project's (#839). */
+const editLogRowIdSchema = z.object({ id: z.string().uuid() });
+
+export const getProjectEditLogValues = createServerFn({ method: "GET" })
+  .validator((data: unknown) => editLogRowIdSchema.parse(data))
+  .handler(async ({ data }) => {
+    const { getProjectEditLogValuesImpl } = await import(
+      "./_internal/projects-queries"
+    );
+    return getProjectEditLogValuesImpl(data);
+  });
+
 export const listProjectComments = createServerFn({ method: "GET" })
   .validator((data: unknown) => projectIdSchema.parse(data))
   .handler(async ({ data }) => {

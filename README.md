@@ -187,6 +187,7 @@ for its recipient; there are no notification preferences (ADR-0019).
 | Approved / Changes requested / Returned to draft | Staff review a project | The proposer |
 | New comment on your project | Staff comment, not internal | The proposer |
 | Comment from the proposer | The proposer comments | `EMAIL_STAFF_INBOX` |
+| Proposer edited a project | The proposer stops saving edits to an approved or published project for 30 minutes, or 3 hours pass (ADR-0071) | `EMAIL_STAFF_INBOX` |
 | A project was assigned to you | Staff reassign the proposer | The new proposer |
 | You were named as a mentor | Staff set a mentor address | The mentor |
 | Your draft was deleted | Staff hard-delete a draft | The proposer |

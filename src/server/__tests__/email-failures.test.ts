@@ -18,6 +18,10 @@ import {
   notifyTransitionByEmail,
 } from "#/server/_internal/project-emails";
 import {
+  deliverStaffEditEmail,
+  runStaffEditEmailSweep,
+} from "#/server/_internal/staff-edit-emails";
+import {
   expectAnchoredRegex,
   metricFilterMatches,
   metricFilterPattern,
@@ -173,6 +177,28 @@ describe("the email_failures metric filter in infra/alarms.tf", () => {
           { expiresAt: null, reason: "Spam", to: "someone@example.com" },
           sesDown
         ),
+    },
+    {
+      notifier: "deliverStaffEditEmail",
+      printed: /^Staff edit email failed for project p1$/u,
+      fail: () =>
+        deliverStaffEditEmail(
+          "p1",
+          {
+            html: "",
+            subject: "Proposer edited a project: Robot arm",
+            text: "",
+          },
+          "staff@oregonstate.edu",
+          sesDown
+        ),
+    },
+    {
+      // The mocked `db` has no `transaction`, so the claim throws the way a
+      // dropped connection would.
+      notifier: "runStaffEditEmailSweep",
+      printed: /^Staff edit email sweep failed$/u,
+      fail: () => runStaffEditEmailSweep({ config: CONFIG, send: sesDown }),
     },
   ])(
     "counts the one line $notifier prints when SES refuses",

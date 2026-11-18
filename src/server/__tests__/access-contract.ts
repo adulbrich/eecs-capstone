@@ -204,7 +204,7 @@ export const ACCESS_CONTRACT: Record<string, AccessDeclaration> = {
   },
   "server/inventory.ts:listInventoryItemEditLog": {
     level: "staff",
-    note: "The item's edit log, staff by the same rule as listProjectEditLog: it names who edited the item and which fields they touched, joining user for the name since #467. Both logs select the same five columns and leave oldValues and newValues behind, because those carry notes, serial and location and nothing renders them. Never on the public item page.",
+    note: "The item's edit log, staff by the same rule as listProjectEditLog: it names who edited the item and which fields they touched, joining user for the name since #467. Both logs select the same five columns and leave oldValues and newValues behind. The item's carry notes, serial and location and nothing renders them; the project's load per row through getProjectEditLogValues (#839). Never on the public item page.",
   },
   "server/inventory.ts:listInventoryRequests": { level: "staff" },
   "server/inventory.ts:listMyItems": {
@@ -360,9 +360,13 @@ export const ACCESS_CONTRACT: Record<string, AccessDeclaration> = {
     level: "public",
     note: "canSeeProject gates the project, then filterCommentsForViewer withholds internal comments from the proposer and everything from a stranger.",
   },
+  "server/projects-queries.ts:getProjectEditLogValues": {
+    level: "staff",
+    note: "One edit log row's oldValues and newValues, which hold private notes and whole markdown fields, so staff only, by assertStaff inside getProjectEditLogValuesAs. Loaded per row when staff open it in the panel, so listProjectEditLog can keep leaving them behind (#839).",
+  },
   "server/projects-queries.ts:listProjectEditLog": {
     level: "staff",
-    note: "Gated by assertStaff inside listProjectEditLogAs, which the Impl the handler calls wraps around getViewer(). One of the seven endpoints #108 found a guard-name grep could not see. Since #467 it joins user for the editor name and selects five columns rather than the row, leaving oldValues and newValues behind.",
+    note: "Gated by assertStaff inside listProjectEditLogAs, which the Impl the handler calls wraps around getViewer(). One of the seven endpoints #108 found a guard-name grep could not see. Since #467 it joins user for the editor name and selects five columns rather than the row, leaving oldValues and newValues to getProjectEditLogValues.",
   },
 
   "server/projects.ts:approveProject": {

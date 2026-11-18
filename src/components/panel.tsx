@@ -72,10 +72,13 @@ export function PanelNote({ children }: { children: ReactNode }) {
 
 export function PanelSection({
   children,
+  id,
   title,
   tone,
 }: {
   children: ReactNode;
+  /** A fragment an email links to, as the edit log's `#edit-log` (#839). */
+  id?: string;
   title: string;
   tone?: "danger";
 }) {
@@ -86,6 +89,7 @@ export function PanelSection({
         "mt-5 border-t pt-4",
         danger ? "border-destructive/30" : "border-border"
       )}
+      id={id}
     >
       <h3 className={cn("text-sm font-medium", danger && "text-destructive")}>
         {title}

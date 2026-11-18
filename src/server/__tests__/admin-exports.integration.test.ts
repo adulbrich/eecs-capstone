@@ -154,6 +154,7 @@ describe("admin project export", () => {
         "programs",
         "proposerEmail",
         "proposerId",
+        "proposerEditedAt",
         "proposerName",
         "publishedAt",
         "requiresNdaIp",
