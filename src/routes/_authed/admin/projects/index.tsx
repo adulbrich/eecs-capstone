@@ -124,7 +124,7 @@ const WITHOUT_MENTOR_LABEL = "have no mentor recorded";
  * before the feature carries no mark and so never matches. The column's
  * header hint says the same.
  */
-const EDITED_BY_PROPOSER_LABEL = "were edited by the proposer after approval";
+const EDITED_BY_PROPOSER_LABEL = "were edited by their proposer";
 const EDITS_MARKED_SINCE = "from November 2026 on";
 const EDITED_BY_PROPOSER_HINT = `Edits saved while approved or published, ${EDITS_MARKED_SINCE}.`;
 
