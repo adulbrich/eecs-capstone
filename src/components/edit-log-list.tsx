@@ -181,14 +181,20 @@ const LINE_STYLE = {
   },
 } as const;
 
-/** The changed words inside a line: the line's own hue, a step stronger. */
+/**
+ * The changed words inside a line: the line's own hue a step stronger behind
+ * them, and the page's text colour on top, because the line's coloured text
+ * on the stronger tint falls to about 3.4:1.
+ */
 const MARK_STYLE = {
   added: {
     backgroundColor:
       "color-mix(in srgb, var(--status-success) 22%, transparent)",
+    color: "var(--foreground)",
   },
   removed: {
     backgroundColor: "color-mix(in srgb, var(--status-error) 22%, transparent)",
+    color: "var(--foreground)",
   },
 } as const;
 
@@ -227,7 +233,13 @@ function FieldDiff({
           No visible change.
         </p>
       ) : (
-        <div className="max-h-96 overflow-y-auto py-0.5 font-mono text-xs leading-relaxed">
+        // Focusable so a keyboard can scroll a long diff, which axe's
+        // `scrollable-region-focusable` requires (docs/QUIRKS.md).
+        <div
+          className="max-h-96 overflow-y-auto py-0.5 font-mono text-xs leading-relaxed"
+          // biome-ignore lint/a11y/noNoninteractiveTabindex: see above
+          tabIndex={0}
+        >
           {lines.map((line, i) =>
             line.kind === "skipped" ? (
               <div

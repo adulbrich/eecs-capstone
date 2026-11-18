@@ -159,7 +159,8 @@ export function emailCarriesValue(field: string): boolean {
   return VALUE_FIELDS.has(field);
 }
 
-const LINE_BREAKS = /\s+/gu;
+// `\s` leaves out U+0085 (NEL), which some mail clients still break a line on.
+const LINE_BREAKS = /[\s\u{85}]+/gu;
 
 /**
  * A proposer's text on one line. The title and the contact name accept line

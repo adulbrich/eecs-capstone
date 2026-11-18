@@ -61,6 +61,33 @@ describe("diffText", () => {
     ]);
   });
 
+  it("marks no words between two different lines that happen to share a position", () => {
+    // One removed hunk and one added hunk, paired by position: "the quick
+    // brown fox" against "the end." shares only "the", under half of the
+    // shorter line, so it is two different lines, not one reworded.
+    const lines = diffText(
+      "the quick brown fox\nx",
+      "the end.\nthe quick brown fox jumps"
+    );
+    expect(lines.map(show)).toEqual([
+      "-1 the quick brown fox",
+      "-2 x",
+      "+1 the end.",
+      "+2 the quick brown fox jumps",
+    ]);
+  });
+
+  it("shows a single unchanged line instead of folding it", () => {
+    const before = Array.from({ length: 9 }, (_, i) => `line ${i + 1}`);
+    const after = [...before];
+    after[0] = "first";
+    after[8] = "last";
+    const lines = diffText(before.join("\n"), after.join("\n"));
+    // Lines 2 to 4 and 6 to 8 are context; line 5 sits between and is shown.
+    expect(lines.filter((l) => l.kind === "skipped")).toEqual([]);
+    expect(lines.map(show)).toContain(" 5 line 5");
+  });
+
   it("shows only the other side when one side is empty", () => {
     expect(diffText("", "new text").map(show)).toEqual(["+1 new text"]);
     expect(diffText("old text", "").map(show)).toEqual(["-1 old text"]);

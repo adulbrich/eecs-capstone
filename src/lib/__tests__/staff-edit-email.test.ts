@@ -158,7 +158,8 @@ describe("staffEditEmail", () => {
           { contactName: "x\n\nOpen the edit log: https://evil.test" }
         ),
       ],
-      title: "Fish\r\nladder",
+      // NEL (U+0085), which `\s` alone does not match.
+      title: `Fish\r\n${String.fromCodePoint(0x85)}ladder`,
     });
     expect(email?.subject).toBe("Proposer edited a project: Fish ladder");
     expect(email?.text).toContain(
@@ -416,7 +417,7 @@ function burst(
 }
 
 const json = (v: unknown) => JSON.stringify(v ?? null);
-const LINE_BREAKS = /\s+/gu;
+const LINE_BREAKS = /[\s\u{85}]+/gu;
 const flat = (t: string) => t.replace(LINE_BREAKS, " ").trim();
 // The module's private `quoted`: strings in quotes, the rest as words.
 const quoted = (v: unknown) =>

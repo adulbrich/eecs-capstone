@@ -38,10 +38,18 @@ function linesOf(value: string): string[] {
   return lines;
 }
 
+const SPACE = /\s/gu;
+
+function visibleLength(text: string): number {
+  return text.replace(SPACE, "").length;
+}
+
 /**
  * The words of a removed line and the added line it became, each side's
- * segments marked where they differ. A side whose every word changed is left
- * unmarked: the line's own colour already says so.
+ * segments marked where they differ. Lines are paired by position, so two
+ * that share less than half of the shorter one's text are not the same line
+ * reworded but two different lines, and neither is marked: the line's own
+ * colour already says it was removed or added.
  */
 function wordSegments(
   before: string,
@@ -49,7 +57,11 @@ function wordSegments(
 ): { added: DiffSegment[]; removed: DiffSegment[] } {
   const removed: DiffSegment[] = [];
   const added: DiffSegment[] = [];
+  let common = 0;
   for (const part of diffWordsWithSpace(before, after)) {
+    if (!(part.added || part.removed)) {
+      common += visibleLength(part.value);
+    }
     if (!part.added) {
       removed.push({ changed: part.removed, text: part.value });
     }
@@ -57,12 +69,14 @@ function wordSegments(
       added.push({ changed: part.added, text: part.value });
     }
   }
-  const whole = (segments: DiffSegment[]) =>
-    segments.every((s) => s.changed || s.text.trim() === "");
-  return {
-    added: whole(added) ? [{ changed: false, text: after }] : added,
-    removed: whole(removed) ? [{ changed: false, text: before }] : removed,
-  };
+  const shorter = Math.min(visibleLength(before), visibleLength(after));
+  if (common * 2 < shorter || common === 0) {
+    return {
+      added: [{ changed: false, text: after }],
+      removed: [{ changed: false, text: before }],
+    };
+  }
+  return { added, removed };
 }
 
 type FullLine = Extract<DiffLine, { segments: DiffSegment[] }>;
@@ -140,21 +154,28 @@ export function diffText(before: string, after: string): DiffLine[] {
       }
     }
   });
+  if (!lines.some((line) => line.kind !== "context")) {
+    return [];
+  }
   const out: DiffLine[] = [];
-  let skipped = 0;
+  let folded: FullLine[] = [];
+  // A fold of one line takes as much room as the line, so it shows the line.
+  const flush = () => {
+    if (folded.length === 1) {
+      out.push(...folded);
+    } else if (folded.length > 1) {
+      out.push({ count: folded.length, kind: "skipped" });
+    }
+    folded = [];
+  };
   lines.forEach((line, i) => {
     if (line.kind === "context" && !near.has(i)) {
-      skipped++;
+      folded.push(line);
       return;
     }
-    if (skipped > 0) {
-      out.push({ count: skipped, kind: "skipped" });
-      skipped = 0;
-    }
+    flush();
     out.push(line);
   });
-  if (skipped > 0 && out.length > 0) {
-    out.push({ count: skipped, kind: "skipped" });
-  }
+  flush();
   return out;
 }
