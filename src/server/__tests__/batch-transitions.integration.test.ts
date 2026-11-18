@@ -174,10 +174,11 @@ describe("batchTransitionAs", () => {
       after.filter((p) => p.id !== batch[0].id).every((p) => p.publishedAt)
     ).toBe(true);
 
-    // Release in waves until every refresh has run.
+    // Release in waves until every refresh has run. Nothing is asserted in
+    // the loop: a throw here would leave embeds parked and hang every later
+    // test's settle, so the peak is read once they have all run.
     while (calls < ids.length || releases.length > 0) {
       await vi.waitFor(() => expect(releases.length).toBeGreaterThan(0));
-      expect(inFlight).toBeLessThanOrEqual(BATCH_REFRESH_CONCURRENCY);
       for (const release of releases.splice(0)) {
         release();
       }

@@ -373,6 +373,10 @@ export const ACCESS_CONTRACT: Record<string, AccessDeclaration> = {
     level: "staff",
     note: "Enforced by TRANSITIONS in src/lib/project-workflow.ts, not by the endpoint gate.",
   },
+  "server/projects.ts:batchTransitionProjects": {
+    level: "staff",
+    note: "batchTransitionAs calls assertStaff itself; the schema limits the target to the two batch targets.",
+  },
   "server/projects.ts:createProject": {
     level: "authenticated",
     note: "Any signed-in user may propose, and the creator is the proposer, staff included. Staff reassign afterwards through updateProjectProposer.",
