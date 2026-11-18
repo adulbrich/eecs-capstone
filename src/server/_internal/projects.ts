@@ -601,11 +601,10 @@ export async function updateProjectProgramsAs(
           }))
         );
       }
-      // Nothing renders these two columns: `EditLogEntry` carries four fields
-      // and #467 kept the values out of both payloads. They are for whoever
-      // reads `project_edit_log` in the database, which is why they are
-      // labels and why they are ordered: an unordered array would differ on
-      // nothing and make two identical sets look like a change.
+      // The staff panel renders these two columns when a row is opened
+      // (#839), which is why they are labels and why they are ordered: an
+      // unordered array would differ on nothing and make two identical sets
+      // look like a change.
       await tx.insert(projectEditLog).values({
         projectId: existing.id,
         editorId: viewer.id,

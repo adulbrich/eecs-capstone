@@ -173,6 +173,16 @@ export const listProjectEditLog = createServerFn({ method: "GET" })
     return listProjectEditLogImpl(data);
   });
 
+// The id is one edit log row's, not a project's (#839).
+export const getProjectEditLogValues = createServerFn({ method: "GET" })
+  .validator((data: unknown) => projectIdSchema.parse(data))
+  .handler(async ({ data }) => {
+    const { getProjectEditLogValuesImpl } = await import(
+      "./_internal/projects-queries"
+    );
+    return getProjectEditLogValuesImpl(data);
+  });
+
 export const listProjectComments = createServerFn({ method: "GET" })
   .validator((data: unknown) => projectIdSchema.parse(data))
   .handler(async ({ data }) => {

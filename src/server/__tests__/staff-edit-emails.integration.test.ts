@@ -12,6 +12,7 @@ import {
   softDeleteProjectAs,
   updateProjectAs,
 } from "#/server/_internal/projects";
+import { getProjectEditLogValuesAs } from "#/server/_internal/projects-queries";
 import { runStaffEditEmailSweep } from "#/server/_internal/staff-edit-emails";
 
 const MINUTE = 60 * 1000;
@@ -337,5 +338,36 @@ describe("runStaffEditEmailSweep", () => {
     expect(sent[1].email.text).toContain(
       'Title: "Fish ladder v2" to "Fish ladder v3".'
     );
+  });
+});
+
+describe("getProjectEditLogValuesAs", () => {
+  it("returns one row's old and new values to staff", async () => {
+    const { admin, id, proposer } = await projectIn("published");
+    await updateProjectAs(proposer, {
+      ...form("Fish ladder v2"),
+      id,
+      notes: "Gate code 4512",
+    });
+    const [row] = await logRows(id);
+    await expect(
+      getProjectEditLogValuesAs(admin, { id: row.id })
+    ).resolves.toEqual({
+      changedFields: ["title", "notes"],
+      newValues: { notes: "Gate code 4512", title: "Fish ladder v2" },
+      oldValues: { notes: null, title: "Fish ladder" },
+    });
+  });
+
+  it("refuses anyone but staff, the project's own proposer included", async () => {
+    const { id, proposer } = await projectIn("published");
+    await updateProjectAs(proposer, { ...form("Fish ladder v2"), id });
+    const [row] = await logRows(id);
+    await expect(
+      getProjectEditLogValuesAs(proposer, { id: row.id })
+    ).rejects.toThrow();
+    await expect(
+      getProjectEditLogValuesAs(null, { id: row.id })
+    ).rejects.toThrow();
   });
 });
