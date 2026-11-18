@@ -409,7 +409,7 @@ describe("a title or a name on one line", () => {
   });
 });
 
-/** A title, name or line a crafted request could send, weighted to breaks. */
+/** A title, a name or a custom line's name, weighted to line breaks. */
 const hostileText = fc.oneof(
   {
     arbitrary: fc.string({
@@ -438,7 +438,7 @@ const hostileText = fc.oneof(
   { arbitrary: trickyTextAcross(200), weight: 1 }
 );
 
-/** Lone surrogates as well, so the well-formedness property can fail. */
+/** Raw code units as well, every BMP character and lone surrogates among them. */
 const anyText = fc.oneof(
   hostileText,
   fc.string({
@@ -450,9 +450,30 @@ const anyText = fc.oneof(
   })
 );
 
+/** One or more of the characters `oneLine` must collapse. */
+const whitespaceRun = fc.string({
+  maxLength: 6,
+  minLength: 1,
+  unit: fc.constantFrom(
+    "\r\n",
+    ...BREAK_CHARS,
+    " ",
+    "\t",
+    "\u{a0}",
+    "\u{feff}"
+  ),
+});
+
 const NOT_A_SPACE = /[\s\u{85}]/gu;
 
-describe("oneLine properties", () => {
+describe("oneLine, on generated text", () => {
+  test.prop([whitespaceRun])(
+    "turns a run of whitespace between two words into one space",
+    (run) => {
+      expect(oneLine(`a${run}b`)).toBe("a b");
+    }
+  );
+
   test.prop([anyText])("leaves no whitespace but a plain space", (text) => {
     expect(oneLine(text)).not.toMatch(/[^\S ]|\u{85}/u);
   });
@@ -474,10 +495,9 @@ describe("oneLine properties", () => {
     );
   });
 
-  test.prop([anyText])("keeps well-formed text well-formed", (text) => {
-    if (isWellFormed(text)) {
-      expect(isWellFormed(oneLine(text))).toBe(true);
-    }
+  // `hostileText` is well-formed by construction, astral characters included.
+  test.prop([hostileText])("keeps well-formed text well-formed", (text) => {
+    expect(isWellFormed(oneLine(text))).toBe(true);
   });
 });
 
@@ -497,8 +517,8 @@ const fields = fc.record({
 
 const propertyUrl = "https://app/projects/p1";
 
-/** Every template that takes a title, a name or a request line. */
-const TEMPLATES: [string, (f: Fields) => RenderedEmail][] = [
+/** Every template whose text quotes a title, a name or a custom line's name. */
+const QUOTING: [string, (f: Fields) => RenderedEmail][] = [
   [
     "projectSubmittedEmail",
     (f) =>
@@ -529,15 +549,6 @@ const TEMPLATES: [string, (f: Fields) => RenderedEmail][] = [
         lines: [f.line, "Arduino"],
         requesterEmail: f.email,
         requesterName: f.name,
-        url: propertyUrl,
-      }),
-  ],
-  [
-    "notificationEmail",
-    (f) =>
-      notificationEmail({
-        message: "One.\n\nTwo.",
-        title: f.title,
         url: propertyUrl,
       }),
   ],
@@ -588,19 +599,38 @@ const TEMPLATES: [string, (f: Fields) => RenderedEmail][] = [
   ["projectDeletedEmail", (f) => projectDeletedEmail({ title: f.title })],
 ];
 
-const ALL_BREAKS = new RegExp(`\r\n|[${BREAK_CHARS}]`, "gu");
+/** The bell title reaches only the subject, so it is checked there alone. */
+const SUBJECTED: [string, (f: Fields) => RenderedEmail][] = [
+  ...QUOTING,
+  [
+    "notificationEmail",
+    (f) =>
+      notificationEmail({
+        message: "One.\n\nTwo.",
+        title: f.title,
+        url: propertyUrl,
+      }),
+  ],
+];
+
+const ALL_BREAKS = new RegExp(LINE_SPLIT.source, "gu");
 const flatten = (text: string) => text.replace(ALL_BREAKS, " ");
 const lineCount = (text: string) => text.split(LINE_SPLIT).length;
 
-describe.each(TEMPLATES)("%s properties", (_name, render) => {
-  test.prop([fields])("has a subject with no line break", (f) => {
-    expect(render(f).subject).not.toMatch(LINE_BREAK);
-  });
+describe.each(SUBJECTED)(
+  "the %s subject, on generated fields",
+  (_name, render) => {
+    test.prop([fields])("has no line break", (f) => {
+      expect(render(f).subject).not.toMatch(LINE_BREAK);
+    });
+  }
+);
 
+describe.each(QUOTING)("the %s text, on generated fields", (_name, render) => {
   // A field cannot add a line: the text part has as many lines as the same
   // email with every break in the fields turned into a space.
   test.prop([fields])(
-    "has no more text lines than break-free fields give",
+    "has as many lines as the same email with break-free fields",
     (f) => {
       const flat: Fields = {
         email: f.email === null ? null : flatten(f.email),
