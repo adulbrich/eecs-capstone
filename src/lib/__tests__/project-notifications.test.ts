@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  batchStatusChangeNotifications,
   commentNotifications,
   projectsClaimedNotification,
   proposerReassignedNotification,
@@ -211,5 +212,72 @@ describe("projectsClaimedNotification", () => {
     expect(projectsClaimedNotification("u-new", 1).title).toBe(
       "1 project was linked to your account"
     );
+  });
+});
+
+describe("batchStatusChangeNotifications", () => {
+  const own = (id: string, proposerId: string | null, title = id) => ({
+    id,
+    proposerId,
+    title,
+  });
+
+  it("gives a proposer with several projects one row that counts them and links to their list", () => {
+    const rows = batchStatusChangeNotifications(
+      [own("p-1", "u-a"), own("p-2", "u-a"), own("p-3", "u-a")],
+      "archived",
+      "u-staff"
+    );
+    expect(rows).toEqual([
+      {
+        userId: "u-a",
+        type: "status_change",
+        title: "3 of your projects were archived",
+        message: "Status changed to archived.",
+        link: "/my/projects",
+      },
+    ]);
+  });
+
+  it("gives a proposer with one project the row a single transition writes", () => {
+    const one = own("p-1", "u-b", "Fish ladder telemetry");
+    expect(
+      batchStatusChangeNotifications([one], "published", "u-staff")
+    ).toEqual([statusChangeNotification(one, "published", "u-staff")]);
+  });
+
+  it("tells nobody for a project with no proposer or whose proposer is the actor", () => {
+    expect(
+      batchStatusChangeNotifications(
+        [own("p-1", null), own("p-2", "u-staff"), own("p-3", "u-staff")],
+        "archived",
+        "u-staff"
+      )
+    ).toEqual([]);
+  });
+
+  it("carries the trimmed comment on the counted row and the single row alike", () => {
+    const rows = batchStatusChangeNotifications(
+      [own("p-1", "u-a"), own("p-2", "u-a"), own("p-3", "u-b")],
+      "published",
+      "u-staff",
+      "  Welcome to the fall catalog.  "
+    );
+    expect(rows.map((r) => [r.userId, r.message])).toEqual([
+      ["u-a", "Status changed to published: Welcome to the fall catalog."],
+      ["u-b", "Status changed to published: Welcome to the fall catalog."],
+    ]);
+    expect(rows[1].title).toBe("Your project 'p-3' is now published");
+    expect(rows[1].link).toBe("/projects/p-3");
+  });
+
+  it("ignores a blank comment", () => {
+    const [row] = batchStatusChangeNotifications(
+      [own("p-1", "u-a"), own("p-2", "u-a")],
+      "archived",
+      "u-staff",
+      "   "
+    );
+    expect(row.message).toBe("Status changed to archived.");
   });
 });

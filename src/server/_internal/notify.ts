@@ -2,6 +2,7 @@ import { and, eq } from "drizzle-orm";
 import type { db as Db } from "#/db";
 import { notifications, projectComments } from "#/db/schema";
 import {
+  batchStatusChangeNotifications,
   commentNotifications,
   type NotifiableComment,
   type NotifiableProject,
@@ -23,6 +24,25 @@ export async function recordStatusChangeNotifications(
   const row = statusChangeNotification(project, newStatus, actorId, comment);
   if (row) {
     await tx.insert(notifications).values(row);
+  }
+}
+
+/** One row per proposer for a batch transition (#889), in one insert. */
+export async function recordBatchStatusChangeNotifications(
+  tx: Tx,
+  batch: readonly NotifiableProject[],
+  newStatus: ProjectStatus,
+  actorId: string,
+  comment?: string | null
+): Promise<void> {
+  const rows = batchStatusChangeNotifications(
+    batch,
+    newStatus,
+    actorId,
+    comment
+  );
+  if (rows.length > 0) {
+    await tx.insert(notifications).values(rows);
   }
 }
 

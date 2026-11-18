@@ -34,6 +34,58 @@ export function refreshProjectInBackground(
 }
 
 /**
+ * How many of a batch's refreshes run at once (#889). Each is two Bedrock
+ * calls, so publishing 40 approved projects unbounded would start about 80 at
+ * once and could throttle the staff panels' own refreshes. Exported for the
+ * test that proves the bound.
+ */
+export const BATCH_REFRESH_CONCURRENCY = 4;
+
+let batchSlotsInUse = 0;
+const batchSlotWaiters: (() => void)[] = [];
+
+async function withBatchSlot(work: () => Promise<void>): Promise<void> {
+  if (batchSlotsInUse >= BATCH_REFRESH_CONCURRENCY) {
+    await new Promise<void>((resolve) => batchSlotWaiters.push(resolve));
+  } else {
+    batchSlotsInUse++;
+  }
+  try {
+    await work();
+  } finally {
+    // A waiter inherits the slot rather than the count dropping and rising,
+    // so a refresh started outside a batch cannot slip between the two.
+    const next = batchSlotWaiters.shift();
+    if (next) {
+      next();
+    } else {
+      batchSlotsInUse--;
+    }
+  }
+}
+
+/**
+ * The refreshes a batch transition owes, started after its commit and not
+ * awaited, at most `BATCH_REFRESH_CONCURRENCY` at a time across every batch
+ * on this task (ADR-0070). Each is enqueued at once on its own project's
+ * queue, so it still orders behind that project's earlier refresh and
+ * `settleProjectRefreshes` covers it from the start; the slot is taken
+ * inside the job, once its turn on that queue comes. A single save's refresh
+ * takes no slot.
+ */
+export function refreshProjectsInBackground(
+  projectIds: readonly string[],
+  deps: RefreshDeps = {}
+): void {
+  const queuedAt = Date.now();
+  for (const projectId of projectIds) {
+    enqueue(projectId, "refresh", () =>
+      withBatchSlot(() => refreshAndLog(projectId, deps, queuedAt))
+    );
+  }
+}
+
+/**
  * Starts the categorizer on a project just submitted, and returns without
  * waiting (#31): a proposer must never wait on a model, and a submission must
  * never fail because one did. On the same per-project queue as the refreshes,
