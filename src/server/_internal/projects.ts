@@ -257,6 +257,10 @@ export async function updateProjectAs(
       .set({ ...newValues, updatedAt: new Date() })
       .where(eq(projects.id, existing.id))
       .returning({ status: projects.status });
+    // Hard deleted since the load: roll back rather than log against nothing.
+    if (!written) {
+      throw new Error("Project not found");
+    }
     await tx.insert(projectEditLog).values({
       projectId: existing.id,
       editorId: viewer.id,
@@ -267,10 +271,7 @@ export async function updateProjectAs(
       // once and owes the staff inbox an email, which the sweep in
       // `staff-edit-emails.ts` sends once the proposer stops saving (#839).
       // Nothing here waits on it.
-      staffEmailDue: isOwedStaffEditEmail(
-        written?.status ?? existing.status,
-        isStaff(viewer)
-      ),
+      staffEmailDue: isOwedStaffEditEmail(written.status, isStaff(viewer)),
     });
   });
 

@@ -183,6 +183,24 @@ describe("staffEditEmail", () => {
     );
   });
 
+  it("sends nothing for a legacy row's null saved back as an empty string", () => {
+    const email = staffEditEmail({
+      ...base,
+      live: { description: "", objectives: "" },
+      saves: [
+        save(
+          0,
+          { description: null, objectives: null },
+          {
+            description: "",
+            objectives: "",
+          }
+        ),
+      ],
+    });
+    expect(email).toBeNull();
+  });
+
   it("sends nothing when the burst changed nothing on net", () => {
     const email = staffEditEmail({
       ...base,
@@ -442,7 +460,9 @@ describe("staffEditEmail properties", () => {
       let visible = false;
       for (const c of netChange(saves)) {
         if (!emailCarriesValue(c.field)) {
-          visible = true;
+          if (formatEditValue(c.before) !== formatEditValue(c.after)) {
+            visible = true;
+          }
           continue;
         }
         const line = `${projectEditFieldLabel(c.field)}: ${quoted(c.before)} to ${quoted(c.after)}.`;

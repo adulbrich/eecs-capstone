@@ -138,7 +138,9 @@ async function claimReadyBursts(now: Date): Promise<string[]> {
     // By project, not by row id: how many saves a burst holds is the
     // proposer's to choose, and past 65,535 bound ids Postgres refuses the
     // statement, which would fail every sweep for every project. The
-    // predicate again, so a row the select read is still claimable.
+    // predicate again, so a row the select read is still claimable. A save
+    // committed between the select and here joins the burst a quiet period
+    // early; it is sent, not lost.
     const claimed = await tx
       .update(projectEditLog)
       .set({ staffEmailClaimedAt: now })
@@ -221,6 +223,7 @@ async function settleBurst(
       changedFields: projectEditLog.changedFields,
       createdAt: projectEditLog.createdAt,
       editorEmail: user.email,
+      editorId: projectEditLog.editorId,
       editorName: user.name,
       newValues: projectEditLog.newValues,
       oldValues: projectEditLog.oldValues,
@@ -234,7 +237,7 @@ async function settleBurst(
   const editors = [
     ...new Map(
       saves.map((s) => [
-        s.editorEmail,
+        s.editorId,
         { email: s.editorEmail, name: s.editorName },
       ])
     ).values(),

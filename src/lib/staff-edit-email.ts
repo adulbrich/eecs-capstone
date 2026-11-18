@@ -221,7 +221,13 @@ export function staffEditEmail(
   const lines = netChange(input.saves).flatMap((c): ProposerEditChange[] => {
     const label = projectEditFieldLabel(c.field);
     if (!emailCarriesValue(c.field)) {
-      const movedOn = !sameValue(input.live[c.field], c.after);
+      // Printed, not shown, but compared the same way: a legacy row's null
+      // saved through the form as "" is no change anyone made.
+      const after = formatEditValue(c.after);
+      if (formatEditValue(c.before) === after) {
+        return [];
+      }
+      const movedOn = formatEditValue(input.live[c.field]) !== after;
       return [{ label, movedOn, values: null }];
     }
     // Compared as the email prints them: "" and null both read "(empty)",
