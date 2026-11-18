@@ -63,6 +63,8 @@ const adminListSchema = z
     // Admin-only: the staff to-do beside "Student proposed" (#402). Plain
     // `mentor_email IS NULL`, the same fact the dashboard tile counts.
     withoutMentorOnly: z.boolean().default(false),
+    // Admin-only: an edit the proposer made after approval (#839).
+    editedByProposerOnly: z.boolean().default(false),
   })
   .refine((v) => !(v.from && v.to) || v.from <= v.to, {
     message: "from must not be after to",

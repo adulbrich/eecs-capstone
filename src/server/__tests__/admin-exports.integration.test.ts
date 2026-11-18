@@ -65,6 +65,7 @@ const ALL_PROJECTS = {
   studentProposedOnly: false,
   to: null,
   withoutMentorOnly: false,
+  editedByProposerOnly: false,
 };
 
 describe("admin project export", () => {
@@ -154,6 +155,7 @@ describe("admin project export", () => {
         "programs",
         "proposerEmail",
         "proposerId",
+        "proposerEditedAt",
         "proposerName",
         "publishedAt",
         "requiresNdaIp",

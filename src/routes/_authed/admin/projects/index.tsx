@@ -102,6 +102,7 @@ const DAY = /^\d{4}-\d{2}-\d{2}$/u;
  */
 const SWITCH_DEFAULTS = {
   acceptingOnly: false,
+  editedByProposerOnly: false,
   includeSoftDeleted: false,
   requiresNdaOnly: false,
   studentProposedOnly: false,
@@ -109,12 +110,22 @@ const SWITCH_DEFAULTS = {
 };
 
 /**
- * The one narrowing switch this page does not share with `/projects`: the
- * mentor is staff information, so the public listing has no switch on it
- * (#402). With "Student proposed" it is the staff to-do that `/admin/mentors`
- * is matched against.
+ * A narrowing switch this page does not share with `/projects`: the mentor
+ * is staff information, so the public listing has no switch on it (#402).
+ * With "Student proposed" it is the staff to-do that `/admin/mentors` is
+ * matched against.
  */
 const WITHOUT_MENTOR_LABEL = "have no mentor recorded";
+
+/**
+ * The other one (#839): a project its proposer edited after staff approved
+ * it, which the staff inbox is also emailed about. The hint states the two
+ * things the label cannot: which statuses count, and that an edit from
+ * before the feature carries no mark and so never matches.
+ */
+const EDITED_BY_PROPOSER_LABEL = "were edited by the proposer after approval";
+const EDITED_BY_PROPOSER_HINT =
+  "Edits saved while approved or published, from November 2026 on.";
 
 export const searchSchema = z.object({
   cols: z.string().optional().catch(undefined),
@@ -165,6 +176,10 @@ export const searchSchema = z.object({
     .boolean()
     .catch(SWITCH_DEFAULTS.withoutMentorOnly)
     .default(SWITCH_DEFAULTS.withoutMentorOnly),
+  editedByProposerOnly: z
+    .boolean()
+    .catch(SWITCH_DEFAULTS.editedByProposerOnly)
+    .default(SWITCH_DEFAULTS.editedByProposerOnly),
 });
 
 type Search = z.infer<typeof searchSchema>;
@@ -189,6 +204,7 @@ export function resolveAdminFilter(search: Search) {
     studentProposedOnly: search.studentProposedOnly,
     to: (reversed ? search.from : search.to) ?? null,
     withoutMentorOnly: search.withoutMentorOnly,
+    editedByProposerOnly: search.editedByProposerOnly,
   };
 }
 
@@ -211,6 +227,7 @@ function countActiveAdminFilters(search: Search): number {
     search.studentProposedOnly,
     search.requiresNdaOnly,
     search.withoutMentorOnly,
+    search.editedByProposerOnly,
     search.includeSoftDeleted,
   ].filter(Boolean).length;
 }
@@ -400,6 +417,21 @@ const COLUMNS = defineAdminColumns<Row>()([
     sortUndefined: "last",
   },
   {
+    accessorFn: (row) => row.proposerEditedAt ?? undefined,
+    cell: ({ row }) =>
+      row.original.proposerEditedAt ? (
+        <LocalTime dateOnly value={row.original.proposerEditedAt} />
+      ) : (
+        "-"
+      ),
+    header: "Proposer edit",
+    headerHint:
+      "The proposer's latest edit after approval, from November 2026 on. The staff inbox is emailed about it once the proposer stops saving.",
+    id: "proposerEditedAt",
+    sortFn: "datetime",
+    sortUndefined: "last",
+  },
+  {
     cell: ({ row }) => (
       <Link
         className="hover:underline"
@@ -520,6 +552,11 @@ const EXPORT_COLUMNS = defineCsvColumns<ExportRow>()([
   },
   { header: "Created", key: "createdAt", value: (row) => row.createdAt },
   { header: "Published", key: "publishedAt", value: (row) => row.publishedAt },
+  {
+    header: "Proposer edited after approval",
+    key: "proposerEditedAt",
+    value: (row) => row.proposerEditedAt,
+  },
   { header: "Archived", key: "archivedAt", value: (row) => row.archivedAt },
   { header: "Soft deleted", key: "deletedAt", value: (row) => row.deletedAt },
   { header: "Updated", key: "updatedAt", value: (row) => row.updatedAt },
@@ -552,6 +589,7 @@ function AdminProjectsFilters({
     });
   const {
     acceptingOnly,
+    editedByProposerOnly,
     includeSoftDeleted,
     program,
     proposer,
@@ -715,8 +753,8 @@ function AdminProjectsFilters({
         {/*
           Three of the public listing's four switches, under the same params,
           so a link pasted from /projects narrows this page the same way
-          (#340). The fourth, archived, is a status here. The last switch is
-          this page's own (#402).
+          (#340). The fourth, archived, is a status here. The last two
+          switches are this page's own (#402, #839).
           Labels are one line each under the legend, so each fits the aside
           beside its switch. An off switch leaves the URL: see SWITCH_DEFAULTS.
         */}
@@ -765,6 +803,17 @@ function AdminProjectsFilters({
               })
             }
           />
+          <FilterSwitch
+            checked={editedByProposerOnly}
+            hint={EDITED_BY_PROPOSER_HINT}
+            id={`${uid}-edited-by-proposer-only`}
+            label={EDITED_BY_PROPOSER_LABEL}
+            onCheckedChange={(checked) =>
+              void navigate({
+                search: (prev) => ({ ...prev, editedByProposerOnly: checked }),
+              })
+            }
+          />
         </div>
       </fieldset>
       {/* Outside the legend: it widens the view rather than narrowing it. */}
@@ -789,6 +838,7 @@ function AdminProjectsFilters({
                 ...prev,
                 acceptingOnly: false,
                 dateField: "published",
+                editedByProposerOnly: false,
                 from: undefined,
                 includeSoftDeleted: false,
                 program: null,
@@ -912,6 +962,7 @@ function AdminProjects() {
   const search = Route.useSearch();
   const {
     acceptingOnly,
+    editedByProposerOnly,
     program,
     proposer,
     q,
@@ -934,7 +985,8 @@ function AdminProjects() {
     acceptingOnly ||
     studentProposedOnly ||
     requiresNdaOnly ||
-    withoutMentorOnly;
+    withoutMentorOnly ||
+    editedByProposerOnly;
   const activeFilterCount = countActiveAdminFilters(search);
   const navigate = useNavigate({ from: "/admin/projects/" });
 

@@ -1,5 +1,5 @@
 import { type SQL, sql } from "drizzle-orm";
-import { projects, user } from "#/db/schema";
+import { projectEditLog, projects, user } from "#/db/schema";
 import {
   descriptionExcerpt,
   LISTING_EXCERPT_LENGTH,
@@ -135,6 +135,27 @@ export const inNoProgram: SQL = sql`NOT EXISTS (
 )`;
 
 /**
+ * The admin list's "edited by the proposer after approval" switch (#839): a
+ * project with an edit its proposer made while it was approved or published.
+ * `staff_email_due` is that fact, set at insert for exactly those edits and
+ * never cleared. Rows from before #839 carry no flag, so an edit made before
+ * then does not count; the switch's hint on the page says so.
+ */
+export const editedByProposerAfterApproval: SQL = sql`EXISTS (
+  SELECT 1 FROM project_edit_log pel
+  WHERE pel.project_id = ${OUTER_PROJECT_ID} AND pel.staff_email_due
+)`;
+
+/**
+ * The latest such edit, or null, for the staff table's column and the CSV.
+ * Mapped through the column so it arrives as a `Date`, as `createdAt` does.
+ */
+export const proposerEditedAtSql = sql<Date | null>`(
+  SELECT max(pel.created_at) FROM project_edit_log pel
+  WHERE pel.project_id = ${OUTER_PROJECT_ID} AND pel.staff_email_due
+)`.mapWith(projectEditLog.createdAt);
+
+/**
  * How many programs a project runs in, for the analytics footnote, which
  * asks "more than one" and never for the list. The staff panel's warning
  * counts the array it already has rather than asking SQL again.
@@ -263,6 +284,8 @@ export const adminProjectSummarySelect = {
   >`coalesce(${user.email}, ${projects.proposerEmail})`,
   proposerId: projects.proposerId,
   proposerName: user.name,
+  // Staff only, like the proposer identity above (#839).
+  proposerEditedAt: proposerEditedAtSql,
   publishedAt: projects.publishedAt,
 };
 
