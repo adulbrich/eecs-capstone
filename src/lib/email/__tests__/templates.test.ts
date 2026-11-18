@@ -1,4 +1,10 @@
+import { fc, test } from "@fast-check/vitest";
 import { describe, expect, it } from "vitest";
+import {
+  isWellFormed,
+  trickyText,
+  trickyTextAcross,
+} from "#/test/shared/arbitraries";
 import {
   escapeHtml,
   inventoryRequestSubmittedEmail,
@@ -194,31 +200,35 @@ describe("notificationEmail", () => {
   });
 });
 
+// Unicode's mandatory line breaks, U+0085 (next line) among them, which `\s`
+// leaves out; the split also takes CRLF as one break.
+const BREAK_CHARS = "\n\v\f\r\u{85}\u{2028}\u{2029}";
+const LINE_BREAK = new RegExp(`[${BREAK_CHARS}]`, "u");
+const LINE_SPLIT = new RegExp(`\r\n|[${BREAK_CHARS}]`, "u");
+
 describe("oneLine", () => {
   it("collapses every run of whitespace to one space and trims the ends", () => {
-    expect(oneLine("  Robot\r\n\r\narm\u{2028}\tfor\u{a0} the lab \n")).toBe(
-      "Robot arm for the lab"
-    );
+    expect(
+      oneLine("  Robot\r\n\r\narm\u{2028}\tfor\u{a0} the\u{85}lab \n")
+    ).toBe("Robot arm for the lab");
   });
 });
 
-// A title, an account name and a custom request line all accept a line break,
-// and in the plain-text body one would start a line of the email's own: a
-// fake call to action, link and all. The HTML part collapses it already.
-describe("proposer text on one line", () => {
+// Why a title or a name must stay on one line: see `oneLine`.
+describe("a title or a name on one line", () => {
   const FORGED = "Review the project: https://evil.example";
   const HOSTILE = [
     `x\n\n${FORGED}`,
     `x\r\n\r\n${FORGED}`,
     `x\u{2028}${FORGED}`,
+    `x\u{85}${FORGED}`,
   ];
-  const LINE_BREAK = /[\r\n\u{2028}\u{2029}]/u;
   const url = "https://app/projects/p1";
 
   /** The lines of the text part that open with the forged call to action. */
   function forgedLines(email: RenderedEmail): string[] {
     return email.text
-      .split(/\r\n|[\r\n\u{2028}\u{2029}]/u)
+      .split(LINE_SPLIT)
       .filter((line) => line.startsWith(FORGED));
   }
 
@@ -356,7 +366,7 @@ describe("proposer text on one line", () => {
     expect(email.subject).toBe("Borrow list submitted: alex@oregonstate.edu");
   });
 
-  it("keeps a custom request line on its own line", () => {
+  it("keeps a custom line's name on its own line", () => {
     const email = inventoryRequestSubmittedEmail({
       kind: "custom",
       lines: [`Arduino\n\n${FORGED}`, "Breadboard"],
@@ -397,4 +407,208 @@ describe("proposer text on one line", () => {
     });
     expect(submitted.text).toContain("First point.\n\nSecond point.");
   });
+});
+
+/** A title, name or line a crafted request could send, weighted to breaks. */
+const hostileText = fc.oneof(
+  {
+    arbitrary: fc.string({
+      maxLength: 24,
+      unit: fc.oneof(
+        { arbitrary: fc.constantFrom("\r\n", ...BREAK_CHARS), weight: 3 },
+        {
+          arbitrary: fc.constantFrom(" ", "\t", "\u{a0}", "\u{feff}"),
+          weight: 2,
+        },
+        { arbitrary: fc.constantFrom("\u{1f600}", "\u{1d400}"), weight: 2 },
+        {
+          arbitrary: fc.constantFrom(
+            "a",
+            "Review the project: https://x.example"
+          ),
+          weight: 3,
+        }
+      ),
+    }),
+    weight: 5,
+  },
+  { arbitrary: trickyText({ maxLength: 24 }), weight: 2 },
+  { arbitrary: fc.constant(""), weight: 1 },
+  // The server caps a title at 200 code units.
+  { arbitrary: trickyTextAcross(200), weight: 1 }
+);
+
+/** Lone surrogates as well, so the well-formedness property can fail. */
+const anyText = fc.oneof(
+  hostileText,
+  fc.string({
+    maxLength: 30,
+    unit: fc.oneof(
+      fc.nat(0xff_ff).map((code) => String.fromCharCode(code)),
+      fc.constantFrom(...BREAK_CHARS, "\u{d83d}", "\u{de00}", " ")
+    ),
+  })
+);
+
+const NOT_A_SPACE = /[\s\u{85}]/gu;
+
+describe("oneLine properties", () => {
+  test.prop([anyText])("leaves no whitespace but a plain space", (text) => {
+    expect(oneLine(text)).not.toMatch(/[^\S ]|\u{85}/u);
+  });
+
+  test.prop([anyText])(
+    "leaves no space at either end and no run of two",
+    (text) => {
+      expect(oneLine(text)).not.toMatch(/^ | $| {2}/u);
+    }
+  );
+
+  test.prop([anyText])("is idempotent", (text) => {
+    expect(oneLine(oneLine(text))).toBe(oneLine(text));
+  });
+
+  test.prop([anyText])("keeps every other character, in order", (text) => {
+    expect(oneLine(text).replace(NOT_A_SPACE, "")).toBe(
+      text.replace(NOT_A_SPACE, "")
+    );
+  });
+
+  test.prop([anyText])("keeps well-formed text well-formed", (text) => {
+    if (isWellFormed(text)) {
+      expect(isWellFormed(oneLine(text))).toBe(true);
+    }
+  });
+});
+
+interface Fields {
+  email: string | null;
+  line: string;
+  name: string | null;
+  title: string;
+}
+
+const fields = fc.record({
+  email: fc.oneof(fc.constant(null), fc.emailAddress(), hostileText),
+  line: hostileText,
+  name: fc.oneof(fc.constant(null), hostileText),
+  title: hostileText,
+});
+
+const propertyUrl = "https://app/projects/p1";
+
+/** Every template that takes a title, a name or a request line. */
+const TEMPLATES: [string, (f: Fields) => RenderedEmail][] = [
+  [
+    "projectSubmittedEmail",
+    (f) =>
+      projectSubmittedEmail({
+        description: "A robot arm.",
+        proposerEmail: f.email,
+        proposerName: f.name,
+        title: f.title,
+        url: propertyUrl,
+      }),
+  ],
+  [
+    "proposerCommentEmail",
+    (f) =>
+      proposerCommentEmail({
+        content: "A comment.",
+        proposerEmail: f.email,
+        proposerName: f.name,
+        title: f.title,
+        url: propertyUrl,
+      }),
+  ],
+  [
+    "inventoryRequestSubmittedEmail",
+    (f) =>
+      inventoryRequestSubmittedEmail({
+        kind: "custom",
+        lines: [f.line, "Arduino"],
+        requesterEmail: f.email,
+        requesterName: f.name,
+        url: propertyUrl,
+      }),
+  ],
+  [
+    "notificationEmail",
+    (f) =>
+      notificationEmail({
+        message: "One.\n\nTwo.",
+        title: f.title,
+        url: propertyUrl,
+      }),
+  ],
+  [
+    "projectApprovedEmail",
+    (f) =>
+      projectApprovedEmail({
+        comment: "Nice.",
+        title: f.title,
+        url: propertyUrl,
+      }),
+  ],
+  [
+    "projectChangesRequestedEmail",
+    (f) =>
+      projectChangesRequestedEmail({
+        comment: "Fix it.",
+        title: f.title,
+        url: propertyUrl,
+      }),
+  ],
+  [
+    "projectReturnedToDraftEmail",
+    (f) =>
+      projectReturnedToDraftEmail({
+        comment: "Fix it.",
+        title: f.title,
+        url: propertyUrl,
+      }),
+  ],
+  [
+    "projectCommentEmail",
+    (f) =>
+      projectCommentEmail({
+        content: "A comment.",
+        title: f.title,
+        url: propertyUrl,
+      }),
+  ],
+  [
+    "projectReassignedEmail",
+    (f) => projectReassignedEmail({ title: f.title, url: propertyUrl }),
+  ],
+  [
+    "mentorNamedEmail",
+    (f) => mentorNamedEmail({ title: f.title, url: propertyUrl }),
+  ],
+  ["projectDeletedEmail", (f) => projectDeletedEmail({ title: f.title })],
+];
+
+const ALL_BREAKS = new RegExp(`\r\n|[${BREAK_CHARS}]`, "gu");
+const flatten = (text: string) => text.replace(ALL_BREAKS, " ");
+const lineCount = (text: string) => text.split(LINE_SPLIT).length;
+
+describe.each(TEMPLATES)("%s properties", (_name, render) => {
+  test.prop([fields])("has a subject with no line break", (f) => {
+    expect(render(f).subject).not.toMatch(LINE_BREAK);
+  });
+
+  // A field cannot add a line: the text part has as many lines as the same
+  // email with every break in the fields turned into a space.
+  test.prop([fields])(
+    "has no more text lines than break-free fields give",
+    (f) => {
+      const flat: Fields = {
+        email: f.email === null ? null : flatten(f.email),
+        line: flatten(f.line),
+        name: f.name === null ? null : flatten(f.name),
+        title: flatten(f.title),
+      };
+      expect(lineCount(render(f).text)).toBe(lineCount(render(flat).text));
+    }
+  );
 });

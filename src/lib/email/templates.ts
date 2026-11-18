@@ -24,16 +24,16 @@ export function escapeHtml(value: string): string {
   return value.replace(HTML_UNSAFE, (char) => HTML_ESCAPES[char] ?? char);
 }
 
-// `\s` takes CR, LF and U+2028 as well as spaces, tabs and a no-break space.
-const WHITESPACE_RUN = /\s+/gu;
+// `\s` takes CR, LF, U+2028 and U+2029 as well as spaces, tabs and a no-break
+// space, but not U+0085 (next line), which Unicode also counts as a line break.
+const WHITESPACE_RUN = /[\s\u{85}]+/gu;
 
 /**
  * Text that must stay on one line: a subject, or a value the body quotes
- * inside a sentence. A title, an account name and a custom request line all
+ * inside a sentence. A title, an account name and a custom line's name all
  * accept line breaks, and one in the plain-text body would start a line of
- * the email's own, a fake call to action and its link included. The HTML part
- * collapses them anyway. Prose (a description, a comment) keeps its paragraphs
- * and does not come through here.
+ * the email's own, a fake call to action and its link included. Prose (a
+ * description, a comment) keeps its paragraphs and does not come through here.
  */
 export function oneLine(text: string): string {
   return text.replace(WHITESPACE_RUN, " ").trim();
