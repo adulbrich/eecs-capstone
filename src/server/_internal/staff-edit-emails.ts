@@ -254,16 +254,24 @@ export interface StaffEditSweepOptions {
 }
 
 /**
- * One sweep. Returns how many bursts it claimed, for the tests. A burst that
- * throws on its way (a database error loading it) is logged and left claimed
- * for a later sweep, and the others still go.
+ * One sweep. Never throws, and returns how many bursts it claimed, for the
+ * tests. A claim that fails is logged and the next sweep tries again; a burst
+ * that throws on its way (a database error loading it) is logged and left
+ * claimed for a later sweep, and the others still go. Both lines are counted
+ * by the `email_failures` metric filter in `infra/alarms.tf`.
  */
 export async function runStaffEditEmailSweep(
   opts: StaffEditSweepOptions = {}
 ): Promise<{ claimed: number }> {
   const now = opts.now ?? new Date();
   const config = opts.config ?? buildNotificationConfig();
-  const bursts = await claimReadyBursts(now);
+  let bursts: ClaimedBurst[];
+  try {
+    bursts = await claimReadyBursts(now);
+  } catch (error) {
+    console.error("Staff edit email sweep failed", redactQueryError(error));
+    return { claimed: 0 };
+  }
   for (const burst of bursts) {
     try {
       await settleBurst(burst, now, config, opts.send);
