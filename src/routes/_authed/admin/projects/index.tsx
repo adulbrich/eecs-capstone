@@ -3,14 +3,20 @@ import {
   Link,
   stripSearchParams,
   useNavigate,
+  useRouter,
 } from "@tanstack/react-router";
-import { useCallback, useId } from "react";
+import { ChevronDown } from "lucide-react";
+import { useCallback, useId, useState } from "react";
 import { z } from "zod";
 import {
   AdminDataTable,
   AdminTableControls,
   defineAdminColumns,
 } from "#/components/admin-data-table";
+import {
+  type BatchRow,
+  BatchTransitionDialog,
+} from "#/components/batch-transition-dialog";
 import { ClearFiltersButton } from "#/components/clear-filters-button";
 import { ExportCsvButton } from "#/components/export-csv-button";
 import { FilterSwitch } from "#/components/filter-switch";
@@ -40,6 +46,12 @@ import {
 } from "#/components/ui/breadcrumb";
 import { Button } from "#/components/ui/button";
 import { Checkbox } from "#/components/ui/checkbox";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "#/components/ui/dropdown-menu";
 import { Input } from "#/components/ui/input";
 import { Label } from "#/components/ui/label";
 import { ListCount } from "#/components/ui/pagination";
@@ -64,6 +76,7 @@ import {
 import { defineCsvColumns, toCsv } from "#/lib/csv";
 import { pageTitle } from "#/lib/page-title";
 import { projectImageSrc } from "#/lib/project-image";
+import type { BatchTarget } from "#/lib/project-workflow";
 import {
   PROJECT_STATUS_DISPLAY_RANK,
   PROJECT_STATUS_LABEL,
@@ -844,6 +857,55 @@ function DatelessNotice({
   );
 }
 
+/**
+ * The batch actions (#889), over every row the current filters show. Two
+ * items and no more: `archived -> published` stays on the staff panel, and
+ * the other transitions each owe a project its own comment. Not modal, as
+ * the Columns menu is not; the dialog sits outside the menu so closing the
+ * menu does not unmount it.
+ */
+function BatchActionsMenu({ rows }: { rows: readonly BatchRow[] }) {
+  const router = useRouter();
+  const [target, setTarget] = useState<BatchTarget | null>(null);
+  // Held after close so the dialog keeps its copy while Radix animates out.
+  const [lastTarget, setLastTarget] = useState<BatchTarget>("archived");
+  function openFor(next: BatchTarget) {
+    setLastTarget(next);
+    setTarget(next);
+  }
+  return (
+    <>
+      <DropdownMenu modal={false}>
+        <DropdownMenuTrigger asChild>
+          <Button type="button" variant="outline">
+            Actions
+            <ChevronDown aria-hidden />
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end">
+          <DropdownMenuItem onSelect={() => openFor("archived")}>
+            Archive published projects...
+          </DropdownMenuItem>
+          <DropdownMenuItem onSelect={() => openFor("published")}>
+            Publish approved projects...
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
+      <BatchTransitionDialog
+        onDone={() => router.invalidate()}
+        onOpenChange={(open) => {
+          if (!open) {
+            setTarget(null);
+          }
+        }}
+        open={target !== null}
+        rows={rows}
+        target={target ?? lastTarget}
+      />
+    </>
+  );
+}
+
 function AdminProjects() {
   const { datelessInScope, rows, proposers, programs } = Route.useLoaderData();
   // The whole search object goes to the hook, which reads cols/dir/sort.
@@ -925,26 +987,29 @@ function AdminProjects() {
       tableControls={
         <AdminTableControls
           actions={
-            <ExportCsvButton
-              filename="projects"
-              load={async () => {
-                // The same resolved filter the loader sent, so the file
-                // can never disagree with the table about which rows
-                // match.
-                const { rows: exportRows } = await exportAdminProjects({
-                  data: resolved,
-                });
-                // The export's rows are a wider projection of the same
-                // records the table lists under the same filters, keyed
-                // by the same id, so ordering by the table's sorted id
-                // sequence still applies even though this array did not
-                // come from `rows`.
-                return toCsv(
-                  EXPORT_COLUMNS,
-                  orderRows(exportRows, (row) => row.id)
-                );
-              }}
-            />
+            <>
+              <BatchActionsMenu rows={rows} />
+              <ExportCsvButton
+                filename="projects"
+                load={async () => {
+                  // The same resolved filter the loader sent, so the file
+                  // can never disagree with the table about which rows
+                  // match.
+                  const { rows: exportRows } = await exportAdminProjects({
+                    data: resolved,
+                  });
+                  // The export's rows are a wider projection of the same
+                  // records the table lists under the same filters, keyed
+                  // by the same id, so ordering by the table's sorted id
+                  // sequence still applies even though this array did not
+                  // come from `rows`.
+                  return toCsv(
+                    EXPORT_COLUMNS,
+                    orderRows(exportRows, (row) => row.id)
+                  );
+                }}
+              />
+            </>
           }
           filtered={filtered}
           rowCount={rows.length}

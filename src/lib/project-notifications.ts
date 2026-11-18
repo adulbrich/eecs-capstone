@@ -135,6 +135,65 @@ export function projectsClaimedNotification(
 }
 
 /**
+ * The notices a batch archive or publish owes (#889): one row per proposer,
+ * as a claim writes, so an end-of-term archive does not push a sponsor's
+ * other notices out of a ten-row bell. A proposer with one project in the
+ * batch gets the row a single transition writes; one with several gets one
+ * row that counts them and links to their list. Nobody is told twice, the
+ * actor is never told, and a project with no proposer tells nobody.
+ *
+ * The batch comment rides in every row's message. `statusChangeNotification`
+ * carries a comment only for changes requested, and its wording is pinned,
+ * so the single-project row keeps its title and link and swaps the message
+ * for one that carries the comment when staff wrote one.
+ */
+export function batchStatusChangeNotifications(
+  batch: readonly NotifiableProject[],
+  newStatus: ProjectStatus,
+  actorId: string,
+  comment?: string | null
+): NotificationRow[] {
+  const byProposer = new Map<string, NotifiableProject[]>();
+  for (const project of batch) {
+    const userId = proposerToTell(project, actorId);
+    if (!userId) {
+      continue;
+    }
+    const theirs = byProposer.get(userId) ?? [];
+    theirs.push(project);
+    byProposer.set(userId, theirs);
+  }
+  const trimmed = comment?.trim();
+  const rows: NotificationRow[] = [];
+  for (const [userId, theirs] of byProposer) {
+    if (theirs.length === 1) {
+      const single = statusChangeNotification(theirs[0], newStatus, actorId);
+      if (single) {
+        rows.push(
+          trimmed
+            ? {
+                ...single,
+                message: `Status changed to ${newStatus}: ${trimmed}`,
+              }
+            : single
+        );
+      }
+      continue;
+    }
+    rows.push({
+      userId,
+      type: "status_change",
+      title: `${theirs.length} of your projects were ${newStatus}`,
+      message: trimmed
+        ? `Status changed to ${newStatus}: ${trimmed}`
+        : `Status changed to ${newStatus}.`,
+      link: "/my/projects",
+    });
+  }
+  return rows;
+}
+
+/**
  * The notices a comment owes, deduped, in insertion order.
  *
  * `parentAuthorId` is a parameter rather than something this module looks up,

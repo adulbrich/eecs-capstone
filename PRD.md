@@ -159,6 +159,12 @@ Each project carries:
 - [x] Admin/staff can perform all status transitions.
 - [x] Admins review and publish submitted projects.
 - [x] Admins archive published projects.
+- [x] Batch actions on `/admin/projects` (#889): an Actions menu archives every
+  published project, or publishes every approved one, in the current filtered
+  view in one confirm. Other statuses and soft-deleted rows are counted and left
+  alone; a row that changed since the page loaded refuses the whole batch; one
+  bell row per proposer, no email; the AI refreshes run four at a time
+  (ADR-0070). `archived -> published` stays a single-project action.
 - [x] Soft delete: projects are marked deleted (not removed). Hidden from users;
   visible to staff in a dedicated view and restorable.
 - [x] Draft projects are hard-deleted; non-draft statuses are soft-deleted.

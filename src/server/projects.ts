@@ -1,6 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { projectUrlSchema } from "#/lib/project-url";
+import { BATCH_TARGETS } from "#/lib/project-workflow";
 import {
   TEAMS_SUPPORTED_MAX,
   TEAMS_SUPPORTED_MIN,
@@ -320,4 +321,24 @@ export const forceSetProjectStatus = createServerFn({ method: "POST" })
       data.comment,
       data.sendEmail
     );
+  });
+
+/**
+ * The admin list's batch actions (#889). The ids are the rows the dialog
+ * listed as eligible; the target is one of the two batch targets, so no
+ * other transition is reachable in batch whatever the client sends.
+ */
+export const batchTransitionSchema = z.object({
+  ids: z.array(z.string().uuid()).nonempty(),
+  target: z.enum(BATCH_TARGETS),
+  comment: z.string().max(2000).optional(),
+});
+
+export const batchTransitionProjects = createServerFn({ method: "POST" })
+  .validator((data: unknown) => batchTransitionSchema.parse(data))
+  .handler(async ({ data }) => {
+    const { batchTransitionForCurrentUser } = await import(
+      "./_internal/projects"
+    );
+    return batchTransitionForCurrentUser(data);
   });

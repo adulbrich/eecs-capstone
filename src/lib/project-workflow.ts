@@ -48,6 +48,66 @@ export function assertTransitionAllowed(
 }
 
 /**
+ * The transitions staff may make on every project in the admin list's view at
+ * once (#889), keyed by target. A subset of the staff arms of `TRANSITIONS`:
+ * `archived -> published` stays on the staff panel, because a project rerun
+ * for a new year is duplicated rather than republished as it stands, and the
+ * other targets each owe a project its own comment or judgement.
+ */
+export const BATCH_TRANSITIONS = {
+  archived: "published",
+  published: "approved",
+} as const satisfies Partial<Record<ProjectStatus, ProjectStatus>>;
+
+export type BatchTarget = keyof typeof BATCH_TRANSITIONS;
+
+export const BATCH_TARGETS = Object.keys(BATCH_TRANSITIONS) as [
+  BatchTarget,
+  ...BatchTarget[],
+];
+
+/** The parts of a row the batch split reads. */
+export interface BatchCandidate {
+  deletedAt: Date | string | null;
+  status: ProjectStatus;
+}
+
+export interface BatchSplit<T> {
+  eligible: T[];
+  otherStatus: T[];
+  softDeleted: T[];
+}
+
+/**
+ * Which rows of a view a batch would move, and why the rest are left alone.
+ * The dialog counts from this and the server refuses from it, so the two
+ * cannot disagree about what is eligible. A soft-deleted row is its own
+ * bucket whatever its status: publishing one would leave it hidden from
+ * everyone but staff, and it is counted apart so the dialog can say to
+ * restore it first.
+ */
+export function splitBatchCandidates<T extends BatchCandidate>(
+  rows: readonly T[],
+  target: BatchTarget
+): BatchSplit<T> {
+  const split: BatchSplit<T> = {
+    eligible: [],
+    otherStatus: [],
+    softDeleted: [],
+  };
+  for (const row of rows) {
+    if (row.deletedAt) {
+      split.softDeleted.push(row);
+    } else if (row.status === BATCH_TRANSITIONS[target]) {
+      split.eligible.push(row);
+    } else {
+      split.otherStatus.push(row);
+    }
+  }
+  return split;
+}
+
+/**
  * The order a reader is shown the statuses in, which is not the vocabulary's.
  * This reads `changes_requested` as the step back out of `submitted` and puts
  * it beside it, where the tuple lists the two outcomes of a review the other

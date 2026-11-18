@@ -22,6 +22,9 @@ import {
 import {
   type ActorRole,
   assertTransitionAllowed,
+  BATCH_TRANSITIONS,
+  type BatchTarget,
+  splitBatchCandidates,
 } from "#/lib/project-workflow";
 import { assertStaff, isStaff, type Viewer } from "#/lib/viewer";
 import type { ProjectStatus } from "#/lib/vocabularies";
@@ -34,6 +37,7 @@ import type {
 } from "../projects";
 import type { EmailOptions } from "./email-dispatch";
 import {
+  recordBatchStatusChangeNotifications,
   recordProposerReassignedNotification,
   recordSoftDeleteNotification,
   recordStatusChangeNotifications,
@@ -49,6 +53,7 @@ import {
   categorizeProjectInBackground,
   type RefreshDeps,
   refreshProjectInBackground,
+  refreshProjectsInBackground,
 } from "./project-refresh";
 
 export interface AuthUser {
@@ -668,6 +673,43 @@ export interface TransitionResult {
   status: ProjectStatus;
 }
 
+type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
+
+/**
+ * The two rows a transition writes inside its caller's transaction: the
+ * status with its timestamps, and the history row. Shared by the single path
+ * and the batch, so both write the same columns (#889). Notifications stay
+ * with each caller, since a batch writes one per proposer rather than one
+ * per project.
+ */
+async function writeTransition(
+  tx: Tx,
+  actorId: string,
+  project: Pick<typeof projects.$inferSelect, "id" | "publishedAt" | "status">,
+  target: ProjectStatus,
+  comment: string | null
+): Promise<void> {
+  const updates: Partial<typeof projects.$inferInsert> = {
+    status: target,
+    updatedAt: new Date(),
+  };
+  if (target === "published" && !project.publishedAt) {
+    updates.publishedAt = new Date();
+  }
+  if (target === "archived") {
+    updates.archivedAt = new Date();
+  }
+  await tx.update(projects).set(updates).where(eq(projects.id, project.id));
+
+  await tx.insert(projectStatusHistory).values({
+    projectId: project.id,
+    oldStatus: project.status,
+    newStatus: target,
+    changedBy: actorId,
+    comment,
+  });
+}
+
 /**
  * Everything a status transition does once someone is allowed to make it.
  *
@@ -691,25 +733,7 @@ async function commitTransition(
   assertChangesRequestedHasComment(target, comment);
 
   await db.transaction(async (tx) => {
-    const updates: Record<string, unknown> = {
-      status: target,
-      updatedAt: new Date(),
-    };
-    if (target === "published" && !project.publishedAt) {
-      updates.publishedAt = new Date();
-    }
-    if (target === "archived") {
-      updates.archivedAt = new Date();
-    }
-    await tx.update(projects).set(updates).where(eq(projects.id, project.id));
-
-    await tx.insert(projectStatusHistory).values({
-      projectId: project.id,
-      oldStatus: project.status,
-      newStatus: target,
-      changedBy: actorId,
-      comment,
-    });
+    await writeTransition(tx, actorId, project, target, comment);
 
     await recordStatusChangeNotifications(
       tx,
@@ -933,6 +957,114 @@ export async function forceTransitionAs(
     throw new Error("Project is already in that status.");
   }
   return commitTransition(viewer.id, project, target, comment ?? null, opts);
+}
+
+/** The past tense a batch refusal names its target by. */
+const BATCH_VERB: Record<BatchTarget, string> = {
+  archived: "archived",
+  published: "published",
+};
+
+/**
+ * Archives or publishes every named project, or none of them (#889).
+ *
+ * The ids are the rows the admin list's dialog showed as eligible, which is
+ * what staff confirmed. Each row is locked (`FOR UPDATE`) in ascending id
+ * order inside one transaction and checked under that lock, so two staff
+ * confirming overlapping batches wait on each other: the second reads the
+ * first's committed status and is refused, rather than both passing a read
+ * made before either wrote. A project that has left the source status, been
+ * soft-deleted or gone since the page loaded refuses the whole batch and is
+ * named, the rule `approveRequestLinesAs` follows (#799). Every one is named
+ * at once, not the first, so a reload shows staff the whole difference.
+ *
+ * Each project gets the status update and history row a single transition
+ * writes; the bell gets one row per proposer, written once after the loop.
+ * Neither target emails anyone (PRD section 13), so nothing is sent. The
+ * refreshes a single transition starts run after the commit under
+ * `BATCH_REFRESH_CONCURRENCY` (ADR-0070).
+ */
+export async function batchTransitionAs(
+  viewer: Viewer,
+  ids: readonly string[],
+  target: BatchTarget,
+  comment: string | null,
+  deps?: RefreshDeps
+): Promise<{ ids: string[]; status: BatchTarget }> {
+  assertStaff(viewer);
+  if (!Object.hasOwn(BATCH_TRANSITIONS, target)) {
+    throw new Error(`Batch transition to ${target} not allowed`);
+  }
+  // Lowercased before the dedupe: the schema accepts either case, and two
+  // spellings of one id would otherwise lock and write it twice.
+  const sorted = [...new Set(ids.map((id) => id.toLowerCase()))].sort();
+  if (sorted.length === 0) {
+    throw new Error("No projects to change");
+  }
+  const trimmed = comment?.trim() || null;
+
+  const moved = await db.transaction(async (tx) => {
+    // One statement, so the lock order is the ORDER BY: Postgres sorts before
+    // it locks, and `uuid` sorts as its lowercase text does.
+    const locked = await tx
+      .select({
+        deletedAt: projects.deletedAt,
+        id: projects.id,
+        proposerId: projects.proposerId,
+        publishedAt: projects.publishedAt,
+        status: projects.status,
+        title: projects.title,
+      })
+      .from(projects)
+      .where(inArray(projects.id, sorted))
+      .orderBy(asc(projects.id))
+      .for("update");
+    const { eligible, otherStatus, softDeleted } = splitBatchCandidates(
+      locked,
+      target
+    );
+    const missing = sorted.length - locked.length;
+    if (eligible.length !== sorted.length) {
+      const stale = [...otherStatus, ...softDeleted].map((row) => row.title);
+      if (missing > 0) {
+        stale.push(
+          missing === 1
+            ? "1 project that no longer exists"
+            : `${missing} projects that no longer exist`
+        );
+      }
+      throw new Error(
+        `Nothing was ${BATCH_VERB[target]}. These changed since the list loaded: ${stale.join(", ")}.`
+      );
+    }
+    for (const row of eligible) {
+      await writeTransition(tx, viewer.id, row, target, trimmed);
+    }
+    await recordBatchStatusChangeNotifications(
+      tx,
+      eligible,
+      target,
+      viewer.id,
+      trimmed
+    );
+    return eligible.map((row) => row.id);
+  });
+
+  // After the commit, never inside it, and behind the same gate as
+  // `commitTransition`, so the two paths cannot drift if a target is added.
+  if (isEmbeddableStatus(target)) {
+    refreshProjectsInBackground(moved, deps);
+  }
+  return { ids: moved, status: target };
+}
+
+export async function batchTransitionForCurrentUser(data: {
+  comment?: string;
+  ids: string[];
+  target: BatchTarget;
+}) {
+  const viewer = await requireUser();
+  return batchTransitionAs(viewer, data.ids, data.target, data.comment ?? null);
 }
 
 // Convenience wrappers that resolve the current user from the request

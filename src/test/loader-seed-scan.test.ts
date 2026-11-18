@@ -126,6 +126,13 @@ const CENSUS = new Map<string, { class: SeedClass; why: string }>([
   ],
   // Class C.
   [
+    "src/components/batch-transition-dialog.tsx: useRef(rows)",
+    {
+      class: "C",
+      why: "reassigned from the loader's rows on every render while open, a render-time resync rather than an effect; frozen while closed",
+    },
+  ],
+  [
     "src/components/instructor-manager.tsx: useState(initial)",
     {
       class: "C",
