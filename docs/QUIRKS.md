@@ -63,6 +63,10 @@ The method is `.validator`. `.inputValidator` no longer exists, so a call is a t
 
 Nitro loads the server entry (`src/server.ts`) on the first request, not at start. Measured on the built output, a throw there leaves the process up and answering 500 on every route, `/api/healthz` included. A plugin listed in `nitro({ plugins })` in `vite.config.ts` runs before the listener binds, so a throw there is exit code 1 and no port. `src/nitro/config-check.ts` is that plugin, and `src/lib/_internal/startup-config.ts` holds the fatal list. The pool warm-up runs on the first request on purpose: [ADR-0052](./adr/0052-the-pool-keeps-a-warm-floor.md).
 
+### A Nitro plugin gets its own copy of any app module it imports
+
+Nitro bundles the plugins in `nitro({ plugins })` apart from the app's SSR bundle, so a module both import exists twice, each with its own state. A plugin that imported `#/db`, even lazily, opened a second `pg` pool beside the app's (#839; the built `.output/server/_chunks/` held the pool code). Per-request work that needs the app's modules goes in `src/server.ts`, which wraps every request the app answers, `/api/healthz` included; the proposer edit notice's sweep starts there. Keep plugins to code with no app state, as the three in `src/nitro/` are.
+
 ### A loader that throws during SSR logs nothing unless `src/server.ts` does it
 
 On the server, router-core catches a loader's or `beforeLoad`'s error, renders the error component and answers 500; no error boundary and no `onCatch` runs, so nothing reaches the log. `src/server.ts` writes one line per failed match through `renderFailureLines` (`src/lib/_internal/render-failure.ts`) and answers 403 for a role refusal. Keep the entry thin: it loads on the first request.

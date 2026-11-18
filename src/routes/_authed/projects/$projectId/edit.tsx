@@ -9,6 +9,7 @@ import { toast } from "sonner";
 import { ProjectForm } from "#/components/project-form";
 import { isUuid } from "#/lib/is-uuid";
 import { pageTitle } from "#/lib/page-title";
+import { isOwedStaffEditEmail } from "#/lib/staff-edit-email";
 import { getProject } from "#/server/projects-queries";
 
 export const Route = createFileRoute("/_authed/projects/$projectId/edit")({
@@ -38,7 +39,7 @@ export const Route = createFileRoute("/_authed/projects/$projectId/edit")({
 function EditProject() {
   const navigate = useNavigate();
   const router = useRouter();
-  const { project } = Route.useLoaderData();
+  const { project, viewerIsStaff } = Route.useLoaderData();
   if (!project) {
     return null;
   }
@@ -46,6 +47,14 @@ function EditProject() {
   return (
     <div className="mx-auto max-w-2xl px-4 py-6 md:p-8">
       <h1 className="text-2xl font-semibold">Edit project</h1>
+      {/* The save has a side effect the proposer cannot see (#839), so the
+          page says so, by the same rule the save applies. */}
+      {isOwedStaffEditEmail(project.status, viewerIsStaff) && (
+        <p className="text-muted-foreground mt-2 text-sm">
+          Staff have approved this project, so your changes take effect when you
+          save, and staff are emailed a summary of them.
+        </p>
+      )}
       <div className="mt-6">
         <ProjectForm
           enableAiReview

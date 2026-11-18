@@ -3,10 +3,10 @@
  * whose burst of due edit log rows is ready, send one staff inbox email per
  * project with no transaction open, then stamp the rows emailed.
  *
- * Started by a request, never by a timer: `src/nitro/staff-edit-email-sweep.ts`
- * runs this at most once a minute per task, after a response, and ADR-0071
- * records why that keeps ADR-0005. The rules (who is owed an email, when a
- * burst is ready, what it says) are in `src/lib/staff-edit-email.ts`.
+ * Started by a request, never by a timer: `src/server.ts` runs this at most
+ * once a minute per task, after a response, and ADR-0071 records why that
+ * keeps ADR-0005. The rules (who is owed an email, when a burst is ready,
+ * what it says) are in `src/lib/staff-edit-email.ts`.
  *
  * Delivery is at least once. Two sweeps never claim one burst, because the
  * claim runs under a transaction-scoped advisory lock: `FOR UPDATE SKIP

@@ -235,7 +235,8 @@ _Avoid_: embedding (in copy), vector, matching, semantic index
 **Staff inbox**:
 The one staff mailbox every email addressed to staff goes to, set by
 `EMAIL_STAFF_INBOX`: a project submitted or resubmitted, a borrow list or custom
-request submitted, and a comment from a proposer. Never fanned out per staff member
+request submitted, a comment from a proposer, and a proposer's burst of edits to an
+approved or published project (ADR-0071). Never fanned out per staff member
 (ADR-0019). Every other staff signal is an in-app count.
 _Avoid_: review inbox (its old name), admin email, notifications address
 
