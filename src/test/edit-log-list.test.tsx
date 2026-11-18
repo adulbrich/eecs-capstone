@@ -30,7 +30,7 @@ describe("EditLogList", () => {
     expect(load).not.toHaveBeenCalled();
   });
 
-  it("shows a row's old and new values when it is opened", async () => {
+  it("shows a row's change as a diff when it is opened", async () => {
     const load = vi.fn(() =>
       Promise.resolve({
         changedFields: ["title", "description"],
@@ -44,20 +44,25 @@ describe("EditLogList", () => {
     expect(toggle.getAttribute("aria-expanded")).toBe("false");
     fireEvent.click(toggle);
 
-    const list = (await screen.findByText("New title")).closest(
-      "dl"
-    ) as HTMLElement;
+    // The changed word of a reworded line is marked on each side.
+    const removedWord = await screen.findByText("Old", { selector: "del" });
+    const detail = removedWord.closest("[id]") as HTMLElement;
     expect(load).toHaveBeenCalledWith("row-1");
-    expect(within(list).getByText("Title")).toBeTruthy();
-    expect(within(list).getByText("Old title")).toBeTruthy();
-    expect(within(list).getByText("New title")).toBeTruthy();
-    expect(within(list).getByText("Description")).toBeTruthy();
-    expect(within(list).getByText("(empty)")).toBeTruthy();
-    expect(within(list).getByText(/Line one\s+Line two/u)).toBeTruthy();
+    expect(within(detail).getByText("New", { selector: "ins" })).toBeTruthy();
+    expect(within(detail).getByText("Title")).toBeTruthy();
+    expect(within(detail).getByText("Description")).toBeTruthy();
+    // A screen reader hears which side each line is on; an empty before
+    // gives added lines only.
+    const text = detail.textContent ?? "";
+    expect(text).toContain("Removed: Old title");
+    expect(text).toContain("Added: New title");
+    expect(text).toContain("Added: Line one");
+    expect(text).toContain("Added: Line two");
+    expect(text).not.toContain("Removed: Line");
 
     const hide = screen.getByRole("button", { name: "Hide values" });
     expect(hide.getAttribute("aria-expanded")).toBe("true");
-    expect(hide.getAttribute("aria-controls")).toBe(list.id);
+    expect(hide.getAttribute("aria-controls")).toBe(detail.id);
   });
 
   it("says so when a row's values cannot be loaded", async () => {

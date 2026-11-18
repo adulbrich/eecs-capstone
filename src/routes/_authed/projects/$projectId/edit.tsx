@@ -5,6 +5,7 @@ import {
   useNavigate,
   useRouter,
 } from "@tanstack/react-router";
+import { TriangleAlert } from "lucide-react";
 import { toast } from "sonner";
 import { ProjectForm } from "#/components/project-form";
 import { isUuid } from "#/lib/is-uuid";
@@ -50,10 +51,25 @@ function EditProject() {
       {/* The save has a side effect the proposer cannot see (#839), so the
           page says so, by the same rule the save applies. */}
       {isOwedStaffEditEmail(project.status, viewerIsStaff) && (
-        <p className="text-muted-foreground mt-2 text-sm">
-          Staff have approved this project, so your changes take effect when you
-          save, and staff are emailed a summary of them.
-        </p>
+        <div
+          className="mt-4 rounded-md border px-3 py-2.5 text-sm"
+          role="note"
+          style={{
+            backgroundColor: "var(--status-warning-bg)",
+            borderColor:
+              "color-mix(in srgb, var(--status-warning) 35%, transparent)",
+            color: "var(--status-warning)",
+          }}
+        >
+          <p className="flex items-center gap-1.5 font-medium">
+            <TriangleAlert aria-hidden="true" className="size-4 shrink-0" />
+            Saving updates an approved project
+          </p>
+          <p className="mt-1">
+            Your changes take effect as soon as you save, and staff are emailed
+            a summary of them.
+          </p>
+        </div>
       )}
       <div className="mt-6">
         <ProjectForm

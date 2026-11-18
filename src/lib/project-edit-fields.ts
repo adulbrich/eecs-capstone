@@ -38,23 +38,30 @@ export function projectEditFieldLabel(field: string): string {
 }
 
 /**
- * One stored value as text. The log's values are whatever the column held,
- * through `jsonb`: a string, a boolean, a number, null, or for `programs` an
- * array of labels. An empty string reads as empty too, because the form
- * writes one for a cleared URL or contact address.
+ * One stored value as the text a diff compares, empty when there is none.
+ * The log's values are whatever the column held, through `jsonb`: a string,
+ * a boolean, a number, null, or for `programs` an array of labels.
  */
-export function formatEditValue(value: unknown): string {
-  if (value === null || value === undefined || value === "") {
-    return "(empty)";
+export function editValueText(value: unknown): string {
+  if (value === null || value === undefined) {
+    return "";
   }
   if (typeof value === "boolean") {
     return value ? "Yes" : "No";
   }
   if (Array.isArray(value)) {
-    return value.length === 0 ? "(empty)" : value.map(String).join(", ");
+    return value.map(String).join(", ");
   }
   if (typeof value === "object") {
     return JSON.stringify(value);
   }
   return String(value);
+}
+
+/**
+ * One stored value as words, for the email. An empty string reads as empty
+ * too, because the form writes one for a cleared URL or contact address.
+ */
+export function formatEditValue(value: unknown): string {
+  return editValueText(value) || "(empty)";
 }

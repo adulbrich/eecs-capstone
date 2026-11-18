@@ -2,9 +2,10 @@ import { type QueryKey, useQuery } from "@tanstack/react-query";
 import { useId, useState } from "react";
 import { errorMessage } from "#/lib/error-message";
 import {
-  formatEditValue,
+  editValueText,
   projectEditFieldLabel,
 } from "#/lib/project-edit-fields";
+import { diffText } from "#/lib/text-diff";
 import { LocalTime } from "./local-time";
 import { Button } from "./ui/button";
 import { FieldError } from "./ui/field";
@@ -155,30 +156,130 @@ function ValuesDetail({
   }
   const { changedFields, newValues, oldValues } = query.data;
   return (
-    <dl className="mt-1 space-y-2 text-xs" id={id}>
+    <div className="mt-2 space-y-2" id={id}>
       {changedFields.map((field) => (
-        <div key={field}>
-          <dt className="font-medium">{projectEditFieldLabel(field)}</dt>
-          <dd className="text-muted-foreground">
-            Before: <ValueText value={oldValues[field]} />
-          </dd>
-          <dd>
-            After: <ValueText value={newValues[field]} />
-          </dd>
-        </div>
+        <FieldDiff
+          after={newValues[field]}
+          before={oldValues[field]}
+          key={field}
+          label={projectEditFieldLabel(field)}
+        />
       ))}
-    </dl>
+    </div>
   );
 }
 
+const LINE_STYLE = {
+  added: {
+    backgroundColor: "var(--status-success-bg)",
+    color: "var(--status-success)",
+  },
+  context: {},
+  removed: {
+    backgroundColor: "var(--status-error-bg)",
+    color: "var(--status-error)",
+  },
+} as const;
+
+/** The changed words inside a line: the line's own hue, a step stronger. */
+const MARK_STYLE = {
+  added: {
+    backgroundColor:
+      "color-mix(in srgb, var(--status-success) 22%, transparent)",
+  },
+  removed: {
+    backgroundColor: "color-mix(in srgb, var(--status-error) 22%, transparent)",
+  },
+} as const;
+
+const SIGN = { added: "+", context: "", removed: "-" } as const;
+const SPOKEN = { added: "Added: ", context: "", removed: "Removed: " } as const;
+
 /**
- * Line breaks kept, because a markdown field's paragraphs are the change, and
- * bounded so one long description does not push the rest of the panel away.
+ * One field's change as a code editor shows it (#839): a box with the
+ * field's name for a tab, removed lines then added lines, the changed words
+ * marked inside them, and unchanged lines around them. Line numbers only for
+ * a value with more than one line; a title has no line 1 worth reading.
+ *
+ * Colour is not the only signal: each line says "Removed" or "Added" to a
+ * screen reader, and changed words are `<del>` and `<ins>`.
  */
-function ValueText({ value }: { value: unknown }) {
+function FieldDiff({
+  after,
+  before,
+  label,
+}: {
+  after: unknown;
+  before: unknown;
+  label: string;
+}) {
+  const oldText = editValueText(before);
+  const newText = editValueText(after);
+  const lines = diffText(oldText, newText);
+  const numbered = oldText.includes("\n") || newText.includes("\n");
   return (
-    <span className="block max-h-40 overflow-y-auto break-words whitespace-pre-wrap">
-      {formatEditValue(value)}
-    </span>
+    <div className="border-border bg-card overflow-hidden rounded-md border">
+      <div className="border-border bg-muted border-b px-2.5 py-1 text-xs font-medium">
+        {label}
+      </div>
+      {lines.length === 0 ? (
+        <p className="text-muted-foreground px-2.5 py-1.5 text-xs">
+          No visible change.
+        </p>
+      ) : (
+        <div className="max-h-96 overflow-y-auto py-0.5 font-mono text-xs leading-relaxed">
+          {lines.map((line, i) =>
+            line.kind === "skipped" ? (
+              <div
+                className="text-muted-foreground bg-muted/50 px-2.5 py-0.5"
+                // A diff never reorders, so position is its identity.
+                // biome-ignore lint/suspicious/noArrayIndexKey: see above
+                key={i}
+              >
+                {line.count === 1
+                  ? "1 unchanged line"
+                  : `${line.count} unchanged lines`}
+              </div>
+            ) : (
+              <div
+                className="grid grid-cols-[2rem_1rem_minmax(0,1fr)]"
+                // biome-ignore lint/suspicious/noArrayIndexKey: see above
+                key={i}
+                style={LINE_STYLE[line.kind]}
+              >
+                <span
+                  aria-hidden
+                  className="text-muted-foreground pr-1.5 text-right select-none"
+                >
+                  {numbered ? line.number : ""}
+                </span>
+                <span aria-hidden className="select-none">
+                  {SIGN[line.kind]}
+                </span>
+                <span className="pr-2.5 break-words whitespace-pre-wrap">
+                  <span className="sr-only">{SPOKEN[line.kind]}</span>
+                  {line.segments.map((segment, j) => {
+                    if (!segment.changed || line.kind === "context") {
+                      return segment.text;
+                    }
+                    const Mark = line.kind === "added" ? "ins" : "del";
+                    return (
+                      <Mark
+                        className="rounded-sm no-underline"
+                        // biome-ignore lint/suspicious/noArrayIndexKey: see above
+                        key={j}
+                        style={MARK_STYLE[line.kind]}
+                      >
+                        {segment.text}
+                      </Mark>
+                    );
+                  })}
+                </span>
+              </div>
+            )
+          )}
+        </div>
+      )}
+    </div>
   );
 }
