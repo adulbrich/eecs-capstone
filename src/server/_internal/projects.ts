@@ -678,34 +678,51 @@ export interface TransitionResult {
  * notifications belong to the transaction, and the two remote calls must not
  * be in it.
  *
- * Takes `actorId` rather than a viewer on purpose. Authorization is settled
- * before this runs, so there is no role left for it to consult.
+ * Takes `actorId` rather than a viewer on purpose. The caller's `check`
+ * settles authorization, so there is no role left for this to consult.
+ *
+ * The row is read once, locked (`FOR UPDATE`) inside the transaction, and
+ * `check` runs on that locked row rather than on a read made before it. Two
+ * transitions of one project, or one racing a batch, therefore queue on the
+ * row: the second sees the first's committed status and is refused when the
+ * workflow no longer allows its move, instead of writing over it with a
+ * history row naming a status the project had already left.
  */
 async function commitTransition(
   actorId: string,
-  project: typeof projects.$inferSelect,
+  id: string,
   target: ProjectStatus,
   comment: string | null,
+  check: (project: typeof projects.$inferSelect) => void,
   opts?: TransitionOptions
 ): Promise<TransitionResult> {
-  assertChangesRequestedHasComment(target, comment);
+  const project = await db.transaction(async (tx) => {
+    const [locked] = await tx
+      .select()
+      .from(projects)
+      .where(eq(projects.id, id))
+      .for("update");
+    if (!locked) {
+      throw new Error("Project not found");
+    }
+    check(locked);
+    assertChangesRequestedHasComment(target, comment);
 
-  await db.transaction(async (tx) => {
     const updates: Record<string, unknown> = {
       status: target,
       updatedAt: new Date(),
     };
-    if (target === "published" && !project.publishedAt) {
+    if (target === "published" && !locked.publishedAt) {
       updates.publishedAt = new Date();
     }
     if (target === "archived") {
       updates.archivedAt = new Date();
     }
-    await tx.update(projects).set(updates).where(eq(projects.id, project.id));
+    await tx.update(projects).set(updates).where(eq(projects.id, locked.id));
 
     await tx.insert(projectStatusHistory).values({
-      projectId: project.id,
-      oldStatus: project.status,
+      projectId: locked.id,
+      oldStatus: locked.status,
       newStatus: target,
       changedBy: actorId,
       comment,
@@ -713,11 +730,12 @@ async function commitTransition(
 
     await recordStatusChangeNotifications(
       tx,
-      { id: project.id, title: project.title, proposerId: project.proposerId },
+      { id: locked.id, title: locked.title, proposerId: locked.proposerId },
       target,
       actorId,
       comment
     );
+    return locked;
   });
 
   // After the transaction, never inside it: a Bedrock call must not hold a
@@ -780,15 +798,7 @@ export async function performTransitionAs(
   comment?: string,
   opts?: TransitionOptions
 ): Promise<TransitionResult> {
-  const project = await loadProjectOr404(id);
-  if (!isStaff(viewer) && project.proposerId !== viewer.id) {
-    throw new Error("Forbidden");
-  }
   const role: ActorRole = isStaff(viewer) ? "staff" : "owner";
-  assertTransitionAllowed(project.status as ProjectStatus, target, role);
-  if (role === "staff") {
-    assertStaffReturnToDraftHasComment(target, comment ?? null);
-  }
   // Skipping the mail is a staff affordance, so the decision is made here from
   // the role rather than read off the request. `sendEmail` cannot be gated by
   // the schema instead: five owner-reachable endpoints carry it (the three
@@ -800,10 +810,25 @@ export async function performTransitionAs(
   //
   // Ignored rather than rejected: an unexpected `false` is a client bug or a
   // probe, and neither should fail a student's submission.
-  return commitTransition(viewer.id, project, target, comment ?? null, {
-    ...opts,
-    sendEmail: role === "staff" ? (opts?.sendEmail ?? true) : true,
-  });
+  return await commitTransition(
+    viewer.id,
+    id,
+    target,
+    comment ?? null,
+    (project) => {
+      if (role === "owner" && project.proposerId !== viewer.id) {
+        throw new Error("Forbidden");
+      }
+      assertTransitionAllowed(project.status as ProjectStatus, target, role);
+      if (role === "staff") {
+        assertStaffReturnToDraftHasComment(target, comment ?? null);
+      }
+    },
+    {
+      ...opts,
+      sendEmail: role === "staff" ? (opts?.sendEmail ?? true) : true,
+    }
+  );
 }
 
 export async function softDeleteProjectAs(
@@ -928,11 +953,18 @@ export async function forceTransitionAs(
   opts?: TransitionOptions
 ): Promise<TransitionResult> {
   assertStaff(viewer);
-  const project = await loadProjectOr404(id);
-  if (project.status === target) {
-    throw new Error("Project is already in that status.");
-  }
-  return commitTransition(viewer.id, project, target, comment ?? null, opts);
+  return await commitTransition(
+    viewer.id,
+    id,
+    target,
+    comment ?? null,
+    (project) => {
+      if (project.status === target) {
+        throw new Error("Project is already in that status.");
+      }
+    },
+    opts
+  );
 }
 
 // Convenience wrappers that resolve the current user from the request
