@@ -678,11 +678,11 @@ export interface TransitionResult {
  * notifications belong to the transaction, and the two remote calls must not
  * be in it.
  *
- * Takes `actorId` rather than a viewer on purpose. The caller's `check`
- * settles authorization, so there is no role left for this to consult.
+ * Takes `actorId` rather than a viewer on purpose. The caller's
+ * `assertAllowed` settles authorization, so there is no role left for this to consult.
  *
  * The row is read once, locked (`FOR UPDATE`) inside the transaction, and
- * `check` runs on that locked row rather than on a read made before it. Two
+ * `assertAllowed` runs on that locked row rather than on a read made before it. Two
  * transitions of one project, or one racing a batch, therefore queue on the
  * row: the second sees the first's committed status and is refused when the
  * workflow no longer allows its move, instead of writing over it with a
@@ -693,7 +693,7 @@ async function commitTransition(
   id: string,
   target: ProjectStatus,
   comment: string | null,
-  check: (project: typeof projects.$inferSelect) => void,
+  assertAllowed: (project: typeof projects.$inferSelect) => void,
   opts?: TransitionOptions
 ): Promise<TransitionResult> {
   const project = await db.transaction(async (tx) => {
@@ -705,7 +705,7 @@ async function commitTransition(
     if (!locked) {
       throw new Error("Project not found");
     }
-    check(locked);
+    assertAllowed(locked);
     assertChangesRequestedHasComment(target, comment);
 
     const updates: Record<string, unknown> = {
@@ -726,6 +726,10 @@ async function commitTransition(
       newStatus: target,
       changedBy: actorId,
       comment,
+      // The time of the write, not the column's `now()`, which is when the
+      // transaction began: one that began first but waited on the lock would
+      // otherwise sort its row before the move it followed.
+      createdAt: sql`clock_timestamp()`,
     });
 
     await recordStatusChangeNotifications(

@@ -9,7 +9,11 @@ import {
   forceTransitionAs,
   performTransitionAs,
 } from "#/server/_internal/projects";
-import { holdOpen, untilABackendWaitsOn } from "./save-race";
+import {
+  holdOpen,
+  untilABackendWaitsOn,
+  untilBackendsWaitOn,
+} from "./save-race";
 
 /**
  * Two transitions of one project that read it before either writes. Each
@@ -25,12 +29,12 @@ const quiet = {
 };
 
 let seq = 0;
-async function makeStaff() {
+async function makeUser(role: "user" | "admin") {
   const email = `race-${Date.now()}-${seq++}@x.com`;
   await auth.api.createUser({ body: { email, name: email } });
   await db
     .update(user)
-    .set({ emailVerified: true, role: "admin" })
+    .set({ emailVerified: true, role })
     .where(eq(user.email, email));
   const [u] = await db.select().from(user).where(eq(user.email, email));
   return { id: u.id, role: u.role };
@@ -61,34 +65,12 @@ async function statusOf(id: string) {
 }
 
 /**
- * Polls until `count` backends are blocked by any of `pids`. `second` may
- * queue behind `first` for the row lock or wait on the holder itself; either
- * way it is blocked, not done. Gives up after about two seconds, as
- * `untilABackendWaitsOn` does.
- */
-async function untilBlockedCount(pids: number[], count: number) {
-  const list = sql.join(
-    pids.map((pid) => sql`${pid}::int`),
-    sql`, `
-  );
-  for (let i = 0; i < 100; i++) {
-    const result = await db.execute(
-      sql`select count(*)::int as n from pg_stat_activity where pg_blocking_pids(pid) && array[${list}]`
-    );
-    const [{ n }] = result.rows as { n: number }[];
-    if (n >= count) {
-      return;
-    }
-    await new Promise((resolve) => setTimeout(resolve, 20));
-  }
-  throw new Error(`Fewer than ${count} backends ever waited on ${pids}.`);
-}
-
-/**
  * Starts `first` and `second` while another transaction holds the project's
  * row, and releases it only once both are blocked: `first` on the holder,
- * `second` behind `first`. Both have read the project by then, so on a path
- * that reads outside its lock both pass their checks on the same status.
+ * `second` behind `first` or on the holder. A path that reads outside its
+ * lock has read the project by then and blocks only at its write, so both
+ * pass their checks on the same status; a path that locks first blocks at
+ * its read, and the second reads what the first committed.
  */
 async function raceWhileHeld(
   id: string,
@@ -105,7 +87,7 @@ async function raceWhileHeld(
     const firstPid = await untilABackendWaitsOn(holder.pid);
     running.push(second());
     running[1].catch(() => undefined);
-    await untilBlockedCount([holder.pid, firstPid], 2);
+    await untilBackendsWaitOn([holder.pid, firstPid], 2);
   } finally {
     await holder.release();
   }
@@ -118,8 +100,8 @@ afterEach(async () => {
 
 describe("a status transition racing another", () => {
   it("lets one of two staff moves out of approved win, and refuses the other", async () => {
-    const a = await makeStaff();
-    const b = await makeStaff();
+    const a = await makeUser("admin");
+    const b = await makeUser("admin");
     const project = await makeProject("approved");
 
     const results = await raceWhileHeld(
@@ -147,8 +129,8 @@ describe("a status transition racing another", () => {
   });
 
   it("records the status a forced move actually left when a transition lands first", async () => {
-    const a = await makeStaff();
-    const b = await makeStaff();
+    const a = await makeUser("admin");
+    const b = await makeUser("admin");
     const project = await makeProject("approved");
 
     const results = await raceWhileHeld(
@@ -167,8 +149,8 @@ describe("a status transition racing another", () => {
   });
 
   it("refuses the second of two forced moves to the same status", async () => {
-    const a = await makeStaff();
-    const b = await makeStaff();
+    const a = await makeUser("admin");
+    const b = await makeUser("admin");
     const project = await makeProject("submitted");
 
     const results = await raceWhileHeld(
@@ -185,5 +167,31 @@ describe("a status transition racing another", () => {
     expect(history.map((h) => [h.oldStatus, h.newStatus])).toEqual([
       ["submitted", "draft"],
     ]);
+  });
+});
+
+describe("the checks a transition runs on the locked row", () => {
+  it("refuses an owner who is not the proposer, writing nothing", async () => {
+    const stranger = await makeUser("user");
+    const project = await makeProject("draft");
+
+    await expect(
+      performTransitionAs(stranger, project.id, "submitted", undefined, quiet)
+    ).rejects.toThrow("Forbidden");
+
+    expect(await statusOf(project.id)).toBe("draft");
+    expect(await historyFor(project.id)).toEqual([]);
+  });
+
+  it("refuses a project that does not exist", async () => {
+    const admin = await makeUser("admin");
+    const missing = "00000000-0000-4000-8000-000000000000";
+
+    await expect(
+      performTransitionAs(admin, missing, "approved", undefined, quiet)
+    ).rejects.toThrow("Project not found");
+    await expect(
+      forceTransitionAs(admin, missing, "approved", undefined, quiet)
+    ).rejects.toThrow("Project not found");
   });
 });

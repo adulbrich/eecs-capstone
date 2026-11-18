@@ -777,7 +777,7 @@ The `.ts` needs `tsx` and runs on a workstation; the `.mjs` is the ECS task. Bot
 
 ### A transition is lock-first
 
-`commitTransition` reads the project `FOR UPDATE` inside its transaction and runs the caller's checks (owner, `assertTransitionAllowed`, force's same-status refusal) on that row, so two transitions of one project queue and the second sees the first's status. A read before the transaction would let both pass and the loser overwrite the winner, with a history row naming a status the project had left. `project-transition-race.integration.test.ts` pins it.
+`commitTransition` reads the project `FOR UPDATE` inside its transaction and runs the caller's checks (owner, `assertTransitionAllowed`, force's same-status refusal) on that row, so two transitions of one project queue and the second sees the first's status. A read before the transaction would let both pass and the loser overwrite the winner, with a history row naming a status the project had left. The history row takes `clock_timestamp()`, since the column's `now()` is the transaction's start and would sort a lock waiter's row before the move it followed. `project-transition-race.integration.test.ts` pins the lock.
 
 ### `sendEmail` is decided by role in `performTransitionAs`, not by the schema
 
