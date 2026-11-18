@@ -70,7 +70,7 @@ export function resolveProposerAddress(
  * console transport means staff are never told, and nothing else in the app
  * surfaces that. Under `ses` the app refuses to boot without one.
  */
-function warnNoStaffInbox(what: string, projectId: string): void {
+export function warnNoStaffInbox(what: string, projectId: string): void {
   console.warn(
     `EMAIL_STAFF_INBOX is unset, so no ${what} was sent for project ${projectId}`
   );

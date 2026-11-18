@@ -32,6 +32,7 @@ const config = defineConfig(({ mode }) => ({
           "./src/nitro/config-check.ts",
           "./src/nitro/keep-alive-timeout.ts",
           "./src/nitro/asset-error-headers.ts",
+          "./src/nitro/staff-edit-email-sweep.ts",
         ],
         rollupConfig: { external: [SENTRY_PACKAGE] },
       }),
