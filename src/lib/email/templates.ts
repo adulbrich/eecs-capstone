@@ -33,7 +33,8 @@ const WHITESPACE_RUN = /[\s\u{85}]+/gu;
  * inside a sentence. A title, an account name and a custom line's name all
  * accept line breaks, and one in the plain-text body would start a line of
  * the email's own, a fake call to action and its link included. Prose (a
- * description, a comment) keeps its paragraphs and does not come through here.
+ * description, a comment) keeps its paragraphs and is quoted instead
+ * (`Quote`).
  */
 export function oneLine(text: string): string {
   return text.replace(WHITESPACE_RUN, " ").trim();
@@ -44,24 +45,71 @@ function oneLineOrNull(text: string | null): string | null {
   return text === null ? null : oneLine(text) || null;
 }
 
-const EXCERPT_LIMIT = 600;
-
-/** The first part of a long text, with a pointer at the rest. */
-function excerpt(text: string, truncationNote: string): string {
-  if (text.length <= EXCERPT_LIMIT) {
-    return text;
-  }
-  return `${text.slice(0, EXCERPT_LIMIT)}...
-
-${truncationNote}`;
+/**
+ * Words a person wrote, under the email's own label: a description, a
+ * comment, a staff note, a ban reason. The text part opens every line of them
+ * with "> ", as a mail client quotes a reply, and the HTML part puts them in a
+ * blockquote, so no line of a proposer's description can pass for the email's
+ * own, its call to action included. A link in them is still a link; the quote
+ * says whose it is, and `layout` puts the email's own link above it.
+ */
+interface Quote {
+  label: string;
+  prose: string;
 }
 
-function summarize(description: string | null): string {
+type Paragraph = string | Quote;
+
+// Unicode's mandatory line breaks, CRLF as one: a mail client may break on
+// any of them, and a line it breaks must still open with "> ".
+const LINE_BREAK = /\r\n|[\n\v\f\r\u{85}\u{2028}\u{2029}]/u;
+
+// Takes a CRLF blank line whole, counts a line of only whitespace (a no-break
+// space included) as blank, and leaves the next paragraph's indent alone.
+const BLANK_LINE = /\r?\n(?:[^\S\r\n]*\r?\n)+/u;
+
+function quoteText({ label, prose }: Quote): string {
+  const lines = prose
+    .split(LINE_BREAK)
+    .map((line) => (line.trim() === "" ? ">" : `> ${line}`));
+  return [label, ...lines].join("\n");
+}
+
+function quoteHtml({ label, prose }: Quote): string {
+  const paragraphs = prose
+    .split(BLANK_LINE)
+    .map((p) => `<p>${escapeHtml(p)}</p>`)
+    .join("");
+  return `<p>${escapeHtml(label)}</p><blockquote>${paragraphs}</blockquote>`;
+}
+
+const EXCERPT_LIMIT = 600;
+
+/** A person's words, the first part of them when long, then where the rest is. */
+function excerpt(
+  label: string,
+  text: string,
+  truncationNote: string
+): Paragraph[] {
+  if (text.length <= EXCERPT_LIMIT) {
+    return [{ label, prose: text }];
+  }
+  return [
+    { label, prose: `${text.slice(0, EXCERPT_LIMIT)}...` },
+    truncationNote,
+  ];
+}
+
+function summarize(description: string | null): Paragraph[] {
   const trimmed = description?.trim() ?? "";
   if (!trimmed) {
-    return "(No description provided.)";
+    return ["Description: (No description provided.)"];
   }
-  return excerpt(trimmed, "Open the project to read the full proposal.");
+  return excerpt(
+    "Description:",
+    trimmed,
+    "Open the project to read the full proposal."
+  );
 }
 
 /**
@@ -78,24 +126,34 @@ function describeProposer(name: string | null, email: string | null): string {
 }
 
 /**
- * Renders the shared shell: paragraphs then a single call to action. Every
+ * Renders the shared shell: paragraphs and a single call to action. Every
  * paragraph is escaped for the HTML alternative because callers pass
  * user-supplied titles, descriptions, and staff comments through here.
  *
- * The call to action is optional for the one message about a row that no
- * longer exists (`projectDeletedEmail`); everything else has a page to open.
+ * The call to action comes last, or above the first `Quote` when there is
+ * one, so the email's own link is the first a reader meets. It is optional
+ * for the messages that have no page to open (`projectDeletedEmail`).
  */
 function layout(
-  paragraphs: string[],
+  paragraphs: Paragraph[],
   cta: { label: string; url: string } | null
 ): { html: string; text: string } {
-  const body = paragraphs.map((p) => `<p>${escapeHtml(p)}</p>`).join("");
-  if (!cta) {
-    return { html: body, text: `${paragraphs.join("\n\n")}\n` };
+  const parts = paragraphs.map((p) =>
+    typeof p === "string"
+      ? { html: `<p>${escapeHtml(p)}</p>`, text: p }
+      : { html: quoteHtml(p), text: quoteText(p) }
+  );
+  if (cta) {
+    const firstQuote = paragraphs.findIndex((p) => typeof p !== "string");
+    parts.splice(firstQuote === -1 ? parts.length : firstQuote, 0, {
+      html: `<p><a href="${escapeHtml(cta.url)}">${escapeHtml(cta.label)}</a></p>`,
+      text: `${cta.label}: ${cta.url}`,
+    });
   }
-  const text = `${paragraphs.join("\n\n")}\n\n${cta.label}: ${cta.url}\n`;
-  const link = `<p><a href="${escapeHtml(cta.url)}">${escapeHtml(cta.label)}</a></p>`;
-  return { html: `${body}${link}`, text };
+  return {
+    html: parts.map((p) => p.html).join(""),
+    text: `${parts.map((p) => p.text).join("\n\n")}\n`,
+  };
 }
 
 /**
@@ -139,7 +197,7 @@ export function projectSubmittedEmail(input: {
       [
         `${who} submitted a project for review.`,
         `Title: ${title}`,
-        `Description: ${summarize(input.description)}`,
+        ...summarize(input.description),
       ],
       { label: "Review the project", url: input.url }
     ),
@@ -152,23 +210,19 @@ export function projectApprovedEmail(input: {
   url: string;
 }): RenderedEmail {
   const title = oneLine(input.title);
-  const paragraphs = [
+  const paragraphs: Paragraph[] = [
     `Your project "${title}" has been approved.`,
     "It will be published to the project list later. You will not receive another email when that happens.",
   ];
   const note = input.comment?.trim();
   if (note) {
-    paragraphs.push(`Note from the reviewer: ${note}`);
+    paragraphs.push({ label: "Note from the reviewer:", prose: note });
   }
   return {
     subject: `Your project was approved: ${title}`,
     ...layout(paragraphs, { label: "View your project", url: input.url }),
   };
 }
-
-// Takes a CRLF blank line whole, counts a line of only whitespace (a no-break
-// space included) as blank, and leaves the next paragraph's indent alone.
-const BLANK_LINE = /\r?\n(?:[^\S\r\n]*\r?\n)+/u;
 
 /**
  * A bell row, mailed. The inventory notices already say the one thing the
@@ -254,7 +308,7 @@ export function accountSuspendedEmail(input: {
     ...layout(
       [
         `An administrator suspended your capstone account ${until}.`,
-        `Reason: ${input.reason}`,
+        { label: "Reason:", prose: input.reason.trim() },
         "Reply to this email if you think this is a mistake.",
       ],
       null
@@ -326,8 +380,12 @@ export function projectCommentEmail(input: {
     subject: `New comment on your project: ${title}`,
     ...layout(
       [
-        `Staff commented on "${title}":`,
-        excerpt(input.content.trim(), "Open the project to read the rest."),
+        `Staff commented on "${title}".`,
+        ...excerpt(
+          "Comment:",
+          input.content.trim(),
+          "Open the project to read the rest."
+        ),
       ],
       { label: "Read and reply", url: input.url }
     ),
@@ -352,8 +410,12 @@ export function proposerCommentEmail(input: {
     subject: `Comment from the proposer: ${title}`,
     ...layout(
       [
-        `${who} commented on "${title}":`,
-        excerpt(input.content.trim(), "Open the project to read the rest."),
+        `${who} commented on "${title}".`,
+        ...excerpt(
+          "Comment:",
+          input.content.trim(),
+          "Open the project to read the rest."
+        ),
       ],
       { label: "Read and reply", url: input.url }
     ),
@@ -389,15 +451,16 @@ export function proposerEditsEmail(input: {
     .map((e) => describeProposer(e.name, e.email))
     .join(" and ");
   const title = oneLine(input.title);
-  // The values arrive on one line: `staffEditEmail` compares them that way.
+  // `staffEditEmail` puts the values on one line to compare them; doing it
+  // again costs nothing and keeps this template safe without it.
   const quotedLines = input.changes.flatMap((c) => {
     if (!c.values) {
       return [];
     }
-    const line = `${c.label}: ${c.values.before} to ${c.values.after}.`;
+    const line = `${c.label}: ${oneLine(c.values.before)} to ${oneLine(c.values.after)}.`;
     return [
       c.movedOn
-        ? `${line} It has changed since and is now ${c.values.live}.`
+        ? `${line} It has changed since and is now ${oneLine(c.values.live)}.`
         : line,
     ];
   });
@@ -432,12 +495,12 @@ export function projectReturnedToDraftEmail(input: {
   url: string;
 }): RenderedEmail {
   const title = oneLine(input.title);
-  const paragraphs = [
+  const paragraphs: Paragraph[] = [
     `Your project "${title}" was returned to draft by staff.`,
   ];
   const note = input.comment?.trim();
   if (note) {
-    paragraphs.push(`Why: ${note}`);
+    paragraphs.push({ label: "Why:", prose: note });
   }
   paragraphs.push("Update the project and submit it again when it is ready.");
   return {
@@ -457,7 +520,7 @@ export function projectChangesRequestedEmail(input: {
     ...layout(
       [
         `Your project "${title}" needs changes before it can be approved.`,
-        `What needs to change: ${input.comment}`,
+        { label: "What needs to change:", prose: input.comment.trim() },
         "Update the project and submit it again for review.",
       ],
       { label: "Revise your project", url: input.url }

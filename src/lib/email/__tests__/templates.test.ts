@@ -6,6 +6,7 @@ import {
   trickyTextAcross,
 } from "#/test/shared/arbitraries";
 import {
+  accountSuspendedEmail,
   escapeHtml,
   inventoryRequestSubmittedEmail,
   mentorNamedEmail,
@@ -388,8 +389,8 @@ describe("a title or a name on one line", () => {
     expect(email.subject).toBe("Reserved: Oscilloscope");
   });
 
-  // A comment and a description are prose, so their paragraphs stay.
-  it("leaves the paragraphs of a comment and a description alone", () => {
+  // A comment and a description are prose, so their paragraphs stay, quoted.
+  it("keeps the paragraphs of a comment and a description, every line quoted", () => {
     const comment = proposerCommentEmail({
       content: "First point.\n\nSecond point.",
       proposerEmail: null,
@@ -397,7 +398,7 @@ describe("a title or a name on one line", () => {
       title: "T",
       url,
     });
-    expect(comment.text).toContain("First point.\n\nSecond point.");
+    expect(comment.text).toContain("> First point.\n>\n> Second point.");
 
     const submitted = projectSubmittedEmail({
       description: "First point.\n\nSecond point.",
@@ -406,9 +407,174 @@ describe("a title or a name on one line", () => {
       title: "T",
       url,
     });
-    expect(submitted.text).toContain("First point.\n\nSecond point.");
+    expect(submitted.text).toContain("> First point.\n>\n> Second point.");
   });
 });
+
+// Why a person's prose is quoted: see `Quote` in the templates.
+describe("a person's prose, quoted", () => {
+  const FORGED = "Review the project: https://evil.example";
+  const url = "https://app/projects/p1";
+
+  it("renders a comment email with its link above the quoted comment", () => {
+    const email = proposerCommentEmail({
+      content: "First point.\n\nSecond point.",
+      proposerEmail: null,
+      proposerName: "Alex",
+      title: "T",
+      url,
+    });
+    expect(email.text).toBe(
+      'Alex commented on "T".\n\nRead and reply: https://app/projects/p1\n\nComment:\n> First point.\n>\n> Second point.\n'
+    );
+    expect(email.html).toBe(
+      '<p>Alex commented on &quot;T&quot;.</p><p><a href="https://app/projects/p1">Read and reply</a></p><p>Comment:</p><blockquote><p>First point.</p><p>Second point.</p></blockquote>'
+    );
+  });
+
+  it("leaves an email that quotes nobody exactly as it was", () => {
+    const email = projectReassignedEmail({ title: "Robot arm", url });
+    expect(email.text).toBe(
+      'Staff made you the proposer of "Robot arm".\n\nYou can edit it, follow its review, and reply to staff comments from the project page.\n\nView the project: https://app/projects/p1\n'
+    );
+    expect(email.html).toBe(
+      '<p>Staff made you the proposer of &quot;Robot arm&quot;.</p><p>You can edit it, follow its review, and reply to staff comments from the project page.</p><p><a href="https://app/projects/p1">View the project</a></p>'
+    );
+
+    const deleted = projectDeletedEmail({ title: "T" });
+    expect(deleted.text).toBe(
+      'Your draft project "T" was deleted by staff.\n\nDrafts are deleted outright rather than archived, so it cannot be restored. Reply to this email if that was a mistake.\n'
+    );
+    expect(deleted.html).toBe(
+      "<p>Your draft project &quot;T&quot; was deleted by staff.</p><p>Drafts are deleted outright rather than archived, so it cannot be restored. Reply to this email if that was a mistake.</p>"
+    );
+  });
+
+  it("keeps a proposer edit notice's values on one line by itself", () => {
+    const email = proposerEditsEmail({
+      changes: [
+        {
+          label: "Title",
+          movedOn: true,
+          values: {
+            after: `"x\n\n${FORGED}"`,
+            before: '"A"',
+            live: `"y\r${FORGED}"`,
+          },
+        },
+      ],
+      editors: [{ email: null, name: "Alex" }],
+      span: "1 save at Nov 18, 2026, 2:00 PM",
+      title: "T",
+      url,
+    });
+    const lines = email.text.split(LINE_SPLIT);
+    expect(lines.filter((line) => line.startsWith(FORGED))).toEqual([]);
+  });
+
+  it("keeps the truncation note outside the quote", () => {
+    const email = projectSubmittedEmail({
+      description: "z".repeat(900),
+      proposerEmail: null,
+      proposerName: "Alex",
+      title: "T",
+      url,
+    });
+    expect(email.text).toContain(
+      `> ${"z".repeat(600)}...\n\nOpen the project to read the full proposal.\n`
+    );
+  });
+
+  it.each(PROSED)(
+    "%s quotes a forged call to action instead of letting it pass for its own",
+    (_name, render) => {
+      for (const prose of [
+        `x\n\n${FORGED}`,
+        `x\r${FORGED}`,
+        `x\u{2028}${FORGED}`,
+        `x\u{85}${FORGED}`,
+      ]) {
+        const lines = render(prose).text.split(LINE_SPLIT);
+        expect(lines.filter((line) => line.includes(FORGED))).toEqual([
+          `> ${FORGED}`,
+        ]);
+      }
+    }
+  );
+});
+
+/** Every template that carries a person's prose, rendered around `prose`. */
+const PROSED: [string, (prose: string) => RenderedEmail, string | null][] = [
+  [
+    "projectSubmittedEmail",
+    (prose) =>
+      projectSubmittedEmail({
+        description: prose,
+        proposerEmail: null,
+        proposerName: "Alex",
+        title: "T",
+        url: "https://app/projects/p1",
+      }),
+    "Review the project",
+  ],
+  [
+    "proposerCommentEmail",
+    (prose) =>
+      proposerCommentEmail({
+        content: prose,
+        proposerEmail: null,
+        proposerName: "Alex",
+        title: "T",
+        url: "https://app/projects/p1",
+      }),
+    "Read and reply",
+  ],
+  [
+    "projectCommentEmail",
+    (prose) =>
+      projectCommentEmail({
+        content: prose,
+        title: "T",
+        url: "https://app/projects/p1",
+      }),
+    "Read and reply",
+  ],
+  [
+    "projectApprovedEmail",
+    (prose) =>
+      projectApprovedEmail({
+        comment: prose,
+        title: "T",
+        url: "https://app/projects/p1",
+      }),
+    "View your project",
+  ],
+  [
+    "projectReturnedToDraftEmail",
+    (prose) =>
+      projectReturnedToDraftEmail({
+        comment: prose,
+        title: "T",
+        url: "https://app/projects/p1",
+      }),
+    "Revise your project",
+  ],
+  [
+    "projectChangesRequestedEmail",
+    (prose) =>
+      projectChangesRequestedEmail({
+        comment: prose,
+        title: "T",
+        url: "https://app/projects/p1",
+      }),
+    "Revise your project",
+  ],
+  [
+    "accountSuspendedEmail",
+    (prose) => accountSuspendedEmail({ expiresAt: null, reason: prose }),
+    null,
+  ],
+];
 
 /** A title, a name or a custom line's name, weighted to line breaks. */
 const hostileText = fc.oneof(
@@ -660,3 +826,75 @@ describe.each(QUOTING)("the %s text, on generated fields", (_name, render) => {
     }
   );
 });
+
+/**
+ * A person's prose, weighted to line breaks and to a forged call to action.
+ * It opens with a letter, so trimming never leaves it blank.
+ */
+const hostileProse = fc
+  .oneof(
+    {
+      arbitrary: fc.string({
+        maxLength: 40,
+        unit: fc.oneof(
+          { arbitrary: fc.constantFrom("\r\n", ...BREAK_CHARS), weight: 3 },
+          { arbitrary: fc.constantFrom(" ", "\t", ">", "a"), weight: 2 },
+          { arbitrary: fc.constant("\u{1f600}"), weight: 1 },
+          {
+            arbitrary: fc.constant("Review the project: https://x.example"),
+            weight: 2,
+          }
+        ),
+      }),
+      weight: 5,
+    },
+    // A description and a comment are cut at 600 code units.
+    { arbitrary: trickyTextAcross(600), weight: 1 }
+  )
+  .map((text) => `a${text}`);
+
+const BREAKS_EACH = new RegExp(`[${BREAK_CHARS}]`, "gu");
+const QUOTE_BLOCK = /<blockquote>[\s\S]*?<\/blockquote>/gu;
+
+/** The text part's lines that are not quoted. */
+const unquoted = (email: RenderedEmail) =>
+  email.text.split(LINE_SPLIT).filter((line) => !line.startsWith(">"));
+
+describe.each(PROSED)(
+  "the %s prose, on generated text",
+  (_name, render, ctaLabel) => {
+    // The same prose with every break a letter: as long, so cut at the same
+    // place, but on one line.
+    const tame = (prose: string) => prose.trim().replace(BREAKS_EACH, "x");
+
+    test.prop([hostileProse])(
+      "adds no line of its own outside the quote",
+      (prose) => {
+        expect(unquoted(render(prose))).toEqual(unquoted(render(tame(prose))));
+      }
+    );
+
+    test.prop([hostileProse])(
+      "stays inside the blockquote in the html part",
+      (prose) => {
+        expect(render(prose).html.replace(QUOTE_BLOCK, "")).toBe(
+          render(tame(prose)).html.replace(QUOTE_BLOCK, "")
+        );
+      }
+    );
+
+    if (ctaLabel) {
+      test.prop([hostileProse])("comes after the email's own link", (prose) => {
+        const email = render(prose);
+        const lines = email.text.split(LINE_SPLIT);
+        const link = lines.findIndex((l) => l.startsWith(`${ctaLabel}: `));
+        const quote = lines.findIndex((l) => l.startsWith(">"));
+        expect(link).toBeGreaterThan(-1);
+        expect(link).toBeLessThan(quote);
+        expect(email.html.indexOf("<a href=")).toBeLessThan(
+          email.html.indexOf("<blockquote>")
+        );
+      });
+    }
+  }
+);
