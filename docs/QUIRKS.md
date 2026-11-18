@@ -775,6 +775,10 @@ It orders "Recently updated", so a writer sets it only when a field in `projectD
 
 The `.ts` needs `tsx` and runs on a workstation; the `.mjs` is the ECS task. Both re-embed a row whose stored hash no longer matches. **Run a sweeper after every import, not only the first:** `import-legacy.mjs` writes text without touching the embedding columns.
 
+### A transition is lock-first
+
+`commitTransition` reads the project `FOR UPDATE` inside its transaction and runs the caller's checks (owner, `assertTransitionAllowed`, force's same-status refusal) on that row, so two transitions of one project queue and the second sees the first's status. A read before the transaction would let both pass and the loser overwrite the winner, with a history row naming a status the project had left. The history row takes `clock_timestamp()`, since the column's `now()` is the transaction's start and would sort a lock waiter's row before the move it followed. `project-transition-race.integration.test.ts` pins the lock.
+
 ### `sendEmail` is decided by role in `performTransitionAs`, not by the schema
 
 Skipping an email is staff-only, decided from the caller's role, because one validator serves staff and owners; a non-staff `sendEmail: false` is ignored. `SEND_EMAIL_FIELD` is spread into each wire schema, and the `*ForCurrentUser` wrapper moves it into `EmailOptions`, off the row input. The bell row is still written. Inventory's `silent` differs: it drops both channels and is refused for self-service. UI: `docs/UI-CONVENTIONS.md`, "The email skip".

@@ -145,6 +145,33 @@ export async function untilSettledOrWaitingOn(
   throw new Error(`The writer neither finished nor waited on ${pid}.`);
 }
 
+/**
+ * Polls until `count` backends are blocked by any of `pids`, for a test that
+ * queues several writers: the second may wait behind the first for a row
+ * lock rather than on the holder itself. Gives up like
+ * `untilABackendWaitsOn`.
+ */
+export async function untilBackendsWaitOn(
+  pids: number[],
+  count: number
+): Promise<void> {
+  const list = sql.join(
+    pids.map((pid) => sql`${pid}::int`),
+    sql`, `
+  );
+  for (let i = 0; i < 100; i++) {
+    const result = await db.execute(
+      sql`select count(*)::int as n from pg_stat_activity where pg_blocking_pids(pid) && array[${list}]`
+    );
+    const [{ n }] = result.rows as { n: number }[];
+    if (n >= count) {
+      return;
+    }
+    await pause();
+  }
+  throw new Error(`Fewer than ${count} backends ever waited on ${pids}.`);
+}
+
 async function backendWaitingOn(pid: number): Promise<number | null> {
   const result = await db.execute(
     sql`select pid from pg_stat_activity where ${pid}::int = any(pg_blocking_pids(pid)) limit 1`
