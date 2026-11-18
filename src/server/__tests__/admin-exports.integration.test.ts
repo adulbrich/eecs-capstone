@@ -65,7 +65,6 @@ const ALL_PROJECTS = {
   studentProposedOnly: false,
   to: null,
   withoutMentorOnly: false,
-  editedByProposerOnly: false,
 };
 
 describe("admin project export", () => {

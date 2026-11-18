@@ -398,7 +398,6 @@ describe("deleteAccountAs", () => {
       studentProposedOnly: false,
       to: null,
       withoutMentorOnly: false,
-      editedByProposerOnly: false,
     });
     const mine = listed.rows.find((r) => r.id === id);
     expect(mine?.proposerName).toBe("Deleted user");

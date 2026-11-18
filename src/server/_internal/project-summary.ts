@@ -135,20 +135,12 @@ export const inNoProgram: SQL = sql`NOT EXISTS (
 )`;
 
 /**
- * The admin list's "edited by the proposer after approval" switch (#839): a
- * project with an edit its proposer made while it was approved or published.
- * `staff_email_due` is that fact, set at insert for exactly those edits and
- * never cleared. Rows from before #839 carry no flag, so an edit made before
- * then does not count; the switch's hint on the page says so.
- */
-export const editedByProposerAfterApproval: SQL = sql`EXISTS (
-  SELECT 1 FROM project_edit_log pel
-  WHERE pel.project_id = ${OUTER_PROJECT_ID} AND pel.staff_email_due
-)`;
-
-/**
- * The latest such edit, or null, for the staff table's column and the CSV.
- * Mapped through the column so it arrives as a `Date`, as `createdAt` does.
+ * The latest edit the proposer made while the project was approved or
+ * published (#839), or null, for the staff table's sortable column and the
+ * CSV. `staff_email_due` is that fact, set at insert for exactly those edits
+ * and never cleared. Rows from before #839 carry no flag, so an edit made
+ * before then does not count; the column's header hint says so. Mapped
+ * through the column so it arrives as a `Date`, as `createdAt` does.
  */
 export const proposerEditedAtSql = sql<Date | null>`(
   SELECT max(pel.created_at) FROM project_edit_log pel

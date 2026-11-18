@@ -48,7 +48,6 @@ import { projectCategoryRows } from "./categories";
 import {
   adminProjectListSelect,
   adminProjectSummarySelect,
-  editedByProposerAfterApproval,
   inNoProgram,
   mentorNameSql,
   projectCategoriesText,
@@ -223,10 +222,6 @@ function buildAdminProjectScope(
   // this is the to-do the mentors page is matched against.
   if (data.withoutMentorOnly) {
     scope.push(isNull(projects.mentorEmail));
-  }
-  // Staff-only: the proposer changed it after staff approved it (#839).
-  if (data.editedByProposerOnly) {
-    scope.push(editedByProposerAfterApproval);
   }
   return scope;
 }

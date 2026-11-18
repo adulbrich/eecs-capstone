@@ -107,7 +107,6 @@ function filter(
     requiresNdaOnly: false,
     studentProposedOnly: false,
     withoutMentorOnly: false,
-    editedByProposerOnly: false,
     ...overrides,
   };
 }
@@ -1206,7 +1205,7 @@ describe("admin projects flag switches", () => {
   });
 });
 
-describe("listAdminProjectsAs, edited by the proposer after approval (#839)", () => {
+describe("listAdminProjectsAs, the Proposer edit column (#839)", () => {
   async function published(
     proposer: { id: string; role: string | null },
     title: string
@@ -1219,13 +1218,14 @@ describe("listAdminProjectsAs, edited by the proposer after approval (#839)", ()
     return project;
   }
 
-  it("lists a project its proposer edited while published, and omits one only staff edited", async () => {
+  it("dates a project its proposer edited while published, and leaves one only staff edited, or edited as a draft, empty", async () => {
     const at = Date.now();
     const admin = await makeAdmin(`pe-a-${at}@x.com`);
     const proposer = await makeProposer(`pe-p-${at}@x.com`);
     const byProposer = await published(proposer, "Edited by proposer");
     const byStaff = await published(proposer, "Edited by staff");
-    await published(proposer, "Not edited");
+    const untouched = await published(proposer, "Not edited");
+    const draft = await createProjectAs(proposer, baseProject("Draft"));
     await updateProjectAs(proposer, {
       ...baseProject("Edited by proposer, v2"),
       id: byProposer.id,
@@ -1234,32 +1234,16 @@ describe("listAdminProjectsAs, edited by the proposer after approval (#839)", ()
       ...baseProject("Edited by staff, v2"),
       id: byStaff.id,
     });
-
-    const { rows } = await listAdminProjectsAs(
-      admin,
-      filter({ editedByProposerOnly: true })
-    );
-    expect(rows.map((r) => r.id)).toEqual([byProposer.id]);
-    expect(rows[0].proposerEditedAt).toBeInstanceOf(Date);
-
-    const all = await listAdminProjectsAs(admin, filter());
-    const byId = new Map(all.rows.map((r) => [r.id, r]));
-    expect(byId.get(byStaff.id)?.proposerEditedAt).toBeNull();
-  });
-
-  it("omits a project its proposer edited only while it was a draft", async () => {
-    const at = Date.now();
-    const admin = await makeAdmin(`pe-d-a-${at}@x.com`);
-    const proposer = await makeProposer(`pe-d-p-${at}@x.com`);
-    const draft = await createProjectAs(proposer, baseProject("Draft"));
     await updateProjectAs(proposer, {
       ...baseProject("Draft, v2"),
       id: draft.id,
     });
-    const { rows } = await listAdminProjectsAs(
-      admin,
-      filter({ editedByProposerOnly: true })
-    );
-    expect(rows).toEqual([]);
+
+    const { rows } = await listAdminProjectsAs(admin, filter());
+    const byId = new Map(rows.map((r) => [r.id, r]));
+    expect(byId.get(byProposer.id)?.proposerEditedAt).toBeInstanceOf(Date);
+    expect(byId.get(byStaff.id)?.proposerEditedAt).toBeNull();
+    expect(byId.get(untouched.id)?.proposerEditedAt).toBeNull();
+    expect(byId.get(draft.id)?.proposerEditedAt).toBeNull();
   });
 });

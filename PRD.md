@@ -501,8 +501,8 @@ catalogue that decided the matrix below; #288 shipped it.
   markdown fields and private notes carry only their names and the edit log
   link, because the inbox is shared and forwarded. A save and its undo send
   nothing. The staff panel's edit log shows any row's old and new values on
-  demand, and the admin projects list filters to these projects with the
-  latest such edit's date as a column. Sent by a sweep a request starts
+  demand, and the admin projects list has the latest such edit's date as a
+  sortable column. Sent by a sweep a request starts
   (ADR-0071), so delivery is at least once.
 - [x] The proposer address is the linked account's email, else the stored
   proposer email, else nothing is sent. An inventory holder with an address
@@ -534,7 +534,7 @@ catalogue that decided the matrix below; #288 shipped it.
   | Staff inbox | Borrow list submitted | tile | yes |
   | Staff inbox | Custom request submitted | tile | yes |
   | Staff inbox | Comment from the proposer | no | yes |
-  | Staff inbox | Proposer edited an approved or published project | admin list filter | yes, one per burst of saves, after they stop (ADR-0071) |
+  | Staff inbox | Proposer edited an approved or published project | admin list column | yes, one per burst of saves, after they stop (ADR-0071) |
   | Staff inbox | New account | no | no |
   | Holder | Request approved, pickup window, place and note | yes | yes |
   | Requester | Request rejected | yes | yes |
