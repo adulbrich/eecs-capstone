@@ -786,9 +786,13 @@ test("admin placement, a run on the results board", async ({ page }) => {
   await page.getByRole("combobox", { name: "Download as" }).click();
   await page.getByRole("option", { name: "Canvas groups" }).click();
   await expect(page.getByRole("listbox")).toHaveCount(0);
+  // The rest of the description, and the board's rules, open (#739).
+  await page.getByRole("button", { name: "More about Canvas groups" }).click();
+  await page.getByRole("button", { name: "How the board works" }).click();
   await expect(
     page.getByText(/Canvas matches each student by their login/u)
   ).toBeVisible();
+  await expect(page.getByText(/^Pin here on the Bids tab/u)).toBeVisible();
   await checkA11y(page);
 
   // A student's bids open under their row (#687), with Move here on each.
@@ -851,6 +855,22 @@ test("admin placement, a run on the results board", async ({ page }) => {
   await page.getByRole("button", { name: "Per project" }).click();
   await expect(page.getByText(/^Placed here, team /u).first()).toBeVisible();
   await checkA11y(page);
+
+  // A parameter change puts the banner out of date and fades the figures
+  // (#739), at both widths.
+  await page.getByRole("tab", { name: "Parameters" }).click();
+  await page.getByLabel("Max students per team").fill("9");
+  await page.keyboard.press("Tab");
+  await page.getByRole("tab", { name: "Results" }).click();
+  await expect(
+    page.getByRole("region", { name: "Placement run" })
+  ).toContainText("Out of date");
+  await expect(page.getByText("before your changes")).toBeVisible();
+  await checkA11y(page);
+  await page.setViewportSize({ width: 375, height: 812 });
+  await checkA11y(page);
+  await expectNoHorizontalOverflow(page);
+  await page.setViewportSize({ width: 1280, height: 720 });
 
   await page.getByRole("button", { name: "Analytics" }).click();
   await expect(

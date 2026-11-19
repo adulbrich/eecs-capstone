@@ -6,8 +6,6 @@ import {
   FoldVertical,
   Pin,
   PinOff,
-  Play,
-  Square,
   TriangleAlert,
   UnfoldVertical,
 } from "lucide-react";
@@ -27,6 +25,8 @@ import {
 import { ErrorBanner } from "#/components/error-banner";
 import { DownloadAs } from "#/components/placement/download-as";
 import { StudentMenu } from "#/components/placement/removed-students";
+import { RuleDisclosure } from "#/components/placement/rule-disclosure";
+import { RunBanner, runBannerState } from "#/components/placement/run-banner";
 import type { PlacementWorkspace } from "#/components/placement/use-placement-workspace";
 import { Badge } from "#/components/ui/badge";
 import { Button } from "#/components/ui/button";
@@ -87,10 +87,15 @@ import {
 import type { SortState } from "#/lib/table-state";
 import { useAdminTable } from "#/lib/use-admin-table";
 import { useLocalTableSearch } from "#/lib/use-local-table-search";
+import { cn } from "#/lib/utils";
 
 const DEFAULT_SORT: SortState = { desc: false, id: "student" };
 
 const WARNING_STYLE = { color: "var(--status-warning)" };
+const STALE_MARK_STYLE = {
+  backgroundColor: "var(--status-neutral-bg)",
+  color: "var(--status-neutral)",
+};
 
 const NO_FOLDS: ReadonlyMap<string, boolean> = new Map();
 
@@ -222,55 +227,26 @@ export function ResultsTab({
     [result, students, allProjects]
   );
 
+  // The board is from inputs that have changed, failed run or not: the
+  // figures say so either way, and `runBannerState` keeps the banner quiet
+  // about it after a failure (#680).
+  const boardStale = result !== undefined && isStale(result, fingerprint);
+
   return (
     <div>
-      <div className="flex flex-wrap items-center gap-2">
-        {running ? (
-          <Button
-            onClick={() => abort.current?.abort()}
-            size="sm"
-            type="button"
-            variant="outline"
-          >
-            <Square aria-hidden="true" />
-            Cancel
-          </Button>
-        ) : (
-          <Button
-            disabled={missing !== null}
-            onClick={() => void run()}
-            size="sm"
-            type="button"
-          >
-            <Play aria-hidden="true" />
-            {result ? "Run placement again" : "Run placement"}
-          </Button>
-        )}
-        {running && (
-          <span aria-live="polite" className="text-muted-foreground text-sm">
-            Placing {students.length} students...
-          </span>
-        )}
-      </div>
-      {result && (
-        <div className="mt-4 flex flex-wrap items-start gap-x-6 gap-y-2">
-          <DownloadAs
-            dataset="placement"
-            filename={`placement-${today()}.csv`}
-            text={() => placementCsv(rows, titles)}
-          >
-            Download placement
-          </DownloadAs>
-          <DownloadAs
-            dataset="bids"
-            filename={`bids-with-pins-${today()}.csv`}
-            text={() => bidsWithPinsCsv(students, titles)}
-          >
-            Download bids with pins
-          </DownloadAs>
-        </div>
-      )}
-      {missing && <p className="mt-2 text-sm">{missing}</p>}
+      <RunBanner
+        hasResult={result !== undefined}
+        onCancel={() => abort.current?.abort()}
+        onRun={() => void run()}
+        state={runBannerState({
+          failed: failure !== null,
+          missing,
+          ranAt: result?.at,
+          running,
+          stale: boardStale,
+          students: students.length,
+        })}
+      />
       <FieldError message={error} />
       {failed &&
         failure === null &&
@@ -301,15 +277,31 @@ export function ResultsTab({
       )}
       {result && (
         <Board
+          downloads={
+            <div className="mt-4 flex flex-wrap items-start gap-x-6 gap-y-2">
+              <DownloadAs
+                dataset="placement"
+                filename={`placement-${today()}.csv`}
+                text={() => placementCsv(rows, titles)}
+              >
+                Download placement
+              </DownloadAs>
+              <DownloadAs
+                dataset="bids"
+                filename={`bids-with-pins-${today()}.csv`}
+                text={() => bidsWithPinsCsv(students, titles)}
+              >
+                Download bids with pins
+              </DownloadAs>
+            </div>
+          }
           failed={failure !== null}
           openBids={openBids}
           preApproved={preApproved}
           projects={allProjects}
           result={result}
           rows={rows}
-          // After a failed run the alert above says what to do; "run again"
-          // would tell the reader to repeat what just failed (#680).
-          stale={failure === null && isStale(result, fingerprint)}
+          stale={boardStale}
           students={students}
           titles={titles}
           toggleBids={toggleBids}
@@ -329,11 +321,14 @@ function Figures({
   first,
   placed,
   sizes,
+  stale,
   total,
 }: {
   first: number;
   placed: number;
   sizes: TeamSizes;
+  /** The run is out of date: the figures fade and the first says so. */
+  stale: boolean;
   total: number;
 }) {
   const unplaced = total - placed;
@@ -341,8 +336,20 @@ function Figures({
     <section aria-label="Placement figures" className="mt-4">
       <dl className="grid grid-cols-2 gap-2 md:grid-cols-4">
         <Figure
+          faded={stale}
           hint={unplaced > 0 ? `${unplaced} unplaced` : null}
-          label="Placed"
+          label={
+            stale ? (
+              <>
+                Placed{" "}
+                <Badge style={STALE_MARK_STYLE} variant="status">
+                  before your changes
+                </Badge>
+              </>
+            ) : (
+              "Placed"
+            )
+          }
           value={
             <>
               {placed}{" "}
@@ -353,11 +360,13 @@ function Figures({
           }
         />
         <Figure
+          faded={stale}
           hint={placed > 0 ? `${percentDown(first, placed)}% of placed` : null}
           label="First choice"
           value={first}
         />
         <Figure
+          faded={stale}
           hint={
             sizes.projects > 0
               ? `on ${sizes.projects} ${sizes.projects === 1 ? "project" : "projects"}`
@@ -367,6 +376,7 @@ function Figures({
           value={sizes.teams}
         />
         <Figure
+          faded={stale}
           hint={sizeRange(sizes.min, sizes.max)}
           label="Students per team"
           value={sizes.mean === null ? "-" : sizes.mean.toFixed(1)}
@@ -385,18 +395,28 @@ function sizeRange(min: number | null, max: number | null): string | null {
 }
 
 function Figure({
+  faded,
   hint,
   label,
   value,
 }: {
+  /** Muted, by token rather than opacity, so it still passes contrast. */
+  faded: boolean;
   hint: string | null;
-  label: string;
+  label: React.ReactNode;
   value: React.ReactNode;
 }) {
   return (
     <Card className="p-4">
       <dt className="text-muted-foreground text-sm">{label}</dt>
-      <dd className="mt-1 text-2xl font-semibold tabular-nums">{value}</dd>
+      <dd
+        className={cn(
+          "mt-1 text-2xl font-semibold tabular-nums",
+          faded && "text-muted-foreground"
+        )}
+      >
+        {value}
+      </dd>
       {hint && <dd className="text-muted-foreground mt-0.5 text-xs">{hint}</dd>}
     </Card>
   );
@@ -418,6 +438,7 @@ function RunReport({ lines }: { lines: string[] }) {
 }
 
 function Board({
+  downloads,
   failed,
   openBids,
   preApproved,
@@ -431,6 +452,8 @@ function Board({
   update,
   workspace,
 }: {
+  /** Under the figures: what the board downloads as. */
+  downloads: React.ReactNode;
   /** The latest run failed, so this board is from an earlier one. */
   failed: boolean;
   openBids: ReadonlySet<string>;
@@ -477,15 +500,10 @@ function Board({
         }
       }
     });
+  // When it ran, and whether it is out of date, are in the banner above.
   const notes = [
-    // After a failed run the heading above already carries the time.
-    ...(failed ? [] : [`Ran at ${new Date(result.at).toLocaleString()}.`]),
-    ...(stale
-      ? [
-          "The projects, parameters or bids changed since this run. Run placement again to use them.",
-        ]
-      : []),
-    ...(result.edited
+    // "Run again" under a failure would repeat what just failed (#680).
+    ...(result.edited && !failed
       ? [
           "Students were moved or removed by hand since this run; run again to balance the teams.",
         ]
@@ -637,8 +655,10 @@ function Board({
           first={first}
           placed={placed.length}
           sizes={sizes}
+          stale={stale}
           total={rows.length}
         />
+        {downloads}
         {unsurveyed.length > 0 && (
           <Unsurveyed
             defaultMaxTeams={workspace.parameters.maxTeams}
@@ -649,24 +669,26 @@ function Board({
             update={update}
           />
         )}
-        {/* Empty after a failed re-run of a clean placement: the heading
-            above carries the time, and nothing else needs saying. */}
+        {/* Empty after a clean run: the banner carries the time. */}
         {notes.length > 0 && <RunReport lines={notes} />}
-        <p className="text-muted-foreground mt-2 text-sm">
-          Approve pins a student to the project they are on for every later run,
-          over any pin from the bids file or the roster; Pin here on the Bids
-          tab does the same. Move puts the student on another project now and
-          pins them there, so later runs keep them there. A student's name opens
-          every project they bid on, under their row, with what they wrote for
-          it, and Move here does what Move does for that project. A project
-          whose students are all pinned folds to its header, since it needs
-          nothing more; its chevron, or Expand all, opens it again, and a new
-          run starts over. Unpin frees the student from every pin, and the next
-          run places them by their bids. A pin changes the next run, not the
-          placement shown here. Remove from placement, in a row's More menu,
-          takes the student off this board and out of every run, not only their
-          team, until you restore them on the Roster tab.
-        </p>
+        <RuleDisclosure
+          className="mt-2"
+          label="How the board works"
+          summary="Approve pins a student to the project they are on for every later run, over any pin from the bids file or the roster. Move puts the student on another project now and pins them there, so later runs keep them there."
+        >
+          <p>
+            Pin here on the Bids tab does the same as Approve. A student's name
+            opens every project they bid on, under their row, with what they
+            wrote for it, and Move here does what Move does for that project. A
+            project whose students are all pinned folds to its header, since it
+            needs nothing more; its chevron, or Expand all, opens it again, and
+            a new run starts over. Unpin frees the student from every pin, and
+            the next run places them by their bids. A pin changes the next run,
+            not the placement shown here. Remove from placement, in a row's More
+            menu, takes the student off this board and out of every run, not
+            only their team, until you restore them on the Roster tab.
+          </p>
+        </RuleDisclosure>
         {empty.length > 0 && (
           <p className="mt-2 text-sm">
             No team formed: {empty.map((p) => p.title).join(", ")}.

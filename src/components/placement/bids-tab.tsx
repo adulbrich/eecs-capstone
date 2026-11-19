@@ -12,6 +12,7 @@ import { CsvFormatHelp } from "#/components/placement/csv-format";
 import { FilePickerButton } from "#/components/placement/file-picker-button";
 import { RemoveStudentButton } from "#/components/placement/removed-students";
 import { plural } from "#/components/placement/roster-section";
+import { RuleDisclosure } from "#/components/placement/rule-disclosure";
 import {
   formatName,
   SourceFormat,
@@ -39,6 +40,8 @@ import { useLocalTableSearch } from "#/lib/use-local-table-search";
 
 const DEFAULT_SORT: SortState = { desc: false, id: "priority" };
 const WARNING_STYLE = { color: "var(--status-warning)" };
+const REMOVE_RULE =
+  "Remove from placement takes a student out of every run, and off the board at once, until you restore them on the Roster tab.";
 
 export type BidsView = "project" | "student";
 
@@ -222,13 +225,40 @@ export function BidsTab({
           />
         )}
       </div>
-      <p className="text-muted-foreground mt-2 text-sm">
-        {view === "project"
-          ? 'Pin here does what Approve does on the Results tab: every run keeps the student on that project until you unpin them, over any pin from the bids file or the roster. Unpin frees them from all of these. A pin changes the next run; the Results tab shows the last run until then. Each project lists who is pinned there and how, and after a run how many the run placed there, each marked Placed here with their team, including anyone placed outside their bids; "(before your changes)" means the projects, parameters or bids changed since. A student pinned since the run shows their pin, not where the run put them, and leaves that count. On a row marked Pinned elsewhere, Pin here moves their pin to this project; the header of the other project lists who is pinned there. Pinned only shows the pinned students alone.'
-          : "Pinned rows show every pin in effect: the bids file's, the roster's, and those set here or on the Results tab, which win over the other two. Each student says where they stand: a pinned student stays on their pin in every run, so only the pin shows; anyone else shows where the last run placed them, marked in their rows."}{" "}
-        Remove from placement takes a student out of every run, and off the
-        board at once, until you restore them on the Roster tab.
-      </p>
+      {view === "project" ? (
+        <RuleDisclosure
+          className="mt-2"
+          key="project"
+          label="How pins and counts work"
+          summary={`Pin here does what Approve does on the Results tab: every run keeps the student on that project until you unpin them, over any pin from the bids file or the roster. ${REMOVE_RULE}`}
+        >
+          <p>
+            Unpin frees them from all of these. A pin changes the next run; the
+            Results tab shows the last run until then. Each project lists who is
+            pinned there and how, and after a run how many the run placed there,
+            each marked Placed here with their team, including anyone placed
+            outside their bids; "(before your changes)" means the projects,
+            parameters or bids changed since. A student pinned since the run
+            shows their pin, not where the run put them, and leaves that count.
+            On a row marked Pinned elsewhere, Pin here moves their pin to this
+            project; the header of the other project lists who is pinned there.
+            Pinned only shows the pinned students alone.
+          </p>
+        </RuleDisclosure>
+      ) : (
+        <RuleDisclosure
+          className="mt-2"
+          key="student"
+          label="How pins and standing work"
+          summary={`Pinned rows show every pin in effect: the bids file's, the roster's, and those set here or on the Results tab, which win over the other two. ${REMOVE_RULE}`}
+        >
+          <p>
+            Each student says where they stand: a pinned student stays on their
+            pin in every run, so only the pin shows; anyone else shows where the
+            last run placed them, marked in their rows.
+          </p>
+        </RuleDisclosure>
+      )}
       {view === "project" ? (
         <BidsByProject
           pinnedOnly={pinnedOnly}

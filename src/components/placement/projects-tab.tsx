@@ -13,6 +13,7 @@ import { ImportIssues } from "#/components/placement/import-issues";
 import { NumberInput } from "#/components/placement/number-input";
 import { PasteList } from "#/components/placement/paste-list";
 import { RosterProjects } from "#/components/placement/roster-projects";
+import { RuleDisclosure } from "#/components/placement/rule-disclosure";
 import type { PlacementWorkspace } from "#/components/placement/use-placement-workspace";
 import { ProjectBadges } from "#/components/project-badges";
 import { Badge } from "#/components/ui/badge";
@@ -656,14 +657,19 @@ function ProjectsTable({
 
   return (
     <div className="mt-4">
-      <p className="text-muted-foreground text-sm">
-        A blank cell uses the default from the Parameters tab. Max teams is how
-        many teams the project may form, and 0 leaves it out; min and max
-        students apply to each of those teams. Weight multiplies every bid on
-        the project: 1 leaves it alone, 0.25 steers students away. Contact, from
-        the Columns menu, names the mentor for a student-proposed project and
-        the proposer for any other, or the other of the two when one is missing.
-      </p>
+      <RuleDisclosure
+        label="What Max teams, Weight and Contact mean"
+        summary="A blank cell uses the default from the Parameters tab, and Max teams 0 leaves the project out."
+      >
+        <p>
+          Max teams is how many teams the project may form; min and max students
+          apply to each of those teams. Weight multiplies every bid on the
+          project: 1 leaves it alone, 0.25 steers students away. Contact, from
+          the Columns menu, names the mentor for a student-proposed project and
+          the proposer for any other, or the other of the two when one is
+          missing.
+        </p>
+      </RuleDisclosure>
       {noContacts && (
         <p className="mt-2 text-sm" role="status">
           {source?.kind === "portal"
