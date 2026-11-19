@@ -8,6 +8,7 @@ import {
 } from "react";
 import { Button } from "#/components/ui/button";
 import { TabsList } from "#/components/ui/tabs";
+import { cn } from "#/lib/utils";
 
 /** How far the tabs scroll past either edge, from a scroll box's sizes. */
 export function tabOverflow(box: {
@@ -23,9 +24,9 @@ export function tabOverflow(box: {
 }
 
 /**
- * The placement tabs (#717, #739). Five tabs are wider than a phone, so the
- * strip scrolls sideways inside itself rather than widening the page, and
- * says so: a fade and a chevron at each edge with tabs past it. The chevron
+ * A tab list too wide for its box (#717, #739), as the placement page's five
+ * tabs are on a phone: the strip scrolls sideways inside itself rather than
+ * widening the page, and says so: a fade and a chevron at each edge with tabs past it. The chevron
  * is for a pointer; a keyboard moves between tabs with the arrow keys, which
  * scroll the focused tab into view, so it stays out of the tab order. The
  * focus ring draws inside each tab, which the scroll box would otherwise
@@ -73,7 +74,12 @@ export function TabStrip({ children }: { children: ReactNode }) {
   return (
     <div className="relative">
       <TabsList
-        className="overflow-x-auto max-sm:pr-10 [&>*]:shrink-0 [&>*]:whitespace-nowrap [&>*]:focus-visible:ring-inset"
+        className={cn(
+          "overflow-x-auto [&>*]:shrink-0 [&>*]:whitespace-nowrap [&>*]:focus-visible:ring-inset",
+          // Room for the chevron only while it shows: padding that is always
+          // there is overflow of its own, and a cue over empty space.
+          more.right && "pr-10"
+        )}
         ref={ref}
       >
         {children}

@@ -608,6 +608,8 @@ card with a rule between each, `cardHidden` leaves a column off the card when th
 header already carries it, and `cardUnlabelled` drops the field name of a value
 that reads as itself, such as a comment (#739). The Bids tab's per-student list
 uses all three: "1 Tide Clock" with the comment under it, one card per student.
+Under `grouped`, `cardHeader` titles each row inside the group's card, not a card
+of its own.
 
 `cardHeader` marks the one column that titles the record. On mobile its cell becomes
 the card's header strip: full width, with no field name in front of it. Use it for a

@@ -502,11 +502,22 @@ a {
   /* Each row is one line and what follows it, with no rule between: the
      header names the bid, an unlabelled field under it reads as its note. */
   .admin-table[data-cards="grouped"] tbody td[data-card-header] {
-    padding: 0.5rem 0.75rem 0;
+    padding: 0.5rem 0.75rem;
+  }
+  /* Only while a field follows: a header left alone, its note hidden from
+     the Columns menu, keeps its own padding. */
+  .admin-table[data-cards="grouped"]
+    tbody
+    td[data-card-header]:has(+ td[data-card-unlabelled]) {
+    padding-bottom: 0;
     border-bottom: none;
   }
-  .admin-table[data-cards="grouped"] tbody td:not([data-label]):not([data-card-header]) {
+  .admin-table[data-cards="grouped"] tbody td[data-card-unlabelled] {
     padding-top: 0;
+  }
+  /* A detail joins its row by cancelling the gap; grouped has none. */
+  .admin-table[data-cards="grouped"] tbody tr[data-row-detail] {
+    margin-top: 0;
   }
 }
 

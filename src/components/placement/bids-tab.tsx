@@ -378,9 +378,6 @@ function bidRows(
   });
 }
 
-// The rows arrive in a fixed order and nothing sorts, which keeps every
-// student's group together (UI-CONVENTIONS, "Grouping rows that arrived
-// together"). The sort below is inert.
 /** A bid's priority, or how a pin outside the bids stands. */
 function priorityText(row: Row): string {
   if (row.priority !== null) {
@@ -389,6 +386,9 @@ function priorityText(row: Row): string {
   return row.pinned ? "Pinned" : "-";
 }
 
+// The rows arrive in a fixed order and nothing sorts, which keeps every
+// student's group together (UI-CONVENTIONS, "Grouping rows that arrived
+// together"). The sort below is inert.
 const COLUMNS = defineAdminColumns<Row>()([
   {
     accessorFn: (row) => (row.priority === null ? "Pin" : String(row.priority)),
@@ -411,8 +411,12 @@ const COLUMNS = defineAdminColumns<Row>()([
       return (
         <>
           {/* On a phone the card is one line per bid, its priority in
-              front and its comment, unlabelled, under it (#739). */}
-          <span className="md:hidden">{priorityText(row.original)} </span>
+              front and its comment, unlabelled, under it (#739). A pin
+              outside the bids and a roster-only row have no priority to
+              show; their mark or "No bids" says it. */}
+          {row.original.priority !== null && (
+            <span className="md:hidden">{row.original.priority} </span>
+          )}
           {row.original.project}
           {mark !== null && (
             <>
@@ -433,7 +437,9 @@ const COLUMNS = defineAdminColumns<Row>()([
     accessorFn: (row) => row.comment || undefined,
     cell: ({ row }) => (
       <div className="max-md:text-muted-foreground whitespace-pre-line md:max-w-xl md:min-w-xs">
-        {row.original.comment || "-"}
+        {/* No comment is a "-" in the table and nothing on a phone card,
+            where a bare dash under every bid is noise. */}
+        {row.original.comment || <span className="max-md:hidden">-</span>}
       </div>
     ),
     cardUnlabelled: true,

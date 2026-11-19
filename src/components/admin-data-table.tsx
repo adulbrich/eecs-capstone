@@ -966,6 +966,9 @@ export function AdminDataTable<T extends RowData>({
                 data-card-hidden={
                   cardHiddenIds.has(cell.column.id) ? "" : undefined
                 }
+                data-card-unlabelled={
+                  unlabelledIds.has(cell.column.id) ? "" : undefined
+                }
                 data-label={
                   isCardHeader || unlabelledIds.has(cell.column.id)
                     ? undefined

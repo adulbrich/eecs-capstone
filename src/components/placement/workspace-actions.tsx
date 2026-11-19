@@ -55,6 +55,9 @@ export function WorkspaceActions({
   workspace: Workspace;
 }) {
   const [error, setError] = useState<string | null>(null);
+  // Controlled so a confirmed action closes it: left open, the menu sits
+  // behind the file picker and keeps focus on an item now disabled.
+  const [menuOpen, setMenuOpen] = useState(false);
   const picker = useFilePicker({
     accept: ".json,application/json",
     inputLabel: "Workspace file",
@@ -81,14 +84,18 @@ export function WorkspaceActions({
   };
   // An empty workspace has nothing to lose, so Import opens the picker at
   // once; otherwise it asks first.
-  const confirmImport = (trigger: ReactNode) =>
+  const confirmImport = (trigger: ReactNode, onConfirm = picker.open) =>
     empty ? (
       trigger
     ) : (
-      <ConfirmDialog {...IMPORT_CONFIRM} onConfirm={picker.open}>
+      <ConfirmDialog {...IMPORT_CONFIRM} onConfirm={onConfirm}>
         {trigger}
       </ConfirmDialog>
     );
+  const fromMenu = (action: () => void) => () => {
+    setMenuOpen(false);
+    action();
+  };
 
   return (
     <div className="flex flex-col items-end gap-1">
@@ -129,7 +136,7 @@ export function WorkspaceActions({
       {/* Not modal, as the Columns menu is not (admin-data-table.tsx): a
           modal menu hides the rest of the page from assistive tech. */}
       <div className="md:hidden">
-        <DropdownMenu modal={false}>
+        <DropdownMenu modal={false} onOpenChange={setMenuOpen} open={menuOpen}>
           <DropdownMenuTrigger asChild>
             <Button size="sm" type="button" variant="outline">
               <FolderOpen aria-hidden="true" />
@@ -156,18 +163,28 @@ export function WorkspaceActions({
               >
                 <Upload aria-hidden="true" />
                 {empty ? "Import workspace" : "Import workspace..."}
-              </DropdownMenuItem>
+              </DropdownMenuItem>,
+              fromMenu(picker.open)
             )}
-            <ConfirmDialog {...CLEAR_CONFIRM} onConfirm={clear}>
-              <DropdownMenuItem
-                disabled={empty}
-                onSelect={(event) => event.preventDefault()}
-                variant="destructive"
-              >
+            {/* Disabled with no confirm around it: the dialog's trigger would
+                open it on a synthesized click, which skips the disabled
+                check Radix runs on select. */}
+            {empty ? (
+              <DropdownMenuItem disabled={true} variant="destructive">
                 <Trash2 aria-hidden="true" />
-                Clear all data...
+                Clear all data
               </DropdownMenuItem>
-            </ConfirmDialog>
+            ) : (
+              <ConfirmDialog {...CLEAR_CONFIRM} onConfirm={fromMenu(clear)}>
+                <DropdownMenuItem
+                  onSelect={(event) => event.preventDefault()}
+                  variant="destructive"
+                >
+                  <Trash2 aria-hidden="true" />
+                  Clear all data...
+                </DropdownMenuItem>
+              </ConfirmDialog>
+            )}
           </DropdownMenuContent>
         </DropdownMenu>
       </div>

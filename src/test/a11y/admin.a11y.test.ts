@@ -377,12 +377,20 @@ test("admin placement at 375, the Workspace menu, the tab cue and the bid list",
     buffer: Buffer.from(PLACEMENT_BIDS_CSV),
   });
   await expect(page.getByText("Tides, and clocks")).toBeVisible();
+  // One line a bid: the priority rides in the header, so its own field is
+  // off the card.
+  await expect(page.locator('td[data-label="Priority"]').first()).toBeHidden();
   await page.getByRole("button", { name: "More tabs" }).click();
   await expect(
     page.getByRole("button", { name: "Earlier tabs" })
   ).toBeVisible();
   await checkA11y(page);
   await expectNoHorizontalOverflow(page);
+  // No tab scrolls sideways at 375 (the issue's criterion).
+  for (const name of [/Roster/u, "Parameters", "Results"]) {
+    await page.getByRole("tab", { name }).click();
+    await expectNoHorizontalOverflow(page);
+  }
 });
 
 test("admin placement, projects from a pasted list", async ({ page }) => {

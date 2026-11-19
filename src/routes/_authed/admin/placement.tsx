@@ -6,9 +6,9 @@ import { ParametersTab } from "#/components/placement/parameters-tab";
 import { ProjectsTab } from "#/components/placement/projects-tab";
 import { ResultsTab } from "#/components/placement/results-tab";
 import { RosterTab } from "#/components/placement/roster-tab";
-import { TabStrip } from "#/components/placement/tab-strip";
 import { usePlacementWorkspace } from "#/components/placement/use-placement-workspace";
 import { WorkspaceActions } from "#/components/placement/workspace-actions";
+import { TabStrip } from "#/components/tab-strip";
 import {
   Breadcrumb,
   BreadcrumbItem,

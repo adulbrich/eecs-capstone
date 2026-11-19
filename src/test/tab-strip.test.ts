@@ -1,6 +1,6 @@
 import { fc, test } from "@fast-check/vitest";
 import { describe, expect, it } from "vitest";
-import { tabOverflow } from "#/components/placement/tab-strip";
+import { tabOverflow } from "#/components/tab-strip";
 
 describe("tabOverflow", () => {
   it("says nothing of a strip that fits", () => {

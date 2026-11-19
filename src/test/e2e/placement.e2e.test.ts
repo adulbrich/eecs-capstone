@@ -1774,11 +1774,13 @@ test.describe("placement workspace", () => {
     ).toBeHidden();
 
     // The strip hides its last tabs, and its chevron brings them in.
+    const results = page.getByRole("tab", { name: "Results" });
+    await expect(results).not.toBeInViewport({ ratio: 1 });
     await page.getByRole("button", { name: "More tabs" }).click();
     await expect(
       page.getByRole("button", { name: "Earlier tabs" })
     ).toBeVisible();
-    await expect(page.getByRole("tab", { name: "Results" })).toBeInViewport();
+    await expect(results).toBeInViewport({ ratio: 1 });
 
     await page.getByRole("button", { name: "Workspace" }).click();
     await page.getByRole("menuitem", { name: "Clear all data..." }).click();

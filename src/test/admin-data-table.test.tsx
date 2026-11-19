@@ -323,6 +323,38 @@ describe("AdminDataTable", () => {
     }
   });
 
+  // The hooks `src/styles.css` reads for the compact mobile card (#739).
+  it("marks a cardHidden cell, and drops a cardUnlabelled cell's label", () => {
+    const columns = COLUMNS.map((column) =>
+      column.id === "name"
+        ? { ...column, cardHidden: true }
+        : { ...column, cardUnlabelled: true }
+    );
+    const { container } = renderTable({ columns, hidden: [] });
+    const cells = container
+      .querySelectorAll("tbody tr")[0]
+      .querySelectorAll("td");
+
+    expect(cells[0].hasAttribute("data-card-hidden")).toBe(true);
+    expect(cells[0].getAttribute("data-label")).toBe("Name");
+    expect(cells[1].hasAttribute("data-card-unlabelled")).toBe(true);
+    expect(cells[1].getAttribute("data-label")).toBeNull();
+  });
+
+  it("names its mobile card layout, one card a row unless grouped", () => {
+    const { container } = renderTable({ hidden: [] });
+    expect(
+      container.querySelector("table.admin-table")?.getAttribute("data-cards")
+    ).toBe("row");
+    cleanup();
+    const grouped = renderTable({ cards: "grouped", hidden: [] });
+    expect(
+      grouped.container
+        .querySelector("table.admin-table")
+        ?.getAttribute("data-cards")
+    ).toBe("grouped");
+  });
+
   it("keeps every cell labelled when no column opts into cardHeader", () => {
     const { container } = renderTable({ hidden: [] });
     const cells = container
