@@ -701,8 +701,14 @@ catalogue that decided the matrix below; #288 shipped it.
   A program selector governs the figures marked per program; every card
   names its scope. No charting library on this page: numbers and small
   grouped counts. `/admin/traffic` has the app's one chart (ADR-0049).
+- [x] Bookmark demand on `/admin/analytics` (#518), as of now and per
+  program, counting bookmarks made since publication: every published
+  project with its bookmarks, teams and bookmarks per team, most per team
+  first, sort kept in the URL; and per category, published projects, team
+  slots, bookmarks and bookmarks per slot. The unbookmarked figure is the
+  table's zero rows. The proposer's count is #906.
 - [ ] Second pass: conversion from submitted to published, stale drafts,
-  repeat proposers, category demand against bookmarks, median review latency.
+  repeat proposers, median review latency.
 - [ ] Site traffic (#18) is separate: this counts what is in the database.
   - [x] Cookieless traffic writer on the public routes (#591): one
     `traffic_events` row per page view or search change, keyed by a visitor
