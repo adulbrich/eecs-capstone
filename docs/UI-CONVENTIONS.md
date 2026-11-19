@@ -603,6 +603,12 @@ card, and inject the label via `content: attr(data-label)`. The `table` keeps
 the cards run past a 375px viewport. Keep both; the signed-in scans in
 `user.a11y.test.ts` measure the overflow.
 
+For rows of a line or two, `cards="grouped"` joins a group's rows into one mobile
+card with a rule between each, `cardHidden` leaves a column off the card when the
+header already carries it, and `cardUnlabelled` drops the field name of a value
+that reads as itself, such as a comment (#739). The Bids tab's per-student list
+uses all three: "1 Tide Clock" with the comment under it, one card per student.
+
 `cardHeader` marks the one column that titles the record. On mobile its cell becomes
 the card's header strip: full width, with no field name in front of it. Use it for a
 column whose content already says what it is, usually a name or title beside a
@@ -919,7 +925,10 @@ A strip with more tabs than a 375px screen fits scrolls sideways inside itself,
 with `className="overflow-x-auto [&>*]:shrink-0 [&>*]:whitespace-nowrap
 [&>*]:focus-visible:ring-inset"` on `TabsList`, rather than wrapping labels or
 widening the page. The inset ring is not optional: a scroll box clips on both axes,
-so an outset focus ring would be cut off. The placement page's tabs do this.
+so an outset focus ring would be cut off. The placement page's tabs do this through
+`TabStrip`, which also says the strip scrolls (#739): a fade and an outline chevron
+at each edge with tabs past it. The chevron is out of the tab order, since the
+arrow keys already move between tabs and scroll the focused one into view.
 
 ### Pagination
 
@@ -1030,6 +1039,15 @@ changes". Its badge paints `--background` rather than a `--status-*` fill,
 since a status tint on the banner's own tint fails contrast. After a failed run
 the banner says nothing of staleness, and no note says "run again"; the alert
 under it says what failed (#680).
+
+### A page's actions on a phone
+
+A page header with more than two actions keeps them as buttons from `md` up and
+folds all but the first into one outline menu below it, with a trailing chevron
+since it is a menu (#739). The placement page shows Analytics and a Workspace menu
+holding Export, Import and Clear all data, so its header takes one row at 375px
+rather than three. An item that confirms keeps the menu open on select, as
+`StudentMenu` does, so the dialog it opens is not unmounted with the menu.
 
 ### Listing layout
 

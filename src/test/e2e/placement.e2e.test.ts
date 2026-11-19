@@ -1760,4 +1760,32 @@ test.describe("placement workspace", () => {
     await expect(page.getByRole("tab", { name: "Projects (0)" })).toBeVisible();
     await expect.poll(() => stored(page)).toBeNull();
   });
+
+  test("on a phone the workspace actions sit in one menu, and the tabs say they scroll (#739)", async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 375, height: 812 });
+    await page.goto("/admin/placement");
+    await waitForHydration(page);
+    await importFiles(page);
+    await expect.poll(() => stored(page)).not.toBeNull();
+    await expect(
+      page.getByRole("button", { name: "Export workspace" })
+    ).toBeHidden();
+
+    // The strip hides its last tabs, and its chevron brings them in.
+    await page.getByRole("button", { name: "More tabs" }).click();
+    await expect(
+      page.getByRole("button", { name: "Earlier tabs" })
+    ).toBeVisible();
+    await expect(page.getByRole("tab", { name: "Results" })).toBeInViewport();
+
+    await page.getByRole("button", { name: "Workspace" }).click();
+    await page.getByRole("menuitem", { name: "Clear all data..." }).click();
+    const dialog = page.getByRole("alertdialog", {
+      name: "Clear all placement data?",
+    });
+    await dialog.getByRole("button", { name: "Clear" }).click();
+    await expect.poll(() => stored(page)).toBeNull();
+  });
 });
