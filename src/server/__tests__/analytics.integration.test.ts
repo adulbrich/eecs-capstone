@@ -417,12 +417,12 @@ describe("bookmarks since publication", () => {
 });
 
 describe("bookmark demand per project and per category (#518)", () => {
-  type Admin = Awaited<ReturnType<typeof makeUser>>;
+  type Account = Awaited<ReturnType<typeof makeUser>>;
   let seq = 0;
 
   /** A published project with its teams written as a column, in programs. */
   async function published(
-    admin: Admin,
+    admin: Account,
     title: string,
     teamsSupported: number,
     programIds: string[] = []
@@ -449,7 +449,7 @@ describe("bookmark demand per project and per category (#518)", () => {
   }
 
   async function readers(n: number) {
-    const made: Admin[] = [];
+    const made: Account[] = [];
     for (let i = 0; i < n; i++) {
       seq += 1;
       made.push(await makeUser(`an-bd-${seq}-${Date.now()}@x.com`, "user"));
@@ -461,7 +461,7 @@ describe("bookmark demand per project and per category (#518)", () => {
    * Bookmarks stamped from the app clock after publication, as the existing
    * unbookmarked test explains: the database's `now()` can lag the host.
    */
-  async function bookmark(projectId: string, by: Admin[]) {
+  async function bookmark(projectId: string, by: Account[]) {
     if (by.length === 0) {
       return;
     }
@@ -483,7 +483,7 @@ describe("bookmark demand per project and per category (#518)", () => {
     return row;
   }
 
-  async function file(projectId: string, ...categoryIds: string[]) {
+  async function categorize(projectId: string, ...categoryIds: string[]) {
     await db
       .insert(projectCategories)
       .values(categoryIds.map((categoryId) => ({ projectId, categoryId })));
@@ -499,8 +499,8 @@ describe("bookmark demand per project and per category (#518)", () => {
     const cat = await category("Marine");
     const early = await published(admin, "Bookmarked in review", 1);
     const late = await published(admin, "Bookmarked once live", 1);
-    await file(early.id, cat.id);
-    await file(late.id, cat.id);
+    await categorize(early.id, cat.id);
+    await categorize(late.id, cat.id);
     // A day before publication: staff or a student looking at a draft.
     await db.insert(projectBookmarks).values({
       userId: reader.id,
@@ -514,7 +514,13 @@ describe("bookmark demand per project and per category (#518)", () => {
     expect(byId.get(early.id)?.bookmarks).toBe(0);
     expect(byId.get(late.id)?.bookmarks).toBe(1);
     expect(view.bookmarksByCategory).toEqual([
-      { key: cat.id, label: cat.name, projects: 2, slots: 2, bookmarks: 1 },
+      {
+        key: cat.id,
+        label: cat.name,
+        projects: 2,
+        teamsSupported: 2,
+        bookmarks: 1,
+      },
     ]);
     expect(view.headline.publishedWithoutBookmarks).toBe(1);
   });
@@ -543,7 +549,7 @@ describe("bookmark demand per project and per category (#518)", () => {
     const shared = await published(admin, "In both", 2, [a.id, b.id]);
     const unfiled = await published(admin, "In none", 1);
     for (const p of [inA, inB, shared]) {
-      await file(p.id, cat.id);
+      await categorize(p.id, cat.id);
     }
     const [one, two] = await readers(2);
     await bookmark(inA.id, [one]);
@@ -593,20 +599,38 @@ describe("bookmark demand per project and per category (#518)", () => {
     expect(ids(onlyA)).toEqual(new Set([f.inA.id, f.quietA.id, f.shared.id]));
     expect(ids(onlyB)).toEqual(new Set([f.inB.id, f.shared.id]));
     // The shared project carries its whole count and its whole teams into
-    // each program, as its slots do (ADR-0028).
+    // each program, as the published team slots tile does (ADR-0028).
     for (const view of [onlyA, onlyB]) {
       expect(
         view.bookmarksByProject.find((r) => r.id === f.shared.id)
       ).toMatchObject({ bookmarks: 2, teamsSupported: 2 });
     }
     expect(all.bookmarksByCategory).toEqual([
-      { key: f.cat.id, label: f.cat.name, projects: 3, slots: 4, bookmarks: 3 },
+      {
+        key: f.cat.id,
+        label: f.cat.name,
+        projects: 3,
+        teamsSupported: 4,
+        bookmarks: 3,
+      },
     ]);
     expect(onlyA.bookmarksByCategory).toEqual([
-      { key: f.cat.id, label: f.cat.name, projects: 2, slots: 3, bookmarks: 3 },
+      {
+        key: f.cat.id,
+        label: f.cat.name,
+        projects: 2,
+        teamsSupported: 3,
+        bookmarks: 3,
+      },
     ]);
     expect(onlyB.bookmarksByCategory).toEqual([
-      { key: f.cat.id, label: f.cat.name, projects: 2, slots: 3, bookmarks: 2 },
+      {
+        key: f.cat.id,
+        label: f.cat.name,
+        projects: 2,
+        teamsSupported: 3,
+        bookmarks: 2,
+      },
     ]);
   });
 
@@ -615,9 +639,9 @@ describe("bookmark demand per project and per category (#518)", () => {
     const x = await category("UX Design");
     const y = await category("Healthcare");
     // Two teams and three bookmarks: a flat join of categories to bookmarks
-    // would report six slots per category.
+    // would report six teams per category.
     const project = await published(admin, "Two categories", 2);
-    await file(project.id, x.id, y.id);
+    await categorize(project.id, x.id, y.id);
     await bookmark(project.id, await readers(3));
 
     const view = await getAnalyticsAs(admin, { ...RANGE, programId: null });
@@ -635,7 +659,7 @@ describe("bookmark demand per project and per category (#518)", () => {
         key: c.id,
         label: c.name,
         projects: 1,
-        slots: 2,
+        teamsSupported: 2,
         bookmarks: 3,
       });
     }
@@ -648,7 +672,7 @@ describe("bookmark demand per project and per category (#518)", () => {
     const archived = await published(admin, "Last cycle", 3);
     const deleted = await published(admin, "Deleted", 3);
     for (const p of [live, archived, deleted]) {
-      await file(p.id, cat.id);
+      await categorize(p.id, cat.id);
     }
     const [reader] = await readers(1);
     for (const p of [live, archived, deleted]) {
@@ -665,7 +689,13 @@ describe("bookmark demand per project and per category (#518)", () => {
     const view = await getAnalyticsAs(admin, { ...RANGE, programId: null });
     expect(view.bookmarksByProject.map((r) => r.id)).toEqual([live.id]);
     expect(view.bookmarksByCategory).toEqual([
-      { key: cat.id, label: cat.name, projects: 1, slots: 1, bookmarks: 1 },
+      {
+        key: cat.id,
+        label: cat.name,
+        projects: 1,
+        teamsSupported: 1,
+        bookmarks: 1,
+      },
     ]);
   });
 
@@ -686,8 +716,8 @@ describe("bookmark demand per project and per category (#518)", () => {
     await bookmark(gamma.id, [r1, r2]);
     await bookmark(alpha.id, [r3, r4]);
     await bookmark(noTeams.id, [r1]);
-    await file(delta.id, hot.id);
-    await file(beta.id, cold.id);
+    await categorize(delta.id, hot.id);
+    await categorize(beta.id, cold.id);
 
     const view = await getAnalyticsAs(admin, { ...RANGE, programId: null });
     expect(view.bookmarksByProject.map((r) => r.title)).toEqual([
@@ -698,7 +728,7 @@ describe("bookmark demand per project and per category (#518)", () => {
       "Quiet",
       "No teams",
     ]);
-    // Hot is 3 per slot, Cold 2.
+    // Hot is 3 per team, Cold 2.
     expect(view.bookmarksByCategory.map((r) => r.key)).toEqual([
       hot.id,
       cold.id,
@@ -713,7 +743,7 @@ describe("bookmark demand per project and per category (#518)", () => {
     );
     const cat = await category("Flutter");
     const project = await published(admin, "Seen by staff", 1);
-    await file(project.id, cat.id);
+    await categorize(project.id, cat.id);
     await bookmark(project.id, await readers(1));
 
     const view = await getAnalyticsAs(instructor, {

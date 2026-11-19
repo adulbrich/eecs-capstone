@@ -1,3 +1,4 @@
+import { fc, test } from "@fast-check/vitest";
 import { describe, expect, it } from "vitest";
 import { bookmarksPer, slotsHint } from "../analytics-copy";
 
@@ -93,4 +94,20 @@ describe("bookmarksPer", () => {
     expect(bookmarksPer(5, 0)).toBeUndefined();
     expect(bookmarksPer(5, -1)).toBeUndefined();
   });
+
+  test.prop([fc.integer(), fc.integer({ max: 0 })])(
+    "is undefined for every team count of zero or less",
+    (bookmarks, teams) => {
+      expect(bookmarksPer(bookmarks, teams)).toBeUndefined();
+    }
+  );
+
+  test.prop([fc.nat(), fc.integer({ min: 1 })])(
+    "is a finite share for every positive team count",
+    (bookmarks, teams) => {
+      const share = bookmarksPer(bookmarks, teams);
+      expect(share).toBe(bookmarks / teams);
+      expect(Number.isFinite(share)).toBe(true);
+    }
+  );
 });

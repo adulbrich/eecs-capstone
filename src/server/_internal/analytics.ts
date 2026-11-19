@@ -51,8 +51,8 @@ export interface ProjectDemand {
 }
 
 /**
- * One category's published projects, their team slots and their bookmarks
- * since publication. A project in two categories counts in full in both.
+ * One category's published projects, the teams they support and their
+ * bookmarks since publication. A project in two categories counts in full in both.
  */
 export interface CategoryDemand {
   bookmarks: number;
@@ -60,14 +60,14 @@ export interface CategoryDemand {
   key: string;
   label: string;
   projects: number;
-  slots: number;
+  teamsSupported: number;
 }
 
 export interface AnalyticsView {
   asOf: Date;
   /**
    * Published projects in scope with at least one category, one row per
-   * category, most bookmarks per slot first (#518).
+   * category, most bookmarks per team first (#518).
    */
   bookmarksByCategory: CategoryDemand[];
   /**
@@ -400,7 +400,7 @@ async function bookmarkDemand(programId: string | null) {
         key: categories.id,
         label: categories.name,
         projects: countRows(),
-        slots: sql<number>`coalesce(sum(${perProject.teamsSupported}), 0)::int`,
+        teamsSupported: sql<number>`coalesce(sum(${perProject.teamsSupported}), 0)::int`,
         bookmarks: sql<number>`coalesce(sum(${perProject.bookmarks}), 0)::int`,
       })
       .from(perProject)
@@ -424,7 +424,7 @@ async function bookmarkDemand(programId: string | null) {
       bookmarks: row.bookmarks,
       id: row.key,
       name: row.label,
-      teams: row.slots,
+      teams: row.teamsSupported,
     })),
   };
 }

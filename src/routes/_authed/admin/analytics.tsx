@@ -1,5 +1,4 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useState } from "react";
 import { z } from "zod";
 import {
   AdminDataTable,
@@ -31,6 +30,7 @@ import { PROJECT_STATUS_LABEL } from "#/lib/project-workflow";
 import { resolveRange } from "#/lib/report-range";
 import type { SortState } from "#/lib/table-state";
 import { useAdminTable } from "#/lib/use-admin-table";
+import { useLocalTableSearch } from "#/lib/use-local-table-search";
 import type {
   InventoryRequestItemStatus,
   ItemStatus,
@@ -198,11 +198,12 @@ const CATEGORY_DEMAND_COLUMNS = defineAdminColumns<CategoryDemand>()([
     sortFn: "basic",
   },
   {
-    accessorFn: (row) => row.slots,
-    cell: ({ row }) => COUNT.format(row.original.slots),
+    accessorFn: (row) => row.teamsSupported,
+    cell: ({ row }) => COUNT.format(row.original.teamsSupported),
     enableHiding: false,
-    header: "Team slots",
-    id: "slots",
+    header: "Teams",
+    headerHint: "The teams its published projects support, added up.",
+    id: "teams",
     sortFn: "basic",
   },
   {
@@ -214,40 +215,40 @@ const CATEGORY_DEMAND_COLUMNS = defineAdminColumns<CategoryDemand>()([
     sortFn: "basic",
   },
   {
-    accessorFn: (row) => bookmarksPer(row.bookmarks, row.slots),
+    accessorFn: (row) => bookmarksPer(row.bookmarks, row.teamsSupported),
     cell: ({ row }) =>
-      ratio(bookmarksPer(row.original.bookmarks, row.original.slots)),
+      ratio(bookmarksPer(row.original.bookmarks, row.original.teamsSupported)),
     enableHiding: false,
-    header: "Per slot",
-    headerHint: "Bookmarks divided by the category's team slots.",
-    id: "perSlot",
+    header: "Per team",
+    headerHint:
+      "Bookmarks divided by the teams the category's projects support.",
+    id: "perTeam",
     sortFn: "basic",
     sortUndefined: "last",
   },
 ]);
 
-const CATEGORY_DEMAND_DEFAULT_SORT: SortState = { desc: true, id: "perSlot" };
+const CATEGORY_DEMAND_DEFAULT_SORT: SortState = { desc: true, id: "perTeam" };
 
 /**
  * The category table sorts in place: the URL's sort belongs to the
- * per-project table, and two tables cannot share it. Nothing to hide, so no
- * Columns menu.
+ * per-project table, and two tables cannot share it (docs/UI-CONVENTIONS.md,
+ * "More than one table on a page").
  */
 function CategoryDemandTable({ rows }: { rows: CategoryDemand[] }) {
-  const [sort, setSort] = useState(CATEGORY_DEMAND_DEFAULT_SORT);
+  const { tableProps } = useAdminTable({
+    ...useLocalTableSearch(),
+    columns: CATEGORY_DEMAND_COLUMNS,
+    defaultSort: CATEGORY_DEMAND_DEFAULT_SORT,
+    storageKey: "analytics-categories",
+  });
   return (
     <AdminDataTable
-      caption="Bookmarks against team slots per category"
-      columns={CATEGORY_DEMAND_COLUMNS}
+      caption="Bookmarks against teams supported per category"
       data={rows}
-      defaultSort={CATEGORY_DEMAND_DEFAULT_SORT}
       emptyMessage="No published project has a category."
       getRowId={(row) => row.key}
-      hidden={[]}
-      onHiddenChange={() => undefined}
-      onSortChange={setSort}
-      sort={sort}
-      storageKey="analytics-categories"
+      {...tableProps}
     />
   );
 }
@@ -532,7 +533,9 @@ function AnalyticsPage() {
         />
       </div>
 
-      <SectionHeading note="per program">Bookmarks per project</SectionHeading>
+      <SectionHeading note="As of now, per program">
+        Bookmarks per project
+      </SectionHeading>
       <p className="text-muted-foreground mt-1 text-sm">
         Every published project, counting the bookmarks made since it was
         published; a project in two programs is listed under each.
@@ -547,11 +550,13 @@ function AnalyticsPage() {
         />
       </div>
 
-      <SectionHeading note="per program">Bookmarks by category</SectionHeading>
+      <SectionHeading note="As of now, per program">
+        Bookmarks by category
+      </SectionHeading>
       <p className="text-muted-foreground mt-1 text-sm">
-        Published projects only, with the same count; a project in two
-        categories counts in full in both, so the columns add up to more than
-        the table above.
+        Published projects with a category, counted as above; a project in two
+        categories counts in full in both, so the columns do not add up to the
+        table above.
       </p>
       <div className="mt-2">
         <CategoryDemandTable rows={view.bookmarksByCategory} />

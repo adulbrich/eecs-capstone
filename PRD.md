@@ -704,8 +704,8 @@ catalogue that decided the matrix below; #288 shipped it.
 - [x] Bookmark demand on `/admin/analytics` (#518), as of now and per
   program, counting bookmarks made since publication: every published
   project with its bookmarks, teams and bookmarks per team, most per team
-  first, sort kept in the URL; and per category, published projects, team
-  slots, bookmarks and bookmarks per slot. The unbookmarked figure is the
+  first, sort kept in the URL; and per category, published projects, teams
+  supported, bookmarks and bookmarks per team. The unbookmarked figure is the
   table's zero rows. The proposer's count is #906.
 - [ ] Second pass: conversion from submitted to published, stale drafts,
   repeat proposers, median review latency.

@@ -316,13 +316,6 @@ const CENSUS = new Map<string, { class: SeedClass; why: string }>([
     },
   ],
   [
-    "src/routes/_authed/admin/analytics.tsx: useState(CATEGORY_DEMAND_DEFAULT_SORT)",
-    {
-      class: "D",
-      why: "the category table's default sort, a module constant",
-    },
-  ],
-  [
     "src/routes/_authed/admin/traffic.tsx: useState(defaultSort)",
     {
       class: "D",
