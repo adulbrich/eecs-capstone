@@ -1,6 +1,10 @@
 import { Download } from "lucide-react";
 import { type ReactNode, useId, useState } from "react";
 import { ImportIssues } from "#/components/placement/import-issues";
+import {
+  RuleDisclosure,
+  splitFirstSentence,
+} from "#/components/placement/rule-disclosure";
 import { Button } from "#/components/ui/button";
 import { Label } from "#/components/ui/label";
 import {
@@ -98,11 +102,7 @@ export function DownloadAs({
         </Select>
         {button}
       </div>
-      {plugin !== null && (
-        <p className="text-muted-foreground max-w-prose">
-          {plugin.description}
-        </p>
-      )}
+      {plugin !== null && <FormatDescription plugin={plugin} />}
       {/* Only a plugin reports issues: the standard CSV goes out as it is.
           They are problems writing the plugin's file, not reading ours. */}
       <ImportIssues
@@ -111,5 +111,31 @@ export function DownloadAs({
         writing={true}
       />
     </div>
+  );
+}
+
+/**
+ * The chosen plugin's description (#739): its first sentence in view, the
+ * rest under a disclosure, since a description is plugin prose with no
+ * summary of its own. Keyed on the plugin, so another choice starts closed.
+ */
+function FormatDescription({
+  plugin,
+}: {
+  plugin: { description: string; id: string; label: string };
+}) {
+  const { rest, summary } = splitFirstSentence(plugin.description);
+  if (rest === "") {
+    return <p className="text-muted-foreground max-w-prose">{summary}</p>;
+  }
+  return (
+    <RuleDisclosure
+      className="max-w-prose"
+      key={plugin.id}
+      label={`More about ${plugin.label}`}
+      summary={summary}
+    >
+      <p>{rest}</p>
+    </RuleDisclosure>
   );
 }

@@ -3,6 +3,7 @@ import { ConfirmDialog } from "#/components/confirm-dialog";
 import { CsvFormatHelp } from "#/components/placement/csv-format";
 import { FilePickerButton } from "#/components/placement/file-picker-button";
 import { PasteList } from "#/components/placement/paste-list";
+import { RuleDisclosure } from "#/components/placement/rule-disclosure";
 import { SourceFormat } from "#/components/placement/source-format";
 import type { PlacementWorkspace } from "#/components/placement/use-placement-workspace";
 import { Button } from "#/components/ui/button";
@@ -143,22 +144,40 @@ export function RosterSection({
         readAs={stored.readAs}
         text={stored.text}
       />
-      <p className="mt-1">
-        {rosterSummary(
-          bids === null,
-          workspace.projects.length === 0,
-          notInSurvey
-        )}
-      </p>
-      {preApproved > 0 && (
+      {notInSurvey > 0 && bids !== null && workspace.projects.length > 0 ? (
+        <RuleDisclosure
+          className="text-foreground mt-1"
+          label="How they are placed"
+          summary={`${plural(notInSurvey, "student on the roster did", "students on the roster did")} not answer the survey; they are on the board with no bids.`}
+        >
+          <p>
+            A run places them where a team needs people to reach its minimum,
+            and otherwise on the projects with the fewest bids, never in a seat
+            a bidder would have had. They never make a project form a team on
+            their own under "At least one team per project".
+          </p>
+        </RuleDisclosure>
+      ) : (
         <p className="mt-1">
-          {preApproved === 1
-            ? "1 student is pre-approved for a project and placed there on every run."
-            : `${preApproved} students are pre-approved for a project and placed there on every run.`}{" "}
-          A pre-approval wins over a pin in the bids file. A pin set on the
-          Results tab or the Bids tab wins over a pre-approval, and Unpin there
-          leaves the student free until the next pin.
+          {rosterSummary(bids === null, workspace.projects.length === 0)}
         </p>
+      )}
+      {preApproved > 0 && (
+        <RuleDisclosure
+          className="text-foreground mt-1"
+          label="Which pin wins"
+          summary={
+            preApproved === 1
+              ? "1 student is pre-approved for a project and placed there on every run."
+              : `${preApproved} students are pre-approved for a project and placed there on every run.`
+          }
+        >
+          <p>
+            A pre-approval wins over a pin in the bids file. A pin set on the
+            Results tab or the Bids tab wins over a pre-approval, and Unpin
+            there leaves the student free until the next pin.
+          </p>
+        </RuleDisclosure>
       )}
       {conflicts.length > 0 && (
         <ul
@@ -209,19 +228,13 @@ export function RosterSection({
   );
 }
 
-function rosterSummary(
-  noBids: boolean,
-  noProjects: boolean,
-  notInSurvey: number
-): string {
+/** The roster's line when nobody is missing from the survey, or no match. */
+function rosterSummary(noBids: boolean, noProjects: boolean): string {
   if (noProjects) {
     return "Load the projects, then the bids, to match the roster against them.";
   }
   if (noBids) {
     return "Upload the bids to match the roster against them.";
   }
-  if (notInSurvey === 0) {
-    return "Everyone on the roster answered the survey.";
-  }
-  return `${plural(notInSurvey, "student on the roster did", "students on the roster did")} not answer the survey; they are on the board with no bids. A run places them where a team needs people to reach its minimum, and otherwise on the projects with the fewest bids, never in a seat a bidder would have had. They never make a project form a team on their own under "At least one team per project".`;
+  return "Everyone on the roster answered the survey.";
 }
