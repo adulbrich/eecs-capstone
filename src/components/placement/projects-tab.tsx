@@ -658,7 +658,7 @@ function ProjectsTable({
   return (
     <div className="mt-4">
       <RuleDisclosure
-        label="What the columns mean"
+        label="What Max teams, Weight and Contact mean"
         summary="A blank cell uses the default from the Parameters tab."
       >
         <p>

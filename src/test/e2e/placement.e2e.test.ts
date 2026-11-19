@@ -546,6 +546,13 @@ test.describe("placement workspace", () => {
     // The same placement as a Canvas group set import (#734).
     await page.getByRole("combobox", { name: "Download as" }).click();
     await page.getByRole("option", { name: "Canvas groups" }).click();
+    // Its first sentence in view, the rest one click away (#739).
+    await expect(
+      page.getByText("A file to import into a Canvas group set.")
+    ).toBeVisible();
+    await page
+      .getByRole("button", { name: "More about Canvas groups" })
+      .click();
     await expect(
       page.getByText(/Canvas matches each student by their login/u)
     ).toBeVisible();

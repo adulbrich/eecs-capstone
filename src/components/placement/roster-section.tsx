@@ -146,8 +146,9 @@ export function RosterSection({
       />
       {notInSurvey > 0 && bids !== null && workspace.projects.length > 0 ? (
         <RuleDisclosure
-          className="text-foreground mt-1"
+          className="mt-1"
           label="How they are placed"
+          muted={false}
           summary={`${plural(notInSurvey, "student on the roster did", "students on the roster did")} not answer the survey; they are on the board with no bids.`}
         >
           <p>
@@ -164,8 +165,9 @@ export function RosterSection({
       )}
       {preApproved > 0 && (
         <RuleDisclosure
-          className="text-foreground mt-1"
+          className="mt-1"
           label="Which pin wins"
+          muted={false}
           summary={
             preApproved === 1
               ? "1 student is pre-approved for a project and placed there on every run."

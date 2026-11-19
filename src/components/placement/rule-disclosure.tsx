@@ -13,6 +13,7 @@ export function RuleDisclosure({
   children,
   className,
   label,
+  muted = true,
   summary,
 }: {
   /** The rest of the rule, word for word where it still reads. */
@@ -20,19 +21,22 @@ export function RuleDisclosure({
   className?: string;
   /** The disclosure's name: "How the board works". */
   label: string;
+  /** Help-text grey; false inside a panel whose sentences are body text. */
+  muted?: boolean;
   /** The sentence that explains the surprise or the side effect. */
   summary: ReactNode;
 }) {
   const id = useId();
   const [open, setOpen] = useState(false);
   const Chevron = open ? ChevronDown : ChevronRight;
+  const tone = muted ? "text-muted-foreground" : undefined;
   return (
-    <div className={cn("text-muted-foreground text-sm", className)}>
-      <p>{summary}</p>
+    <div className={cn("text-sm", className)}>
+      <p className={tone}>{summary}</p>
       <Button
         aria-controls={id}
         aria-expanded={open}
-        className="text-foreground mt-1"
+        className="mt-1"
         onClick={() => setOpen(!open)}
         size="bare"
         type="button"
@@ -41,7 +45,7 @@ export function RuleDisclosure({
         <Chevron aria-hidden="true" />
         {label}
       </Button>
-      <div className="mt-1 max-w-prose pl-5" hidden={!open} id={id}>
+      <div className={cn("mt-1 max-w-prose pl-5", tone)} hidden={!open} id={id}>
         {children}
       </div>
     </div>

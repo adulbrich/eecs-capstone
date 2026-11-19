@@ -60,8 +60,9 @@ const STALE_STYLE = {
   backgroundColor: "var(--status-warning-bg)",
   borderColor: "color-mix(in srgb, var(--status-warning) 40%, transparent)",
 };
+// Opaque: the warning tint on the banner's own tint fails contrast.
 const STALE_BADGE_STYLE = {
-  backgroundColor: "var(--status-warning-bg)",
+  backgroundColor: "var(--background)",
   color: "var(--status-warning)",
 };
 

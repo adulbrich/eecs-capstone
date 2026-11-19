@@ -1006,6 +1006,26 @@ controls away. Closed, the details carry `hidden` rather than unmounting, so a
 column mapping being edited keeps its draft. The caller keys the strip on the
 file's text, so a workspace imported over it starts it over.
 
+### A rule in one sentence and a disclosure
+
+A rule longer than two sentences renders as `RuleDisclosure` (#739): the sentence
+that explains the surprise or the side effect stays in view at the control, and
+the rest sits under a "How ... works" disclosure, word for word where it still
+reads. The disclosure is drawn as Details is, a ghost Button with a leading
+chevron, and its body carries `hidden` when closed. A plugin's description has no
+summary of its own, so `splitFirstSentence` shows its first sentence and puts the
+rest under "More about" the plugin. Help text is muted; pass `muted={false}`
+inside a panel whose sentences are body text.
+
+### A run's state in one banner
+
+The Results tab opens with `RunBanner`: when the board's run ran, whether it is
+out of date, and the action that changes it, in one line. Out of date tints the
+banner with the warning token, fades the figures with `text-muted-foreground`
+rather than opacity, which fails contrast, and marks the first "before your
+changes". After a failed run the banner says nothing of staleness; the alert
+under it says what failed (#680).
+
 ### Listing layout
 
 A page that lists and filters renders through `ListingLayout` from
