@@ -87,10 +87,15 @@ import {
 import type { SortState } from "#/lib/table-state";
 import { useAdminTable } from "#/lib/use-admin-table";
 import { useLocalTableSearch } from "#/lib/use-local-table-search";
+import { cn } from "#/lib/utils";
 
 const DEFAULT_SORT: SortState = { desc: false, id: "student" };
 
 const WARNING_STYLE = { color: "var(--status-warning)" };
+const STALE_MARK_STYLE = {
+  backgroundColor: "var(--status-neutral-bg)",
+  color: "var(--status-neutral)",
+};
 
 const NO_FOLDS: ReadonlyMap<string, boolean> = new Map();
 
@@ -222,10 +227,10 @@ export function ResultsTab({
     [result, students, allProjects]
   );
 
-  // After a failed run the alert below says what to do; "run again" would
-  // tell the reader to repeat what just failed (#680).
-  const stale =
-    failure === null && result !== undefined && isStale(result, fingerprint);
+  // The board is from inputs that have changed, failed run or not: the
+  // figures say so either way, and `runBannerState` keeps the banner quiet
+  // about it after a failure (#680).
+  const boardStale = result !== undefined && isStale(result, fingerprint);
 
   return (
     <div>
@@ -238,22 +243,19 @@ export function ResultsTab({
           missing,
           ranAt: result?.at,
           running,
-          stale,
+          stale: boardStale,
           students: students.length,
         })}
       />
       <FieldError message={error} />
-      {failed &&
-        failure === null &&
-        result === undefined &&
-        missing === null && (
-          // A run that failed after its inputs changed under it: its reasons
-          // may no longer hold, but the reader still learns it failed.
-          <p className="mt-2 text-sm">
-            The last run failed, and the projects, parameters or bids changed
-            while it ran. Run placement again.
-          </p>
-        )}
+      {failed && failure === null && missing === null && (
+        // A run that failed after its inputs changed under it: its reasons
+        // may no longer hold, but the reader still learns it failed.
+        <p className="mt-2 text-sm">
+          The last run failed, and the projects, parameters or bids changed
+          while it ran. Run placement again.
+        </p>
+      )}
       {failure && (
         <ErrorBanner className="mt-4">
           <ul className="space-y-0.5">
@@ -296,7 +298,7 @@ export function ResultsTab({
           projects={allProjects}
           result={result}
           rows={rows}
-          stale={stale}
+          stale={boardStale}
           students={students}
           titles={titles}
           toggleBids={toggleBids}
@@ -337,7 +339,7 @@ function Figures({
             stale ? (
               <>
                 Placed{" "}
-                <Badge className="font-normal" variant="secondary">
+                <Badge style={STALE_MARK_STYLE} variant="status">
                   before your changes
                 </Badge>
               </>
@@ -405,7 +407,10 @@ function Figure({
     <Card className="p-4">
       <dt className="text-muted-foreground text-sm">{label}</dt>
       <dd
-        className={`mt-1 text-2xl font-semibold tabular-nums ${faded ? "text-muted-foreground" : ""}`}
+        className={cn(
+          "mt-1 text-2xl font-semibold tabular-nums",
+          faded && "text-muted-foreground"
+        )}
       >
         {value}
       </dd>
@@ -665,20 +670,19 @@ function Board({
         <RuleDisclosure
           className="mt-2"
           label="How the board works"
-          summary="Approve pins a student to the project they are on for every later run, over any pin from the bids file or the roster. Move puts the student on another project now and pins them there."
+          summary="Approve pins a student to the project they are on for every later run, over any pin from the bids file or the roster. Move puts the student on another project now and pins them there, so later runs keep them there."
         >
           <p>
-            Pin here on the Bids tab does what Approve does. After a Move, later
-            runs keep the student there. A student's name opens every project
-            they bid on, under their row, with what they wrote for it, and Move
-            here does what Move does for that project. A project whose students
-            are all pinned folds to its header, since it needs nothing more; its
-            chevron, or Expand all, opens it again, and a new run starts over.
-            Unpin frees the student from every pin, and the next run places them
-            by their bids. A pin changes the next run, not the placement shown
-            here. Remove from placement, in a row's More menu, takes the student
-            off this board and out of every run, not only their team, until you
-            restore them on the Roster tab.
+            Pin here on the Bids tab does the same as Approve. A student's name
+            opens every project they bid on, under their row, with what they
+            wrote for it, and Move here does what Move does for that project. A
+            project whose students are all pinned folds to its header, since it
+            needs nothing more; its chevron, or Expand all, opens it again, and
+            a new run starts over. Unpin frees the student from every pin, and
+            the next run places them by their bids. A pin changes the next run,
+            not the placement shown here. Remove from placement, in a row's More
+            menu, takes the student off this board and out of every run, not
+            only their team, until you restore them on the Roster tab.
           </p>
         </RuleDisclosure>
         {empty.length > 0 && (

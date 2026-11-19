@@ -659,15 +659,15 @@ function ProjectsTable({
     <div className="mt-4">
       <RuleDisclosure
         label="What Max teams, Weight and Contact mean"
-        summary="A blank cell uses the default from the Parameters tab."
+        summary="A blank cell uses the default from the Parameters tab, and Max teams 0 leaves the project out."
       >
         <p>
-          Max teams is how many teams the project may form, and 0 leaves it out;
-          min and max students apply to each of those teams. Weight multiplies
-          every bid on the project: 1 leaves it alone, 0.25 steers students
-          away. Contact, from the Columns menu, names the mentor for a
-          student-proposed project and the proposer for any other, or the other
-          of the two when one is missing.
+          Max teams is how many teams the project may form; min and max students
+          apply to each of those teams. Weight multiplies every bid on the
+          project: 1 leaves it alone, 0.25 steers students away. Contact, from
+          the Columns menu, names the mentor for a student-proposed project and
+          the proposer for any other, or the other of the two when one is
+          missing.
         </p>
       </RuleDisclosure>
       {noContacts && (

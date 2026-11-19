@@ -7,7 +7,8 @@ import { cn } from "#/lib/utils";
  * A rule the page explains (#739): the one sentence a reader needs at the
  * control, always in view, and the rest under a disclosure drawn as the
  * page's others are, a ghost button with a leading chevron. Closed, the rest
- * is hidden rather than unmounted, so its text stays in the page.
+ * carries `hidden`: out of the accessibility tree and find-in-page, still
+ * mounted.
  */
 export function RuleDisclosure({
   children,
@@ -52,7 +53,7 @@ export function RuleDisclosure({
   );
 }
 
-const FIRST_SENTENCE = /^(.+?[.!?])\s+(\S[\s\S]*)$/u;
+const FIRST_SENTENCE = /^([\s\S]+?[.!?])\s+(\S[\s\S]*)$/u;
 
 /**
  * A plain-prose description cut after its first sentence, for a summary and

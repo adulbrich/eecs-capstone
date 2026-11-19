@@ -100,6 +100,11 @@ export function RosterSection({
   const from =
     stored.source.kind === "csv" ? stored.source.filename : "a pasted list";
   const notInSurvey = bids?.students.filter((s) => s.rosterOnly).length ?? 0;
+  const summaryLine = rosterSummary(
+    bids === null,
+    workspace.projects.length === 0,
+    notInSurvey
+  );
   const notOnRoster = bids?.notOnRoster ?? [];
   const preApproved = assignments?.pins.size ?? 0;
   const conflicts = bids?.conflicts ?? [];
@@ -144,7 +149,7 @@ export function RosterSection({
         readAs={stored.readAs}
         text={stored.text}
       />
-      {notInSurvey > 0 && bids !== null && workspace.projects.length > 0 ? (
+      {summaryLine === null ? (
         <RuleDisclosure
           className="mt-1"
           label="How they are placed"
@@ -159,9 +164,7 @@ export function RosterSection({
           </p>
         </RuleDisclosure>
       ) : (
-        <p className="mt-1">
-          {rosterSummary(bids === null, workspace.projects.length === 0)}
-        </p>
+        <p className="mt-1">{summaryLine}</p>
       )}
       {preApproved > 0 && (
         <RuleDisclosure
@@ -230,13 +233,22 @@ export function RosterSection({
   );
 }
 
-/** The roster's line when nobody is missing from the survey, or no match. */
-function rosterSummary(noBids: boolean, noProjects: boolean): string {
+/**
+ * The roster's line against the bids, or null when students on it did not
+ * answer the survey, which the page explains under a disclosure.
+ */
+function rosterSummary(
+  noBids: boolean,
+  noProjects: boolean,
+  notInSurvey: number
+): string | null {
   if (noProjects) {
     return "Load the projects, then the bids, to match the roster against them.";
   }
   if (noBids) {
     return "Upload the bids to match the roster against them.";
   }
-  return "Everyone on the roster answered the survey.";
+  return notInSurvey === 0
+    ? "Everyone on the roster answered the survey."
+    : null;
 }

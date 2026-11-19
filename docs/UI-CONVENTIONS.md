@@ -68,8 +68,9 @@ Sizes are `xs` (h-6, inline micro-actions like Post reply), `sm` (h-8, most
 contextual buttons), `default` (h-9, standalone form submits), and `lg` (h-10,
 hero / landing CTAs). Icon-only buttons use `icon-xs`, `icon-sm`, `icon`, or
 `icon-lg` to stay square. `bare` has no height and no padding, for a Button that
-reads as a line of text: a `link` one in a panel (`ClearFiltersButton`), or a
-`ghost` one that is a row's own title.
+reads as a line of text: a `link` one in a panel (`ClearFiltersButton`), a
+`ghost` one that is a row's own title, or the `ghost` toggle of a
+`RuleDisclosure` under its sentence.
 
 The size variant also sets the icon size, so pass no size class on an icon inside a
 `Button`; the scan refuses one. The base class carries
@@ -1008,11 +1009,12 @@ file's text, so a workspace imported over it starts it over.
 
 ### A rule in one sentence and a disclosure
 
-A rule longer than two sentences renders as `RuleDisclosure` (#739): the sentence
+A rule paragraph renders as `RuleDisclosure` (#739): the sentence
 that explains the surprise or the side effect stays in view at the control, and
 the rest sits under a "How ... works" disclosure, word for word where it still
-reads. The disclosure is drawn as Details is, a ghost Button with a leading
-chevron, and its body carries `hidden` when closed. A plugin's description has no
+reads; a side effect with no confirm, such as Remove from placement on the
+Bids tab, stays in view. The toggle is a ghost Button with a leading chevron, as
+Details is, and its body carries `hidden` when closed. A plugin's description has no
 summary of its own, so `splitFirstSentence` shows its first sentence and puts the
 rest under "More about" the plugin. Help text is muted; pass `muted={false}`
 inside a panel whose sentences are body text.
@@ -1023,7 +1025,8 @@ The Results tab opens with `RunBanner`: when the board's run ran, whether it is
 out of date, and the action that changes it, in one line. Out of date tints the
 banner with the warning token, fades the figures with `text-muted-foreground`
 rather than opacity, which fails contrast, and marks the first "before your
-changes". After a failed run the banner says nothing of staleness; the alert
+changes". Its badge paints `--background` rather than a `--status-*` fill,
+since a status tint on the banner's own tint fails contrast. After a failed run the banner says nothing of staleness; the alert
 under it says what failed (#680).
 
 ### Listing layout

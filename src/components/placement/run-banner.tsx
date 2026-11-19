@@ -7,7 +7,7 @@ export type RunBannerState =
   /** A run is in progress; Cancel stops it. */
   | { kind: "running"; students: number }
   /** Something a run needs is not loaded; the message says where. */
-  | { kind: "missing"; message: string }
+  | { at: string | undefined; kind: "missing"; message: string }
   /**
    * The latest run failed and the alert under the banner says why; "run
    * again" here would tell the reader to repeat what just failed (#680).
@@ -45,7 +45,7 @@ export function runBannerState({
     return { kind: "running", students };
   }
   if (missing !== null) {
-    return { kind: "missing", message: missing };
+    return { at: ranAt, kind: "missing", message: missing };
   }
   if (failed) {
     return { kind: "failed" };
@@ -84,6 +84,7 @@ export function RunBanner({
   state: RunBannerState;
 }) {
   const stale = state.kind === "stale";
+  const at = "at" in state ? state.at : undefined;
   return (
     <section
       aria-label="Placement run"
@@ -98,15 +99,19 @@ export function RunBanner({
             </Badge>{" "}
           </>
         )}
-        {(state.kind === "fresh" || state.kind === "stale") && (
+        {at !== undefined && (
           <span className="font-medium">
-            Ran at {new Date(state.at).toLocaleString()}.
+            Ran at {new Date(at).toLocaleString()}.
           </span>
         )}
         {stale &&
           " The projects, parameters or bids changed since this run. Run placement again to use them."}
-        {state.kind === "running" && `Placing ${state.students} students...`}
-        {state.kind === "missing" && state.message}
+        {state.kind === "running" &&
+          `Placing ${state.students} ${state.students === 1 ? "student" : "students"}...`}
+        {state.kind === "missing" &&
+          `${at === undefined ? "" : " "}${state.message}`}
+        {state.kind === "failed" &&
+          "The last run failed; the alert below says why."}
       </p>
       {state.kind === "running" ? (
         <Button onClick={onCancel} size="sm" type="button" variant="outline">

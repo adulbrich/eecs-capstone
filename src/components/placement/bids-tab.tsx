@@ -228,8 +228,9 @@ export function BidsTab({
       {view === "project" ? (
         <RuleDisclosure
           className="mt-2"
+          key="project"
           label="How pins and counts work"
-          summary="Pin here does what Approve does on the Results tab: every run keeps the student on that project until you unpin them, over any pin from the bids file or the roster."
+          summary={`Pin here does what Approve does on the Results tab: every run keeps the student on that project until you unpin them, over any pin from the bids file or the roster. ${REMOVE_RULE}`}
         >
           <p>
             Unpin frees them from all of these. A pin changes the next run; the
@@ -241,19 +242,20 @@ export function BidsTab({
             shows their pin, not where the run put them, and leaves that count.
             On a row marked Pinned elsewhere, Pin here moves their pin to this
             project; the header of the other project lists who is pinned there.
-            Pinned only shows the pinned students alone. {REMOVE_RULE}
+            Pinned only shows the pinned students alone.
           </p>
         </RuleDisclosure>
       ) : (
         <RuleDisclosure
           className="mt-2"
+          key="student"
           label="How pins and standing work"
-          summary="Pinned rows show every pin in effect: the bids file's, the roster's, and those set here or on the Results tab, which win over the other two."
+          summary={`Pinned rows show every pin in effect: the bids file's, the roster's, and those set here or on the Results tab, which win over the other two. ${REMOVE_RULE}`}
         >
           <p>
             Each student says where they stand: a pinned student stays on their
             pin in every run, so only the pin shows; anyone else shows where the
-            last run placed them, marked in their rows. {REMOVE_RULE}
+            last run placed them, marked in their rows.
           </p>
         </RuleDisclosure>
       )}
