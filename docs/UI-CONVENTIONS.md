@@ -1016,7 +1016,8 @@ for word where it still reads; a side effect with no confirm, such as Remove fro
 placement on the Bids tab, stays in view. The toggle is a ghost Button with a
 leading chevron, as Details is, and its body carries `hidden` when closed. A
 plugin's description has no summary of its own, so `splitFirstSentence` shows
-its first sentence and puts the rest under "More about" the plugin. Help text is
+its first sentence and puts the rest under "More about" the plugin from the
+second sentence on, since a plugin's prose is not written to this threshold. Help text is
 muted; pass `muted={false}` inside a panel whose sentences are body text.
 
 ### A run's state in one banner

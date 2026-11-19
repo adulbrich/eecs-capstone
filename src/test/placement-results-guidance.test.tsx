@@ -284,6 +284,16 @@ describe("runBannerState properties", () => {
     expect(kind).not.toBe("fresh");
   });
 
+  test.prop([inputs])("says a run failed once nothing outranks it", (i) => {
+    const state = runBannerState({
+      ...i,
+      failed: true,
+      missing: null,
+      running: false,
+    });
+    expect(state.kind).toBe("failed");
+  });
+
   test.prop([inputs])("names a run's time only when there is a board", (i) => {
     const state = runBannerState(i);
     if ("at" in state) {
