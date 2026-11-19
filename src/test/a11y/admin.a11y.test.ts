@@ -616,6 +616,45 @@ for (const width of [1280, 375]) {
   });
 }
 
+// The bids file's status strip (#739): a bad row opens its Details by itself,
+// and closing them leaves the strip alone. A long export name must wrap.
+for (const width of [1280, 375]) {
+  test(`admin placement, the bids file's status strip at ${width}`, async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width, height: 800 });
+    await page.goto("/admin/placement");
+    await waitForHydration(page);
+    await page.getByLabel("Projects CSV file").setInputFiles({
+      name: "projects.csv",
+      mimeType: "text/csv",
+      buffer: Buffer.from(PLACEMENT_PROJECTS_CSV),
+    });
+    await page.getByRole("tab", { name: /Bids/u }).click();
+    await page.getByLabel("Bids CSV file").setInputFiles({
+      name: "capstone-bidding-survey-fall-2026-final-export.csv",
+      mimeType: "text/csv",
+      buffer: Buffer.from(
+        // A bad priority (an error), a second name for Ben (a warning),
+        // and the fixture's Moon Base (the filled unmatched panel).
+        `${PLACEMENT_BIDS_CSV}\ndee@example.edu,Dee Hart,first,Tide Clock,,,\nben@example.edu,Benjamin Ito,2,Tide Clock,,,`
+      ),
+    });
+    const strip = page.getByRole("region", { name: "Loaded bids file" });
+    const details = strip.getByRole("button", { name: "Details" });
+    await expect(strip).toContainText("1 row left out");
+    await expect(strip).toContainText("1 warning");
+    await expect(details).toHaveAttribute("aria-expanded", "true");
+    await checkA11y(page);
+    await expectNoHorizontalOverflow(page);
+
+    await details.click();
+    await expect(details).toHaveAttribute("aria-expanded", "false");
+    await checkA11y(page);
+    await expectNoHorizontalOverflow(page);
+  });
+}
+
 test("@smoke admin placement, projects and bids loaded", async ({ page }) => {
   await page.goto("/admin/placement");
   await waitForHydration(page);

@@ -40,6 +40,47 @@ const STANDARD_LABELS: Record<PlacementDataset, string> = {
   bids: "Bids CSV",
 };
 
+/**
+ * What a workspace saved before plugins converted on read (#733) was
+ * converted from: only the Qualtrics export converted then.
+ */
+const LEGACY_LABEL = "Qualtrics export";
+
+/**
+ * The format a file is read as, in a word or two: the plugin's name in the
+ * Read as select, or the standard format's. A workspace saved before plugins
+ * converted on read holds a converted Qualtrics export.
+ */
+export function formatName(
+  dataset: PlacementDataset,
+  plugin: ImportPlugin | null,
+  legacyConvertedFrom: string | undefined
+): string {
+  if (plugin !== null) {
+    return plugin.menuLabel ?? plugin.label;
+  }
+  return legacyConvertedFrom === undefined
+    ? STANDARD_LABELS[dataset]
+    : LEGACY_LABEL;
+}
+
+/**
+ * Every problem `SourceFormat` lists: the conversion's, then the parser's,
+ * unless the conversion stopped, since a source the plugin could not read
+ * leaves an empty CSV whose missing columns would only repeat that (#681).
+ */
+export function shownIssues(
+  conversion: Conversion,
+  parseIssues: readonly ImportIssue[]
+): readonly ImportIssue[] {
+  return conversionStopped(conversion)
+    ? conversion.issues
+    : [...conversion.issues, ...parseIssues];
+}
+
+const conversionStopped = (conversion: Conversion) =>
+  conversion.issues.some((i) => i.wholeFile);
+
 /** "survey.csv" to "survey (converted).csv". */
 const convertedFilename = (filename: string) =>
   filename.replace(CSV_EXTENSION, " (converted).csv");
@@ -148,6 +189,7 @@ export function SourceFormat({
   conversion,
   dataset,
   filename,
+  flatIssues = false,
   legacyConvertedFrom,
   mapping,
   onMapping,
@@ -159,6 +201,8 @@ export function SourceFormat({
 }: {
   conversion: Conversion;
   dataset: PlacementDataset;
+  /** Under a `SourceStatus` strip, whose badges count the problems. */
+  flatIssues?: boolean;
   /** The uploaded file's name; null for pasted text, which has no Read as. */
   filename: string | null;
   /**
@@ -187,7 +231,7 @@ export function SourceFormat({
   const [mappingOpen, setMappingOpen] = useState(false);
   const plugins = uploadPlugins(dataset);
   const mapped = plugin?.input === "chosen";
-  const conversionStopped = conversion.issues.some((i) => i.wholeFile);
+  const stopped = conversionStopped(conversion);
   // Only when detection found nothing: staff who chose the standard format
   // for a file a plugin claims know what it is. A stored id no plugin has
   // any more was detected again, so it counts as detection.
@@ -243,7 +287,7 @@ export function SourceFormat({
         (plugin !== null || legacyConvertedFrom !== undefined) && (
           <div className="flex flex-wrap items-center gap-2">
             <span>
-              Converted from the {plugin?.label ?? "Qualtrics export"}{" "}
+              Converted from the {plugin?.label ?? LEGACY_LABEL}{" "}
               {legacyConvertedFrom ?? filename}.
             </span>
             <DownloadConverted
@@ -266,16 +310,16 @@ export function SourceFormat({
         />
       )}
       <ImportIssues
+        flat={flatIssues}
         issues={conversion.issues}
-        label={
-          plugin?.label ?? (legacyConvertedFrom ? "Qualtrics export" : dataset)
-        }
+        label={plugin?.label ?? (legacyConvertedFrom ? LEGACY_LABEL : dataset)}
         unit={plugin?.input === "paste" ? "line" : "row"}
       />
       {/* A source the plugin could not read leaves an empty CSV, whose
           missing columns would only repeat that (#681). */}
-      {!conversionStopped && (
+      {!stopped && (
         <ImportIssues
+          flat={flatIssues}
           issues={parseIssues}
           label={
             plugin === null && legacyConvertedFrom === undefined

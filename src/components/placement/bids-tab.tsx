@@ -12,7 +12,12 @@ import { CsvFormatHelp } from "#/components/placement/csv-format";
 import { FilePickerButton } from "#/components/placement/file-picker-button";
 import { RemoveStudentButton } from "#/components/placement/removed-students";
 import { plural } from "#/components/placement/roster-section";
-import { SourceFormat } from "#/components/placement/source-format";
+import {
+  formatName,
+  SourceFormat,
+  shownIssues,
+} from "#/components/placement/source-format";
+import { SourceStatus } from "#/components/placement/source-status";
 import { TitleMatchesPanel } from "#/components/placement/title-matches";
 import type { PlacementWorkspace } from "#/components/placement/use-placement-workspace";
 import { Button } from "#/components/ui/button";
@@ -111,58 +116,75 @@ export function BidsTab({
   );
   const pinnedCount = withPins.filter((s) => s.pin !== undefined).length;
   const rosterOnly = students.filter((s) => s.rosterOnly).length;
+  const conversion = {
+    text: source?.text ?? workspace.bids.text,
+    issues: conversionIssues,
+  };
+  const plugin = source?.plugin ?? null;
+  const format = formatName("bids", plugin, workspace.bids.convertedFrom);
   return (
     <div>
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <p className="text-sm">
-          {students.length - rosterOnly} students and {bidCount} bids from{" "}
-          {workspace.bids.filename}
-          {pinnedCount > 0 && `, ${pinnedCount} pinned`}
-          {rosterOnly > 0 &&
-            `, and ${rosterOnly} more from the roster with no bids`}
-          .
-        </p>
-        <ConfirmDialog
-          busyLabel="Removing..."
-          confirmLabel="Remove"
-          description={`The bids leave this workspace, and with them any placement, the pins set on it and the titles matched by hand. Upload the file again to bring the bids back.${workspace.bids.mapping === undefined ? "" : " The column mapping goes with the file; download it first to keep it."}`}
-          onConfirm={() =>
-            update((w) => ({
-              ...w,
-              bids: null,
-              pins: undefined,
-              result: undefined,
-              titleMatches: undefined,
-            }))
-          }
-          title={`Remove the bids from ${workspace.bids.filename}?`}
-        >
-          <Button size="sm" type="button" variant="ghost">
-            <Trash2 aria-hidden="true" />
-            Remove bids
-          </Button>
-        </ConfirmDialog>
-      </div>
-      <SourceFormat
-        conversion={{
-          text: source?.text ?? workspace.bids.text,
-          issues: conversionIssues,
-        }}
+      <SourceStatus
         dataset="bids"
         filename={workspace.bids.filename}
-        // A workspace saved before plugins converted on read (#733) holds
-        // the converted text, and its conversion's issues, as they were.
-        legacyConvertedFrom={workspace.bids.convertedFrom}
-        mapping={workspace.bids.mapping}
-        onMapping={(mapping) =>
-          update((w) => setColumnMapping(w, "bids", mapping))
+        // Read wide (#736), the column mapping makes one bid of each
+        // filled project cell.
+        format={source?.wide ? `${format}, one column per project` : format}
+        issues={shownIssues(conversion, bids.issues)}
+        // Another file, from a workspace imported over this one, starts
+        // the strip over, so its error opens Details as a first one does.
+        key={workspace.bids.text}
+        remove={
+          <ConfirmDialog
+            busyLabel="Removing..."
+            confirmLabel="Remove"
+            description={`The bids leave this workspace, and with them any placement, the pins set on it and the titles matched by hand. Upload the file again to bring the bids back.${workspace.bids.mapping === undefined ? "" : " The column mapping goes with the file; download it first to keep it."}`}
+            onConfirm={() =>
+              update((w) => ({
+                ...w,
+                bids: null,
+                pins: undefined,
+                result: undefined,
+                titleMatches: undefined,
+              }))
+            }
+            title={`Remove the bids from ${workspace.bids.filename}?`}
+          >
+            <Button size="sm" type="button" variant="ghost">
+              <Trash2 aria-hidden="true" />
+              Remove bids
+            </Button>
+          </ConfirmDialog>
         }
-        onReadAs={(choice) => update((w) => setReadAs(w, "bids", choice))}
-        parseIssues={bids.issues}
-        plugin={source?.plugin ?? null}
-        readAs={workspace.bids.readAs}
-        text={workspace.bids.text}
-      />
+        summary={
+          <>
+            {students.length - rosterOnly} students and {bidCount} bids
+            {pinnedCount > 0 && `, ${pinnedCount} pinned`}
+            {rosterOnly > 0 &&
+              `, and ${rosterOnly} more from the roster with no bids`}
+            .
+          </>
+        }
+      >
+        <SourceFormat
+          conversion={conversion}
+          dataset="bids"
+          filename={workspace.bids.filename}
+          flatIssues
+          // A workspace saved before plugins converted on read (#733) holds
+          // the converted text, and its conversion's issues, as they were.
+          legacyConvertedFrom={workspace.bids.convertedFrom}
+          mapping={workspace.bids.mapping}
+          onMapping={(mapping) =>
+            update((w) => setColumnMapping(w, "bids", mapping))
+          }
+          onReadAs={(choice) => update((w) => setReadAs(w, "bids", choice))}
+          parseIssues={bids.issues}
+          plugin={plugin}
+          readAs={workspace.bids.readAs}
+          text={workspace.bids.text}
+        />
+      </SourceStatus>
       <TitleMatchesPanel
         matches={workspace.titleMatches}
         onMatch={(added) =>
