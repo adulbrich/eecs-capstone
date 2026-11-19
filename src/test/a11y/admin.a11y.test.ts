@@ -635,12 +635,15 @@ for (const width of [1280, 375]) {
       name: "capstone-bidding-survey-fall-2026-final-export.csv",
       mimeType: "text/csv",
       buffer: Buffer.from(
-        `${PLACEMENT_BIDS_CSV}\ndee@example.edu,Dee Hart,first,Tide Clock,,,`
+        // A bad priority (an error), a second name for Ben (a warning),
+        // and the fixture's Moon Base (the filled unmatched panel).
+        `${PLACEMENT_BIDS_CSV}\ndee@example.edu,Dee Hart,first,Tide Clock,,,\nben@example.edu,Benjamin Ito,2,Tide Clock,,,`
       ),
     });
     const strip = page.getByRole("region", { name: "Loaded bids file" });
     const details = strip.getByRole("button", { name: "Details" });
     await expect(strip).toContainText("1 row left out");
+    await expect(strip).toContainText("1 warning");
     await expect(details).toHaveAttribute("aria-expanded", "true");
     await checkA11y(page);
     await expectNoHorizontalOverflow(page);

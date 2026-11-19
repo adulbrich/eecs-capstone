@@ -1,4 +1,4 @@
-import { Undo2 } from "lucide-react";
+import { TriangleAlert, Undo2 } from "lucide-react";
 import { useMemo, useState } from "react";
 import { Button } from "#/components/ui/button";
 import {
@@ -70,16 +70,28 @@ export function TitleMatchesPanel({
   return (
     <div className="mt-4 flex flex-col gap-3">
       {unmatched.length > 0 && (
+        // Filled, not outlined: an action the run waits on, where the bids
+        // file's own problems are a list under its strip (#739).
         <section
           aria-label="Unmatched titles"
           className="border-destructive/40 rounded-md border px-3 py-2 text-sm"
+          style={{ backgroundColor: "var(--status-error-bg)" }}
         >
           <div className="flex flex-wrap items-center justify-between gap-2">
-            <p className="font-medium">
-              {plural(unmatched.length, "title matches", "titles match")} no
-              project{" "}
-              <span className="text-muted-foreground font-normal">
-                ({plural(leftOut, "bid", "bids")} left out)
+            <p className="flex min-w-0 gap-2">
+              <TriangleAlert
+                aria-hidden="true"
+                className="mt-0.5 size-4 shrink-0"
+                style={{ color: "var(--status-error)" }}
+              />
+              <span>
+                <span className="font-medium">
+                  {plural(unmatched.length, "title matches", "titles match")} no
+                  project.
+                </span>{" "}
+                {unmatched.length === 1 ? "Its" : "Their"}{" "}
+                {plural(leftOut, "bid is", "bids are")} left out until you match{" "}
+                {unmatched.length === 1 ? "it" : "them"}.
               </span>
             </p>
             {withSuggestion.length > 0 && (
@@ -125,7 +137,9 @@ export function TitleMatchesPanel({
                     >
                       <SelectTrigger
                         aria-label={`Project for "${entry.title}"`}
-                        className="w-full min-w-0 sm:w-96"
+                        // Opaque on the tinted panel; shadcn's dark
+                        // input fill is translucent.
+                        className="bg-background dark:bg-background w-full min-w-0 sm:w-96"
                         size="sm"
                       >
                         <SelectValue placeholder="Pick a project" />

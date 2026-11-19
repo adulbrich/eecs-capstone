@@ -3,7 +3,10 @@ import { fc, test } from "@fast-check/vitest";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { useState } from "react";
 import { afterEach, describe, expect, it } from "vitest";
-import { issueCounts } from "#/components/placement/import-issues";
+import {
+  ImportIssues,
+  issueCounts,
+} from "#/components/placement/import-issues";
 import { shownIssues } from "#/components/placement/source-format";
 import { SourceStatus } from "#/components/placement/source-status";
 import type { ImportIssue } from "#/lib/placement/csv";
@@ -192,6 +195,31 @@ describe("SourceStatus (#739)", () => {
     expect(details().getAttribute("aria-expanded")).toBe("true");
     fireEvent.click(screen.getByRole("button", { name: "Fix it" }));
     expect(details().getAttribute("aria-expanded")).toBe("true");
+  });
+
+  it("lists the problems flat under the strip, with no count of its own", () => {
+    render(<ImportIssues flat issues={[PREVIEW, LEFT_OUT]} label="bids" />);
+    const list = screen.getByRole("region", {
+      name: "Problems in the bids file",
+    });
+    expect(list.textContent).toContain("In the bids file");
+    expect(list.textContent).not.toContain("left out in");
+    // Errors first, and a warning still says so without its icon.
+    expect(
+      [...list.querySelectorAll("li")].map((li) => li.textContent)
+    ).toEqual([
+      "Row 19: The response has no recipient email. Left out.",
+      "Row 4 (warning): A survey preview, not a response; skipped.",
+    ]);
+  });
+
+  it("says the file was not read, flat as boxed", () => {
+    render(
+      <ImportIssues flat issues={[NO_EMAIL_COLUMN]} label="Qualtrics export" />
+    );
+    expect(
+      screen.getByText("The Qualtrics export file was not read")
+    ).toBeTruthy();
   });
 
   it("keeps what the details hold while closed, rather than unmounting", () => {

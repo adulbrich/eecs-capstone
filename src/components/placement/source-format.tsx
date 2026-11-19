@@ -189,6 +189,7 @@ export function SourceFormat({
   conversion,
   dataset,
   filename,
+  flatIssues = false,
   legacyConvertedFrom,
   mapping,
   onMapping,
@@ -200,6 +201,8 @@ export function SourceFormat({
 }: {
   conversion: Conversion;
   dataset: PlacementDataset;
+  /** Under a `SourceStatus` strip, whose badges count the problems. */
+  flatIssues?: boolean;
   /** The uploaded file's name; null for pasted text, which has no Read as. */
   filename: string | null;
   /**
@@ -307,6 +310,7 @@ export function SourceFormat({
         />
       )}
       <ImportIssues
+        flat={flatIssues}
         issues={conversion.issues}
         label={plugin?.label ?? (legacyConvertedFrom ? LEGACY_LABEL : dataset)}
         unit={plugin?.input === "paste" ? "line" : "row"}
@@ -315,6 +319,7 @@ export function SourceFormat({
           missing columns would only repeat that (#681). */}
       {!stopped && (
         <ImportIssues
+          flat={flatIssues}
           issues={parseIssues}
           label={
             plugin === null && legacyConvertedFrom === undefined

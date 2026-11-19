@@ -1,4 +1,10 @@
-import { ChevronDown, CircleX, FileText, TriangleAlert } from "lucide-react";
+import {
+  ChevronDown,
+  ChevronRight,
+  CircleX,
+  FileText,
+  TriangleAlert,
+} from "lucide-react";
 import { type ReactNode, useId, useState } from "react";
 import { issueCounts } from "#/components/placement/import-issues";
 import { plural } from "#/components/placement/roster-section";
@@ -66,6 +72,7 @@ export function SourceStatus({
       setOpen(true);
     }
   }
+  const Chevron = open ? ChevronDown : ChevronRight;
   return (
     // Not "The bids file": that is a substring of "Problems in the bids
     // file", the problem list's name inside it.
@@ -82,39 +89,42 @@ export function SourceStatus({
         <Badge variant="outline">{format}</Badge>
         {/* "0 students and 0 bids" beside Not read says the same thing
             twice, and reads as if the file were empty. */}
-        {!unread && <span className="min-w-0">{summary}</span>}
-        {unread && (
-          <Badge style={ERROR_STYLE} variant="status">
-            <CircleX aria-hidden="true" className="size-3" />
-            Not read
-          </Badge>
-        )}
-        {!unread && rowsLeftOut > 0 && (
-          <Badge style={ERROR_STYLE} variant="status">
-            <CircleX aria-hidden="true" className="size-3" />
-            {plural(rowsLeftOut, "row", "rows")} left out
-          </Badge>
-        )}
-        {warnings > 0 && (
-          <Badge style={WARNING_STYLE} variant="status">
-            <TriangleAlert aria-hidden="true" className="size-3" />
-            {plural(warnings, "warning", "warnings")}
-          </Badge>
+        {!unread && (
+          <span className="text-muted-foreground min-w-0">{summary}</span>
         )}
         <span className="ml-auto flex flex-wrap items-center gap-2">
+          {unread && (
+            <Badge style={ERROR_STYLE} variant="status">
+              <CircleX aria-hidden="true" className="size-3" />
+              Not read
+            </Badge>
+          )}
+          {!unread && rowsLeftOut > 0 && (
+            <Badge style={ERROR_STYLE} variant="status">
+              <CircleX aria-hidden="true" className="size-3" />
+              {plural(rowsLeftOut, "row", "rows")} left out
+            </Badge>
+          )}
+          {warnings > 0 && (
+            <Badge style={WARNING_STYLE} variant="status">
+              <TriangleAlert aria-hidden="true" className="size-3" />
+              {plural(warnings, "warning", "warnings")}
+            </Badge>
+          )}
+          {/* A disclosure, drawn as the page's others are ("Not in the
+              survey", a student's bids): a leading chevron on a ghost
+              button. An outline button with a trailing chevron is how this
+              app draws a menu or a select. */}
           <Button
             aria-controls={detailsId}
             aria-expanded={open}
             onClick={() => setOpen(!open)}
             size="sm"
             type="button"
-            variant="outline"
+            variant="ghost"
           >
+            <Chevron aria-hidden="true" />
             Details
-            <ChevronDown
-              aria-hidden="true"
-              className={open ? "rotate-180" : undefined}
-            />
           </Button>
           {remove}
         </span>

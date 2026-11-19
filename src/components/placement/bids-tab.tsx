@@ -170,6 +170,7 @@ export function BidsTab({
           conversion={conversion}
           dataset="bids"
           filename={workspace.bids.filename}
+          flatIssues
           // A workspace saved before plugins converted on read (#733) holds
           // the converted text, and its conversion's issues, as they were.
           legacyConvertedFrom={workspace.bids.convertedFrom}

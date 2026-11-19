@@ -985,20 +985,26 @@ no count; the card and the detail page have no such column.
 
 A file the placement tool has read shows as one `SourceStatus` strip (#739): the
 file name, an outline badge for the format it is read as, what reading it gave in
-one sentence, a status badge for rows left out (or "Not read", when an error
-stopped the whole file) and one for warnings, then Details and the source's Remove
-button. Each problem badge is silent at zero, and its counts come from
+one muted sentence, then on the right a status badge for rows left out (or "Not
+read", when an error stopped the whole file) and one for warnings, Details and the
+source's Remove button. Each problem badge is silent at zero, and its counts come from
 `issueCounts` over `shownIssues`, the same lists the details print, so the badge
-and the list cannot disagree.
+and the list cannot disagree. Details is a disclosure, a ghost Button with a
+leading chevron as on the Results tab; an outline Button with a trailing chevron
+is this app's menu or select.
 
-Details holds `SourceFormat` and everything in it. It opens by itself when an error
+Details holds `SourceFormat` with `flatIssues`, so the problems print as a plain
+list, an icon per row, with no box or count of their own: a red frame inside the
+strip's border nests one error in another. Something that needs an action before
+a run, such as the unmatched titles, sits outside the strip as a filled panel
+saying what stays out until it is done.
+
+Details opens by itself when an error
 appears, because an error changes what the run sees, and does not close by itself
 while mounted: applying a column mapping that clears the error must not pull its
 controls away. Closed, the details carry `hidden` rather than unmounting, so a
 column mapping being edited keeps its draft. The caller keys the strip on the
-file's text, so a workspace imported over it starts it over. Something that needs
-an action before a run, such as the unmatched titles, sits outside the strip, not
-under Details.
+file's text, so a workspace imported over it starts it over.
 
 ### Listing layout
 

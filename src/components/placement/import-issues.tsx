@@ -1,3 +1,4 @@
+import { CircleX, TriangleAlert } from "lucide-react";
 import type { ImportIssue } from "#/lib/placement/csv";
 
 /** What a list of import problems adds up to, as its heading says it. */
@@ -27,13 +28,18 @@ export function issueCounts(issues: readonly ImportIssue[]): IssueCounts {
  * Every problem an import found, errors first. A row with an error is left
  * out of the run; a warning keeps the row. With `writing`, the problems an
  * export plugin found writing its file, whose rows are those it left out.
+ * With `flat`, a plain list under a status strip whose badges already count
+ * it (#739): no box of its own and no count, so it draws no second error
+ * frame inside the strip's.
  */
 export function ImportIssues({
+  flat = false,
   issues,
   label,
   unit = "row",
   writing = false,
 }: {
+  flat?: boolean;
   issues: readonly ImportIssue[];
   label: string;
   /** "line" for pasted text, which has no header row. */
@@ -48,6 +54,49 @@ export function ImportIssues({
   const warnings = issues.filter((i) => i.level === "warning");
   const { rowsLeftOut, unread } = issueCounts(issues);
   const where = unit === "line" ? `the pasted ${label}` : `the ${label} file`;
+  if (flat) {
+    return (
+      <section aria-label={`Problems in ${where}`} className="mt-3 text-sm">
+        {unread ? (
+          <p className="font-medium">
+            The {label} file was not {writing ? "written" : "read"}
+          </p>
+        ) : (
+          <p className="text-muted-foreground">In {where}</p>
+        )}
+        <ul className="mt-1 max-h-60 space-y-0.5 overflow-y-auto">
+          {[...errors, ...warnings].map((issue) => (
+            <li
+              className="flex gap-2"
+              key={`${issue.level}-${issue.row}-${issue.message}`}
+            >
+              {issue.level === "error" ? (
+                <CircleX
+                  aria-hidden="true"
+                  className="mt-0.5 size-4 shrink-0"
+                  style={{ color: "var(--status-error)" }}
+                />
+              ) : (
+                <TriangleAlert
+                  aria-hidden="true"
+                  className="mt-0.5 size-4 shrink-0"
+                  style={{ color: "var(--status-warning)" }}
+                />
+              )}
+              <span className="text-muted-foreground min-w-16 shrink-0">
+                {unit === "line" ? issueLines(issue) : issueRows(issue)}
+                <span className="sr-only">
+                  {issue.level === "warning" ? " (warning)" : ""}
+                  {": "}
+                </span>
+              </span>
+              <span className="min-w-0 wrap-anywhere">{issue.message}</span>
+            </li>
+          ))}
+        </ul>
+      </section>
+    );
+  }
   return (
     <section
       aria-label={`Problems in ${where}`}
