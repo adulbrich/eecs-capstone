@@ -92,9 +92,11 @@ export function WorkspaceActions({
         {trigger}
       </ConfirmDialog>
     );
+  // The action first: a throw leaves the menu, and the dialog in it showing
+  // the error, open.
   const fromMenu = (action: () => void) => () => {
-    setMenuOpen(false);
     action();
+    setMenuOpen(false);
   };
 
   return (

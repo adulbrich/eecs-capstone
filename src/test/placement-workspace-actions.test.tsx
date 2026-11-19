@@ -69,6 +69,11 @@ describe("the Workspace menu (#739)", () => {
     );
     fireEvent.click(await screen.findByRole("button", { name: "Clear" }));
     await vi.waitFor(() => expect(clear).toHaveBeenCalledOnce());
+    // The dialog first: while it is up it hides the menu from the tree, so
+    // the menu reads as closed whether it is or not.
+    await vi.waitFor(() =>
+      expect(screen.queryByRole("alertdialog")).toBeNull()
+    );
     expect(screen.queryByRole("menu")).toBeNull();
   });
 });
