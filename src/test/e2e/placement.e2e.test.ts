@@ -57,6 +57,18 @@ async function importFiles(page: Page) {
   await expect(page.getByText("2 students and 3 bids")).toBeVisible();
 }
 
+/**
+ * Opens the bids file's Details, which stays closed for a file with no error
+ * (#739): Read as, the conversion and the problem list sit under it.
+ */
+async function openBidsDetails(page: Page) {
+  const details = page
+    .getByRole("region", { name: "Loaded bids file" })
+    .getByRole("button", { name: "Details" });
+  await expect(details).toHaveAttribute("aria-expanded", "false");
+  await details.click();
+}
+
 const stored = (page: Page) =>
   page.evaluate((key) => window.localStorage.getItem(key), STORAGE_KEY);
 
@@ -380,6 +392,7 @@ test.describe("placement workspace", () => {
       mimeType: "text/csv",
       buffer: Buffer.from(survey),
     });
+    await openBidsDetails(page);
     await expect(
       page.getByText("Converted from the Qualtrics export survey.csv.")
     ).toBeVisible();
@@ -435,6 +448,14 @@ test.describe("placement workspace", () => {
     await waitForHydration(page);
     await page.getByRole("tab", { name: /Bids/u }).click();
     await expect(page.getByText("2 students and 3 bids")).toBeVisible();
+    // The strip's format badge names what the stored text was converted
+    // from, though no plugin reads it again.
+    await expect(
+      page
+        .getByRole("region", { name: "Loaded bids file" })
+        .getByText("Qualtrics export", { exact: true })
+    ).toBeVisible();
+    await openBidsDetails(page);
     await expect(
       page.getByText("Converted from the Qualtrics export survey.csv.")
     ).toBeVisible();
@@ -709,6 +730,7 @@ test.describe("placement workspace", () => {
       mimeType: "text/csv",
       buffer: Buffer.from(edited),
     });
+    await openBidsDetails(page);
     await expect(
       page.getByText("Converted from the Qualtrics export edited.csv.")
     ).toBeVisible();
@@ -738,9 +760,53 @@ test.describe("placement workspace", () => {
     await expect(problems).toContainText(
       "The export has no Recipient Email column"
     );
+    // On the strip, one badge for a file not read, and its Details open.
+    const strip = page.getByRole("region", { name: "Loaded bids file" });
+    await expect(strip.getByText("Not read", { exact: true })).toBeVisible();
+    await expect(
+      strip.getByRole("button", { name: "Details" })
+    ).toHaveAttribute("aria-expanded", "true");
+    await expect(strip).not.toContainText("0 students and 0 bids");
     await expect(
       page.getByRole("region", { name: "Problems in the bids file" })
     ).toHaveCount(0);
+  });
+
+  test("a workspace imported over a closed bids strip opens it on its own error (#739)", async ({
+    page,
+  }) => {
+    const badRow = (name: string) =>
+      `${BIDS_CSV}\n${name.toLowerCase()}@${DOMAIN},${name} Hart,first,Tide Clock,,,`;
+    await page.goto("/admin/placement");
+    await waitForHydration(page);
+    await page.getByLabel("Projects CSV file").setInputFiles({
+      name: "projects.csv",
+      mimeType: "text/csv",
+      buffer: Buffer.from(PROJECTS_CSV),
+    });
+    await page.getByRole("tab", { name: /Bids/u }).click();
+    await page.getByLabel("Bids CSV file").setInputFiles({
+      name: "first.csv",
+      mimeType: "text/csv",
+      buffer: Buffer.from(badRow("Dee")),
+    });
+    const strip = page.getByRole("region", { name: "Loaded bids file" });
+    const details = strip.getByRole("button", { name: "Details" });
+    await expect(details).toHaveAttribute("aria-expanded", "true");
+    await details.click();
+    await expect(details).toHaveAttribute("aria-expanded", "false");
+
+    // Another workspace whose bids file also has a bad row, imported while
+    // the strip is on screen.
+    const workspace = JSON.parse((await stored(page)) ?? "null");
+    workspace.bids = { filename: "second.csv", text: badRow("Eve") };
+    await page.getByLabel("Workspace file").setInputFiles({
+      name: "workspace.json",
+      mimeType: "application/json",
+      buffer: Buffer.from(JSON.stringify(workspace)),
+    });
+    await expect(strip).toContainText("second.csv");
+    await expect(details).toHaveAttribute("aria-expanded", "true");
   });
 
   test("the analytics Sheet downloads each of its tables", async ({ page }) => {
@@ -1342,6 +1408,11 @@ test.describe("placement workspace", () => {
     await expect(page.getByText("2 students and 3 bids")).toBeVisible();
     await expect(
       page.getByRole("rowheader", { name: /Ada Park/u })
+    ).toBeVisible();
+    await expect(
+      page
+        .getByRole("region", { name: "Loaded bids file" })
+        .getByText("Column mapping, one column per project", { exact: true })
     ).toBeVisible();
 
     const bidsOf = async () => JSON.parse((await stored(page)) ?? "null")?.bids;

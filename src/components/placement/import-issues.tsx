@@ -1,5 +1,28 @@
 import type { ImportIssue } from "#/lib/placement/csv";
 
+/** What a list of import problems adds up to, as its heading says it. */
+export interface IssueCounts {
+  errors: number;
+  /** Rows, or lines, an error left out of the run. */
+  rowsLeftOut: number;
+  /**
+   * A problem with the header or the file's shape stopped every row, so
+   * counting rows left out would say one when none was read (#681).
+   */
+  unread: boolean;
+  warnings: number;
+}
+
+export function issueCounts(issues: readonly ImportIssue[]): IssueCounts {
+  const errors = issues.filter((i) => i.level === "error");
+  return {
+    errors: errors.length,
+    rowsLeftOut: errors.reduce((n, i) => n + (i.rows?.length ?? 1), 0),
+    unread: errors.some((i) => i.wholeFile),
+    warnings: issues.filter((i) => i.level === "warning").length,
+  };
+}
+
 /**
  * Every problem an import found, errors first. A row with an error is left
  * out of the run; a warning keeps the row. With `writing`, the problems an
@@ -22,12 +45,9 @@ export function ImportIssues({
     return null;
   }
   const errors = issues.filter((i) => i.level === "error");
-  const rowsLeftOut = errors.reduce((n, i) => n + (i.rows?.length ?? 1), 0);
   const warnings = issues.filter((i) => i.level === "warning");
+  const { rowsLeftOut, unread } = issueCounts(issues);
   const where = unit === "line" ? `the pasted ${label}` : `the ${label} file`;
-  // A problem with the header or the file's shape stops every row, so
-  // counting rows left out would say one when none was read (#681).
-  const unread = errors.some((i) => i.wholeFile);
   return (
     <section
       aria-label={`Problems in ${where}`}

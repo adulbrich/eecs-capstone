@@ -981,6 +981,25 @@ tables carry a Teams supported column, so their Badges cell passes `ProjectBadge
 no count; the card and the detail page have no such column.
 `src/test/project-table-columns.test.tsx` pins that.
 
+### A loaded file's status strip
+
+A file the placement tool has read shows as one `SourceStatus` strip (#739): the
+file name, an outline badge for the format it is read as, what reading it gave in
+one sentence, a status badge for rows left out (or "Not read", when an error
+stopped the whole file) and one for warnings, then Details and the source's Remove
+button. Each problem badge is silent at zero, and its counts come from
+`issueCounts` over `shownIssues`, the same lists the details print, so the badge
+and the list cannot disagree.
+
+Details holds `SourceFormat` and everything in it. It opens by itself when an error
+appears, because an error changes what the run sees, and does not close by itself
+while mounted: applying a column mapping that clears the error must not pull its
+controls away. Closed, the details carry `hidden` rather than unmounting, so a
+column mapping being edited keeps its draft. The caller keys the strip on the
+file's text, so a workspace imported over it starts it over. Something that needs
+an action before a run, such as the unmatched titles, sits outside the strip, not
+under Details.
+
 ### Listing layout
 
 A page that lists and filters renders through `ListingLayout` from

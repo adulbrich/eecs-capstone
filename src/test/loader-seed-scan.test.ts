@@ -253,6 +253,13 @@ const CENSUS = new Map<string, { class: SeedClass; why: string }>([
     },
   ],
   [
+    "src/components/placement/source-status.tsx: useState(hasError)",
+    {
+      class: "D",
+      why: "whether Details is open and whether the file had an error, both from the workspace in localStorage, never loader data; the component resyncs both during render when an error appears",
+    },
+  ],
+  [
     "src/components/comment-thread.tsx: useState(comment.content)",
     {
       class: "D",
