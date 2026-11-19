@@ -1009,15 +1009,15 @@ file's text, so a workspace imported over it starts it over.
 
 ### A rule in one sentence and a disclosure
 
-A rule paragraph renders as `RuleDisclosure` (#739): the sentence
-that explains the surprise or the side effect stays in view at the control, and
-the rest sits under a "How ... works" disclosure, word for word where it still
-reads; a side effect with no confirm, such as Remove from placement on the
-Bids tab, stays in view. The toggle is a ghost Button with a leading chevron, as
-Details is, and its body carries `hidden` when closed. A plugin's description has no
-summary of its own, so `splitFirstSentence` shows its first sentence and puts the
-rest under "More about" the plugin. Help text is muted; pass `muted={false}`
-inside a panel whose sentences are body text.
+A rule paragraph of three sentences or more above a control or its data renders
+as `RuleDisclosure` (#739): the sentence that explains the surprise or the side
+effect stays in view, and the rest sits under a "How ... works" disclosure, word
+for word where it still reads; a side effect with no confirm, such as Remove from
+placement on the Bids tab, stays in view. The toggle is a ghost Button with a
+leading chevron, as Details is, and its body carries `hidden` when closed. A
+plugin's description has no summary of its own, so `splitFirstSentence` shows
+its first sentence and puts the rest under "More about" the plugin. Help text is
+muted; pass `muted={false}` inside a panel whose sentences are body text.
 
 ### A run's state in one banner
 
@@ -1026,7 +1026,8 @@ out of date, and the action that changes it, in one line. Out of date tints the
 banner with the warning token, fades the figures with `text-muted-foreground`
 rather than opacity, which fails contrast, and marks the first "before your
 changes". Its badge paints `--background` rather than a `--status-*` fill,
-since a status tint on the banner's own tint fails contrast. After a failed run the banner says nothing of staleness; the alert
+since a status tint on the banner's own tint fails contrast. After a failed run
+the banner says nothing of staleness, and no note says "run again"; the alert
 under it says what failed (#680).
 
 ### Listing layout

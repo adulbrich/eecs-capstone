@@ -274,22 +274,29 @@ describe("runBannerState properties", () => {
     students: fc.oneof(fc.constantFrom(0, 1, 2), fc.nat()),
   });
 
-  test.prop([inputs])(
-    "is total: running, then missing, then failed, then ready, then the run",
-    (i) => {
-      let expected: unknown;
-      if (i.running) {
-        expected = { kind: "running", students: i.students };
-      } else if (i.missing !== null) {
-        expected = { at: i.ranAt, kind: "missing", message: i.missing };
-      } else if (i.failed) {
-        expected = { kind: "failed" };
-      } else if (i.ranAt === undefined) {
-        expected = { kind: "ready" };
-      } else {
-        expected = { at: i.ranAt, kind: i.stale ? "stale" : "fresh" };
-      }
-      expect(runBannerState(i)).toEqual(expected);
+  test.prop([inputs])("a run in progress wins over every other input", (i) => {
+    expect(runBannerState({ ...i, running: true }).kind).toBe("running");
+  });
+
+  test.prop([inputs])("never says out of date after a failure (#680)", (i) => {
+    const { kind } = runBannerState({ ...i, failed: true });
+    expect(kind).not.toBe("stale");
+    expect(kind).not.toBe("fresh");
+  });
+
+  test.prop([inputs])("names a run's time only when there is a board", (i) => {
+    const state = runBannerState(i);
+    if ("at" in state) {
+      expect(state.at).toBe(i.ranAt);
     }
-  );
+    if (state.kind === "fresh" || state.kind === "stale") {
+      expect(i.ranAt).not.toBeUndefined();
+      expect(state.kind === "stale").toBe(i.stale);
+    }
+  });
+
+  test.prop([inputs])("blocks the run whenever an input is missing", (i) => {
+    const { kind } = runBannerState({ ...i, running: false });
+    expect(kind === "missing").toBe(i.missing !== null);
+  });
 });

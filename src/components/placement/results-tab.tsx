@@ -248,14 +248,17 @@ export function ResultsTab({
         })}
       />
       <FieldError message={error} />
-      {failed && failure === null && missing === null && (
-        // A run that failed after its inputs changed under it: its reasons
-        // may no longer hold, but the reader still learns it failed.
-        <p className="mt-2 text-sm">
-          The last run failed, and the projects, parameters or bids changed
-          while it ran. Run placement again.
-        </p>
-      )}
+      {failed &&
+        failure === null &&
+        result === undefined &&
+        missing === null && (
+          // A run that failed after its inputs changed under it: its reasons
+          // may no longer hold, but the reader still learns it failed.
+          <p className="mt-2 text-sm">
+            The last run failed, and the projects, parameters or bids changed
+            while it ran. Run placement again.
+          </p>
+        )}
       {failure && (
         <ErrorBanner className="mt-4">
           <ul className="space-y-0.5">
@@ -499,7 +502,8 @@ function Board({
     });
   // When it ran, and whether it is out of date, are in the banner above.
   const notes = [
-    ...(result.edited
+    // "Run again" under a failure would repeat what just failed (#680).
+    ...(result.edited && !failed
       ? [
           "Students were moved or removed by hand since this run; run again to balance the teams.",
         ]
