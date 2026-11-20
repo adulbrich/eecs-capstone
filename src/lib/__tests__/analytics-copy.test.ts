@@ -1,5 +1,6 @@
+import { fc, test } from "@fast-check/vitest";
 import { describe, expect, it } from "vitest";
-import { slotsHint } from "../analytics-copy";
+import { bookmarksPer, slotsHint } from "../analytics-copy";
 
 describe("slotsHint", () => {
   it("says not set rather than comparing against zero", () => {
@@ -81,4 +82,32 @@ describe("slotsHint", () => {
       "5 expected across 1 of 2 programs with a value set, 3 short against that"
     );
   });
+});
+
+describe("bookmarksPer", () => {
+  it("divides bookmarks by the teams on offer", () => {
+    expect(bookmarksPer(12, 4)).toBe(3);
+    expect(bookmarksPer(0, 2)).toBe(0);
+  });
+
+  it("refuses to divide by a team count the database does not bound", () => {
+    expect(bookmarksPer(5, 0)).toBeUndefined();
+    expect(bookmarksPer(5, -1)).toBeUndefined();
+  });
+
+  test.prop([fc.integer(), fc.integer({ max: 0 })])(
+    "is undefined for every team count of zero or less",
+    (bookmarks, teams) => {
+      expect(bookmarksPer(bookmarks, teams)).toBeUndefined();
+    }
+  );
+
+  test.prop([fc.nat(), fc.integer({ min: 1 })])(
+    "is a finite share for every positive team count",
+    (bookmarks, teams) => {
+      const share = bookmarksPer(bookmarks, teams);
+      expect(share).toBe(bookmarks / teams);
+      expect(Number.isFinite(share)).toBe(true);
+    }
+  );
 });

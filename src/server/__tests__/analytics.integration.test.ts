@@ -2,8 +2,10 @@ import { eq } from "drizzle-orm";
 import { describe, expect, it } from "vitest";
 import { db } from "#/db";
 import {
+  categories,
   inventoryItems,
   projectBookmarks,
+  projectCategories,
   projectStatusHistory,
   projects,
   user,
@@ -411,6 +413,345 @@ describe("bookmarks since publication", () => {
 
     const view = await getAnalyticsAs(admin, { ...RANGE, programId: null });
     expect(view.headline.publishedWithoutBookmarks).toBe(1);
+  });
+});
+
+describe("bookmark demand per project and per category (#518)", () => {
+  type Account = Awaited<ReturnType<typeof makeUser>>;
+  let seq = 0;
+
+  /** A published project with its teams written as a column, in programs. */
+  async function published(
+    admin: Account,
+    title: string,
+    teamsSupported: number,
+    programIds: string[] = []
+  ) {
+    const project = await createProjectAs(admin, { ...baseProject(), title });
+    if (programIds.length > 0) {
+      await updateProjectProgramsAs(admin, {
+        id: project.id,
+        programIds,
+        acceptingApplicants: true,
+        teamsSupported: 1,
+      });
+    }
+    await forceTransitionAs(admin, project.id, "published", undefined, {
+      sendEmail: false,
+    });
+    // Written after the writers, so the count under test is the column's,
+    // including the zero that no writer offers but the database allows.
+    await db
+      .update(projects)
+      .set({ teamsSupported })
+      .where(eq(projects.id, project.id));
+    return project;
+  }
+
+  async function readers(n: number) {
+    const made: Account[] = [];
+    for (let i = 0; i < n; i++) {
+      seq += 1;
+      made.push(await makeUser(`an-bd-${seq}-${Date.now()}@x.com`, "user"));
+    }
+    return made;
+  }
+
+  /**
+   * Bookmarks stamped from the app clock after publication, as the existing
+   * unbookmarked test explains: the database's `now()` can lag the host.
+   */
+  async function bookmark(projectId: string, by: Account[]) {
+    if (by.length === 0) {
+      return;
+    }
+    await db.insert(projectBookmarks).values(
+      by.map((r) => ({
+        userId: r.id,
+        projectId,
+        createdAt: new Date(),
+      }))
+    );
+  }
+
+  async function category(name: string) {
+    seq += 1;
+    const [row] = await db
+      .insert(categories)
+      .values({ domain: "project", type: "industry", name: `${name} ${seq}` })
+      .returning();
+    return row;
+  }
+
+  async function categorize(projectId: string, ...categoryIds: string[]) {
+    await db
+      .insert(projectCategories)
+      .values(categoryIds.map((categoryId) => ({ projectId, categoryId })));
+  }
+
+  function zeroRows(view: Awaited<ReturnType<typeof getAnalyticsAs>>) {
+    return view.bookmarksByProject.filter((r) => r.bookmarks === 0).length;
+  }
+
+  it("counts a bookmark made since publication in both tables and takes its project out of the tile, and one made before in neither", async () => {
+    const admin = await makeUser(`an-bd-a-${Date.now()}@x.com`, "admin");
+    const [reader] = await readers(1);
+    const cat = await category("Marine");
+    const early = await published(admin, "Bookmarked in review", 1);
+    const late = await published(admin, "Bookmarked once live", 1);
+    await categorize(early.id, cat.id);
+    await categorize(late.id, cat.id);
+    // A day before publication: staff or a student looking at a draft.
+    await db.insert(projectBookmarks).values({
+      userId: reader.id,
+      projectId: early.id,
+      createdAt: new Date(Date.now() - 86_400_000),
+    });
+    await bookmark(late.id, [reader]);
+
+    const view = await getAnalyticsAs(admin, { ...RANGE, programId: null });
+    const byId = new Map(view.bookmarksByProject.map((r) => [r.id, r]));
+    expect(byId.get(early.id)?.bookmarks).toBe(0);
+    expect(byId.get(late.id)?.bookmarks).toBe(1);
+    expect(view.bookmarksByCategory).toEqual([
+      {
+        key: cat.id,
+        label: cat.name,
+        projects: 2,
+        teamsSupported: 2,
+        bookmarks: 1,
+      },
+    ]);
+    expect(view.headline.publishedWithoutBookmarks).toBe(1);
+  });
+
+  /**
+   * Two programs and a project in each, a project in both, and one in none.
+   * Bookmarked: the one in A, and the shared one.
+   */
+  async function programFixture() {
+    const admin = await makeUser(`an-bd-p-${Date.now()}@x.com`, "admin");
+    const stamp = Date.now();
+    const a = await createProgramAs(admin, {
+      courseId: `AN-BD-A-${stamp}`,
+      courseName: "A",
+      description: null,
+    });
+    const b = await createProgramAs(admin, {
+      courseId: `AN-BD-B-${stamp}`,
+      courseName: "B",
+      description: null,
+    });
+    const cat = await category("Robotics");
+    const inA = await published(admin, "In A", 1, [a.id]);
+    const quietA = await published(admin, "Quiet in A", 1, [a.id]);
+    const inB = await published(admin, "In B", 1, [b.id]);
+    const shared = await published(admin, "In both", 2, [a.id, b.id]);
+    const unfiled = await published(admin, "In none", 1);
+    for (const p of [inA, inB, shared]) {
+      await categorize(p.id, cat.id);
+    }
+    const [one, two] = await readers(2);
+    await bookmark(inA.id, [one]);
+    await bookmark(shared.id, [one, two]);
+    return { admin, a, b, cat, inA, quietA, inB, shared, unfiled };
+  }
+
+  it("states the tile as the table's zero rows for every program selection", async () => {
+    const f = await programFixture();
+    const all = await getAnalyticsAs(f.admin, { ...RANGE, programId: null });
+    const onlyA = await getAnalyticsAs(f.admin, {
+      ...RANGE,
+      programId: f.a.id,
+    });
+    const onlyB = await getAnalyticsAs(f.admin, {
+      ...RANGE,
+      programId: f.b.id,
+    });
+
+    for (const view of [all, onlyA, onlyB]) {
+      expect(view.headline.publishedWithoutBookmarks).toBe(zeroRows(view));
+    }
+    // And the counts are the ones the fixture makes, not two agreeing zeros:
+    // quiet in A, in B and in none; quiet in A; in B.
+    expect(all.headline.publishedWithoutBookmarks).toBe(3);
+    expect(onlyA.headline.publishedWithoutBookmarks).toBe(1);
+    expect(onlyB.headline.publishedWithoutBookmarks).toBe(1);
+  });
+
+  it("filters both tables by program, and lists a project in two programs under each", async () => {
+    const f = await programFixture();
+    const all = await getAnalyticsAs(f.admin, { ...RANGE, programId: null });
+    const onlyA = await getAnalyticsAs(f.admin, {
+      ...RANGE,
+      programId: f.a.id,
+    });
+    const onlyB = await getAnalyticsAs(f.admin, {
+      ...RANGE,
+      programId: f.b.id,
+    });
+
+    const ids = (view: typeof all) =>
+      new Set(view.bookmarksByProject.map((r) => r.id));
+    expect(ids(all)).toEqual(
+      new Set([f.inA.id, f.quietA.id, f.inB.id, f.shared.id, f.unfiled.id])
+    );
+    expect(ids(onlyA)).toEqual(new Set([f.inA.id, f.quietA.id, f.shared.id]));
+    expect(ids(onlyB)).toEqual(new Set([f.inB.id, f.shared.id]));
+    // The shared project carries its whole count and its whole teams into
+    // each program, as the published team slots tile does (ADR-0028).
+    for (const view of [onlyA, onlyB]) {
+      expect(
+        view.bookmarksByProject.find((r) => r.id === f.shared.id)
+      ).toMatchObject({ bookmarks: 2, teamsSupported: 2 });
+    }
+    expect(all.bookmarksByCategory).toEqual([
+      {
+        key: f.cat.id,
+        label: f.cat.name,
+        projects: 3,
+        teamsSupported: 4,
+        bookmarks: 3,
+      },
+    ]);
+    expect(onlyA.bookmarksByCategory).toEqual([
+      {
+        key: f.cat.id,
+        label: f.cat.name,
+        projects: 2,
+        teamsSupported: 3,
+        bookmarks: 3,
+      },
+    ]);
+    expect(onlyB.bookmarksByCategory).toEqual([
+      {
+        key: f.cat.id,
+        label: f.cat.name,
+        projects: 2,
+        teamsSupported: 3,
+        bookmarks: 2,
+      },
+    ]);
+  });
+
+  it("counts a project in two categories in full under each, once, whatever its bookmark count", async () => {
+    const admin = await makeUser(`an-bd-c-${Date.now()}@x.com`, "admin");
+    const x = await category("UX Design");
+    const y = await category("Healthcare");
+    // Two teams and three bookmarks: a flat join of categories to bookmarks
+    // would report six teams per category.
+    const project = await published(admin, "Two categories", 2);
+    await categorize(project.id, x.id, y.id);
+    await bookmark(project.id, await readers(3));
+
+    const view = await getAnalyticsAs(admin, { ...RANGE, programId: null });
+    expect(view.bookmarksByProject).toEqual([
+      {
+        id: project.id,
+        title: "Two categories",
+        teamsSupported: 2,
+        bookmarks: 3,
+      },
+    ]);
+    const byKey = new Map(view.bookmarksByCategory.map((r) => [r.key, r]));
+    for (const c of [x, y]) {
+      expect(byKey.get(c.id)).toEqual({
+        key: c.id,
+        label: c.name,
+        projects: 1,
+        teamsSupported: 2,
+        bookmarks: 3,
+      });
+    }
+  });
+
+  it("leaves an archived and a soft-deleted project out of both tables", async () => {
+    const admin = await makeUser(`an-bd-x-${Date.now()}@x.com`, "admin");
+    const cat = await category("AWS");
+    const live = await published(admin, "Live", 1);
+    const archived = await published(admin, "Last cycle", 3);
+    const deleted = await published(admin, "Deleted", 3);
+    for (const p of [live, archived, deleted]) {
+      await categorize(p.id, cat.id);
+    }
+    const [reader] = await readers(1);
+    for (const p of [live, archived, deleted]) {
+      await bookmark(p.id, [reader]);
+    }
+    await forceTransitionAs(admin, archived.id, "archived", undefined, {
+      sendEmail: false,
+    });
+    await db
+      .update(projects)
+      .set({ deletedAt: new Date() })
+      .where(eq(projects.id, deleted.id));
+
+    const view = await getAnalyticsAs(admin, { ...RANGE, programId: null });
+    expect(view.bookmarksByProject.map((r) => r.id)).toEqual([live.id]);
+    expect(view.bookmarksByCategory).toEqual([
+      {
+        key: cat.id,
+        label: cat.name,
+        projects: 1,
+        teamsSupported: 1,
+        bookmarks: 1,
+      },
+    ]);
+  });
+
+  it("orders most bookmarks per team first, then most bookmarks, then title, with no teams last", async () => {
+    const admin = await makeUser(`an-bd-o-${Date.now()}@x.com`, "admin");
+    const hot = await category("Hot");
+    const cold = await category("Cold");
+    const [r1, r2, r3, r4] = await readers(4);
+    // Per team: 3, 2, 2, 2, 0, none.
+    const delta = await published(admin, "Delta", 1);
+    const beta = await published(admin, "Beta", 2);
+    const gamma = await published(admin, "Gamma", 1);
+    const alpha = await published(admin, "Alpha", 1);
+    await published(admin, "Quiet", 1);
+    const noTeams = await published(admin, "No teams", 0);
+    await bookmark(delta.id, [r1, r2, r3]);
+    await bookmark(beta.id, [r1, r2, r3, r4]);
+    await bookmark(gamma.id, [r1, r2]);
+    await bookmark(alpha.id, [r3, r4]);
+    await bookmark(noTeams.id, [r1]);
+    await categorize(delta.id, hot.id);
+    await categorize(beta.id, cold.id);
+
+    const view = await getAnalyticsAs(admin, { ...RANGE, programId: null });
+    expect(view.bookmarksByProject.map((r) => r.title)).toEqual([
+      "Delta",
+      "Beta",
+      "Alpha",
+      "Gamma",
+      "Quiet",
+      "No teams",
+    ]);
+    // Hot is 3 per team, Cold 2.
+    expect(view.bookmarksByCategory.map((r) => r.key)).toEqual([
+      hot.id,
+      cold.id,
+    ]);
+  });
+
+  it("gives an instructor both tables, as the rest of the page", async () => {
+    const admin = await makeUser(`an-bd-ia-${Date.now()}@x.com`, "admin");
+    const instructor = await makeUser(
+      `an-bd-i-${Date.now()}@x.com`,
+      "instructor"
+    );
+    const cat = await category("Flutter");
+    const project = await published(admin, "Seen by staff", 1);
+    await categorize(project.id, cat.id);
+    await bookmark(project.id, await readers(1));
+
+    const view = await getAnalyticsAs(instructor, {
+      ...RANGE,
+      programId: null,
+    });
+    expect(view.bookmarksByProject).toHaveLength(1);
+    expect(view.bookmarksByCategory).toHaveLength(1);
   });
 });
 

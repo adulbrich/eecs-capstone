@@ -15,6 +15,7 @@ import {
   user,
 } from "#/db/schema";
 import { requireUser } from "#/lib/_internal/auth-guards";
+import { bookmarksPer } from "#/lib/analytics-copy";
 import { comparisonPeriods } from "#/lib/day-range";
 import { PROJECT_STATUSES_IN_DISPLAY_ORDER } from "#/lib/project-workflow";
 import { assertStaff, isAdmin, type Viewer } from "#/lib/viewer";
@@ -41,8 +42,41 @@ export interface LabelledBucket extends Bucket {
   label: string;
 }
 
+/** A published project's bookmarks since publication, against its teams. */
+export interface ProjectDemand {
+  bookmarks: number;
+  id: string;
+  teamsSupported: number;
+  title: string;
+}
+
+/**
+ * One category's published projects, the teams they support and their
+ * bookmarks since publication. A project in two categories counts in full
+ * in both.
+ */
+export interface CategoryDemand {
+  bookmarks: number;
+  /** The category's id: a name can repeat across facets. */
+  key: string;
+  label: string;
+  projects: number;
+  teamsSupported: number;
+}
+
 export interface AnalyticsView {
   asOf: Date;
+  /**
+   * Published projects in scope with at least one category, one row per
+   * category, most bookmarks per team first (#518).
+   */
+  bookmarksByCategory: CategoryDemand[];
+  /**
+   * Every published project in scope, zeros included, most bookmarks per
+   * team first, then most bookmarks, then title (#518). The page's default
+   * sort is per team alone, and tied rows keep this order.
+   */
+  bookmarksByProject: ProjectDemand[];
   breakdowns: {
     itemsByCategory: Bucket[];
     itemsByStatus: Bucket[];
@@ -97,6 +131,10 @@ export interface AnalyticsView {
      * do not sum to the global one and `slotsHint` names the reason (#462).
      */
     sharedProjects: number;
+    /**
+     * The zero rows of `bookmarksByProject`, counted from them so the tile
+     * and the table cannot disagree.
+     */
     publishedWithoutBookmarks: number;
     publishedWithoutMentor: number;
     requestsWithPending: number;
@@ -154,7 +192,6 @@ async function headline(programId: string | null) {
     [overdue],
     [pending],
     requestsWithPending,
-    [unbookmarked],
   ] = await Promise.all([
     db
       .select({
@@ -248,21 +285,6 @@ async function headline(programId: string | null) {
       )
       .where(eq(inventoryRequestItems.status, "pending")),
     countPendingRequests(),
-    // Since publication, not absolute, or every project looks doomed in its
-    // first week. A project with no published_at counts every bookmark.
-    db
-      .select({ unbookmarked: countRows() })
-      .from(projects)
-      .where(
-        and(
-          published,
-          sql`not exists (
-            select 1 from ${projectBookmarks} b
-            where b.project_id = ${projects.id}
-              and (${projects.publishedAt} is null or b.created_at >= ${projects.publishedAt})
-          )`
-        )
-      ),
   ]);
 
   const expectedRow = expected[0];
@@ -286,7 +308,125 @@ async function headline(programId: string | null) {
     pendingLines: pending?.lines ?? 0,
     oldestPendingRequestAt: toDate(pending?.oldest),
     requestsWithPending,
-    publishedWithoutBookmarks: unbookmarked?.unbookmarked ?? 0,
+  };
+}
+
+/**
+ * When a bookmark counts as interest in a published project: made at or
+ * after its publication, or always when `published_at` is null. Since
+ * publication rather than ever, so a project is not credited with the
+ * bookmarks staff made on its draft in review. The one statement of the
+ * rule: both bookmark tables read through it, and the unbookmarked tile is
+ * their zeros.
+ */
+const countsSincePublication = sql`(${projects.publishedAt} is null or ${projectBookmarks.createdAt} >= ${projects.publishedAt})`;
+
+/**
+ * Every published project in scope with its bookmarks since publication. A
+ * left join, with the rule in its `on`, so a project nobody bookmarked keeps
+ * its row at zero; counted on a bookmark column, not `count(*)`, which would
+ * give that row a one.
+ */
+function bookmarksPerProject(programId: string | null) {
+  return db
+    .select({
+      id: projects.id,
+      title: projects.title,
+      teamsSupported: projects.teamsSupported,
+      bookmarks: sql<number>`count(${projectBookmarks.userId})::int`.as(
+        "bookmarks"
+      ),
+    })
+    .from(projects)
+    .leftJoin(
+      projectBookmarks,
+      and(eq(projectBookmarks.projectId, projects.id), countsSincePublication)
+    )
+    .where(
+      and(
+        isNull(projects.deletedAt),
+        eq(projects.status, "published"),
+        programId ? runsInProgram(programId) : undefined
+      )
+    )
+    .groupBy(projects.id);
+}
+
+/**
+ * Most bookmarks per team first, a row with no teams last, then most
+ * bookmarks, then the name. The page sorts both tables on the ratio alone,
+ * and TanStack keeps tied rows in the order they arrived
+ * (`createSortedRowModel` falls back to the row index), so this order is
+ * what breaks the page's ties.
+ */
+function byDemand<T>(
+  rows: T[],
+  demand: (row: T) => {
+    bookmarks: number;
+    id: string;
+    name: string;
+    teams: number;
+  }
+): T[] {
+  const keyed = rows.map((row) => {
+    const d = demand(row);
+    return {
+      ...d,
+      per: bookmarksPer(d.bookmarks, d.teams) ?? Number.NEGATIVE_INFINITY,
+      row,
+    };
+  });
+  keyed.sort(
+    (a, b) =>
+      (a.per === b.per ? 0 : b.per - a.per) ||
+      b.bookmarks - a.bookmarks ||
+      a.name.localeCompare(b.name) ||
+      a.id.localeCompare(b.id)
+  );
+  return keyed.map((k) => k.row);
+}
+
+/**
+ * The two bookmark tables (#518). Per project, then per category from the
+ * same per-project counts as a subquery, so a project in two categories
+ * contributes its teams and its bookmarks once to each. A flat join of
+ * categories to bookmarks would add its teams once per bookmark.
+ */
+async function bookmarkDemand(programId: string | null) {
+  const perProject = bookmarksPerProject(programId).as("per_project");
+  const [byProject, byCategory] = await Promise.all([
+    bookmarksPerProject(programId),
+    db
+      .select({
+        key: categories.id,
+        label: categories.name,
+        projects: countRows(),
+        teamsSupported: sql<number>`coalesce(sum(${perProject.teamsSupported}), 0)::int`,
+        bookmarks: sql<number>`coalesce(sum(${perProject.bookmarks}), 0)::int`,
+      })
+      .from(perProject)
+      .innerJoin(
+        projectCategories,
+        eq(projectCategories.projectId, perProject.id)
+      )
+      .innerJoin(categories, eq(projectCategories.categoryId, categories.id))
+      // By id: the unique index is per domain, type and name, so two facets
+      // can each hold a category of the same name.
+      .groupBy(categories.id, categories.name),
+  ]);
+  return {
+    byProject: byDemand(byProject, (row) => ({
+      bookmarks: row.bookmarks,
+      id: row.id,
+      name: row.title,
+      teams: row.teamsSupported,
+    })),
+    byCategory: byDemand(byCategory, (row) => ({
+      bookmarks: row.bookmarks,
+      id: row.key,
+      name: row.label,
+      teams: row.teamsSupported,
+    })),
   };
 }
 
@@ -516,35 +656,53 @@ export async function getAnalyticsAs(
   const p = periods(input);
   const programId = input.programId;
 
-  const [program, head, submitted, published, inventory, newUsers, groups] =
-    await Promise.all([
-      programId
-        ? db
-            .select({
-              id: programs.id,
-              courseId: programs.courseId,
-              courseName: programs.courseName,
-            })
-            .from(programs)
-            .where(eq(programs.id, programId))
-            .then(([row]) =>
-              row
-                ? { id: row.id, label: `${row.courseId} ${row.courseName}` }
-                : null
-            )
-        : Promise.resolve(null),
-      headline(programId),
-      flow((s, e) => transitionsIn("submitted", s, e, programId), p),
-      flow((s, e) => transitionsIn("published", s, e, programId), p),
-      flow(requestsIn, p),
-      viewerIsAdmin ? flow(usersIn, p) : Promise.resolve(null),
-      breakdowns(programId, viewerIsAdmin),
-    ]);
+  const [
+    program,
+    head,
+    submitted,
+    published,
+    inventory,
+    newUsers,
+    groups,
+    demand,
+  ] = await Promise.all([
+    programId
+      ? db
+          .select({
+            id: programs.id,
+            courseId: programs.courseId,
+            courseName: programs.courseName,
+          })
+          .from(programs)
+          .where(eq(programs.id, programId))
+          .then(([row]) =>
+            row
+              ? { id: row.id, label: `${row.courseId} ${row.courseName}` }
+              : null
+          )
+      : Promise.resolve(null),
+    headline(programId),
+    flow((s, e) => transitionsIn("submitted", s, e, programId), p),
+    flow((s, e) => transitionsIn("published", s, e, programId), p),
+    flow(requestsIn, p),
+    viewerIsAdmin ? flow(usersIn, p) : Promise.resolve(null),
+    breakdowns(programId, viewerIsAdmin),
+    bookmarkDemand(programId),
+  ]);
 
   return {
     asOf: new Date(),
     program,
-    headline: head,
+    headline: {
+      ...head,
+      // Derived, not queried: the tile is the table's zeros by construction,
+      // and ADR-0064 counts every connection this page opens.
+      publishedWithoutBookmarks: demand.byProject.filter(
+        (row) => row.bookmarks === 0
+      ).length,
+    },
+    bookmarksByProject: demand.byProject,
+    bookmarksByCategory: demand.byCategory,
     flows: {
       range: p.range,
       submitted,

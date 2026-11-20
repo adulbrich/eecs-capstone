@@ -1,5 +1,6 @@
-// Copy the analytics dashboard derives from numbers. Pure, so the "not set"
-// rule the issue asks for can be asserted without rendering a route.
+// Copy and figures the analytics dashboard derives from numbers. Pure, so the
+// "not set" rule and the zero-team guard can be asserted without rendering a
+// route.
 
 export interface SlotsFigure {
   expectedTeams: number | null;
@@ -40,6 +41,20 @@ function base(figure: SlotsFigure): string {
     return `${expectedTeams} expected across ${p.set} of ${p.total} programs with a value set, ${verdict} against that`;
   }
   return `${expectedTeams} expected, ${verdict}`;
+}
+
+/**
+ * Bookmarks per team a project or a category offers, the demand figure of the
+ * two bookmark tables (#518). Undefined rather than a division when the
+ * supply is zero or less: `teams_supported` has no database bound, so a zero
+ * or a negative can be stored, and the tables render it as "-" and sort it
+ * last.
+ */
+export function bookmarksPer(
+  bookmarks: number,
+  teams: number
+): number | undefined {
+  return teams > 0 ? bookmarks / teams : undefined;
 }
 
 function sharedNote(shared: number): string {

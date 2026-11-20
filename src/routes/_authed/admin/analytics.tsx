@@ -1,5 +1,9 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { z } from "zod";
+import {
+  AdminDataTable,
+  defineAdminColumns,
+} from "#/components/admin-data-table";
 import { LocalTime } from "#/components/local-time";
 import {
   Breadcrumb,
@@ -20,10 +24,13 @@ import {
   SelectValue,
 } from "#/components/ui/select";
 import { requireStaff } from "#/lib/access-denied";
-import { slotsHint } from "#/lib/analytics-copy";
+import { bookmarksPer, slotsHint } from "#/lib/analytics-copy";
 import { pageTitle } from "#/lib/page-title";
 import { PROJECT_STATUS_LABEL } from "#/lib/project-workflow";
 import { resolveRange } from "#/lib/report-range";
+import type { SortState } from "#/lib/table-state";
+import { useAdminTable } from "#/lib/use-admin-table";
+import { useLocalTableSearch } from "#/lib/use-local-table-search";
 import type {
   InventoryRequestItemStatus,
   ItemStatus,
@@ -39,17 +46,24 @@ const DATE = /^\d{4}-\d{2}-\d{2}$/u;
 type AnalyticsView = Awaited<ReturnType<typeof getAnalytics>>;
 type Flow = AnalyticsView["flows"]["submitted"];
 type Bucket = AnalyticsView["breakdowns"]["projectsByStatus"][number];
+type ProjectDemand = AnalyticsView["bookmarksByProject"][number];
+type CategoryDemand = AnalyticsView["bookmarksByCategory"][number];
 
 /**
- * The two page controls live in the URL so a filtered view is a link staff
- * can share. Defaults: the last thirty days, every program.
+ * The page controls and the per-project table's sort live in the URL so a
+ * view is a link staff can share. Defaults: the last thirty days, every
+ * program, most bookmarks per team first. The category table sorts in place
+ * and forgets it on reload.
  */
 const searchSchema = z.object({
-  // `.catch` on all three, so a stale or hand-edited link degrades to the
+  // `.catch` on every one, so a stale or hand-edited link degrades to the
   // default rather than a route error.
   from: z.string().regex(DATE).optional().catch(undefined),
   to: z.string().regex(DATE).optional().catch(undefined),
   program: z.string().uuid().nullable().catch(null).default(null),
+  sort: z.string().optional().catch(undefined),
+  dir: z.enum(["asc", "desc"]).optional().catch(undefined),
+  cols: z.string().optional().catch(undefined),
 });
 
 export const Route = createFileRoute("/_authed/admin/analytics")({
@@ -101,6 +115,143 @@ const ROLE_LABEL: Record<UserRole, string> = {
   instructor: "Instructor",
   user: "User",
 };
+
+const COUNT = new Intl.NumberFormat("en-US");
+const ONE_PLACE = new Intl.NumberFormat("en-US", {
+  maximumFractionDigits: 1,
+  minimumFractionDigits: 1,
+});
+
+/** A ratio to one place, or "-" where there are no teams to divide by. */
+function ratio(value: number | undefined): string {
+  return value === undefined ? "-" : ONE_PLACE.format(value);
+}
+
+const PROJECT_DEMAND_COLUMNS = defineAdminColumns<ProjectDemand>()([
+  {
+    accessorFn: (row) => row.title,
+    cardHeader: true,
+    // The free-text title recipe (docs/UI-CONVENTIONS.md, "A free-text
+    // column is bounded and clamped"), so a long title cannot push the
+    // counts off the table.
+    cell: ({ row }) => (
+      <div className="flex md:max-w-md md:min-w-xs">
+        <Link
+          className="text-brand-dark min-w-0 underline md:line-clamp-2 md:whitespace-normal"
+          params={{ projectId: row.original.id }}
+          title={row.original.title}
+          to="/projects/$projectId"
+        >
+          {row.original.title}
+        </Link>
+      </div>
+    ),
+    enableHiding: false,
+    header: "Project",
+    id: "title",
+  },
+  {
+    accessorFn: (row) => row.bookmarks,
+    cell: ({ row }) => COUNT.format(row.original.bookmarks),
+    enableHiding: false,
+    header: "Bookmarks",
+    id: "bookmarks",
+    sortFn: "basic",
+  },
+  {
+    accessorFn: (row) => row.teamsSupported,
+    cell: ({ row }) => COUNT.format(row.original.teamsSupported),
+    enableHiding: false,
+    header: "Teams",
+    id: "teams",
+    sortFn: "basic",
+  },
+  {
+    accessorFn: (row) => bookmarksPer(row.bookmarks, row.teamsSupported),
+    cell: ({ row }) =>
+      ratio(bookmarksPer(row.original.bookmarks, row.original.teamsSupported)),
+    enableHiding: false,
+    header: "Per team",
+    headerHint: "Bookmarks divided by the teams the project supports.",
+    id: "perTeam",
+    sortFn: "basic",
+    sortUndefined: "last",
+  },
+]);
+
+const PROJECT_DEMAND_DEFAULT_SORT: SortState = { desc: true, id: "perTeam" };
+
+const CATEGORY_DEMAND_COLUMNS = defineAdminColumns<CategoryDemand>()([
+  {
+    accessorFn: (row) => row.label,
+    cardHeader: true,
+    enableHiding: false,
+    header: "Category",
+    id: "label",
+  },
+  {
+    accessorFn: (row) => row.projects,
+    cell: ({ row }) => COUNT.format(row.original.projects),
+    enableHiding: false,
+    header: "Projects",
+    id: "projects",
+    sortFn: "basic",
+  },
+  {
+    accessorFn: (row) => row.teamsSupported,
+    cell: ({ row }) => COUNT.format(row.original.teamsSupported),
+    enableHiding: false,
+    header: "Teams",
+    headerHint: "The teams its published projects support, added up.",
+    id: "teams",
+    sortFn: "basic",
+  },
+  {
+    accessorFn: (row) => row.bookmarks,
+    cell: ({ row }) => COUNT.format(row.original.bookmarks),
+    enableHiding: false,
+    header: "Bookmarks",
+    id: "bookmarks",
+    sortFn: "basic",
+  },
+  {
+    accessorFn: (row) => bookmarksPer(row.bookmarks, row.teamsSupported),
+    cell: ({ row }) =>
+      ratio(bookmarksPer(row.original.bookmarks, row.original.teamsSupported)),
+    enableHiding: false,
+    header: "Per team",
+    headerHint:
+      "Bookmarks divided by the teams the category's projects support.",
+    id: "perTeam",
+    sortFn: "basic",
+    sortUndefined: "last",
+  },
+]);
+
+const CATEGORY_DEMAND_DEFAULT_SORT: SortState = { desc: true, id: "perTeam" };
+
+/**
+ * The category table sorts in place: the URL's sort belongs to the
+ * per-project table, and two tables cannot share it (docs/UI-CONVENTIONS.md,
+ * "More than one table on a page").
+ */
+function CategoryDemandTable({ rows }: { rows: CategoryDemand[] }) {
+  const { tableProps } = useAdminTable({
+    ...useLocalTableSearch(),
+    columns: CATEGORY_DEMAND_COLUMNS,
+    defaultSort: CATEGORY_DEMAND_DEFAULT_SORT,
+    storageKey: "analytics-categories",
+  });
+  return (
+    <AdminDataTable
+      caption="Bookmarks against teams supported per category"
+      data={rows}
+      emptyMessage="No published project has a category."
+      getRowId={(row) => row.key}
+      {...tableProps}
+    />
+  );
+}
 
 function daysSince(date: Date | string | null): string | null {
   if (!date) {
@@ -228,6 +379,13 @@ function AnalyticsPage() {
   const search = Route.useSearch();
   const navigate = Route.useNavigate();
   const h = view.headline;
+  const { tableProps } = useAdminTable({
+    columns: PROJECT_DEMAND_COLUMNS,
+    defaultSort: PROJECT_DEMAND_DEFAULT_SORT,
+    navigate,
+    search,
+    storageKey: "analytics-bookmarks",
+  });
 
   return (
     <div className="mx-auto max-w-4xl px-4 py-6 md:p-8">
@@ -373,6 +531,35 @@ function AnalyticsPage() {
           scope="program"
           value={h.publishedWithoutBookmarks}
         />
+      </div>
+
+      <SectionHeading note="As of now, per program">
+        Bookmarks per project
+      </SectionHeading>
+      <p className="text-muted-foreground mt-1 text-sm">
+        Every published project, counting the bookmarks made since it was
+        published; a project in two programs is listed under each.
+      </p>
+      <div className="mt-2">
+        <AdminDataTable
+          caption="Bookmarks per published project"
+          data={view.bookmarksByProject}
+          emptyMessage="No published projects."
+          getRowId={(row) => row.id}
+          {...tableProps}
+        />
+      </div>
+
+      <SectionHeading note="As of now, per program">
+        Bookmarks by category
+      </SectionHeading>
+      <p className="text-muted-foreground mt-1 text-sm">
+        Published projects with a category, counted as above; a project in two
+        categories counts in full in both, so the columns do not add up to the
+        table above.
+      </p>
+      <div className="mt-2">
+        <CategoryDemandTable rows={view.bookmarksByCategory} />
       </div>
 
       <SectionHeading
