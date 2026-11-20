@@ -8,6 +8,7 @@ import { ResultsTab } from "#/components/placement/results-tab";
 import { RosterTab } from "#/components/placement/roster-tab";
 import { usePlacementWorkspace } from "#/components/placement/use-placement-workspace";
 import { WorkspaceActions } from "#/components/placement/workspace-actions";
+import { TabStrip } from "#/components/tab-strip";
 import {
   Breadcrumb,
   BreadcrumbItem,
@@ -17,7 +18,7 @@ import {
   BreadcrumbSeparator,
 } from "#/components/ui/breadcrumb";
 import { FieldError } from "#/components/ui/field";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "#/components/ui/tabs";
+import { Tabs, TabsContent, TabsTrigger } from "#/components/ui/tabs";
 import { requireStaff } from "#/lib/access-denied";
 import { pageTitle } from "#/lib/page-title";
 import { listPrograms } from "#/server/programs";
@@ -133,11 +134,7 @@ function PlacementPage() {
           }
           value={tab}
         >
-          {/* Five tabs are wider than a phone: the strip scrolls sideways
-              inside itself rather than widening the page (#717), and the
-              focus ring draws inside each tab, which the scroll box would
-              otherwise clip. */}
-          <TabsList className="overflow-x-auto [&>*]:shrink-0 [&>*]:whitespace-nowrap [&>*]:focus-visible:ring-inset">
+          <TabStrip>
             <TabsTrigger value="projects">
               Projects ({workspace.projects.length})
             </TabsTrigger>
@@ -149,7 +146,7 @@ function PlacementPage() {
             </TabsTrigger>
             <TabsTrigger value="parameters">Parameters</TabsTrigger>
             <TabsTrigger value="results">Results</TabsTrigger>
-          </TabsList>
+          </TabStrip>
           <TabsContent value="projects">
             <ProjectsTab
               programs={programs}

@@ -346,6 +346,53 @@ test("admin placement, empty", async ({ page }) => {
   await checkA11y(page);
 });
 
+// On a phone the workspace actions are one menu and the tab strip shows a
+// chevron at the edge it scrolls past (#739); the bids are a card per
+// student, one line per bid.
+test("admin placement at 375, the Workspace menu, the tab cue and the bid list", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 375, height: 812 });
+  await page.goto("/admin/placement");
+  await waitForHydration(page);
+  await page.getByLabel("Projects CSV file").setInputFiles({
+    name: "projects.csv",
+    mimeType: "text/csv",
+    buffer: Buffer.from(PLACEMENT_PROJECTS_CSV),
+  });
+  await expect(page.getByRole("button", { name: "More tabs" })).toBeVisible();
+  await checkA11y(page);
+  await expectNoHorizontalOverflow(page);
+
+  await page.getByRole("button", { name: "Workspace" }).click();
+  const menu = page.locator('[data-slot="dropdown-menu-content"]');
+  await waitForSurfaceSettled(menu);
+  await checkA11y(page);
+  await closeMenu(page);
+
+  await page.getByRole("tab", { name: /Bids/u }).click();
+  await page.getByLabel("Bids CSV file").setInputFiles({
+    name: "bids.csv",
+    mimeType: "text/csv",
+    buffer: Buffer.from(PLACEMENT_BIDS_CSV),
+  });
+  await expect(page.getByText("Tides, and clocks")).toBeVisible();
+  // One line a bid: the priority rides in the header, so its own field is
+  // off the card.
+  await expect(page.locator('td[data-label="Priority"]').first()).toBeHidden();
+  await page.getByRole("button", { name: "More tabs" }).click();
+  await expect(
+    page.getByRole("button", { name: "Earlier tabs" })
+  ).toBeVisible();
+  await checkA11y(page);
+  await expectNoHorizontalOverflow(page);
+  // No tab scrolls sideways at 375 (the issue's criterion).
+  for (const name of [/Roster/u, "Parameters", "Results"]) {
+    await page.getByRole("tab", { name }).click();
+    await expectNoHorizontalOverflow(page);
+  }
+});
+
 test("admin placement, projects from a pasted list", async ({ page }) => {
   await page.goto("/admin/placement");
   await waitForHydration(page);

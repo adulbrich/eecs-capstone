@@ -157,6 +157,16 @@ export type AdminColumn<T extends RowData> = ColumnDef<
 /** The fields `AdminColumn` adds on top of TanStack's `ColumnDef`. */
 interface AdminColumnExtras {
   cardHeader?: boolean;
+  /**
+   * Left off the mobile card, for a field the card header already carries
+   * (#739). The column still renders from `md` up.
+   */
+  cardHidden?: boolean;
+  /**
+   * On the mobile card, the field with no name in front of it, for a value
+   * that reads as itself under the card header, such as a comment (#739).
+   */
+  cardUnlabelled?: boolean;
   defaultHidden?: boolean;
   header: string;
   headerHint?: string;
@@ -335,6 +345,12 @@ export interface AdminDataTableProps<T extends RowData> {
    */
   actions?: ReactNode;
   caption: string;
+  /**
+   * On mobile, `row` (the default) draws each row as a card of its own;
+   * `grouped` joins a group's rows into one card, a rule between each, for
+   * rows short enough that a card apiece is mostly border (#739).
+   */
+  cards?: "grouped" | "row";
   columns: AdminColumn<T>[];
   /**
    * Where Export CSV and the Columns menu render. `inline`, the default, is
@@ -764,6 +780,7 @@ function SortIcon({ direction }: { direction: false | "asc" | "desc" }) {
 export function AdminDataTable<T extends RowData>({
   actions,
   caption,
+  cards = "row",
   columns,
   controls = "inline",
   data,
@@ -806,6 +823,18 @@ export function AdminDataTable<T extends RowData>({
   // prop's TSDoc has said "at most one" since it was added, where no compiler
   // could read it.
   const cardHeaderIds = useMemo(() => new Set(marked.slice(0, 1)), [marked]);
+  const cardHiddenIds = useMemo(
+    () =>
+      new Set(columns.filter((column) => column.cardHidden).map((c) => c.id)),
+    [columns]
+  );
+  const unlabelledIds = useMemo(
+    () =>
+      new Set(
+        columns.filter((column) => column.cardUnlabelled).map((c) => c.id)
+      ),
+    [columns]
+  );
   // Joined so the dependency is stable by value rather than by array identity.
   const tooManyCardHeaders = marked.length > 1 ? marked.join(", ") : null;
   useEffect(() => {
@@ -934,8 +963,16 @@ export function AdminDataTable<T extends RowData>({
             return (
               <TableCell
                 data-card-header={isCardHeader ? "" : undefined}
+                data-card-hidden={
+                  cardHiddenIds.has(cell.column.id) ? "" : undefined
+                }
+                data-card-unlabelled={
+                  unlabelledIds.has(cell.column.id) ? "" : undefined
+                }
                 data-label={
-                  isCardHeader ? undefined : (labels.get(cell.column.id) ?? "")
+                  isCardHeader || unlabelledIds.has(cell.column.id)
+                    ? undefined
+                    : (labels.get(cell.column.id) ?? "")
                 }
                 key={cell.id}
               >
@@ -998,6 +1035,7 @@ export function AdminDataTable<T extends RowData>({
         <Table
           className="admin-table"
           containerClassName="mt-4 md:rounded-lg md:border md:border-border md:bg-card"
+          data-cards={cards}
         >
           <TableCaption className="sr-only">{caption}</TableCaption>
           <TableHeader>

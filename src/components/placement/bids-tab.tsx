@@ -378,18 +378,22 @@ function bidRows(
   });
 }
 
+/** A bid's priority, or how a pin outside the bids stands. */
+function priorityText(row: Row): string {
+  if (row.priority !== null) {
+    return String(row.priority);
+  }
+  return row.pinned ? "Pinned" : "-";
+}
+
 // The rows arrive in a fixed order and nothing sorts, which keeps every
 // student's group together (UI-CONVENTIONS, "Grouping rows that arrived
 // together"). The sort below is inert.
 const COLUMNS = defineAdminColumns<Row>()([
   {
     accessorFn: (row) => (row.priority === null ? "Pin" : String(row.priority)),
-    cell: ({ row }) => {
-      if (row.original.priority !== null) {
-        return row.original.priority;
-      }
-      return row.original.pinned ? "Pinned" : "-";
-    },
+    cell: ({ row }) => priorityText(row.original),
+    cardHidden: true,
     enableHiding: false,
     enableSorting: false,
     header: "Priority",
@@ -404,15 +408,26 @@ const COLUMNS = defineAdminColumns<Row>()([
       } else if (row.original.placed) {
         mark = "(placed)";
       }
-      return mark === null ? (
-        row.original.project
-      ) : (
-        <span>
-          {row.original.project}{" "}
-          <span className="text-muted-foreground text-xs">{mark}</span>
-        </span>
+      return (
+        <>
+          {/* On a phone the card is one line per bid, its priority in
+              front and its comment, unlabelled, under it (#739). A pin
+              outside the bids and a roster-only row have no priority to
+              show; their mark or "No bids" says it. */}
+          {row.original.priority !== null && (
+            <span className="md:hidden">{row.original.priority} </span>
+          )}
+          {row.original.project}
+          {mark !== null && (
+            <>
+              {" "}
+              <span className="text-muted-foreground text-xs">{mark}</span>
+            </>
+          )}
+        </>
       );
     },
+    cardHeader: true,
     enableHiding: false,
     enableSorting: false,
     header: "Project",
@@ -421,10 +436,13 @@ const COLUMNS = defineAdminColumns<Row>()([
   {
     accessorFn: (row) => row.comment || undefined,
     cell: ({ row }) => (
-      <div className="whitespace-pre-line md:max-w-xl md:min-w-xs">
-        {row.original.comment || "-"}
+      <div className="max-md:text-muted-foreground whitespace-pre-line md:max-w-xl md:min-w-xs">
+        {/* No comment is a "-" in the table and nothing on a phone card,
+            where a bare dash under every bid is noise. */}
+        {row.original.comment || <span className="max-md:hidden">-</span>}
       </div>
     ),
+    cardUnlabelled: true,
     enableSorting: false,
     header: "Comment",
     id: "comment",
@@ -544,6 +562,7 @@ function StudentsTable({
     <div className="mt-4">
       <AdminDataTable
         caption="Each student's bids, first choice first"
+        cards="grouped"
         data={rows}
         emptyMessage="No rows in the file could be used."
         getRowId={(row) => row.id}

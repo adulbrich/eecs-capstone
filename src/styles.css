@@ -475,6 +475,50 @@ a {
     padding: 0.75rem;
     font-weight: 500;
   }
+  /* `cardHidden`: a field the card header already carries. */
+  .admin-table tbody td[data-card-hidden] {
+    display: none;
+  }
+  /* `cards="grouped"`: a group's rows are one card, a rule between each,
+     rather than a card apiece (#739). The group header stays a strip above
+     it; a flat sort, with no header, is one card for the lot. */
+  .admin-table[data-cards="grouped"] tbody {
+    gap: 0;
+  }
+  .admin-table[data-cards="grouped"] tbody tr:not([data-group-header]) {
+    border-top: none;
+    border-radius: 0;
+  }
+  .admin-table[data-cards="grouped"] tbody tr:not([data-group-header]):first-child,
+  .admin-table[data-cards="grouped"] tbody tr[data-group-header] + tr {
+    border-top: 1px solid var(--border);
+    border-top-left-radius: 8px;
+    border-top-right-radius: 8px;
+  }
+  .admin-table[data-cards="grouped"] tbody tr:last-child {
+    border-bottom-left-radius: 8px;
+    border-bottom-right-radius: 8px;
+  }
+  /* Each row is one line and what follows it, with no rule between: the
+     header names the bid, an unlabelled field under it reads as its note. */
+  .admin-table[data-cards="grouped"] tbody td[data-card-header] {
+    padding: 0.5rem 0.75rem;
+  }
+  /* Only while a field follows: a header left alone, its note hidden from
+     the Columns menu, keeps its own padding. */
+  .admin-table[data-cards="grouped"]
+    tbody
+    td[data-card-header]:has(+ td[data-card-unlabelled]) {
+    padding-bottom: 0;
+    border-bottom: none;
+  }
+  .admin-table[data-cards="grouped"] tbody td[data-card-unlabelled] {
+    padding-top: 0;
+  }
+  /* A detail joins its row by cancelling the gap; grouped has none. */
+  .admin-table[data-cards="grouped"] tbody tr[data-row-detail] {
+    margin-top: 0;
+  }
 }
 
 /* The table proper, at md and up. The container supplies the surface, the
