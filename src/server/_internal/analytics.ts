@@ -52,7 +52,8 @@ export interface ProjectDemand {
 
 /**
  * One category's published projects, the teams they support and their
- * bookmarks since publication. A project in two categories counts in full in both.
+ * bookmarks since publication. A project in two categories counts in full
+ * in both.
  */
 export interface CategoryDemand {
   bookmarks: number;
