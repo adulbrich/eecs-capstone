@@ -14,6 +14,7 @@ import {
 import { auth } from "#/lib/auth";
 import { deleteAccountAs } from "#/server/_internal/account";
 import { getAnalyticsAs } from "#/server/_internal/analytics";
+import { projectBookmarkCount } from "#/server/_internal/bookmarks";
 import {
   createProjectAs,
   forceTransitionAs,
@@ -2108,6 +2109,19 @@ describe("the bookmark count on the public project payload (#906)", () => {
     const anonymous = await getProjectAs(null, { id: archived.id });
     expect(anonymous.project).not.toBeNull();
     expect(anonymous.bookmarkCount).toBeNull();
+    // A draft hidden from a stranger answers no project and no count.
+    const hidden = await getProjectAs(reader, { id: draft.id });
+    expect(hidden.project).toBeNull();
+    expect(hidden.bookmarkCount).toBeNull();
+  });
+
+  it("refuses an empty id rather than answering another project's count", async () => {
+    // The server function's uuid validator keeps "" out today; this pins the
+    // query's own guard, which an unscoped fall-through would defeat.
+    const admin = await makeUser(`bc-e-${Date.now()}@x.com`, "admin");
+    const { id } = await createProjectAs(admin, baseProject());
+    await publish(admin, id);
+    await expect(projectBookmarkCount("")).rejects.toThrow();
   });
 
   it("agrees with the staff table's row for every published project", async () => {

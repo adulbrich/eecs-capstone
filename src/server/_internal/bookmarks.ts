@@ -191,9 +191,10 @@ const countsSincePublication = sql`(${projects.publishedAt} is null or ${project
  * give that row a one.
  *
  * Two readers, one query: the staff tables on `/admin/analytics` scope it by
- * program (#518), and the project page's public badge by id (#906). So the
- * page and the table cannot disagree about a project's count, or about which
- * projects have one at all.
+ * program (#518), and the project page's public badge by id (#906). So a
+ * project's count on its page is its row in the table, and a project that is
+ * not published, or is soft-deleted, has neither. The program scope is the
+ * table's alone: a project outside the selected program keeps its badge.
  */
 export function bookmarksPerProject(scope: {
   programId?: string | null;
@@ -218,7 +219,12 @@ export function bookmarksPerProject(scope: {
         isNull(projects.deletedAt),
         eq(projects.status, "published"),
         scope.programId ? runsInProgram(scope.programId) : undefined,
-        scope.projectId ? eq(projects.id, scope.projectId) : undefined
+        // Against undefined, not truthiness: an empty id reaches Postgres and
+        // fails as a uuid there, rather than falling through to every project
+        // and answering another project's count.
+        scope.projectId === undefined
+          ? undefined
+          : eq(projects.id, scope.projectId)
       )
     )
     .groupBy(projects.id);

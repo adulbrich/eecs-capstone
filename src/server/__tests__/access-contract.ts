@@ -326,7 +326,7 @@ export const ACCESS_CONTRACT: Record<string, AccessDeclaration> = {
   },
   "server/projects-queries.ts:getProject": {
     level: "public",
-    note: "canSeeProject decides, so a draft 404s for a stranger. Status history and staff fields are withheld separately. The projection carries contactEmail, which is manually entered and publicly visible by design, and must never carry proposerEmail. The project's category names ride the same payload, read after the canSeeProject gate, so a hidden project returns none (#726). So does bookmarkCount, public for every viewer on a published project (#906, ADR-0072): a number from bookmarksPerProject, never a user, and null on any other status.",
+    note: "canSeeProject decides, so a draft 404s for a stranger. Status history and staff fields are withheld separately. The projection carries contactEmail, which is manually entered and publicly visible by design, and must never carry proposerEmail. The project's category names ride the same payload, read after the canSeeProject gate, so a hidden project returns none (#726). So does bookmarkCount, public for every viewer on a published project (#906, ADR-0072): a number from bookmarksPerProject, never a user, and null unless the project is published and not soft-deleted.",
   },
   "server/projects-queries.ts:getSimilarProjects": {
     level: "public",

@@ -56,8 +56,16 @@ export function ProjectBadges({
 }) {
   const manyTeams = (teamsSupported ?? 1) > 1;
   // A type test, not truthiness: zero is a count the page shows.
-  const counted = typeof bookmarkCount === "number";
-  if (!(children || studentProposed || requiresNdaIp || manyTeams || counted)) {
+  const hasBookmarkCount = typeof bookmarkCount === "number";
+  if (
+    !(
+      children ||
+      studentProposed ||
+      requiresNdaIp ||
+      manyTeams ||
+      hasBookmarkCount
+    )
+  ) {
     return null;
   }
   return (
@@ -72,7 +80,7 @@ export function ProjectBadges({
       {manyTeams && <Badge variant="outline">{teamsSupported} teams</Badge>}
       {/* After the teams, so a project that takes several reads "2 teams,
           12 bookmarks": interest beside room. */}
-      {counted && (
+      {hasBookmarkCount && (
         <Badge variant="outline">
           {bookmarkCount} {bookmarkCount === 1 ? "bookmark" : "bookmarks"}
         </Badge>

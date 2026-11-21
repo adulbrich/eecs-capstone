@@ -472,9 +472,10 @@ export async function getProjectAs(viewer: Viewer, data: { id: string }) {
     // After the gate above, never before it: a draft's category names are
     // visible only to the people who can see the draft.
     categories: await projectCategoryRows(data.id),
-    // Public, the same for every viewer, and null on any project the staff
-    // table leaves out, so the page has no badge there (#906). A number,
-    // never a user: who bookmarked stays private to them.
+    // Public and the same for every viewer (#906). Null unless the project is
+    // published and not soft-deleted, the projects the staff table counts,
+    // so the page has no badge on any other. A number, never a user: who
+    // bookmarked stays private to them.
     bookmarkCount: await projectBookmarkCount(data.id),
     canEdit,
     viewerIsStaff,
