@@ -2117,10 +2117,8 @@ describe("the bookmark count on the public project payload (#906)", () => {
 
   it("refuses an empty id rather than answering another project's count", async () => {
     // The server function's uuid validator keeps "" out today; this pins the
-    // query's own guard, which an unscoped fall-through would defeat.
-    const admin = await makeUser(`bc-e-${Date.now()}@x.com`, "admin");
-    const { id } = await createProjectAs(admin, baseProject());
-    await publish(admin, id);
+    // query's own guard. An unscoped fall-through resolves, with some other
+    // project's count or with null, and either way fails this.
     await expect(projectBookmarkCount("")).rejects.toThrow();
   });
 
