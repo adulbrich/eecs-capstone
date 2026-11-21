@@ -102,3 +102,55 @@ describe("ProjectBadges", () => {
     ]);
   });
 });
+
+// The project page's public bookmark count (#906, ADR-0072): exact at every
+// value, and absent only when the server sends none.
+describe("ProjectBadges bookmark count", () => {
+  it("renders no badge for a null count or none at all", () => {
+    const nulled = render(<ProjectBadges {...OFF} bookmarkCount={null} />);
+    expect(nulled.container.innerHTML).toBe("");
+    const omitted = render(<ProjectBadges {...OFF} />);
+    expect(omitted.queryByText(/bookmark/iu)).toBeNull();
+  });
+
+  it("renders zero, alone, as a row of its own", () => {
+    // Zero is falsy, and the guard and the badge must not treat it as absent.
+    const { getByText } = render(<ProjectBadges {...OFF} bookmarkCount={0} />);
+    expect(getByText("0 bookmarks").getAttribute("data-variant")).toBe(
+      "outline"
+    );
+  });
+
+  it("says one bookmark in the singular and more in the plural", () => {
+    expect(
+      render(<ProjectBadges {...OFF} bookmarkCount={1} />).getByText(
+        "1 bookmark"
+      )
+    ).toBeTruthy();
+    expect(
+      render(<ProjectBadges {...OFF} bookmarkCount={2} />).getByText(
+        "2 bookmarks"
+      )
+    ).toBeTruthy();
+  });
+
+  it("comes last, after the teams", () => {
+    const { container } = render(
+      <ProjectBadges
+        {...OFF}
+        bookmarkCount={12}
+        studentProposed
+        teamsSupported={2}
+      >
+        <span>Published</span>
+      </ProjectBadges>
+    );
+    const row = container.firstElementChild;
+    expect(Array.from(row?.children ?? []).map((c) => c.textContent)).toEqual([
+      "Published",
+      "Student proposed",
+      "2 teams",
+      "12 bookmarks",
+    ]);
+  });
+});

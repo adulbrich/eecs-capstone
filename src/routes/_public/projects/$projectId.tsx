@@ -34,6 +34,7 @@ type GetProjectResult = Awaited<ReturnType<typeof getProject>>;
 // limitation; an explicit Promise<ProjectDetailData> return alone does not fix
 // it, so we also cast at the use sites below). Runtime is unaffected.
 interface ProjectDetailData {
+  bookmarkCount: GetProjectResult["bookmarkCount"];
   canEdit: GetProjectResult["canEdit"];
   history: GetProjectResult["history"];
   project: NonNullable<GetProjectResult["project"]>;
@@ -99,6 +100,7 @@ export const Route = createFileRoute("/_public/projects/$projectId")({
     }
     return {
       project: data.project,
+      bookmarkCount: data.bookmarkCount,
       history: data.history,
       canEdit: data.canEdit,
       viewerIsStaff: data.viewerIsStaff,
@@ -113,6 +115,7 @@ function ProjectDetail() {
   const router = useRouter();
   const {
     project,
+    bookmarkCount,
     history,
     canEdit,
     viewerIsStaff,
@@ -150,6 +153,7 @@ function ProjectDetail() {
         </div>
       </div>
       <ProjectBadges
+        bookmarkCount={bookmarkCount}
         className="mt-3"
         requiresNdaIp={project.requiresNdaIp}
         studentProposed={project.studentProposed}

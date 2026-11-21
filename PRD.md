@@ -266,6 +266,11 @@ Each project carries:
   #631).
 - [x] Bookmarks: bookmark button on project detail and a toggle on every row of
   the public listing (authed), and a `/my/bookmarks` view.
+- [x] A published project's page shows its bookmark count to everyone, as the
+  last badge under the title, exact at every value including zero, counted
+  since publication through the same query as the staff tables (#906,
+  [ADR-0072](./docs/adr/0072-a-projects-bookmark-count-is-public-and-exact.md)).
+  Not on the card or the tables, and no sort by it.
 
 ## 9. Categories & Programs
 
@@ -706,7 +711,7 @@ catalogue that decided the matrix below; #288 shipped it.
   project with its bookmarks, teams and bookmarks per team, most per team
   first, sort kept in the URL; and per category, published projects, teams
   supported, bookmarks and bookmarks per team. The unbookmarked figure is the
-  table's zero rows. The proposer's count is #906.
+  table's zero rows. The public count on the project page is #906.
 - [ ] Second pass: conversion from submitted to published, stale drafts,
   repeat proposers, median review latency.
 - [ ] Site traffic (#18) is separate: this counts what is in the database.

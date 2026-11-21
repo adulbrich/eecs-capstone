@@ -4,6 +4,7 @@ import { db } from "#/db";
 import {
   notifications,
   programs,
+  projectBookmarks,
   projectEditLog,
   projectPrograms,
   projectStatusHistory,
@@ -12,6 +13,7 @@ import {
 } from "#/db/schema";
 import { auth } from "#/lib/auth";
 import { deleteAccountAs } from "#/server/_internal/account";
+import { getAnalyticsAs } from "#/server/_internal/analytics";
 import {
   createProjectAs,
   forceTransitionAs,
@@ -2009,5 +2011,136 @@ describe("listMyProjectsAs", () => {
       "url",
     ]);
     expect(rows[0].excerpt).toBe("Bold start of a description.");
+  });
+});
+
+describe("the bookmark count on the public project payload (#906)", () => {
+  let seq = 0;
+
+  async function readers(n: number) {
+    const made: Awaited<ReturnType<typeof makeUser>>[] = [];
+    for (let i = 0; i < n; i++) {
+      seq += 1;
+      made.push(await makeUser(`bc-r-${seq}-${Date.now()}@x.com`, "user"));
+    }
+    return made;
+  }
+
+  async function publish(admin: { id: string; role: string }, id: string) {
+    await forceTransitionAs(admin, id, "published", undefined, {
+      sendEmail: false,
+    });
+    const [row] = await db
+      .select({ publishedAt: projects.publishedAt })
+      .from(projects)
+      .where(eq(projects.id, id));
+    if (!row.publishedAt) {
+      throw new Error("publish did not stamp publishedAt");
+    }
+    return row.publishedAt;
+  }
+
+  /**
+   * Stamped from the app clock, as `publishedAt` is, rather than the
+   * database's `now()`, which can lag the host under docker and put a
+   * bookmark made right after publishing before it.
+   */
+  async function bookmark(projectId: string, userId: string, at = new Date()) {
+    await db
+      .insert(projectBookmarks)
+      .values({ userId, projectId, createdAt: at });
+  }
+
+  it("gives a signed-out viewer the exact count since publication, zero included", async () => {
+    const admin = await makeUser(`bc-a-${Date.now()}@x.com`, "admin");
+    const { id } = await createProjectAs(admin, baseProject());
+    const publishedAt = await publish(admin, id);
+
+    expect((await getProjectAs(null, { id })).bookmarkCount).toBe(0);
+
+    const [after, before] = await readers(2);
+    await bookmark(id, after.id);
+    // Made on the draft in review, before publication: not interest.
+    await bookmark(id, before.id, new Date(publishedAt.getTime() - 86_400_000));
+    expect((await getProjectAs(null, { id })).bookmarkCount).toBe(1);
+
+    // A project with no publication date counts every bookmark.
+    await db
+      .update(projects)
+      .set({ publishedAt: null })
+      .where(eq(projects.id, id));
+    expect((await getProjectAs(null, { id })).bookmarkCount).toBe(2);
+  });
+
+  it("sends no count for a project that is not published, to staff and the proposer too", async () => {
+    const owner = await makeUser(`bc-o-${Date.now()}@x.com`, "user");
+    const admin = await makeUser(`bc-oa-${Date.now()}@x.com`, "admin");
+    const [reader] = await readers(1);
+
+    const draft = await createProjectAs(owner, baseProject());
+    await bookmark(draft.id, owner.id);
+
+    const submitted = await createProjectAs(owner, baseProject());
+    await performTransitionAs(owner, submitted.id, "submitted");
+    await bookmark(submitted.id, owner.id);
+
+    const archived = await createProjectAs(owner, baseProject());
+    await publish(admin, archived.id);
+    await bookmark(archived.id, reader.id);
+    await forceTransitionAs(admin, archived.id, "archived", undefined, {
+      sendEmail: false,
+    });
+
+    const deleted = await createProjectAs(owner, baseProject());
+    await publish(admin, deleted.id);
+    await bookmark(deleted.id, reader.id);
+    await db
+      .update(projects)
+      .set({ deletedAt: new Date() })
+      .where(eq(projects.id, deleted.id));
+
+    for (const { id } of [draft, submitted, archived, deleted]) {
+      for (const viewer of [owner, admin]) {
+        expect((await getProjectAs(viewer, { id })).bookmarkCount).toBeNull();
+      }
+    }
+    // An archived project stays public by its link, and still shows none.
+    const anonymous = await getProjectAs(null, { id: archived.id });
+    expect(anonymous.project).not.toBeNull();
+    expect(anonymous.bookmarkCount).toBeNull();
+  });
+
+  it("agrees with the staff table's row for every published project", async () => {
+    const admin = await makeUser(`bc-t-${Date.now()}@x.com`, "admin");
+    const rs = await readers(3);
+    const ids: string[] = [];
+    for (const n of [0, 1, 3]) {
+      const { id } = await createProjectAs(admin, baseProject());
+      const publishedAt = await publish(admin, id);
+      for (const r of rs.slice(0, n)) {
+        await bookmark(id, r.id);
+      }
+      // One before publication on each, which neither reader may count.
+      seq += 1;
+      const early = await makeUser(`bc-te-${seq}-${Date.now()}@x.com`, "user");
+      await bookmark(id, early.id, new Date(publishedAt.getTime() - 60_000));
+      ids.push(id);
+    }
+
+    const today = new Date().toISOString().slice(0, 10);
+    const view = await getAnalyticsAs(admin, {
+      from: today,
+      to: today,
+      programId: null,
+    });
+    const counts = await Promise.all(
+      ids.map(async (id) => (await getProjectAs(null, { id })).bookmarkCount)
+    );
+    expect(counts).toEqual([0, 1, 3]);
+    expect(counts).toEqual(
+      ids.map(
+        (id) => view.bookmarksByProject.find((r) => r.id === id)?.bookmarks
+      )
+    );
   });
 });

@@ -44,6 +44,7 @@ import {
 import { assertStaff, isStaff, type Viewer } from "#/lib/viewer";
 import type { ProjectStatus } from "#/lib/vocabularies";
 import type { AdminProjectsFilter } from "../projects-queries";
+import { projectBookmarkCount } from "./bookmarks";
 import { projectCategoryRows } from "./categories";
 import {
   adminProjectListSelect,
@@ -412,6 +413,7 @@ export async function getProjectAs(viewer: Viewer, data: { id: string }) {
       project: null,
       history: [],
       categories: [],
+      bookmarkCount: null,
       canEdit: false,
       viewerIsStaff: false,
       viewerIsOwner: false,
@@ -470,6 +472,10 @@ export async function getProjectAs(viewer: Viewer, data: { id: string }) {
     // After the gate above, never before it: a draft's category names are
     // visible only to the people who can see the draft.
     categories: await projectCategoryRows(data.id),
+    // Public, the same for every viewer, and null on any project the staff
+    // table leaves out, so the page has no badge there (#906). A number,
+    // never a user: who bookmarked stays private to them.
+    bookmarkCount: await projectBookmarkCount(data.id),
     canEdit,
     viewerIsStaff,
     viewerIsOwner,
