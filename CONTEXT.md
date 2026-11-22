@@ -195,7 +195,9 @@ table views at any value.
 _Avoid_: capacity, slots, team count (that is the mentor's number)
 
 **Bookmark**:
-A project a signed-in user has saved to come back to. Private to that user.
+A project a signed-in user has saved to come back to. Who bookmarked a project is
+private to that user; how many did is public, as the bookmark count on a published
+project's page, counted since publication ([ADR-0072](./docs/adr/0072-a-projects-bookmark-count-is-public-and-exact.md)).
 _Avoid_: shortlist, favourite, save, star, watch
 
 **Interests**:

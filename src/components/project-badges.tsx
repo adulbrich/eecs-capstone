@@ -23,12 +23,21 @@ import { Badge } from "./ui/badge";
  * staff route, and both listings filter on the same facts (#336, #372).
  */
 export function ProjectBadges({
+  bookmarkCount,
   children,
   className,
   requiresNdaIp,
   studentProposed,
   teamsSupported,
 }: {
+  /**
+   * A published project's bookmarks since publication, public and exact at
+   * every value, zero included (#906, ADR-0072). Null or omitted renders no
+   * badge: the project page passes null for a project that is not
+   * published, and the card and the tables pass nothing, since a count on
+   * every row is the herding the ADR declined.
+   */
+  bookmarkCount?: number | null;
   children?: React.ReactNode;
   className?: string;
   requiresNdaIp: boolean;
@@ -46,7 +55,17 @@ export function ProjectBadges({
   teamsSupported?: number;
 }) {
   const manyTeams = (teamsSupported ?? 1) > 1;
-  if (!(children || studentProposed || requiresNdaIp || manyTeams)) {
+  // A type test, not truthiness: zero is a count the page shows.
+  const hasBookmarkCount = typeof bookmarkCount === "number";
+  if (
+    !(
+      children ||
+      studentProposed ||
+      requiresNdaIp ||
+      manyTeams ||
+      hasBookmarkCount
+    )
+  ) {
     return null;
   }
   return (
@@ -54,11 +73,18 @@ export function ProjectBadges({
       {children}
       {studentProposed && <Badge variant="outline">Student proposed</Badge>}
       {requiresNdaIp && <Badge variant="outline">NDA/IP required</Badge>}
-      {/* A count, in the glossary's word for them. Last in the row because it
-          is the weakest of the three marks: it says how much room there is,
-          not what a reader would have to agree to. Always plural, because
+      {/* A count, in the glossary's word for them. After the other two marks
+          because it is the weakest of the three: it says how much room there
+          is, not what a reader would have to agree to. Always plural, because
           `manyTeams` is false at one and the badge is not rendered. */}
       {manyTeams && <Badge variant="outline">{teamsSupported} teams</Badge>}
+      {/* After the teams, so a project that takes several reads "2 teams,
+          12 bookmarks": interest beside room. */}
+      {hasBookmarkCount && (
+        <Badge variant="outline">
+          {bookmarkCount} {bookmarkCount === 1 ? "bookmark" : "bookmarks"}
+        </Badge>
+      )}
     </div>
   );
 }

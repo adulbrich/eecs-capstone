@@ -7,7 +7,6 @@ import {
   inventoryRequestItems,
   inventoryRequests,
   programs,
-  projectBookmarks,
   projectCategories,
   projectPrograms,
   projectStatusHistory,
@@ -26,6 +25,7 @@ import {
 } from "#/lib/vocabularies";
 import type { AnalyticsInput } from "../analytics";
 import { countPendingRequests, countRows, countSubmitted } from "./admin";
+import { bookmarksPerProject } from "./bookmarks";
 import { projectProgramCount, runsInProgram } from "./project-summary";
 
 export interface Flow {
@@ -312,47 +312,6 @@ async function headline(programId: string | null) {
 }
 
 /**
- * When a bookmark counts as interest in a published project: made at or
- * after its publication, or always when `published_at` is null. Since
- * publication rather than ever, so a project is not credited with the
- * bookmarks staff made on its draft in review. The one statement of the
- * rule: both bookmark tables read through it, and the unbookmarked tile is
- * their zeros.
- */
-const countsSincePublication = sql`(${projects.publishedAt} is null or ${projectBookmarks.createdAt} >= ${projects.publishedAt})`;
-
-/**
- * Every published project in scope with its bookmarks since publication. A
- * left join, with the rule in its `on`, so a project nobody bookmarked keeps
- * its row at zero; counted on a bookmark column, not `count(*)`, which would
- * give that row a one.
- */
-function bookmarksPerProject(programId: string | null) {
-  return db
-    .select({
-      id: projects.id,
-      title: projects.title,
-      teamsSupported: projects.teamsSupported,
-      bookmarks: sql<number>`count(${projectBookmarks.userId})::int`.as(
-        "bookmarks"
-      ),
-    })
-    .from(projects)
-    .leftJoin(
-      projectBookmarks,
-      and(eq(projectBookmarks.projectId, projects.id), countsSincePublication)
-    )
-    .where(
-      and(
-        isNull(projects.deletedAt),
-        eq(projects.status, "published"),
-        programId ? runsInProgram(programId) : undefined
-      )
-    )
-    .groupBy(projects.id);
-}
-
-/**
  * Most bookmarks per team first, a row with no teams last, then most
  * bookmarks, then the name. The page sorts both tables on the ratio alone,
  * and TanStack keeps tied rows in the order they arrived
@@ -393,9 +352,9 @@ function byDemand<T>(
  * categories to bookmarks would add its teams once per bookmark.
  */
 async function bookmarkDemand(programId: string | null) {
-  const perProject = bookmarksPerProject(programId).as("per_project");
+  const perProject = bookmarksPerProject({ programId }).as("per_project");
   const [byProject, byCategory] = await Promise.all([
-    bookmarksPerProject(programId),
+    bookmarksPerProject({ programId }),
     db
       .select({
         key: categories.id,

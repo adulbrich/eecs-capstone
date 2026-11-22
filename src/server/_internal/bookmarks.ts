@@ -1,10 +1,14 @@
-import { and, desc, eq, isNull } from "drizzle-orm";
+import { and, desc, eq, isNull, sql } from "drizzle-orm";
 import { db } from "#/db";
 import { projectBookmarks, projects } from "#/db/schema";
 import { requireUser } from "#/lib/_internal/auth-guards";
 import { canSeeProject } from "#/lib/project-visibility";
 import type { Viewer } from "#/lib/viewer";
-import { projectSummarySelect, withExcerpt } from "./project-summary";
+import {
+  projectSummarySelect,
+  runsInProgram,
+  withExcerpt,
+} from "./project-summary";
 
 /**
  * `*As` first, `*ForCurrentUser` second, per the workflow conventions in
@@ -169,4 +173,71 @@ export async function listMyBookmarksForCurrentUser() {
 export async function listMyBookmarkIdsForCurrentUser() {
   const viewer = await requireUser();
   return listMyBookmarkIdsAs(viewer);
+}
+
+/**
+ * When a bookmark counts as interest in a published project: made at or
+ * after its publication, or always when `published_at` is null. Since
+ * publication rather than ever, so a project is not credited with the
+ * bookmarks staff made on its draft in review. The one statement of the
+ * rule, read only through `bookmarksPerProject`.
+ */
+const countsSincePublication = sql`(${projects.publishedAt} is null or ${projectBookmarks.createdAt} >= ${projects.publishedAt})`;
+
+/**
+ * Every published project in scope with its bookmarks since publication. A
+ * left join, with the rule in its `on`, so a project nobody bookmarked keeps
+ * its row at zero; counted on a bookmark column, not `count(*)`, which would
+ * give that row a one.
+ *
+ * Two readers, one query: the staff tables on `/admin/analytics` scope it by
+ * program (#518), and the project page's public badge by id (#906). So a
+ * project's count on its page is its row in the table, and a project that is
+ * not published, or is soft-deleted, has neither. The program scope is the
+ * table's alone: a project outside the selected program keeps its badge.
+ */
+export function bookmarksPerProject(scope: {
+  programId?: string | null;
+  projectId?: string;
+}) {
+  return db
+    .select({
+      id: projects.id,
+      title: projects.title,
+      teamsSupported: projects.teamsSupported,
+      bookmarks: sql<number>`count(${projectBookmarks.userId})::int`.as(
+        "bookmarks"
+      ),
+    })
+    .from(projects)
+    .leftJoin(
+      projectBookmarks,
+      and(eq(projectBookmarks.projectId, projects.id), countsSincePublication)
+    )
+    .where(
+      and(
+        isNull(projects.deletedAt),
+        eq(projects.status, "published"),
+        scope.programId ? runsInProgram(scope.programId) : undefined,
+        // Against undefined, not truthiness: an empty id reaches Postgres and
+        // fails as a uuid there, rather than falling through to every project
+        // and answering another project's count.
+        scope.projectId === undefined
+          ? undefined
+          : eq(projects.id, scope.projectId)
+      )
+    )
+    .groupBy(projects.id);
+}
+
+/**
+ * A project's public bookmark count (#906): its row of the staff table, or
+ * null when it has none, which is every project that is not published or
+ * is soft-deleted. Public at any value, zero included (ADR-0072).
+ */
+export async function projectBookmarkCount(
+  projectId: string
+): Promise<number | null> {
+  const [row] = await bookmarksPerProject({ projectId });
+  return row?.bookmarks ?? null;
 }

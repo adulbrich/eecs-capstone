@@ -984,7 +984,10 @@ use of `variant="status"`: it wants the blank canvas, and paints it with
 A badge that reports a number is silent at the value nearly every row holds.
 `TeamFullBadge` renders nothing for a team with room, and the teams badge in
 `ProjectBadges` renders nothing at one team; a badge that is always there is
-filler. So a row of badges can be empty: the component returns null rather than an
+filler. The bookmark count is the exception: no value dominates it, so it renders
+at every value, zero included, last in the detail page's row and nowhere else
+([ADR-0072](./adr/0072-a-projects-bookmark-count-is-public-and-exact.md)).
+So a row of badges can be empty: the component returns null rather than an
 empty flex row, and a caller passing `children` handles that case itself, because
 an element is truthy even when it renders nothing.
 
