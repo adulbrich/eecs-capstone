@@ -19,25 +19,29 @@ import {
   TableHeader,
   TableRow,
 } from "#/components/ui/table";
-import { type CsvColumn, toCsv } from "#/lib/csv";
-import {
-  bidsPerProject,
-  type PriorityRow,
-  type ProjectBids,
-  priorityDistribution,
-  type TeamSizeRow,
-  teamSizes,
+import type { CsvColumn } from "#/lib/csv";
+import { toCsv } from "#/lib/csv";
+import type {
+  PriorityRow,
+  ProjectBids,
+  TeamSizeRow,
 } from "#/lib/placement/analytics";
 import {
+  bidsPerProject,
+  priorityDistribution,
+  teamSizes,
+} from "#/lib/placement/analytics";
+import type { BoardRow } from "#/lib/placement/board";
+import {
   applyPins,
-  type BoardRow,
   boardRows,
   projectsWithoutTeam,
   unplacedReason,
 } from "#/lib/placement/board";
 import { downloadText } from "#/lib/placement/download";
 import type { WorkspaceProject } from "#/lib/placement/types";
-import { isStale, type Workspace } from "#/lib/placement/workspace";
+import type { Workspace } from "#/lib/placement/workspace";
+import { isStale } from "#/lib/placement/workspace";
 
 const percent = (share: number) => `${(share * 100).toFixed(1)}%`;
 

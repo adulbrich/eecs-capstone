@@ -1,11 +1,8 @@
-import { type ParsedLocation, useRouter } from "@tanstack/react-router";
+import type { ParsedLocation } from "@tanstack/react-router";
+import { useRouter } from "@tanstack/react-router";
 import { useEffect } from "react";
-import {
-  isTrafficRoute,
-  type TrafficBody,
-  type TrafficLocation,
-  trafficKind,
-} from "./traffic-scope";
+import type { TrafficBody, TrafficLocation } from "./traffic-scope";
+import { isTrafficRoute, trafficKind } from "./traffic-scope";
 
 /**
  * Whether this document has sent its referrer yet. Module state, so a

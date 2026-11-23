@@ -20,21 +20,22 @@
  * The statement the pin compares is the skip inside `refreshProjectEmbedding`.
  * Change it and the script has to change with it, in the same commit.
  */
-import { and, eq, isNull, type SQL } from "drizzle-orm";
+import type { SQL } from "drizzle-orm";
+import { and, eq, isNull } from "drizzle-orm";
 import { db } from "#/db";
 import { projects, userInterests } from "#/db/schema";
+import type { EmbedFn } from "#/lib/_internal/bedrock-embed";
 import {
   bedrockEmbed,
   EMBEDDING_DIMENSIONS,
   EMBEDDING_MODEL_ID,
-  type EmbedFn,
 } from "#/lib/_internal/bedrock-embed";
 import { redactQueryError } from "#/lib/_internal/redact-query-error";
 import type { AiRefreshTrigger } from "#/lib/ai-refresh";
+import type { EmbeddableProject } from "#/lib/embedding-source";
 import {
   buildInterestsEmbeddingSource,
   buildProjectEmbeddingSource,
-  type EmbeddableProject,
   embeddingHash,
 } from "#/lib/embedding-source";
 import type { SocialSummarySourceProject } from "#/lib/social-summary-source";

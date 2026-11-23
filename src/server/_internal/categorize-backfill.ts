@@ -17,11 +17,8 @@ import { buildCategorizeTool } from "#/lib/categorize";
 import { KIND_OF_WORK_TYPE } from "#/lib/default-categories";
 import { assertStaff } from "#/lib/viewer";
 import type { CategorizeNextInput } from "../categories";
-import {
-  type CategorizeOutcome,
-  categorizeProject,
-  loadCategoryOptions,
-} from "./project-categorize";
+import type { CategorizeOutcome } from "./project-categorize";
+import { categorizeProject, loadCategoryOptions } from "./project-categorize";
 
 /**
  * The categorization backfill (#31): the back catalog had no categories, so

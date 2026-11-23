@@ -1,8 +1,6 @@
 import type { Highs, ModelData } from "highs";
-import {
-  buildPlacementModel,
-  type PlacementModel,
-} from "#/lib/placement/model";
+import type { PlacementModel } from "#/lib/placement/model";
+import { buildPlacementModel } from "#/lib/placement/model";
 import type {
   Placement,
   PlacementInput,

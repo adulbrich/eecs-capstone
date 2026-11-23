@@ -5,11 +5,11 @@ import { trafficEvents, trafficSalt } from "#/db/schema";
 import type { TrafficDb } from "#/db/traffic";
 import { CONNECTION_BUDGET } from "#/lib/_internal/db-pool";
 import { redactQueryError } from "#/lib/_internal/redact-query-error";
+import type { TrafficRequestBody } from "#/lib/_internal/traffic-request";
 import {
   describeAgent,
   readCappedBody,
   referrerHost,
-  type TrafficRequestBody,
   trafficBodySchema,
   viewerAddress,
   viewerCountry,

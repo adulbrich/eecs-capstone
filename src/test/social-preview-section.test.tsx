@@ -18,10 +18,8 @@ const server = vi.hoisted(() => ({
 }));
 vi.mock("#/server/social-summary", () => server);
 
-import {
-  SocialPreviewSection,
-  type SummaryRefresh,
-} from "#/components/social-preview-section";
+import type { SummaryRefresh } from "#/components/social-preview-section";
+import { SocialPreviewSection } from "#/components/social-preview-section";
 import type {
   RegenerateSocialSummaryResult,
   SaveSocialSummaryResult,

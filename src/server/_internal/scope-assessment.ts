@@ -3,17 +3,13 @@ import { z } from "zod";
 import { db } from "#/db";
 import { programs, projectPrograms, projects } from "#/db/schema";
 import { requireUser } from "#/lib/_internal/auth-guards";
-import {
-  mantleResponses,
-  type ResponsesFn,
-} from "#/lib/_internal/bedrock-mantle";
-import {
-  type ScopeAssessmentView,
-  scopeAssessmentSchema,
-} from "#/lib/scope-assessment";
+import type { ResponsesFn } from "#/lib/_internal/bedrock-mantle";
+import { mantleResponses } from "#/lib/_internal/bedrock-mantle";
+import type { ScopeAssessmentView } from "#/lib/scope-assessment";
+import { scopeAssessmentSchema } from "#/lib/scope-assessment";
+import type { ScopeSourceProgram } from "#/lib/scope-assessment-source";
 import {
   buildScopeSource,
-  type ScopeSourceProgram,
   scopeSourceHash,
 } from "#/lib/scope-assessment-source";
 import { assertStaff } from "#/lib/viewer";

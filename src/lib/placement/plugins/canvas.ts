@@ -1,11 +1,6 @@
 import { toCsv } from "#/lib/csv";
-import {
-  cell,
-  type ImportIssue,
-  missingColumns,
-  parseRows,
-  type Row,
-} from "#/lib/placement/csv";
+import type { ImportIssue, Row } from "#/lib/placement/csv";
+import { cell, missingColumns, parseRows } from "#/lib/placement/csv";
 import { CSV_EXTENSION, PLACEMENT_FORMAT } from "#/lib/placement/formats";
 import type { ExportPlugin, FilePlugin } from "#/lib/placement/plugins/types";
 import { readRosterCsv, rosterCsv } from "#/lib/placement/roster";

@@ -4,16 +4,12 @@ import {
   FIXTURE_PROJECTS,
   PLUGIN_FIXTURES,
 } from "#/lib/placement/__tests__/plugin-fixtures";
-import {
-  type ImportIssue,
-  parseBidsCsv,
-  parseProjectsCsv,
-  parseRows,
-} from "#/lib/placement/csv";
+import type { ImportIssue } from "#/lib/placement/csv";
+import { parseBidsCsv, parseProjectsCsv, parseRows } from "#/lib/placement/csv";
+import type { PlacementDataset } from "#/lib/placement/formats";
 import {
   EXPORT_FORMATS,
   formatTemplate,
-  type PlacementDataset,
   STANDARD_FORMATS,
   writeFormat,
 } from "#/lib/placement/formats";

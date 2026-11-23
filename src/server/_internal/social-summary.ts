@@ -2,17 +2,17 @@ import { and, eq, isNull } from "drizzle-orm";
 import { db } from "#/db";
 import { projects } from "#/db/schema";
 import { requireUser } from "#/lib/_internal/auth-guards";
-import {
-  mantleResponses,
-  type ResponsesFn,
-} from "#/lib/_internal/bedrock-mantle";
+import type { ResponsesFn } from "#/lib/_internal/bedrock-mantle";
+import { mantleResponses } from "#/lib/_internal/bedrock-mantle";
 import { socialSummariesEnabled } from "#/lib/_internal/social-summary-flag";
 import { currentAttempt } from "#/lib/ai-refresh";
+import type {
+  RegenerateSocialSummaryResult,
+  SaveSocialSummaryResult,
+  SocialSummaryView,
+} from "#/lib/social-summary";
 import {
-  type RegenerateSocialSummaryResult,
-  type SaveSocialSummaryResult,
   SOCIAL_SUMMARY_TOO_LONG_MESSAGE,
-  type SocialSummaryView,
   socialSummaryTextSchema,
 } from "#/lib/social-summary";
 import {

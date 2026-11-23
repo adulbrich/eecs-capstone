@@ -15,8 +15,8 @@ import {
   tagsIn,
   trickyText,
 } from "#/test/shared/arbitraries";
+import type { BurstSave } from "../staff-edit-email";
 import {
-  type BurstSave,
   describeSaveSpan,
   emailCarriesValue,
   isBurstReady,

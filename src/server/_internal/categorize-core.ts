@@ -1,9 +1,8 @@
-import {
-  findToolCall,
-  type MantleResponse,
-  mantleResponses,
-  type ResponsesFn,
+import type {
+  MantleResponse,
+  ResponsesFn,
 } from "#/lib/_internal/bedrock-mantle";
+import { findToolCall, mantleResponses } from "#/lib/_internal/bedrock-mantle";
 import { redactQueryError } from "#/lib/_internal/redact-query-error";
 import type { ReviewOutcome } from "#/lib/ai-review-limits";
 import type { CategorizeAnswer, CategorizeTool } from "#/lib/categorize";

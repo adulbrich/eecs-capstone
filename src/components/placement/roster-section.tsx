@@ -8,11 +8,11 @@ import { SourceFormat } from "#/components/placement/source-format";
 import type { PlacementWorkspace } from "#/components/placement/use-placement-workspace";
 import { Button } from "#/components/ui/button";
 import { ROSTER_FORMAT } from "#/lib/placement/formats";
+import type { Workspace } from "#/lib/placement/workspace";
 import {
   removeStudents,
   setColumnMapping,
   setReadAs,
-  type Workspace,
 } from "#/lib/placement/workspace";
 
 export const plural = (n: number, one: string, many: string) =>

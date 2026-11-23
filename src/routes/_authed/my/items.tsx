@@ -12,7 +12,8 @@ import {
   defineAdminColumns,
 } from "#/components/admin-data-table";
 import { InventoryStatusBadge } from "#/components/inventory-status-badge";
-import { LineSheet, type LineSheetField } from "#/components/line-sheet";
+import type { LineSheetField } from "#/components/line-sheet";
+import { LineSheet } from "#/components/line-sheet";
 import { LocalTime, OfficeDate } from "#/components/local-time";
 import { NeedsAttention } from "#/components/my-items-attention";
 import { OverdueBadge } from "#/components/overdue-badge";
@@ -32,11 +33,11 @@ import { isOpenCustomLine } from "#/lib/inventory-custom-workflow";
 import type { DeadlineEntry } from "#/lib/inventory-deadlines";
 import { deadlineOf } from "#/lib/inventory-deadlines";
 import { lineTimeline } from "#/lib/inventory-timeline";
+import type { MyItemsFilter } from "#/lib/my-items-filter";
 import {
   filterMyItems,
   isOpenRow,
   MY_ITEMS_FILTERS,
-  type MyItemsFilter,
 } from "#/lib/my-items-filter";
 import { formatPickupWindow, pickupPhrase } from "#/lib/pickup-window";
 import type { SortState } from "#/lib/table-state";

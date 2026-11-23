@@ -1,11 +1,13 @@
 import { and, eq } from "drizzle-orm";
 import type { db as Db } from "#/db";
 import { notifications, projectComments } from "#/db/schema";
+import type {
+  NotifiableComment,
+  NotifiableProject,
+} from "#/lib/project-notifications";
 import {
   batchStatusChangeNotifications,
   commentNotifications,
-  type NotifiableComment,
-  type NotifiableProject,
   proposerReassignedNotification,
   softDeleteNotification,
   statusChangeNotification,

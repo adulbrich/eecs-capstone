@@ -1,9 +1,7 @@
 import { Link } from "@tanstack/react-router";
 import { STAFF_PANEL_AUDIENCE_HINT } from "#/lib/private-notes";
-import {
-  type HistoryRow,
-  InventoryLifecyclePanel,
-} from "./inventory-lifecycle-panel";
+import type { HistoryRow } from "./inventory-lifecycle-panel";
+import { InventoryLifecyclePanel } from "./inventory-lifecycle-panel";
 import { Panel, PanelHeader, PanelNote } from "./panel";
 import { Button } from "./ui/button";
 

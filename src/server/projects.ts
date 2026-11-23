@@ -6,7 +6,8 @@ import {
   TEAMS_SUPPORTED_MAX,
   TEAMS_SUPPORTED_MIN,
 } from "#/lib/teams-supported";
-import { PROJECT_STATUSES, type ProjectStatus } from "#/lib/vocabularies";
+import type { ProjectStatus } from "#/lib/vocabularies";
+import { PROJECT_STATUSES } from "#/lib/vocabularies";
 import { SEND_EMAIL_FIELD } from "./send-email-field";
 
 const projectInputSchema = z.object({

@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useAction } from "#/lib/use-action";
-import { USER_ROLES, type UserRole } from "#/lib/vocabularies";
+import type { UserRole } from "#/lib/vocabularies";
+import { USER_ROLES } from "#/lib/vocabularies";
 import { setUserRole } from "#/server/users";
 import { EMAIL_SKIP_HINT } from "./send-email-checkbox";
 import { SendEmailDialog } from "./send-email-dialog";

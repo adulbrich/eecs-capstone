@@ -10,10 +10,8 @@ import {
 } from "#/lib/staff-project-queries";
 import { useAction } from "#/lib/use-action";
 import { updateProjectMentorship } from "#/server/projects";
-import {
-  getProjectMentorship,
-  type ProjectMentorship,
-} from "#/server/projects-queries";
+import type { ProjectMentorship } from "#/server/projects-queries";
+import { getProjectMentorship } from "#/server/projects-queries";
 import { AccountLinkSummary } from "./account-link-summary";
 import { PanelSection } from "./panel";
 import { EMAIL_SKIP_HINT } from "./send-email-checkbox";

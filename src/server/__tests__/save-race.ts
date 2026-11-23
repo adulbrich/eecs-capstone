@@ -1,4 +1,5 @@
-import { and, eq, inArray, type SQL, sql } from "drizzle-orm";
+import type { SQL } from "drizzle-orm";
+import { and, eq, inArray, sql } from "drizzle-orm";
 import { db } from "#/db";
 import { projectCategories } from "#/db/schema";
 import { lockProjectCategories } from "#/server/_internal/project-category-lock";

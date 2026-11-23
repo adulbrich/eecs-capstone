@@ -1,7 +1,7 @@
+import type { ErrorComponentProps } from "@tanstack/react-router";
 import {
   createRouter as createTanStackRouter,
   ErrorComponent,
-  type ErrorComponentProps,
   Link,
 } from "@tanstack/react-router";
 import { setupRouterSsrQueryIntegration } from "@tanstack/react-router-ssr-query";

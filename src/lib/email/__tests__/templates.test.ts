@@ -5,6 +5,7 @@ import {
   trickyText,
   trickyTextAcross,
 } from "#/test/shared/arbitraries";
+import type { RenderedEmail } from "../templates";
 import {
   accountSuspendedEmail,
   escapeHtml,
@@ -21,7 +22,6 @@ import {
   projectSubmittedEmail,
   proposerCommentEmail,
   proposerEditsEmail,
-  type RenderedEmail,
   signInCodeEmail,
 } from "../templates";
 

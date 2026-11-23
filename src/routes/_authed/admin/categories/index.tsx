@@ -7,8 +7,8 @@ import {
 import { FolderPlus } from "lucide-react";
 import { useState } from "react";
 import { z } from "zod";
+import type { AdminColumn } from "#/components/admin-data-table";
 import {
-  type AdminColumn,
   AdminDataTable,
   defineAdminColumns,
 } from "#/components/admin-data-table";
@@ -52,11 +52,11 @@ import { pageTitle } from "#/lib/page-title";
 import type { SortState } from "#/lib/table-state";
 import { useAction } from "#/lib/use-action";
 import { useAdminTable } from "#/lib/use-admin-table";
+import type { listSchema } from "#/server/categories";
 import {
   createCategory,
   listCategoriesWithUsage,
   listCategoryTypes,
-  type listSchema,
 } from "#/server/categories";
 
 const searchSchema = z.object({

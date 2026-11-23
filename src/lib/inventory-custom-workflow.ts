@@ -21,7 +21,8 @@
  * rejected from `sourcing`, because an order can fall through.
  */
 
-import { isStaff, type Viewer } from "./viewer";
+import type { Viewer } from "./viewer";
+import { isStaff } from "./viewer";
 import type { InventoryCustomLineStatus, SubsetOf } from "./vocabularies";
 
 export type CustomLineTransition = "cancel" | "fulfill" | "reject" | "source";

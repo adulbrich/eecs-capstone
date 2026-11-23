@@ -1,5 +1,6 @@
 import { readFile } from "node:fs/promises";
-import { expect, type Page, test } from "@playwright/test";
+import type { Page } from "@playwright/test";
+import { expect, test } from "@playwright/test";
 import { eq } from "drizzle-orm";
 import { projectPrograms, projects } from "../../db/schema";
 import { waitForHydration } from "../shared/playwright";

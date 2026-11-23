@@ -4,10 +4,8 @@ import { Layers, Minus } from "lucide-react";
 import type * as React from "react";
 import { useId, useState } from "react";
 import { cn } from "#/lib/utils.ts";
-import {
-  getSimilarProjects,
-  type SimilarProject,
-} from "#/server/projects-queries";
+import type { SimilarProject } from "#/server/projects-queries";
+import { getSimilarProjects } from "#/server/projects-queries";
 import { Button } from "./ui/button";
 import { Card } from "./ui/card";
 import {

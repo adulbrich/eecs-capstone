@@ -39,7 +39,8 @@ import { searchParamQuerySchema } from "#/lib/search-query";
 import type { SortState } from "#/lib/table-state";
 import { useAdminTable } from "#/lib/use-admin-table";
 import { useSearchDraft } from "#/lib/use-search-draft";
-import { USER_ROLES, type UserRole } from "#/lib/vocabularies";
+import type { UserRole } from "#/lib/vocabularies";
+import { USER_ROLES } from "#/lib/vocabularies";
 import { exportUsers, listUsers } from "#/server/users";
 
 const searchSchema = z.object({

@@ -7,15 +7,8 @@ import {
   screen,
   waitFor,
 } from "@testing-library/react";
-import {
-  afterEach,
-  beforeEach,
-  describe,
-  expect,
-  it,
-  type Mock,
-  vi,
-} from "vitest";
+import type { Mock } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ExportCsvButton } from "#/components/export-csv-button";
 import { deferred } from "./shared/deferred";
 

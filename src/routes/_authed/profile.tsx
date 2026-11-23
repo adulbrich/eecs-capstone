@@ -1,10 +1,8 @@
 import { createFileRoute, Link, useRouter } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { AvatarUploader } from "#/components/avatar-uploader";
-import {
-  DeleteAccountDialog,
-  type DeletionPreview,
-} from "#/components/delete-account-dialog";
+import type { DeletionPreview } from "#/components/delete-account-dialog";
+import { DeleteAccountDialog } from "#/components/delete-account-dialog";
 import { MentorFields } from "#/components/mentor-fields";
 import { RecommendedProjectsLink } from "#/components/recommended-projects-link";
 import { Button } from "#/components/ui/button";

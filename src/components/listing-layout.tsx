@@ -1,5 +1,6 @@
 import { SlidersHorizontal } from "lucide-react";
-import { type ReactNode, useState } from "react";
+import type { ReactNode } from "react";
+import { useState } from "react";
 import { cn } from "#/lib/utils.ts";
 import { CountBadge } from "./count-badge";
 import { Button } from "./ui/button";

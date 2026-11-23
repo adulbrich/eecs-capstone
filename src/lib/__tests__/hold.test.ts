@@ -2,18 +2,16 @@ import { fc, test } from "@fast-check/vitest";
 import { describe, expect, it } from "vitest";
 import { blankText, holderText, looseHolder } from "#/test/shared/arbitraries";
 import { normalizeEmailAddress } from "../email-address";
+import type { Hold, HoldInput, ResolvedAccount } from "../hold";
 import {
   formatHoldDetailed,
   formatHoldShort,
-  type Hold,
-  type HoldInput,
   holdEmail,
   holdFromInput,
   holdFromJoinedRow,
   holdFromStoredRow,
   holdName,
   holdToColumns,
-  type ResolvedAccount,
 } from "../hold";
 import { assertTransitionAllowed } from "../inventory-workflow";
 

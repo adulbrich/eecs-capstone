@@ -1,3 +1,4 @@
+import type { SQL } from "drizzle-orm";
 import {
   and,
   asc,
@@ -12,7 +13,6 @@ import {
   lt,
   ne,
   or,
-  type SQL,
   sql,
 } from "drizzle-orm";
 import { db } from "#/db";
@@ -33,15 +33,16 @@ import {
   descriptionExcerpt,
   SIMILAR_PROJECT_EXCERPT_LENGTH,
 } from "#/lib/description-excerpt";
+import type { ProjectProgram } from "#/lib/project-visibility";
 import {
   canEditProject,
   canSeeProject,
   canSeeStatusHistory,
   filterCommentsForViewer,
-  type ProjectProgram,
   projectDetailView,
 } from "#/lib/project-visibility";
-import { assertStaff, isStaff, type Viewer } from "#/lib/viewer";
+import type { Viewer } from "#/lib/viewer";
+import { assertStaff, isStaff } from "#/lib/viewer";
 import type { ProjectStatus } from "#/lib/vocabularies";
 import type { AdminProjectsFilter } from "../projects-queries";
 import { projectBookmarkCount } from "./bookmarks";

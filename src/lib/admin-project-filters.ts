@@ -1,5 +1,6 @@
 import { PROJECT_STATUS_LABEL } from "./project-workflow";
-import { PROJECT_STATUSES, type ProjectStatus } from "./vocabularies";
+import type { ProjectStatus } from "./vocabularies";
+import { PROJECT_STATUSES } from "./vocabularies";
 
 /**
  * The status set and the date range on `/admin/projects` (#335), as pure

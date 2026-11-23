@@ -17,16 +17,10 @@ import {
 } from "#/components/ui/select";
 import type { ImportIssue } from "#/lib/placement/csv";
 import { downloadText } from "#/lib/placement/download";
-import {
-  CSV_EXTENSION,
-  type PlacementDataset,
-  STANDARD_FORMATS,
-} from "#/lib/placement/formats";
-import {
-  type ReadAs,
-  STANDARD_OPTION,
-  uploadPlugins,
-} from "#/lib/placement/plugins";
+import type { PlacementDataset } from "#/lib/placement/formats";
+import { CSV_EXTENSION, STANDARD_FORMATS } from "#/lib/placement/formats";
+import type { ReadAs } from "#/lib/placement/plugins";
+import { STANDARD_OPTION, uploadPlugins } from "#/lib/placement/plugins";
 import type {
   ColumnMapping,
   Conversion,

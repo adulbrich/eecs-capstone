@@ -1,7 +1,8 @@
 import { Link } from "@tanstack/react-router";
 import { useState } from "react";
 import { useAction } from "#/lib/use-action";
-import { type DeletionPreview, deleteAccount } from "#/server/account";
+import type { DeletionPreview } from "#/server/account";
+import { deleteAccount } from "#/server/account";
 import {
   AlertDialog,
   AlertDialogBody,

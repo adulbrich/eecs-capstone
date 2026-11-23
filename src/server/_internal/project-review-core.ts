@@ -1,20 +1,21 @@
 import { z } from "zod";
-import {
-  findToolCall,
-  type MantleResponse,
-  mantleResponses,
-  type ResponsesFn,
+import type {
+  MantleResponse,
+  ResponsesFn,
 } from "#/lib/_internal/bedrock-mantle";
+import { findToolCall, mantleResponses } from "#/lib/_internal/bedrock-mantle";
 import { redactQueryError } from "#/lib/_internal/redact-query-error";
 import type { ReviewOutcome } from "#/lib/ai-review-limits";
 import { escapeAngleBrackets } from "#/lib/angle-brackets";
 import { errorMessage } from "#/lib/error-message";
+import type {
+  ImprovableField,
+  ReviewResult,
+} from "#/lib/project-review-fields";
 import {
   FIELD_LABELS,
   FIELD_MAX_LENGTHS,
   IMPROVABLE_FIELDS,
-  type ImprovableField,
-  type ReviewResult,
 } from "#/lib/project-review-fields";
 import { PROPOSAL_SCOPE_RULE } from "#/lib/proposal-guidance";
 

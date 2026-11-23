@@ -1,8 +1,8 @@
 import { and, desc, eq, gt, inArray, lt, sql } from "drizzle-orm";
 import { db } from "#/db";
 import { verificationSends } from "#/db/schema";
+import type { VerificationMailKind } from "#/lib/verification-mail-limits";
 import {
-  type VerificationMailKind,
   verificationMailAllowed,
   verificationMailLimits,
 } from "#/lib/verification-mail-limits";

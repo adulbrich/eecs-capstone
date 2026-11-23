@@ -45,16 +45,11 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "#/components/ui/popover";
-import {
-  ordinal,
-  percentDown,
-  type TeamSizes,
-  teamSizes,
-} from "#/lib/placement/analytics";
+import type { TeamSizes } from "#/lib/placement/analytics";
+import { ordinal, percentDown, teamSizes } from "#/lib/placement/analytics";
+import type { BidOption, BoardRow, UnsurveyedRow } from "#/lib/placement/board";
 import {
   applyPins,
-  type BidOption,
-  type BoardRow,
   bidOptions,
   bidsWithPinsCsv,
   boardRows,
@@ -69,7 +64,6 @@ import {
   removeFromResult,
   standingPreApprovals,
   UNPLACED_GROUP,
-  type UnsurveyedRow,
   unplacedReason,
   unsurveyedRows,
 } from "#/lib/placement/board";
@@ -79,11 +73,8 @@ import type {
   PlacementStudent,
   WorkspaceProject,
 } from "#/lib/placement/types";
-import {
-  isStale,
-  toPlacementInput,
-  type Workspace,
-} from "#/lib/placement/workspace";
+import type { Workspace } from "#/lib/placement/workspace";
+import { isStale, toPlacementInput } from "#/lib/placement/workspace";
 import type { SortState } from "#/lib/table-state";
 import { useAdminTable } from "#/lib/use-admin-table";
 import { useLocalTableSearch } from "#/lib/use-local-table-search";

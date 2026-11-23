@@ -7,12 +7,10 @@ import {
 } from "#/db/schema";
 import { requireUser } from "#/lib/_internal/auth-guards";
 import type { InventoryNotice } from "#/lib/inventory-notifications";
-import {
-  type PickupInput,
-  type PickupTerms,
-  resolvePickupTerms,
-} from "#/lib/pickup-window";
-import { assertStaff, type Viewer } from "#/lib/viewer";
+import type { PickupInput, PickupTerms } from "#/lib/pickup-window";
+import { resolvePickupTerms } from "#/lib/pickup-window";
+import type { Viewer } from "#/lib/viewer";
+import { assertStaff } from "#/lib/viewer";
 import type { EmailOptions } from "./email-dispatch";
 import { notifyInventoryByEmail } from "./inventory-emails";
 import type { Tx } from "./inventory-transitions";

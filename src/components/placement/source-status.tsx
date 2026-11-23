@@ -5,7 +5,8 @@ import {
   FileText,
   TriangleAlert,
 } from "lucide-react";
-import { type ReactNode, useId, useState } from "react";
+import type { ReactNode } from "react";
+import { useId, useState } from "react";
 import { issueCounts } from "#/components/placement/import-issues";
 import { plural } from "#/components/placement/roster-section";
 import { Badge } from "#/components/ui/badge";

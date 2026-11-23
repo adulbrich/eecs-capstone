@@ -1,6 +1,6 @@
 import { CartesianGrid, Line, LineChart, XAxis, YAxis } from "recharts";
+import type { ChartConfig } from "#/components/ui/chart";
 import {
-  type ChartConfig,
   ChartContainer,
   ChartLegend,
   ChartLegendContent,

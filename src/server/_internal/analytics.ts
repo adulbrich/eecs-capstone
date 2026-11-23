@@ -17,7 +17,8 @@ import { requireUser } from "#/lib/_internal/auth-guards";
 import { bookmarksPer } from "#/lib/analytics-copy";
 import { comparisonPeriods } from "#/lib/day-range";
 import { PROJECT_STATUSES_IN_DISPLAY_ORDER } from "#/lib/project-workflow";
-import { assertStaff, isAdmin, type Viewer } from "#/lib/viewer";
+import type { Viewer } from "#/lib/viewer";
+import { assertStaff, isAdmin } from "#/lib/viewer";
 import {
   INVENTORY_ITEM_STATUSES,
   INVENTORY_REQUEST_ITEM_STATUSES,

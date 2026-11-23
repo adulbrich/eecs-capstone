@@ -4,9 +4,9 @@ import { projects } from "#/db/schema";
 import type { ResponsesFn } from "#/lib/_internal/bedrock-mantle";
 import { redactQueryError } from "#/lib/_internal/redact-query-error";
 import { socialSummariesEnabled } from "#/lib/_internal/social-summary-flag";
+import type { SocialSummarySourceProject } from "#/lib/social-summary-source";
 import {
   buildSocialSummarySource,
-  type SocialSummarySourceProject,
   socialSummaryHash,
 } from "#/lib/social-summary-source";
 import { recordAiRefresh } from "./project-ai-refreshes";

@@ -1,10 +1,6 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import {
-  confidenceLabel,
-  SCOPE_VERDICT_LABELS,
-  type ScopeAssessmentView,
-  type ScopeVerdict,
-} from "#/lib/scope-assessment";
+import type { ScopeAssessmentView, ScopeVerdict } from "#/lib/scope-assessment";
+import { confidenceLabel, SCOPE_VERDICT_LABELS } from "#/lib/scope-assessment";
 import {
   STAFF_READ_OPTIONS,
   staffProjectKeys,

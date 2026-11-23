@@ -6,9 +6,9 @@ import { usePlacementWorkspace } from "#/components/placement/use-placement-work
 import { PLUGIN_FIXTURES } from "#/lib/placement/__tests__/plugin-fixtures";
 import { qualtricsBids } from "#/lib/placement/plugins/qualtrics";
 import type { WorkspaceProject } from "#/lib/placement/types";
+import type { Workspace } from "#/lib/placement/workspace";
 import {
   EMPTY_WORKSPACE,
-  type Workspace,
   writeStoredWorkspace,
 } from "#/lib/placement/workspace";
 

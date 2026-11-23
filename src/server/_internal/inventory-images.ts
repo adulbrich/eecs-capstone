@@ -3,7 +3,8 @@ import { db } from "#/db";
 import { inventoryItems } from "#/db/schema";
 import { requireUser } from "#/lib/_internal/auth-guards";
 import { assertImageFile } from "#/lib/image-upload-policy";
-import { assertStaff, type Viewer } from "#/lib/viewer";
+import type { Viewer } from "#/lib/viewer";
+import { assertStaff } from "#/lib/viewer";
 
 /**
  * Stores an inventory photo and returns its key. Writes no row, for the same

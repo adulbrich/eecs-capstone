@@ -1,9 +1,9 @@
 import { describe, expect, it } from "vitest";
+import type { CustomLineTransition } from "../inventory-custom-workflow";
 import {
   assertCustomLineTransition,
   assertSourcingNoteEditable,
   CUSTOM_LINE_TARGET,
-  type CustomLineTransition,
   isOpenCustomLine,
 } from "../inventory-custom-workflow";
 import type { Viewer } from "../viewer";

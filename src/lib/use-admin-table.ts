@@ -1,11 +1,11 @@
 import { useCallback, useRef } from "react";
 import { orderBySortedIds } from "./csv";
-import {
-  type AdminTableSearch,
-  type AdminTableStateColumn,
-  type SortState,
-  useAdminTableState,
+import type {
+  AdminTableSearch,
+  AdminTableStateColumn,
+  SortState,
 } from "./table-state";
+import { useAdminTableState } from "./table-state";
 
 /**
  * The slice of the router's `navigate` this hook uses. Structural so the hook

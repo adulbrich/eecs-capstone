@@ -5,7 +5,8 @@ import {
   Trash2,
   Upload,
 } from "lucide-react";
-import { type ReactNode, useState } from "react";
+import type { ReactNode } from "react";
+import { useState } from "react";
 import { ConfirmDialog } from "#/components/confirm-dialog";
 import { useFilePicker } from "#/components/placement/file-picker-button";
 import type { PlacementWorkspace } from "#/components/placement/use-placement-workspace";
@@ -18,11 +19,11 @@ import {
 } from "#/components/ui/dropdown-menu";
 import { FieldError } from "#/components/ui/field";
 import { downloadText } from "#/lib/placement/download";
+import type { Workspace } from "#/lib/placement/workspace";
 import {
   isEmptyWorkspace,
   parseWorkspace,
   serializeWorkspace,
-  type Workspace,
 } from "#/lib/placement/workspace";
 
 const IMPORT_CONFIRM = {

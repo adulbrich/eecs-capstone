@@ -9,12 +9,14 @@ import {
   PRIVATE_NOTES_FIELD_LABEL,
   PRIVATE_NOTES_PROJECT_HINT,
 } from "#/lib/private-notes";
+import type {
+  FieldSuggestion,
+  ImprovableField,
+} from "#/lib/project-review-fields";
 import {
   FIELD_LABELS,
   FIELD_MAX_LENGTHS,
-  type FieldSuggestion,
   IMPROVABLE_FIELDS,
-  type ImprovableField,
 } from "#/lib/project-review-fields";
 import { projectUrlSchema } from "#/lib/project-url";
 import {

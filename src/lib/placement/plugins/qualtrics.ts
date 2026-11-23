@@ -1,5 +1,6 @@
 import Papa from "papaparse";
-import { type ImportIssue, normalizeTitle } from "#/lib/placement/csv";
+import type { ImportIssue } from "#/lib/placement/csv";
+import { normalizeTitle } from "#/lib/placement/csv";
 import { BIDS_FORMAT, writeFormat } from "#/lib/placement/formats";
 import {
   QUALTRICS_SEPARATOR,

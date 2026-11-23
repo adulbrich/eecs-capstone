@@ -1,5 +1,6 @@
 import { LayoutGrid, Table } from "lucide-react";
-import { type ViewMode, writeStoredView } from "#/lib/view-preference";
+import type { ViewMode } from "#/lib/view-preference";
+import { writeStoredView } from "#/lib/view-preference";
 import { Button } from "./ui/button";
 
 /**

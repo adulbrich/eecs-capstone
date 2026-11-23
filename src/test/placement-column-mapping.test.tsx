@@ -29,10 +29,8 @@ beforeAll(() => {
 });
 
 import { ColumnMappingEditor } from "#/components/placement/column-mapping";
-import {
-  type ColumnMapping,
-  serializeMapping,
-} from "#/lib/placement/plugins/custom-mapping";
+import type { ColumnMapping } from "#/lib/placement/plugins/custom-mapping";
+import { serializeMapping } from "#/lib/placement/plugins/custom-mapping";
 
 afterEach(cleanup);
 

@@ -1,9 +1,9 @@
 import { randomUUID } from "node:crypto";
+import type { S3ClientConfig } from "@aws-sdk/client-s3";
 import {
   DeleteObjectCommand,
   PutObjectCommand,
   S3Client,
-  type S3ClientConfig,
 } from "@aws-sdk/client-s3";
 import { redactQueryError } from "#/lib/_internal/redact-query-error";
 import { INVALID_IMAGE } from "#/lib/image-upload-policy";
