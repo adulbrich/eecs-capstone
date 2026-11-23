@@ -535,7 +535,7 @@ GritQL plugins live in `biome-plugins/` and are listed under `plugins` in `biome
 
 ### Hard rules
 
-Biome owns the formatting (2-space indent, double quotes) and the import order; do not fight either. `biome.json` excludes `src/routeTree.gen.ts`, `src/styles.css`, `scripts/`, `drizzle/` and `**/*.svg`, so an autofix never reaches a `scripts/` copy that a parity test pins to its `src/` twin; change both by hand. The YAML formatter keeps `bracketSpacing` off, matching the existing flow lists. Biome formats Markdown too, code samples included: wrap sibling JSX in a fragment, or a leading `{/* comment */}` is rewritten as a block.
+Biome owns the formatting (2-space indent, double quotes) and the import order; do not fight either. `biome.json` excludes `src/routeTree.gen.ts`, `src/styles.css`, `scripts/`, `drizzle/` and `**/*.svg`, so an autofix never reaches a `scripts/` copy that a parity test pins to its `src/` twin; change both by hand. The YAML formatter keeps `bracketSpacing` off, matching the existing flow lists.
 
 ### The git hooks
 
