@@ -606,10 +606,10 @@ describe("after-edit", () => {
       tool_input: { file_path: join(cwd, file) },
     });
 
-  // Its own ceiling, for the reason the session-context test below has one:
-  // this is the only test here that runs Biome, twice, and the full suite
-  // spawns a worker per file, so two Biome starts on a loaded machine spend
-  // the default 5000ms before either prints. Reproduced on `main` at load
+  // Both tests take the ceiling the session-context test below has: each runs
+  // Biome, this one twice, and the full suite spawns a worker per file, so
+  // two Biome starts on a loaded machine spend the default 5000ms before
+  // either prints. Reproduced on `main` at load
   // average 14, where it failed three runs in a row and passed alone.
   it("is quiet on a clean file, and on a file Biome excludes", () => {
     expect(edited("scripts/check-prose.mjs").status).toBe(0);
@@ -627,7 +627,7 @@ describe("after-edit", () => {
     });
     expect(result.status).toBe(2);
     expect(result.stderr).toContain("emdash");
-  });
+  }, 30_000);
 });
 
 describe("session-context", () => {
