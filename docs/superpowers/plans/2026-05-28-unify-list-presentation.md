@@ -2,7 +2,6 @@
 
 > **Status (verified 2026-06-07):** ✅ **Implemented and shipped, with one deliberate deviation.** The shared card/row presentation, `image-or-fallback`, `projectSummarySelect` projection, embedded add-to-cart, and inventory pagination are all in place. The plan's outer `max-w-7xl` widening (Tasks 8 & 10) was **not** adopted: the project standardized on `max-w-4xl` page wrappers per `AGENTS.md` (Mobile-First Design → Page wrapper padding). Stale `- [ ]` checkboxes below.
 
-
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Give the Projects and Inventory browse pages (plus the project management views) one cohesive card/row presentation, shared layout/width conventions, an image placeholder for inventory, and Projects-style pagination on Inventory.
@@ -34,6 +33,7 @@
 ## Task 1: Extract shared `ImageOrFallback`
 
 **Files:**
+
 - Create: `src/components/image-or-fallback.tsx`
 - Modify: `src/components/project-card.tsx` (remove local copy, import shared)
 
@@ -103,6 +103,7 @@ git commit -m "refactor(ui): extract shared ImageOrFallback component"
 ## Task 2: Shared project summary projection + search query
 
 **Files:**
+
 - Create: `src/server/_internal/project-summary.ts`
 - Modify: `src/server/_internal/search.ts`
 
@@ -156,28 +157,28 @@ import { projectSummarySelect } from "./project-summary";
 Then replace the `const rows = await db ...` block:
 
 ```ts
-  const offset = (data.page - 1) * data.pageSize;
-  const rows = await db
-    .select()
-    .from(projects)
-    .where(and(...conditions))
-    .orderBy(orderBy)
-    .limit(data.pageSize)
-    .offset(offset);
+const offset = (data.page - 1) * data.pageSize;
+const rows = await db
+  .select()
+  .from(projects)
+  .where(and(...conditions))
+  .orderBy(orderBy)
+  .limit(data.pageSize)
+  .offset(offset);
 ```
 
 with:
 
 ```ts
-  const offset = (data.page - 1) * data.pageSize;
-  const rows = await db
-    .select(projectSummarySelect)
-    .from(projects)
-    .leftJoin(programs, eq(projects.programId, programs.id))
-    .where(and(...conditions))
-    .orderBy(orderBy)
-    .limit(data.pageSize)
-    .offset(offset);
+const offset = (data.page - 1) * data.pageSize;
+const rows = await db
+  .select(projectSummarySelect)
+  .from(projects)
+  .leftJoin(programs, eq(projects.programId, programs.id))
+  .where(and(...conditions))
+  .orderBy(orderBy)
+  .limit(data.pageSize)
+  .offset(offset);
 ```
 
 (The `count` query is unchanged.)
@@ -199,6 +200,7 @@ git commit -m "feat(projects): add shared project summary projection with progra
 ## Task 3: Apply projection to the other three project queries
 
 **Files:**
+
 - Modify: `src/server/_internal/projects-queries.ts` (`listMyProjectsImpl`, `listAdminProjectsImpl`)
 - Modify: `src/server/_internal/bookmarks.ts` (`listMyBookmarksForCurrentUser`)
 
@@ -351,6 +353,7 @@ git commit -m "feat(projects): return shared summary shape from my/admin/bookmar
 ## Task 4: Redesign `ProjectCard` (+ type, helper, test)
 
 **Files:**
+
 - Modify: `src/components/project-card.tsx`
 - Test: `src/test/project-card.test.tsx` (new)
 
@@ -386,7 +389,7 @@ describe("ProjectCard", () => {
 
   it("shows the status badge for archived projects", () => {
     const { getByText } = render(
-      <ProjectCard project={{ ...base, status: "archived" }} />,
+      <ProjectCard project={{ ...base, status: "archived" }} />
     );
     expect(getByText("archived")).toBeTruthy();
   });
@@ -428,14 +431,14 @@ type ProjectSummary = {
 
 function programLabel(project: ProjectSummary): string | null {
   const parts = [project.programCourseId, project.programCourseName].filter(
-    Boolean,
+    Boolean
   ) as string[];
   return parts.length > 0 ? parts.join(" ") : null;
 }
 
 function ProjectMeta({ project }: { project: ProjectSummary }) {
   const meta = [programLabel(project), project.contactName].filter(
-    Boolean,
+    Boolean
   ) as string[];
   return (
     <div className="mt-2">
@@ -459,7 +462,10 @@ export function ProjectCard({ project }: { project: ProjectSummary }) {
       params={{ projectId: project.id }}
       className="flex flex-col overflow-hidden rounded-lg border border-border bg-card transition-colors hover:border-primary"
     >
-      <ImageOrFallback src={src} className="aspect-[16/9] w-full object-cover" />
+      <ImageOrFallback
+        src={src}
+        className="aspect-[16/9] w-full object-cover"
+      />
       <div className="flex flex-1 flex-col p-4">
         <div className="flex items-start justify-between gap-3">
           <h3 className="font-semibold leading-tight">{project.title}</h3>
@@ -499,6 +505,7 @@ git commit -m "feat(projects): redesign ProjectCard with image, meta, archived-o
 ## Task 5: Redesign `ProjectRow`
 
 **Files:**
+
 - Modify: `src/components/project-row.tsx`
 
 - [ ] **Step 1: Rewrite `project-row.tsx`**
@@ -515,7 +522,7 @@ import { StatusBadge } from "./status-badge";
 export function ProjectRow({ project }: { project: ProjectSummary }) {
   const src = getPublicUrl(project.imageUrl);
   const meta = [programLabel(project), project.contactName].filter(
-    Boolean,
+    Boolean
   ) as string[];
   return (
     <Link
@@ -523,10 +530,7 @@ export function ProjectRow({ project }: { project: ProjectSummary }) {
       params={{ projectId: project.id }}
       className="flex items-stretch gap-3 overflow-hidden rounded-lg border border-border bg-card transition-colors hover:border-primary"
     >
-      <ImageOrFallback
-        src={src}
-        className="h-24 w-32 shrink-0 object-cover"
-      />
+      <ImageOrFallback src={src} className="h-24 w-32 shrink-0 object-cover" />
       <div className="min-w-0 flex-1 py-3 pr-3">
         <div className="flex items-start justify-between gap-3">
           <h3 className="truncate text-sm font-semibold">{project.title}</h3>
@@ -572,6 +576,7 @@ git commit -m "feat(projects): redesign ProjectRow with thumbnail and shared met
 ## Task 6: Redesign `InventoryCard` (+ test)
 
 **Files:**
+
 - Modify: `src/components/inventory-card.tsx`
 - Test: `src/test/inventory-card.test.tsx` (new)
 
@@ -598,7 +603,7 @@ const item = {
 describe("InventoryCard", () => {
   it("renders name, description, and status", () => {
     const { getByText } = render(
-      <InventoryCard item={item} signedIn={false} />,
+      <InventoryCard item={item} signedIn={false} />
     );
     expect(getByText("Arduino Uno")).toBeTruthy();
     expect(getByText("Microcontroller board for prototyping.")).toBeTruthy();
@@ -608,7 +613,7 @@ describe("InventoryCard", () => {
   it("shows Add to cart only when signed in and available", () => {
     const onAddToCart = vi.fn();
     const { getByText, queryByText, rerender } = render(
-      <InventoryCard item={item} signedIn onAddToCart={onAddToCart} />,
+      <InventoryCard item={item} signedIn onAddToCart={onAddToCart} />
     );
     expect(getByText("Add to cart")).toBeTruthy();
     rerender(
@@ -616,7 +621,7 @@ describe("InventoryCard", () => {
         item={{ ...item, status: "reserved" }}
         signedIn
         onAddToCart={onAddToCart}
-      />,
+      />
     );
     expect(queryByText("Add to cart")).toBeNull();
   });
@@ -716,6 +721,7 @@ git commit -m "feat(inventory): redesign InventoryCard with description, image, 
 ## Task 7: Redesign `InventoryRow`
 
 **Files:**
+
 - Modify: `src/components/inventory-row.tsx`
 
 - [ ] **Step 1: Rewrite `inventory-row.tsx`**
@@ -805,6 +811,7 @@ git commit -m "feat(inventory): redesign InventoryRow with thumbnail, descriptio
 ## Task 8: Projects page layout & grid density
 
 **Files:**
+
 - Modify: `src/routes/projects/index.tsx`
 
 - [ ] **Step 1: Widen the container and bound the sub-sections**
@@ -902,6 +909,7 @@ git commit -m "feat(projects): widen browse layout, bound filter/rows, denser ca
 ## Task 9: Inventory page layout, pagination, row props
 
 **Files:**
+
 - Modify: `src/routes/inventory/index.tsx`
 
 - [ ] **Step 1: Align pageSize to 20**
@@ -1032,6 +1040,7 @@ git commit -m "feat(inventory): widen layout, add pagination, unify card/row pro
 ## Task 10: Adopt layout in management views
 
 **Files:**
+
 - Modify: `src/routes/_authed/my/bookmarks.tsx`
 - Modify: `src/routes/_authed/my/projects.tsx`
 - Modify: `src/routes/_authed/admin/projects/index.tsx`
@@ -1043,16 +1052,16 @@ the card-view grid classes. Replace the list container that currently renders
 `rows.map((p) => <ProjectCard key={p.id} project={p} />)` so the cards sit in:
 
 ```tsx
-      <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-        {rows.length === 0 ? (
-          <p className="text-sm text-muted-foreground">
-            No bookmarks yet. Browse <Link to="/projects">projects</Link> and
-            click the bookmark icon to save one.
-          </p>
-        ) : (
-          rows.map((p) => <ProjectCard key={p.id} project={p} />)
-        )}
-      </div>
+<div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+  {rows.length === 0 ? (
+    <p className="text-sm text-muted-foreground">
+      No bookmarks yet. Browse <Link to="/projects">projects</Link> and click
+      the bookmark icon to save one.
+    </p>
+  ) : (
+    rows.map((p) => <ProjectCard key={p.id} project={p} />)
+  )}
+</div>;
 ```
 
 (Match the existing empty-state text already in the file; only the wrapper
@@ -1069,15 +1078,13 @@ list container that renders `rows.map((p) => <ProjectRow key={p.id} project={p} 
 to:
 
 ```tsx
-      <div className="mt-6 flex max-w-4xl flex-col gap-3">
-        {rows.length === 0 ? (
-          <p className="text-sm text-muted-foreground">
-            No projects in this view.
-          </p>
-        ) : (
-          rows.map((p) => <ProjectRow key={p.id} project={p} />)
-        )}
-      </div>
+<div className="mt-6 flex max-w-4xl flex-col gap-3">
+  {rows.length === 0 ? (
+    <p className="text-sm text-muted-foreground">No projects in this view.</p>
+  ) : (
+    rows.map((p) => <ProjectRow key={p.id} project={p} />)
+  )}
+</div>;
 ```
 
 Wrap the existing status-filter controls block in `<div className="max-w-4xl">...</div>`
@@ -1090,15 +1097,13 @@ Change the outer wrapper `max-w-4xl` → `max-w-7xl`. Wrap the status controls i
 `rows.map((p) => <ProjectRow key={p.id} project={p} />)` to:
 
 ```tsx
-      <div className="mt-6 flex max-w-4xl flex-col gap-3">
-        {rows.length === 0 ? (
-          <p className="text-sm text-muted-foreground">
-            No projects in this view.
-          </p>
-        ) : (
-          rows.map((p) => <ProjectRow key={p.id} project={p} />)
-        )}
-      </div>
+<div className="mt-6 flex max-w-4xl flex-col gap-3">
+  {rows.length === 0 ? (
+    <p className="text-sm text-muted-foreground">No projects in this view.</p>
+  ) : (
+    rows.map((p) => <ProjectRow key={p.id} project={p} />)
+  )}
+</div>;
 ```
 
 (Preserve the existing breadcrumb/header/pagination markup; only widen the page,
@@ -1141,12 +1146,13 @@ Expected: all tests pass (including the new `project-card` and `inventory-card` 
 
 With the dev server running on `http://localhost:3000`, signed in as the seed
 admin (`admin@example.com` / `password`), verify with Playwright:
+
 - `/projects` card view: wide 7xl grid, filter box bounded, cards show image/placeholder, title, 3-line description, program · contact, Updated date; published projects show no badge.
 - `/projects` row view (`?view=row`): rows bounded to filter width, thumbnail left.
 - `/inventory` card view: cards show image/placeholder, name, 3-line description, status, embedded Add to cart (when signed in); pagination controls present.
 - `/inventory` row view: thumbnail left, embedded Add to cart.
 - `/my/bookmarks`, `/my/projects`, `/admin/projects`: consistent widths and card/row styling; management views show real status badges.
-Take screenshots and confirm each.
+  Take screenshots and confirm each.
 
 - [ ] **Step 5: Final commit (if lint/format produced changes)**
 

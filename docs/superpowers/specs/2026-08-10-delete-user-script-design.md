@@ -65,7 +65,7 @@ an explicit reason it does not.
   item the account has checked out would stay in `checked_out` with no holder,
   and nothing in the app can return it from there.
 - `inventory_item_status_history.holder_id`, and `.request_item_id` via the
-  account's own request lines. Both would strip attribution off a *real* item's
+  account's own request lines. Both would strip attribution off a _real_ item's
   history.
 - `inventory_request_items.reviewed_by` and `.closed_by`. An account that
   reviewed someone else's request would have that attribution nulled.
@@ -80,12 +80,12 @@ only the `RESTRICT` ones.
 Inputs, all environment variables, with the email also accepted as the first
 CLI argument:
 
-| Variable | Meaning |
-| --- | --- |
+| Variable       | Meaning                                                                  |
+| -------------- | ------------------------------------------------------------------------ |
 | `TARGET_EMAIL` | One address, or several separated by commas. Matched case-insensitively. |
-| `CONFIRM` | Must be exactly `DELETE` to write anything. Absent means dry run. |
-| `ALLOW_ADMIN` | Must be `1` to act on an account whose role is `admin`. |
-| `DATABASE_URL` | As every other script. |
+| `CONFIRM`      | Must be exactly `DELETE` to write anything. Absent means dry run.        |
+| `ALLOW_ADMIN`  | Must be `1` to act on an account whose role is `admin`.                  |
+| `DATABASE_URL` | As every other script.                                                   |
 
 The dry run default is the confirmation step. The operator runs the task, reads
 the report in CloudWatch, and runs it again with `CONFIRM=DELETE`.
@@ -107,18 +107,18 @@ a pooled client satisfy.
 `purgeUser` refuses when any of these is non-zero, and names each with its
 count. "Their project" means a project whose `proposer_id` is the target.
 
-| Check | Why it blocks |
-| --- | --- |
-| `project_comments` authored on a project that is not theirs | Removing them edits another person's thread |
-| `project_status_history.changed_by` on a project that is not theirs | They reviewed real work |
-| `project_edit_log.editor_id` on a project that is not theirs | They edited real work |
+| Check                                                                                                                | Why it blocks                                                             |
+| -------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------- |
+| `project_comments` authored on a project that is not theirs                                                          | Removing them edits another person's thread                               |
+| `project_status_history.changed_by` on a project that is not theirs                                                  | They reviewed real work                                                   |
+| `project_edit_log.editor_id` on a project that is not theirs                                                         | They edited real work                                                     |
 | Any `inventory_item_status_history` row naming them as changer or holder, or reached through their own request lines | Items are never user-owned, so every such row is an action on shared data |
-| Any `inventory_item_edit_log.editor_id` row | Same |
-| `inventory_request_items` they reviewed or closed on someone else's request | Same |
-| `projects.program_manager_id` on a project that is not theirs | `RESTRICT`, and a real assignment |
-| Any `project_bids` or `project_assignments` row naming them, in any column | `RESTRICT`, and neither table has a UI to clean up through |
-| Bids or assignments by anyone on one of their projects | Would block deleting that project |
-| Any inventory item whose `current_holder_id` is them | Deleting would strand the item with no holder |
+| Any `inventory_item_edit_log.editor_id` row                                                                          | Same                                                                      |
+| `inventory_request_items` they reviewed or closed on someone else's request                                          | Same                                                                      |
+| `projects.program_manager_id` on a project that is not theirs                                                        | `RESTRICT`, and a real assignment                                         |
+| Any `project_bids` or `project_assignments` row naming them, in any column                                           | `RESTRICT`, and neither table has a UI to clean up through                |
+| Bids or assignments by anyone on one of their projects                                                               | Would block deleting that project                                         |
+| Any inventory item whose `current_holder_id` is them                                                                 | Deleting would strand the item with no holder                             |
 
 An account whose role is `admin` also refuses unless `ALLOW_ADMIN=1`.
 

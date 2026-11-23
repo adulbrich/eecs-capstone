@@ -57,10 +57,12 @@ reviewable.
 unconditionally and pairs none of them, so it cannot fail. Replace it with a unit test.
 
 **Files:**
+
 - Create: `src/server/__tests__/seam-convention.test.ts`
 - Modify: `docs/QUIRKS.md` (the audit passage at the `*As` first bullet)
 
 **Interfaces:**
+
 - Consumes: nothing from earlier tasks.
 - Produces: nothing later tasks import. The test reads `src/server/_internal/*.ts` off
   disk with `node:fs`, so it needs no imports from the modules under test and cannot be
@@ -84,7 +86,9 @@ describe("the *As / *Impl seam convention", () => {
   it("gives every *ForCurrentUser wrapper a seam with the same stem in the same file", () => {
     const unpaired: string[] = [];
 
-    for (const file of readdirSync(INTERNAL_DIR).filter((f) => f.endsWith(".ts"))) {
+    for (const file of readdirSync(INTERNAL_DIR).filter((f) =>
+      f.endsWith(".ts")
+    )) {
       const names = exportedFunctionNames(
         readFileSync(join(INTERNAL_DIR, file), "utf8")
       );
@@ -112,6 +116,7 @@ ulimit -n 8192 && npx vitest run src/server/__tests__/seam-convention.test.ts
 
 This is the step the issue's step 2 asks about: if any wrapper legitimately cannot share a
 stem with its seam, the run names it here. Two outcomes, both fine:
+
 - Empty list: stem matching is the right key. Continue.
 - A short list: read each one. If the wrapper genuinely cannot share a stem, rename the
   seam so it can (that is what #107 did for three helpers), and only if a rename is wrong
@@ -135,11 +140,11 @@ it ("All 59 wrappers now have a seam under them ..." through "read the list agai
 seams beside them rather than expecting empty output to mean clean"). Replace with:
 
 ```markdown
-  Every wrapper has a seam under it, one of those two shapes, and
-  `src/server/__tests__/seam-convention.test.ts` enforces it: it pairs each
-  `*ForCurrentUser` against an `*As` or `*Impl` with the same stem in the same file and
-  fails naming any wrapper that has none. It runs in `npm test`, so a wrapper added without
-  a seam is a red CI check rather than a convention someone remembers.
+Every wrapper has a seam under it, one of those two shapes, and
+`src/server/__tests__/seam-convention.test.ts` enforces it: it pairs each
+`*ForCurrentUser` against an `*As` or `*Impl` with the same stem in the same file and
+fails naming any wrapper that has none. It runs in `npm test`, so a wrapper added without
+a seam is a red CI check rather than a convention someone remembers.
 ```
 
 Do not restate the wrapper count. A number in prose goes stale, which is half of what
@@ -175,12 +180,14 @@ mislabelled seven of seventeen endpoints because the gate is spelled three ways,
 cannot separate a correctly ungated public read from a gate it failed to recognise.
 
 **Files:**
+
 - Create: `src/server/__tests__/access-contract.ts` (the declared table, not a test file,
   so later work can import it)
 - Create: `src/server/__tests__/access-contract.test.ts`
 - Modify: `docs/QUIRKS.md` (a new entry under the server section)
 
 **Interfaces:**
+
 - Consumes: `src/server/__tests__/seam-convention.test.ts` establishes the
   read-source-off-disk pattern this task reuses. Nothing is imported across the two.
 - Produces: `ACCESS_CONTRACT: Record<string, AccessLevel>` exported from
@@ -245,7 +252,9 @@ function declaredEndpoints(): string[] {
 
 describe("the server function access contract", () => {
   it("declares a level for every createServerFn endpoint", () => {
-    const undeclared = declaredEndpoints().filter((k) => !(k in ACCESS_CONTRACT));
+    const undeclared = declaredEndpoints().filter(
+      (k) => !(k in ACCESS_CONTRACT)
+    );
     expect(undeclared).toEqual([]);
   });
 
@@ -315,6 +324,7 @@ The hypothesis: `BEDROCK_EMBEDDINGS_ENABLED` failing open reaches the AWS SDK, w
 the credential chain and pays an IMDS probe with retries.
 
 **Files:**
+
 - Modify: `.github/workflows/ci.yml` (the integration job's `.env.local` heredoc)
 - Modify: `vitest.integration.config.ts` or the integration setup file, whichever owns env
 - Modify: `docs/QUIRKS.md` if the integration-test section documents the env contract
@@ -331,11 +341,11 @@ Add `BEDROCK_EMBEDDINGS_ENABLED=false` to the integration job's `.env.local` her
 `.github/workflows/ci.yml`, with a comment naming why:
 
 ```yaml
-          # Explicitly off, not merely unset: #22's investigation found that a
-          # failed-open read reaches the AWS SDK, which walks the credential
-          # chain and pays an IMDS probe with retries. That is seconds per call,
-          # which fits the 11s the flaky run took against 1.2s in isolation.
-          BEDROCK_EMBEDDINGS_ENABLED=false
+# Explicitly off, not merely unset: #22's investigation found that a
+# failed-open read reaches the AWS SDK, which walks the credential
+# chain and pays an IMDS probe with retries. That is seconds per call,
+# which fits the 11s the flaky run took against 1.2s in isolation.
+BEDROCK_EMBEDDINGS_ENABLED=false
 ```
 
 - [ ] **Step 3: Assert it, so the condition cannot come back silently**
@@ -427,7 +437,7 @@ lines out of the hook call and two into the JSX.
 says so.
 
 - [x] **Done in PR #118.** Do not re-apply the docblock this task originally carried; it
-  argued for the resolution that was rejected, and named a generic that no longer exists.
+      argued for the resolution that was rejected, and named a generic that no longer exists.
 
 ---
 
@@ -445,6 +455,7 @@ The issue names option 1 as the one to attempt and option 2 as the fallback. Att
 that order; do not skip to option 3.
 
 **Files:**
+
 - Modify: `src/lib/use-admin-table.ts:14-17` and the hook signature
 - Modify: the seven `/admin/*` route files that call it, if inference needs help
 - Modify: `src/lib/__tests__/use-admin-table.test.tsx`
@@ -505,6 +516,7 @@ better served by a development-time runtime assertion plus a unit test, since bo
 about a whole column list rather than one column.
 
 **Files:**
+
 - Modify: `src/components/` (wherever `AdminColumn<T>` and `AdminDataTable` live; find with
   `grep -rn 'AdminColumn' src/`)
 - Create: a `defineAdminColumns<T>()` builder if the check in step 1 says yes
@@ -607,6 +619,7 @@ UNIQUE (domain, coalesce(type, ''), lower(name))
 ```
 
 Each detail matters and a plain `UNIQUE (domain, type, name)` gets all three wrong:
+
 - `coalesce(type, '')` because `type` is nullable and Postgres treats NULLs as distinct, so
   every inventory category (always `type = null`) would be unconstrained. `NULLS NOT
   DISTINCT` is the other spelling on PG15+; pick one and comment why.
@@ -614,6 +627,7 @@ Each detail matters and a plain `UNIQUE (domain, type, name)` gets all three wro
 - `domain` in the key so a project category and an inventory category may share a name.
 
 **Files:**
+
 - Modify: `src/db/schema.ts:71-89`
 - Create: `drizzle/<generated>.sql`, hand-edited to add the dedupe step
 - Create or modify: `src/server/__tests__/categories.integration.test.ts`
@@ -626,7 +640,9 @@ it("rejects a second category with the same domain, type and name");
 it("allows the same name in different domains");
 it("rejects a name differing only in case");
 it("rejects two inventory categories with the same name and type = null");
-it("leaves a project that carried both duplicates carrying the survivor exactly once");
+it(
+  "leaves a project that carried both duplicates carrying the survivor exactly once"
+);
 ```
 
 The fourth is the case a plain unique index lets through, so it is the one that proves the
@@ -675,10 +691,12 @@ rendering for that student, including a description the proposer has since rewri
 Not a guessed-id leak, the write gate prevents that. A stale-authorization disclosure.
 
 **Files:**
+
 - Modify: `src/server/_internal/bookmarks.ts:77-92`
 - Modify: `src/server/__tests__/bookmarks.integration.test.ts`
 
 **Interfaces:**
+
 - Consumes: `canSeeProject(project: VisibleProject, viewer: Viewer)` from
   `#/lib/project-visibility`, already imported in this file.
 - Produces: `listMyBookmarksAs` keeps its `{ rows }` return shape and its row fields
@@ -708,7 +726,7 @@ and drop them before returning.
 
 **Keep the `isNull(projects.deletedAt)` predicate.** It is tempting to delete it now that
 `canSeeProject` also considers `deletedAt`, but the two do not agree: `canSeeProject`
-returns `true` for staff *before* it looks at `deletedAt`, so dropping the SQL predicate
+returns `true` for staff _before_ it looks at `deletedAt`, so dropping the SQL predicate
 would start showing soft-deleted projects in a staff member's bookmark list, which they do
 not see today. That is a behavior change nobody asked for, in a task whose whole point is a
 narrow authorization fix. Keeping both means the filter only ever removes rows.
@@ -788,11 +806,11 @@ Three vocabularies are written out twice with nothing linking the copies. A valu
 one and not the other is either a row Postgres accepts that the app cannot name, or a
 status the app hands to a column that rejects it at runtime.
 
-| Vocabulary | Database | TypeScript |
-| --- | --- | --- |
-| project status | `projectStatusEnum` (`src/db/schema.ts:31`) | `Status` (`src/lib/project-workflow.ts:1`) |
-| inventory item status | `inventoryItemStatusEnum` (`schema.ts:325`) | `ItemStatus` (`src/lib/inventory-visibility.ts:23`) |
-| request line status | `inventoryRequestItemStatusEnum` (`schema.ts:334`) | `RequestLineOutcome` (`src/lib/inventory-workflow.ts`), a subset |
+| Vocabulary            | Database                                           | TypeScript                                                       |
+| --------------------- | -------------------------------------------------- | ---------------------------------------------------------------- |
+| project status        | `projectStatusEnum` (`src/db/schema.ts:31`)        | `Status` (`src/lib/project-workflow.ts:1`)                       |
+| inventory item status | `inventoryItemStatusEnum` (`schema.ts:325`)        | `ItemStatus` (`src/lib/inventory-visibility.ts:23`)              |
+| request line status   | `inventoryRequestItemStatusEnum` (`schema.ts:334`) | `RequestLineOutcome` (`src/lib/inventory-workflow.ts`), a subset |
 
 `src/server/_internal/categories.ts:20` already shows the pattern:
 
@@ -892,6 +910,7 @@ radius first: overdue scanning, cart, request lifecycle, holdings reads, then ca
 the filename. **Five PRs, not one.** Each `*ForCurrentUser` wrapper travels with its `*As`.
 
 Constraints that must appear verbatim in the plan:
+
 - `transitionItem` stays the only writer of item status and holder columns.
 - Every new file goes under `_internal/`; client-importable wrappers in
   `src/server/inventory.ts` dynamically import the impl.

@@ -21,12 +21,12 @@
 
 ## File Structure
 
-| File | Responsibility |
-| --- | --- |
-| `src/server/__tests__/projects.integration.test.ts` | characterization tests for the force path |
-| `src/server/__tests__/project-embeddings.integration.test.ts` | the force path's embedding trigger |
-| `src/server/_internal/projects.ts` | `commitTransition`, and both public functions reduced to their gates |
-| `docs/QUIRKS.md` | the sole-writer invariant, scoped to what its grep proves |
+| File                                                          | Responsibility                                                       |
+| ------------------------------------------------------------- | -------------------------------------------------------------------- |
+| `src/server/__tests__/projects.integration.test.ts`           | characterization tests for the force path                            |
+| `src/server/__tests__/project-embeddings.integration.test.ts` | the force path's embedding trigger                                   |
+| `src/server/_internal/projects.ts`                            | `commitTransition`, and both public functions reduced to their gates |
+| `docs/QUIRKS.md`                                              | the sole-writer invariant, scoped to what its grep proves            |
 
 ---
 
@@ -37,70 +37,70 @@ The extraction assumes the two bodies are equivalent. Nothing checks that today.
 - [ ] **Step 1: add the history and notification characterization test** to `src/server/__tests__/projects.integration.test.ts`, inside the `describe("project workflow")` block, after `"owner cannot publish"`. All the imports it needs are already at the top of that file.
 
 ```ts
-  it("force writes the same history row and notification as a normal transition", async () => {
-    // forceTransitionAs has never been asserted to do either. It shares a
-    // body with performTransitionAs by copy, so this is what makes the
-    // equivalence checkable rather than reviewable.
-    const owner = await makeUser(`fo-${Date.now()}@x.com`, "user");
-    const admin = await makeUser(`fa-${Date.now()}@x.com`, "admin");
-    const { id } = await createProjectAs(owner, baseProject());
+it("force writes the same history row and notification as a normal transition", async () => {
+  // forceTransitionAs has never been asserted to do either. It shares a
+  // body with performTransitionAs by copy, so this is what makes the
+  // equivalence checkable rather than reviewable.
+  const owner = await makeUser(`fo-${Date.now()}@x.com`, "user");
+  const admin = await makeUser(`fa-${Date.now()}@x.com`, "admin");
+  const { id } = await createProjectAs(owner, baseProject());
 
-    await forceTransitionAs(admin, id, "changes_requested", "force note");
+  await forceTransitionAs(admin, id, "changes_requested", "force note");
 
-    const [row] = await db.select().from(projects).where(eq(projects.id, id));
-    expect(row.status).toBe("changes_requested");
+  const [row] = await db.select().from(projects).where(eq(projects.id, id));
+  expect(row.status).toBe("changes_requested");
 
-    const history = await db
-      .select()
-      .from(projectStatusHistory)
-      .where(eq(projectStatusHistory.projectId, id));
-    expect(history).toHaveLength(1);
-    expect(history[0].oldStatus).toBe("draft");
-    expect(history[0].newStatus).toBe("changes_requested");
-    expect(history[0].changedBy).toBe(admin.id);
-    expect(history[0].comment).toBe("force note");
+  const history = await db
+    .select()
+    .from(projectStatusHistory)
+    .where(eq(projectStatusHistory.projectId, id));
+  expect(history).toHaveLength(1);
+  expect(history[0].oldStatus).toBe("draft");
+  expect(history[0].newStatus).toBe("changes_requested");
+  expect(history[0].changedBy).toBe(admin.id);
+  expect(history[0].comment).toBe("force note");
 
-    const ownerNotifs = await db
-      .select()
-      .from(notifications)
-      .where(eq(notifications.userId, owner.id));
-    expect(ownerNotifs).toHaveLength(1);
-  });
+  const ownerNotifs = await db
+    .select()
+    .from(notifications)
+    .where(eq(notifications.userId, owner.id));
+  expect(ownerNotifs).toHaveLength(1);
+});
 
-  it("force sets publishedAt and archivedAt the same way", async () => {
-    const owner = await makeUser(`fp-${Date.now()}@x.com`, "user");
-    const admin = await makeUser(`fpa-${Date.now()}@x.com`, "admin");
-    const { id } = await createProjectAs(owner, baseProject());
+it("force sets publishedAt and archivedAt the same way", async () => {
+  const owner = await makeUser(`fp-${Date.now()}@x.com`, "user");
+  const admin = await makeUser(`fpa-${Date.now()}@x.com`, "admin");
+  const { id } = await createProjectAs(owner, baseProject());
 
-    await forceTransitionAs(admin, id, "published");
-    const [published] = await db
-      .select()
-      .from(projects)
-      .where(eq(projects.id, id));
-    expect(published.publishedAt).not.toBeNull();
+  await forceTransitionAs(admin, id, "published");
+  const [published] = await db
+    .select()
+    .from(projects)
+    .where(eq(projects.id, id));
+  expect(published.publishedAt).not.toBeNull();
 
-    await forceTransitionAs(admin, id, "archived");
-    const [archived] = await db
-      .select()
-      .from(projects)
-      .where(eq(projects.id, id));
-    expect(archived.archivedAt).not.toBeNull();
-  });
+  await forceTransitionAs(admin, id, "archived");
+  const [archived] = await db
+    .select()
+    .from(projects)
+    .where(eq(projects.id, id));
+  expect(archived.archivedAt).not.toBeNull();
+});
 ```
 
 - [ ] **Step 2: add the force path's embedding trigger test** to `src/server/__tests__/project-embeddings.integration.test.ts`, inside `describe("embedding triggers")`, after `"embeds when a project is published"`. Import `forceTransitionAs` alongside the existing `performTransitionAs` import.
 
 ```ts
-  it("embeds when the force path publishes", async () => {
-    const admin = await makeAdmin(`fg-${Date.now()}@x.com`);
-    const { id } = await createProjectAs(admin, baseProject("Forced"));
-    const embed = vi.fn().mockResolvedValue(VECTOR);
+it("embeds when the force path publishes", async () => {
+  const admin = await makeAdmin(`fg-${Date.now()}@x.com`);
+  const { id } = await createProjectAs(admin, baseProject("Forced"));
+  const embed = vi.fn().mockResolvedValue(VECTOR);
 
-    await forceTransitionAs(admin, id, "published", undefined, { embed });
+  await forceTransitionAs(admin, id, "published", undefined, { embed });
 
-    expect(embed).toHaveBeenCalledTimes(1);
-    expect((await readRow(id)).embedding?.length).toBe(1024);
-  });
+  expect(embed).toHaveBeenCalledTimes(1);
+  expect((await readRow(id)).embedding?.length).toBe(1024);
+});
 ```
 
 - [ ] **Step 3: run them against the unchanged code.**
@@ -295,9 +295,9 @@ git commit -m "docs(quirks): record the project transition writer"
 
 ## Risks
 
-| Risk | Mitigation |
-| --- | --- |
-| The two bodies were never equivalent | Phase 1 is exactly this check, and Step 3 says stop rather than adjust the assertion |
-| The gate reduction changes an error precedence | Both gates are reproduced verbatim in Phase 2 Steps 3 and 4, load-versus-authorize order included; `"owner cannot publish"` and the `Forbidden` test cover them |
-| `recordStatusChangeNotifications`'s comment parameter does not accept null | Phase 2 Step 2 says to check the signature and drop the coercion if it does |
-| `project.status` is typed `string` and `oldStatus` expects it | Unchanged from today: the moved code already passes `project.status` straight through |
+| Risk                                                                       | Mitigation                                                                                                                                                      |
+| -------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| The two bodies were never equivalent                                       | Phase 1 is exactly this check, and Step 3 says stop rather than adjust the assertion                                                                            |
+| The gate reduction changes an error precedence                             | Both gates are reproduced verbatim in Phase 2 Steps 3 and 4, load-versus-authorize order included; `"owner cannot publish"` and the `Forbidden` test cover them |
+| `recordStatusChangeNotifications`'s comment parameter does not accept null | Phase 2 Step 2 says to check the signature and drop the coercion if it does                                                                                     |
+| `project.status` is typed `string` and `oldStatus` expects it              | Unchanged from today: the moved code already passes `project.status` straight through                                                                           |

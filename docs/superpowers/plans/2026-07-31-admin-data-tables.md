@@ -4,11 +4,11 @@
 
 **Goal:** Rebuild `/admin/inventory`, `/admin/projects`, and `/admin/mentors` on TanStack Table so staff can sort every column, choose which columns are visible, and see far more of each record at once, on desktop tables and mobile cards alike.
 
-**Architecture:** The server decides which rows exist (Postgres filtering and full-text search, in the URL, in `loaderDeps`); the client decides their order and which columns show (TanStack Table state, in the URL, deliberately *not* in `loaderDeps`). One controlled `AdminDataTable` component renders all three pages from per-page column definitions; each route owns its own URL state and filter controls.
+**Architecture:** The server decides which rows exist (Postgres filtering and full-text search, in the URL, in `loaderDeps`); the client decides their order and which columns show (TanStack Table state, in the URL, deliberately _not_ in `loaderDeps`). One controlled `AdminDataTable` component renders all three pages from per-page column definitions; each route owns its own URL state and filter controls.
 
 **Tech Stack:** TanStack Start + TanStack Router, TanStack Table v8.21, Drizzle ORM + Postgres, Zod v4, React 19, Tailwind v4, shadcn/ui over Radix, Vitest + Testing Library, Playwright + axe.
 
-**Design spec:** `docs/superpowers/specs/2026-07-31-admin-data-tables-design.md`. Read it before starting; it explains *why* for most of what follows.
+**Design spec:** `docs/superpowers/specs/2026-07-31-admin-data-tables-design.md`. Read it before starting; it explains _why_ for most of what follows.
 
 ## Global Constraints
 
@@ -31,35 +31,35 @@
 
 **Created**
 
-| File | Responsibility |
-| --- | --- |
-| `src/lib/table-state.ts` | Pure codec between URL params / localStorage and table state. No React except one seeding hook. |
-| `src/lib/__tests__/table-state.test.ts` | Unit tests for the codec. |
-| `src/components/ui/table.tsx` | shadcn table primitives, with four documented local edits. |
-| `src/components/admin-data-table.tsx` | The shared controlled table: toolbar, sortable header, `data-label` body, column picker. |
-| `src/test/admin-data-table.test.tsx` | jsdom tests for the shared table. |
-| `src/server/__tests__/admin-inventory.integration.test.ts` | Integration tests for the admin inventory listing. |
+| File                                                       | Responsibility                                                                                  |
+| ---------------------------------------------------------- | ----------------------------------------------------------------------------------------------- |
+| `src/lib/table-state.ts`                                   | Pure codec between URL params / localStorage and table state. No React except one seeding hook. |
+| `src/lib/__tests__/table-state.test.ts`                    | Unit tests for the codec.                                                                       |
+| `src/components/ui/table.tsx`                              | shadcn table primitives, with four documented local edits.                                      |
+| `src/components/admin-data-table.tsx`                      | The shared controlled table: toolbar, sortable header, `data-label` body, column picker.        |
+| `src/test/admin-data-table.test.tsx`                       | jsdom tests for the shared table.                                                               |
+| `src/server/__tests__/admin-inventory.integration.test.ts` | Integration tests for the admin inventory listing.                                              |
 
 **Modified**
 
-| File | Change |
-| --- | --- |
-| `src/server/_internal/inventory.ts` | Extract `buildInventoryScope`, add `listAdminInventoryAs`, add `createdAt`/`updatedAt` to staff rows. |
-| `src/server/inventory.ts` | Add the `listAdminInventory` server function. |
-| `src/server/_internal/project-summary.ts` | Add `adminProjectSummarySelect`. |
-| `src/server/_internal/projects-queries.ts` | Join `user` for the proposer, widen the search predicate. |
-| `src/server/_internal/users.ts` | Add an optional `q` to `listMentorsAs`. |
-| `src/server/users.ts` | Pass `q` through `listMentors`. |
-| `src/routes/_authed/admin/inventory/index.tsx` | Rebuild on `AdminDataTable`; drop pagination; wire the category filter. |
-| `src/routes/_authed/admin/projects/index.tsx` | Rebuild on `AdminDataTable`; stop using `ProjectRow`. |
-| `src/routes/_authed/admin/mentors/index.tsx` | Rebuild on `AdminDataTable`; add search. |
-| `src/server/__tests__/admin-projects-filter.integration.test.ts` | Cover the widened search and the left join. |
-| `src/test/a11y/admin.a11y.test.ts` | Add an interaction pass on the inventory table. |
+| File                                                             | Change                                                                                                |
+| ---------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------- |
+| `src/server/_internal/inventory.ts`                              | Extract `buildInventoryScope`, add `listAdminInventoryAs`, add `createdAt`/`updatedAt` to staff rows. |
+| `src/server/inventory.ts`                                        | Add the `listAdminInventory` server function.                                                         |
+| `src/server/_internal/project-summary.ts`                        | Add `adminProjectSummarySelect`.                                                                      |
+| `src/server/_internal/projects-queries.ts`                       | Join `user` for the proposer, widen the search predicate.                                             |
+| `src/server/_internal/users.ts`                                  | Add an optional `q` to `listMentorsAs`.                                                               |
+| `src/server/users.ts`                                            | Pass `q` through `listMentors`.                                                                       |
+| `src/routes/_authed/admin/inventory/index.tsx`                   | Rebuild on `AdminDataTable`; drop pagination; wire the category filter.                               |
+| `src/routes/_authed/admin/projects/index.tsx`                    | Rebuild on `AdminDataTable`; stop using `ProjectRow`.                                                 |
+| `src/routes/_authed/admin/mentors/index.tsx`                     | Rebuild on `AdminDataTable`; add search.                                                              |
+| `src/server/__tests__/admin-projects-filter.integration.test.ts` | Cover the widened search and the left join.                                                           |
+| `src/test/a11y/admin.a11y.test.ts`                               | Add an interaction pass on the inventory table.                                                       |
 
 **Deleted**
 
-| File | Reason |
-| --- | --- |
+| File                             | Reason                                                                                                                                                                                                                                                                                             |
+| -------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `src/components/admin-table.tsx` | Superseded by `AdminDataTable`. This row originally said "not deleted" because `AdminTable` still had three consumers after Task 7 (`/admin/programs`, `/admin/users`, `/admin/categories`); that correction is itself stale now that those three migrated in Tasks 10 and 11. Deleted in Task 12. |
 
 **Untouched on purpose:** `src/styles.css` (the `.admin-table` mobile card rules keep working as-is), `src/components/project-row.tsx` (still used by the public listing through `project-list-item.tsx`), `src/lib/view-preference.ts`.
@@ -69,10 +69,12 @@
 ## Task 1: The table-state codec
 
 **Files:**
+
 - Create: `src/lib/table-state.ts`
 - Test: `src/lib/__tests__/table-state.test.ts`
 
 **Interfaces:**
+
 - Consumes: nothing.
 - Produces: `interface SortState { desc: boolean; id: string }`; `parseSort(sort, dir, sortableIds, fallback): SortState`; `serializeSort(state, fallback): { dir?: "asc" | "desc"; sort?: string }`; `parseHidden(cols, hideableIds, fallback): string[]`; `serializeHidden(hidden, fallback): string | undefined`; `readStoredHidden(storageKey): string[] | null`; `writeStoredHidden(storageKey, hidden): void`; `useSeedColumnsFromStorage(storageKey, current, seed): void`; and the hook all three routes use, `useAdminTableState({ columns, defaultSort, replaceSearch, search, setSearch, storageKey }): { hidden, onHiddenChange, onSortChange, sort }`.
 
@@ -575,11 +577,13 @@ git commit -m "feat(admin): add the URL and storage codec for table state"
 ## Task 2: The shared AdminDataTable
 
 **Files:**
+
 - Create: `src/components/ui/table.tsx` (via `npx shadcn@latest add table`, then edited)
 - Create: `src/components/admin-data-table.tsx`
 - Test: `src/test/admin-data-table.test.tsx`
 
 **Interfaces:**
+
 - Consumes: everything from Task 1.
 - Produces: `type AdminColumn<T> = ColumnDef<T, unknown> & { defaultHidden?: boolean; header: string; id: string }` and the `AdminDataTable` component with this exact prop set:
 
@@ -732,9 +736,7 @@ describe("AdminDataTable", () => {
 
   it("hides a column's header and every one of its cells", () => {
     renderTable();
-    expect(
-      screen.queryByRole("columnheader", { name: /Location/ })
-    ).toBeNull();
+    expect(screen.queryByRole("columnheader", { name: /Location/ })).toBeNull();
     expect(screen.queryByText("Lab 2")).toBeNull();
   });
 
@@ -761,9 +763,7 @@ describe("AdminDataTable", () => {
   it("offers no checkbox for a column that cannot be hidden", () => {
     renderTable();
     screen.getByRole("button", { name: "Columns" }).click();
-    expect(
-      screen.queryByRole("menuitemcheckbox", { name: "Name" })
-    ).toBeNull();
+    expect(screen.queryByRole("menuitemcheckbox", { name: "Name" })).toBeNull();
   });
 
   it("renders the empty message instead of a table when there are no rows", () => {
@@ -967,7 +967,9 @@ export function AdminDataTable<T>({
   );
   const defaultHidden = useMemo(
     () =>
-      columns.filter((column) => column.defaultHidden).map((column) => column.id),
+      columns
+        .filter((column) => column.defaultHidden)
+        .map((column) => column.id),
     [columns]
   );
 
@@ -1131,11 +1133,13 @@ git commit -m "feat(admin): add the shared sortable data table"
 ## Task 3: Inventory server listing
 
 **Files:**
+
 - Modify: `src/server/_internal/inventory.ts`
 - Modify: `src/server/inventory.ts`
 - Test: `src/server/__tests__/admin-inventory.integration.test.ts`
 
 **Interfaces:**
+
 - Consumes: nothing from Tasks 1 and 2.
 - Produces: `listAdminInventoryAs(viewer, { category, q, status })` returning `{ rows }`, where each row is `InventoryItemStaff & { createdAt: Date; currentHolderEmail: string | null; currentHolderName: string | null; dueAt: Date | null; pickupBy: Date | null; updatedAt: Date }`; and the `listAdminInventory` server function taking `{ category: string | null; q: string; status: ItemStatus | null }`.
 
@@ -1176,9 +1180,9 @@ const EMPTY = { category: null, q: "", status: null } as const;
 describe("listAdminInventoryAs", () => {
   it("returns every matching row rather than one page", async () => {
     const admin = await makeAdmin("admin@example.edu");
-    await db.insert(inventoryItems).values(
-      Array.from({ length: 25 }, (_, i) => ({ name: `Item ${i}` }))
-    );
+    await db
+      .insert(inventoryItems)
+      .values(Array.from({ length: 25 }, (_, i) => ({ name: `Item ${i}` })));
     const { rows } = await listAdminInventoryAs(admin, EMPTY);
     expect(rows).toHaveLength(25);
   });
@@ -1194,12 +1198,10 @@ describe("listAdminInventoryAs", () => {
 
   it("finds an item by its serial", async () => {
     const admin = await makeAdmin("admin@example.edu");
-    await db
-      .insert(inventoryItems)
-      .values([
-        { name: "Oscilloscope", serial: "SN-99812" },
-        { name: "Multimeter", serial: "SN-11111" },
-      ]);
+    await db.insert(inventoryItems).values([
+      { name: "Oscilloscope", serial: "SN-99812" },
+      { name: "Multimeter", serial: "SN-11111" },
+    ]);
     const { rows } = await listAdminInventoryAs(admin, {
       ...EMPTY,
       q: "99812",
@@ -1455,9 +1457,11 @@ git commit -m "feat(inventory): add an unpaginated staff listing with a wider se
 ## Task 4: The inventory route
 
 **Files:**
+
 - Modify: `src/routes/_authed/admin/inventory/index.tsx` (full rewrite of the component and its search schema)
 
 **Interfaces:**
+
 - Consumes: `AdminDataTable`, `AdminColumn` (Task 2); `parseSort`, `serializeSort`, `parseHidden`, `serializeHidden`, `useSeedColumnsFromStorage`, `SortState` (Task 1); `listAdminInventory` (Task 3).
 - Produces: nothing consumed by later tasks. Tasks 6 and 7 copy this route's shape, so get it right here.
 
@@ -1551,7 +1555,10 @@ const COLUMNS: AdminColumn<Row>[] = [
     // an item actually moves through.
     accessorFn: (row) => STATUS_ORDER[row.status] ?? 99,
     cell: ({ row }) => (
-      <InventoryStatusBadge showRetired status={row.original.status as Status} />
+      <InventoryStatusBadge
+        showRetired
+        status={row.original.status as Status}
+      />
     ),
     header: "Status",
     id: "status",
@@ -1676,7 +1683,10 @@ function AdminInventory() {
   );
   const replaceSearch = useCallback(
     (patch: AdminTableSearch) =>
-      void navigate({ replace: true, search: (prev) => ({ ...prev, ...patch }) }),
+      void navigate({
+        replace: true,
+        search: (prev) => ({ ...prev, ...patch }),
+      }),
     [navigate]
   );
 
@@ -1770,11 +1780,13 @@ git commit -m "feat(admin): rebuild the inventory list as a sortable data table"
 ## Task 5: Projects server listing
 
 **Files:**
+
 - Modify: `src/server/_internal/project-summary.ts`
 - Modify: `src/server/_internal/projects-queries.ts`
 - Test: `src/server/__tests__/admin-projects-filter.integration.test.ts`
 
 **Interfaces:**
+
 - Consumes: nothing.
 - Produces: `adminProjectSummarySelect`, and a widened `listAdminProjectsAs` whose rows additionally carry `contactEmail`, `createdAt`, `deletedAt`, `programId`, `proposerEmail`, `proposerId`, `proposerName`, `publishedAt`, and `teamsSupported`.
 
@@ -1934,9 +1946,11 @@ git commit -m "feat(projects): give the staff listing proposer, contact and life
 ## Task 6: The projects route
 
 **Files:**
+
 - Modify: `src/routes/_authed/admin/projects/index.tsx`
 
 **Interfaces:**
+
 - Consumes: Tasks 1, 2, and 5. Follows the exact route shape established in Task 4; read that route's final source before starting.
 
 - [ ] **Step 1: Extend the search schema**
@@ -2000,7 +2014,9 @@ const COLUMNS: AdminColumn<Row>[] = [
       }
       return (
         <div className="leading-tight">
-          <span className="block">{row.original.proposerName ?? "(no name)"}</span>
+          <span className="block">
+            {row.original.proposerName ?? "(no name)"}
+          </span>
           <span className="block text-muted-foreground text-xs">
             {row.original.proposerEmail}
           </span>
@@ -2110,6 +2126,7 @@ git commit -m "feat(admin): rebuild the projects list as a sortable data table"
 ## Task 7: Mentors, and removing the old table
 
 **Files:**
+
 - Modify: `src/server/_internal/users.ts`
 - Modify: `src/server/users.ts`
 - Modify: `src/routes/_authed/admin/mentors/index.tsx`
@@ -2117,6 +2134,7 @@ git commit -m "feat(admin): rebuild the projects list as a sortable data table"
 - ~~Delete: `src/components/admin-table.tsx`~~ (see the correction in File Structure: it still has three consumers and stays)
 
 **Interfaces:**
+
 - Consumes: Tasks 1 and 2, and the route shape from Task 4.
 - Produces: `listMentorsAs(viewer, { q })`.
 
@@ -2327,9 +2345,11 @@ git commit -m "feat(admin): rebuild the mentors list and delete the old admin ta
 ## Task 8: Accessibility pass
 
 **Files:**
+
 - Modify: `src/test/a11y/admin.a11y.test.ts`
 
 **Interfaces:**
+
 - Consumes: all previous tasks.
 
 - [ ] **Step 1: Add the interaction test**
@@ -2428,6 +2448,7 @@ still must not, because column visibility never involves the server.
 ## Task 9: Server-sorted mode
 
 **Files:**
+
 - Modify: `src/components/admin-data-table.tsx`
 - Modify: `src/server/_internal/users.ts`
 - Modify: `src/server/users.ts`
@@ -2435,6 +2456,7 @@ still must not, because column visibility never involves the server.
 - Test: `src/server/__tests__/admin-users-sort.integration.test.ts` (create)
 
 **Interfaces:**
+
 - Consumes: `AdminDataTableProps` (Task 2), `listUsersImpl` as it stands.
 - Produces: an optional `serverSorted?: boolean` prop on `AdminDataTable`, and
   `listUsersImpl` accepting `sort` and `dir`.
@@ -2553,6 +2575,7 @@ git commit -m "feat(admin): add server-sorted mode for paginated tables"
 ## Task 10: The users route
 
 **Files:**
+
 - Modify: `src/routes/_authed/admin/users/index.tsx`
 
 **Interfaces:** consumes Task 9's `serverSorted` prop and the widened
@@ -2588,14 +2611,14 @@ file for anyone who read the other four routes first.
 
 Module-level `COLUMNS` and `DEFAULT_SORT = { desc: true, id: "createdAt" }`.
 
-| Column | id | Default | Notes |
-| --- | --- | --- | --- |
-| Email | `email` | visible, `enableHiding: false` | |
-| Name | `name` | visible | `?? "(none)"` |
-| Role | `role` | visible | |
-| Banned | `banned` | visible | render "yes" or "" as today |
-| Created | `createdAt` | hidden | `LocalTime dateOnly`, `sortingFn: "datetime"` |
-| Actions | `actions` | visible, `enableHiding: false`, `enableSorting: false` | the existing Manage link |
+| Column  | id          | Default                                                | Notes                                         |
+| ------- | ----------- | ------------------------------------------------------ | --------------------------------------------- |
+| Email   | `email`     | visible, `enableHiding: false`                         |                                               |
+| Name    | `name`      | visible                                                | `?? "(none)"`                                 |
+| Role    | `role`      | visible                                                |                                               |
+| Banned  | `banned`    | visible                                                | render "yes" or "" as today                   |
+| Created | `createdAt` | hidden                                                 | `LocalTime dateOnly`, `sortingFn: "datetime"` |
+| Actions | `actions`   | visible, `enableHiding: false`, `enableSorting: false` | the existing Manage link                      |
 
 Sorting is server-side, so `sortingFn` and `accessorFn` null-mapping are inert
 for ordering here. Keep the accessors anyway so the column ids stay meaningful
@@ -2630,6 +2653,7 @@ git commit -m "feat(admin): rebuild the users list on the shared table"
 ## Task 11: The categories and programs routes
 
 **Files:**
+
 - Modify: `src/routes/_authed/admin/categories/index.tsx`
 - Modify: `src/routes/_authed/admin/programs/index.tsx`
 
@@ -2647,12 +2671,12 @@ filters; leave the loader as it is.
 `orderBy(categories.type, categories.name)` as closely as a single sort key
 can.
 
-| Column | id | Default | Notes |
-| --- | --- | --- | --- |
-| Name | `name` | visible, `enableHiding: false` | |
-| Type | `type` | visible | keep the `text-muted-foreground` styling on the cell |
-| Created | `createdAt` | hidden | `LocalTime dateOnly`, `sortingFn: "datetime"` |
-| Actions | `actions` | visible, `enableHiding: false`, `enableSorting: false` | the existing Edit link |
+| Column  | id          | Default                                                | Notes                                                |
+| ------- | ----------- | ------------------------------------------------------ | ---------------------------------------------------- |
+| Name    | `name`      | visible, `enableHiding: false`                         |                                                      |
+| Type    | `type`      | visible                                                | keep the `text-muted-foreground` styling on the cell |
+| Created | `createdAt` | hidden                                                 | `LocalTime dateOnly`, `sortingFn: "datetime"`        |
+| Actions | `actions`   | visible, `enableHiding: false`, `enableSorting: false` | the existing Edit link                               |
 
 `caption` is "Categories", `emptyMessage` is "No categories yet.",
 `storageKey` is `"categories"`.
@@ -2662,14 +2686,14 @@ can.
 Same treatment. `DEFAULT_SORT = { desc: false, id: "courseId" }`, matching
 today's `orderBy(programs.courseId)`.
 
-| Column | id | Default | Notes |
-| --- | --- | --- | --- |
-| Course ID | `courseId` | visible, `enableHiding: false` | |
-| Course name | `courseName` | visible | |
-| Description | `description` | hidden | `?? "-"`, nulls last |
-| Created | `createdAt` | hidden | `LocalTime dateOnly`, `sortingFn: "datetime"` |
-| Updated | `updatedAt` | hidden | `LocalTime dateOnly`, `sortingFn: "datetime"` |
-| Actions | `actions` | visible, `enableHiding: false`, `enableSorting: false` | the existing Manage link |
+| Column      | id            | Default                                                | Notes                                         |
+| ----------- | ------------- | ------------------------------------------------------ | --------------------------------------------- |
+| Course ID   | `courseId`    | visible, `enableHiding: false`                         |                                               |
+| Course name | `courseName`  | visible                                                |                                               |
+| Description | `description` | hidden                                                 | `?? "-"`, nulls last                          |
+| Created     | `createdAt`   | hidden                                                 | `LocalTime dateOnly`, `sortingFn: "datetime"` |
+| Updated     | `updatedAt`   | hidden                                                 | `LocalTime dateOnly`, `sortingFn: "datetime"` |
+| Actions     | `actions`     | visible, `enableHiding: false`, `enableSorting: false` | the existing Manage link                      |
 
 `listProgramsImpl` already does a bare `select()`, so `description`,
 `createdAt`, and `updatedAt` are on the rows already. No server change.
@@ -2698,6 +2722,7 @@ git commit -m "feat(admin): rebuild the categories and programs lists on the sha
 ## Task 12: Delete AdminTable and extend the accessibility pass
 
 **Files:**
+
 - Delete: `src/components/admin-table.tsx`
 - Modify: `src/test/a11y/admin.a11y.test.ts`
 

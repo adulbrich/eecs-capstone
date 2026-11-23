@@ -2,7 +2,6 @@
 
 > **Status (verified 2026-06-07):** ✅ **Implemented and shipped.** Verified against the codebase; all deliverables exist. The `- [ ]` checkboxes below were never ticked during execution; they are stale, not a sign of incomplete work.
 
-
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Close the latent type-safety, linting, CI, and documentation gaps found in the 2026-05-30 codebase review, migrate linting to Ultracite, and adopt Ultracite + context7 in the agent workflow, without changing runtime behavior.
@@ -12,6 +11,7 @@
 **Tech Stack:** TanStack Start (React 19 SSR), TanStack Router/Query/Form, Drizzle ORM + Postgres, Better Auth, Biome 2.4.5 via Ultracite, Vitest 4, Playwright (a11y), AWS Bedrock + S3.
 
 **Decisions baked in from the maintainer (2026-05-30):**
+
 1. Node target is the **latest LTS, 24.16.0** (nvmrc, nixpacks, CI). Maintainer uses nvm. Local toolchain is 24.15.0; build/test verified there.
 2. **Keep `"latest"`** version specifiers for `@tanstack/*` and nitro for now. No dependency pinning task.
 3. Validate the CI workflow locally with **`act`** (installed) before committing.
@@ -21,6 +21,7 @@
 7. **Full** Ultracite migration now, plus add Ultracite and context7 to the agent workflow.
 
 **Repository conventions that override skill defaults (from `docs/QUIRKS.md`):**
+
 - Commit messages: lowercase imperative, no Conventional Commits prefix.
 - Co-author trailer on every assistant commit: `Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>` (HEREDOC).
 - Never `git add -A`, `git add .`, or `git add AGENTS.md`. Stage files by name. The user commits `AGENTS.md` themselves.
@@ -163,9 +164,9 @@ The `vcs.useIgnoreFile: true` plus the already-gitignored `playwright-report/` i
 - [ ] **Step 1:** Replace in `admin.ts`:
 
 ```tsx
-    const viewer = await requireUser();
-    if (!isStaff({ id: viewer.id, role: viewer.role ?? null }))
-      throw new Error("Forbidden");
+const viewer = await requireUser();
+if (!isStaff({ id: viewer.id, role: viewer.role ?? null }))
+  throw new Error("Forbidden");
 ```
 
 - [ ] **Step 2:** Replace `view-toggle.tsx:18` `const current = props.value ?? props.current!;` with `const current = props.value ?? props.current ?? "card";`
@@ -179,9 +180,9 @@ The `vcs.useIgnoreFile: true` plus the already-gitignored `playwright-report/` i
 - [ ] **Step 1:** Add a guard before `defineConfig` and use the narrowed value:
 
 ```ts
-const databaseUrl = process.env.DATABASE_URL
+const databaseUrl = process.env.DATABASE_URL;
 if (!databaseUrl) {
-  throw new Error('DATABASE_URL environment variable is not set')
+  throw new Error("DATABASE_URL environment variable is not set");
 }
 ```
 

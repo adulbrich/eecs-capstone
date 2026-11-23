@@ -16,10 +16,10 @@ The governing principle:
 
 ## The 57 are not one thing
 
-| Shape | Count | What they are |
-| --- | --- | --- |
-| Two lines | ~50 | `const viewer = await requireUser(); return xAs(viewer, data);` |
-| The implementation itself | **6** | No `*As` twin at all |
+| Shape                     | Count | What they are                                                   |
+| ------------------------- | ----- | --------------------------------------------------------------- |
+| Two lines                 | ~50   | `const viewer = await requireUser(); return xAs(viewer, data);` |
+| The implementation itself | **6** | No `*As` twin at all                                            |
 
 The 50 are the convention working as designed, and `QUIRKS.md` gives a stated
 reason to keep them: grep-ability over line count. Collapsing them would touch
@@ -42,9 +42,9 @@ integration tests. Where the convention was skipped, that is what happened.
 `bookmarks.integration.test.ts` has two tests and **neither calls a bookmark
 function**:
 
-| Test | What it actually does |
-| --- | --- |
-| "idempotent insert via ON CONFLICT DO NOTHING" | `db.insert(projectBookmarks)` twice, directly |
+| Test                                                     | What it actually does                               |
+| -------------------------------------------------------- | --------------------------------------------------- |
+| "idempotent insert via ON CONFLICT DO NOTHING"           | `db.insert(projectBookmarks)` twice, directly       |
 | "listMyBookmarks join filters out soft-deleted projects" | writes its own copy of the join and asserts on that |
 
 The second re-implements the query it claims to cover, so it passes whether or

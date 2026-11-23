@@ -18,42 +18,42 @@
 
 ## Seams under test
 
-| Seam | Kind |
-| --- | --- |
-| `readStoredView` / `writeStoredView` | unit |
-| `ViewToggle` | unit, jsdom |
-| `ProjectCard`, `InventoryCard` | unit, jsdom |
-| `BookmarkSetProvider` + `BookmarkToggle` | unit, jsdom, server fns mocked |
-| `PROJECT_TABLE_COLUMNS` rendered through `AdminDataTable` | unit, jsdom |
-| `searchProjectsImpl` key set | integration |
-| `listMyBookmarkIdsAs` | integration |
-| `listMyBookmarksAs` key set | integration, updated |
-| `/projects` table mode and toggle | accessibility suite |
+| Seam                                                      | Kind                           |
+| --------------------------------------------------------- | ------------------------------ |
+| `readStoredView` / `writeStoredView`                      | unit                           |
+| `ViewToggle`                                              | unit, jsdom                    |
+| `ProjectCard`, `InventoryCard`                            | unit, jsdom                    |
+| `BookmarkSetProvider` + `BookmarkToggle`                  | unit, jsdom, server fns mocked |
+| `PROJECT_TABLE_COLUMNS` rendered through `AdminDataTable` | unit, jsdom                    |
+| `searchProjectsImpl` key set                              | integration                    |
+| `listMyBookmarkIdsAs`                                     | integration                    |
+| `listMyBookmarksAs` key set                               | integration, updated           |
+| `/projects` table mode and toggle                         | accessibility suite            |
 
 ## File Structure
 
-| File | Responsibility |
-| --- | --- |
-| `src/lib/view-preference.ts` | `ViewMode = "card" \| "table"` |
-| `src/components/view-toggle.tsx` | two buttons, `current` plus `onChange` |
-| `src/components/project-card.tsx` | one responsive card with a bookmark slot |
-| `src/components/project-row.tsx`, `project-list-item.tsx` | deleted |
-| `src/components/inventory-card.tsx` | one responsive card |
-| `src/components/inventory-row.tsx` | deleted |
-| `src/components/bookmark-set.tsx` | provider, hook, `BookmarkToggle` |
-| `src/components/project-table-columns.tsx` | public column list and default sort |
-| `src/server/_internal/project-summary.ts` | widened projection, shared `categoriesOf` |
-| `src/server/_internal/projects-queries.ts` | export select narrowed |
-| `src/server/_internal/bookmarks.ts`, `src/server/bookmarks.ts` | `listMyBookmarkIds` |
-| `src/server/__tests__/access-contract.ts` | new entry |
-| `src/routes/projects/index.tsx` | two modes, `order` param, narrowed `loaderDeps` |
-| `src/components/projects-filter-bar.tsx` | `order` prop |
-| `src/routes/inventory/index.tsx`, `inventory-filter-bar.tsx` | both modes; see Phase 8 |
-| `src/components/inventory-table-columns.tsx` | inventory column list and default sort |
-| `src/routes/_authed/my/projects.tsx`, `my/bookmarks.tsx` | `ProjectCard` in a column list |
-| `src/routes/_authed/admin/projects/index.tsx` | CSV gains NDA column |
-| `src/test/a11y/public.a11y.test.ts` | table mode coverage |
-| `docs/UI-CONVENTIONS.md`, `docs/QUIRKS.md`, `PRD.md` | updated |
+| File                                                           | Responsibility                                  |
+| -------------------------------------------------------------- | ----------------------------------------------- |
+| `src/lib/view-preference.ts`                                   | `ViewMode = "card" \| "table"`                  |
+| `src/components/view-toggle.tsx`                               | two buttons, `current` plus `onChange`          |
+| `src/components/project-card.tsx`                              | one responsive card with a bookmark slot        |
+| `src/components/project-row.tsx`, `project-list-item.tsx`      | deleted                                         |
+| `src/components/inventory-card.tsx`                            | one responsive card                             |
+| `src/components/inventory-row.tsx`                             | deleted                                         |
+| `src/components/bookmark-set.tsx`                              | provider, hook, `BookmarkToggle`                |
+| `src/components/project-table-columns.tsx`                     | public column list and default sort             |
+| `src/server/_internal/project-summary.ts`                      | widened projection, shared `categoriesOf`       |
+| `src/server/_internal/projects-queries.ts`                     | export select narrowed                          |
+| `src/server/_internal/bookmarks.ts`, `src/server/bookmarks.ts` | `listMyBookmarkIds`                             |
+| `src/server/__tests__/access-contract.ts`                      | new entry                                       |
+| `src/routes/projects/index.tsx`                                | two modes, `order` param, narrowed `loaderDeps` |
+| `src/components/projects-filter-bar.tsx`                       | `order` prop                                    |
+| `src/routes/inventory/index.tsx`, `inventory-filter-bar.tsx`   | both modes; see Phase 8                         |
+| `src/components/inventory-table-columns.tsx`                   | inventory column list and default sort          |
+| `src/routes/_authed/my/projects.tsx`, `my/bookmarks.tsx`       | `ProjectCard` in a column list                  |
+| `src/routes/_authed/admin/projects/index.tsx`                  | CSV gains NDA column                            |
+| `src/test/a11y/public.a11y.test.ts`                            | table mode coverage                             |
+| `docs/UI-CONVENTIONS.md`, `docs/QUIRKS.md`, `PRD.md`           | updated                                         |
 
 ---
 

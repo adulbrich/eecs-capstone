@@ -179,12 +179,12 @@ boundary, so the rule lives in one place rather than in each caller.
 
 ## Server surface
 
-| Function | Change |
-| --- | --- |
-| `listCategoriesImpl` | Takes `domain`, drops `excludeTypes` |
-| `listCategoryTypesImpl` | Scoped to `domain = 'project'`; inventory has no facets |
-| `setInventoryItemCategoriesAs` | New, mirroring `setProjectCategoriesAs` |
-| `listInventoryCategoriesImpl` | Categories in use, via the join table |
+| Function                                          | Change                                                                            |
+| ------------------------------------------------- | --------------------------------------------------------------------------------- |
+| `listCategoriesImpl`                              | Takes `domain`, drops `excludeTypes`                                              |
+| `listCategoryTypesImpl`                           | Scoped to `domain = 'project'`; inventory has no facets                           |
+| `setInventoryItemCategoriesAs`                    | New, mirroring `setProjectCategoriesAs`                                           |
+| `listInventoryCategoriesImpl`                     | Categories in use, via the join table                                             |
 | `createInventoryItemAs` / `updateInventoryItemAs` | Take `categoryIds: string[]`; write the join rows inside the existing transaction |
 
 Item write paths replace their `categoryId` field with `categoryIds`. The join
@@ -258,7 +258,7 @@ projects export already does.
   the reverse, asserted through the **zod boundary** and not only the impl, as
   the `excludeTypes` test learned to do.
 - Validation: creating a project category without a type is rejected; creating
-  an inventory category *with* one is rejected rather than silently stripped.
+  an inventory category _with_ one is rejected rather than silently stripped.
 - Cardinality: an item with two categories round-trips through create, read and
   update; removing one leaves the other.
 - Filter semantics: an item matching one of two selected categories is

@@ -10,17 +10,17 @@ plugin and not the `@better-auth/sso` package. The design reasoning lives in
 
 ## Registration
 
-| | |
-|---|---|
-| Tenant ID | `ce6d05e1-3c5e-4d62-87a8-4c4a2713c113` |
-| Client ID | `d551d87a-b608-46a6-9fc3-a8b6bd56a5df` |
-| Discovery URL | `https://login.microsoftonline.com/ce6d05e1-3c5e-4d62-87a8-4c4a2713c113/v2.0/.well-known/openid-configuration` |
-| Client secrets | Two, both in Azure Key Vault `kv-engr-coe-vault-caps`: one for production, one for local development |
-| Secret expiry | 2028-08-24. No auto-renewal. Renew through the UIT support portal. |
-| Scopes requested | `openid profile email` |
-| Claims released | `email`, `given_name`, `family_name`, and a UPN claim UIT call `username` |
-| Tenancy | Single tenant, and pinned to it in code. See "Why single tenant". |
-| Audience | Any ONID holder (maintainer, 2026-09-22). The mapper refuses a token whose `idp` names another identity provider. |
+|                  |                                                                                                                   |
+| ---------------- | ----------------------------------------------------------------------------------------------------------------- |
+| Tenant ID        | `ce6d05e1-3c5e-4d62-87a8-4c4a2713c113`                                                                            |
+| Client ID        | `d551d87a-b608-46a6-9fc3-a8b6bd56a5df`                                                                            |
+| Discovery URL    | `https://login.microsoftonline.com/ce6d05e1-3c5e-4d62-87a8-4c4a2713c113/v2.0/.well-known/openid-configuration`    |
+| Client secrets   | Two, both in Azure Key Vault `kv-engr-coe-vault-caps`: one for production, one for local development              |
+| Secret expiry    | 2028-08-24. No auto-renewal. Renew through the UIT support portal.                                                |
+| Scopes requested | `openid profile email`                                                                                            |
+| Claims released  | `email`, `given_name`, `family_name`, and a UPN claim UIT call `username`                                         |
+| Tenancy          | Single tenant, and pinned to it in code. See "Why single tenant".                                                 |
+| Audience         | Any ONID holder (maintainer, 2026-09-22). The mapper refuses a token whose `idp` names another identity provider. |
 
 The client ID, tenant ID and discovery URL are public values. They appear in
 `.env.example` and `infra/variables.tf` on purpose; treating them as secrets
@@ -146,8 +146,8 @@ that does not include a tenant-custom `username`. The default therefore routes
 the exact case UIT warned about to the one source that cannot answer it.
 
 One case the fallback does not solve, and cannot: a student with a verified
-account at their ONID *email* address who then signs in with ONID and
-gets no `email` claim. The fallback hands back their *UPN*, a different address,
+account at their ONID _email_ address who then signs in with ONID and
+gets no `email` claim. The fallback hands back their _UPN_, a different address,
 so they get a second account rather than a link. At Oregon State the two usually
 match, so this should be rare. It is inherent to an IdP that does not guarantee
 the email claim, not a bug with a fix on our side.

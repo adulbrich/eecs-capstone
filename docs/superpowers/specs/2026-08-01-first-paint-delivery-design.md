@@ -38,12 +38,12 @@ Measured on 2026-08-01 against a real `npm run build` and the production Nitro
 server (`node .output/server/index.mjs`), with
 `curl -H 'Accept-Encoding: gzip, br'`.
 
-| Asset | Bytes on the wire | gzip -9 | brotli -q11 |
-| --- | ---: | ---: | ---: |
-| `/assets/styles-<hash>.css` | 98,008 | 16,651 | 14,200 |
-| `/logo-institution.svg` | 35,440 | 11,814 | not measured |
-| 24 `modulepreload` JS chunks in `<head>` | 634,413 | 196,382 | 165,672 |
-| **Critical-path total** | **767,861** | ~225 KB | **~190 KB** |
+| Asset                                    | Bytes on the wire | gzip -9 |  brotli -q11 |
+| ---------------------------------------- | ----------------: | ------: | -----------: |
+| `/assets/styles-<hash>.css`              |            98,008 |  16,651 |       14,200 |
+| `/logo-institution.svg`                  |            35,440 |  11,814 | not measured |
+| 24 `modulepreload` JS chunks in `<head>` |           634,413 | 196,382 |      165,672 |
+| **Critical-path total**                  |       **767,861** | ~225 KB |  **~190 KB** |
 
 All figures are measured. The JS row is the concatenation of the 24 chunks the
 SSR HTML actually links from `<head>`, not the whole 79-file `assets/` directory.
@@ -174,8 +174,8 @@ purpose is to stop reaching the origin is pure overhead.
 
 **This behavior must never widen beyond `/assets/*`.** `CachingOptimized`
 carries a one-second minimum TTL, and AWS documents that a minimum TTL above zero
-caches for at least that long *even when the origin sends `no-cache`, `no-store`,
-or `private`*. That is harmless for content-hashed immutable files and becomes a
+caches for at least that long _even when the origin sends `no-cache`, `no-store`,
+or `private`_. That is harmless for content-hashed immutable files and becomes a
 signed-in-response leak the moment the pattern matches an auth-dependent path.
 
 ---
@@ -374,11 +374,11 @@ scheduled for change.
 
 ## Testing
 
-| What | Where | Guards |
-| --- | --- | --- |
-| Logo `<img>` carries `width`/`height` matching the SVG viewBox ratio | `src/test/institution-logo.test.tsx` (new) | B1 being dropped in a later refactor |
+| What                                                                                                                                                       | Where                                                               | Guards                                   |
+| ---------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------- | ---------------------------------------- |
+| Logo `<img>` carries `width`/`height` matching the SVG viewBox ratio                                                                                       | `src/test/institution-logo.test.tsx` (new)                          | B1 being dropped in a later refactor     |
 | Header session slot reserves the same width in pending, signed-out, and signed-in states, **conditional on Feature C's measurement showing real movement** | `src/test/site-header.test.tsx` (new; not created if nothing moves) | C regressing, if the fix is built at all |
-| Build emits `.br` variants for `/assets/*` | `scripts/` check, run after build in CI | **A1 regressing on a dependency bump** |
+| Build emits `.br` variants for `/assets/*`                                                                                                                 | `scripts/` check, run after build in CI                             | **A1 regressing on a dependency bump**   |
 
 The third row carries the most weight. A1 is a build-configuration flag with no
 runtime signature: if a `nitro-nightly` bump changes the option's behavior,

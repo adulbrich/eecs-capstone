@@ -28,12 +28,14 @@ Source spec: `docs/superpowers/specs/2026-07-30-unified-detail-pages-and-private
 ## File Structure
 
 **Created:**
+
 - `src/components/staff-inventory-panel.tsx`: the staff-only half of the inventory item page (staff fields, private notes, Edit link, lifecycle panel).
 - `src/components/project-private-panel.tsx`: the proposer-and-staff half of the project page (private notes, status history, comments).
 - `src/routes/_authed/inventory/new.tsx`: moved from `_authed/admin/inventory/new.tsx`.
 - `src/routes/_authed/inventory/$itemId/edit.tsx`: moved from `_authed/admin/inventory/$itemId_.edit.tsx`.
 
 **Modified:**
+
 - `src/server/_internal/inventory.ts`: add `getInventoryItemDetailAs` + `getInventoryItemDetailForCurrentUser`; remove `getItemHistoryForCurrentUser`.
 - `src/server/inventory.ts`: add `getInventoryItemDetail` server fn; remove `getItemHistory` server fn.
 - `src/routes/inventory/$itemId.tsx`: becomes the single item detail page.
@@ -44,6 +46,7 @@ Source spec: `docs/superpowers/specs/2026-07-30-unified-detail-pages-and-private
 - `PRD.md`: §12 and §16.
 
 **Deleted:**
+
 - `src/routes/_authed/admin/inventory/$itemId.tsx`
 - `src/routes/_authed/admin/inventory/$itemId_.edit.tsx`
 - `src/routes/_authed/admin/inventory/new.tsx`
@@ -55,11 +58,13 @@ Source spec: `docs/superpowers/specs/2026-07-30-unified-detail-pages-and-private
 ## Task 1: Combined item detail server function
 
 **Files:**
+
 - Modify: `src/server/_internal/inventory.ts` (near `getInventoryItemAs`, ~line 166, and `getItemHistoryAs`, ~line 976)
 - Modify: `src/server/inventory.ts` (near `getInventoryItem`, ~line 56, and `getItemHistory`, ~line 210)
 - Test: `src/server/__tests__/inventory.integration.test.ts` (append to the `listInventoryAs privacy` describe block)
 
 **Interfaces:**
+
 - Consumes: existing `getInventoryItemAs(viewer, {id})`, `getItemHistoryAs(viewer, {itemId})`, `isStaff(viewer)`, `readSession()` — all already in `src/server/_internal/inventory.ts`.
 - Produces: `getInventoryItemDetailAs(viewer, { id: string })` returning `{ item, history, viewerIsStaff: boolean } | null`, and the `getInventoryItemDetail` server fn wrapping it. Tasks 2 and 3 consume both.
 
@@ -70,72 +75,72 @@ Source spec: `docs/superpowers/specs/2026-07-30-unified-detail-pages-and-private
 Append inside the existing `describe("listInventoryAs privacy", ...)` block in `src/server/__tests__/inventory.integration.test.ts`:
 
 ```ts
-  it("gives an anonymous viewer no history and no staff fields", async () => {
-    const admin = await makeUser(`dtl-a-${Date.now()}@x.com`, "admin");
-    const item = await makeItem({ notes: "Locker B4, code 1180." });
-    await transitionItem(admin, {
-      itemId: item.id,
-      nextStatus: "maintenance",
-    });
-
-    const view = await getInventoryItemDetailAs(null, { id: item.id });
-    expect(view).not.toBeNull();
-    expect(view?.viewerIsStaff).toBe(false);
-    expect(view?.history).toEqual([]);
-    expect("notes" in (view?.item as object)).toBe(false);
-    expect(JSON.stringify(view)).not.toContain("1180");
+it("gives an anonymous viewer no history and no staff fields", async () => {
+  const admin = await makeUser(`dtl-a-${Date.now()}@x.com`, "admin");
+  const item = await makeItem({ notes: "Locker B4, code 1180." });
+  await transitionItem(admin, {
+    itemId: item.id,
+    nextStatus: "maintenance",
   });
 
-  it("gives a signed-in non-staff user no history and no staff fields", async () => {
-    const admin = await makeUser(`dtl-a2-${Date.now()}@x.com`, "admin");
-    const student = await makeUser(`dtl-s2-${Date.now()}@x.com`, "user");
-    const item = await makeItem({ notes: "Locker B4, code 1180." });
-    await transitionItem(admin, {
-      itemId: item.id,
-      nextStatus: "maintenance",
-    });
+  const view = await getInventoryItemDetailAs(null, { id: item.id });
+  expect(view).not.toBeNull();
+  expect(view?.viewerIsStaff).toBe(false);
+  expect(view?.history).toEqual([]);
+  expect("notes" in (view?.item as object)).toBe(false);
+  expect(JSON.stringify(view)).not.toContain("1180");
+});
 
-    const view = await getInventoryItemDetailAs(student, { id: item.id });
-    expect(view?.viewerIsStaff).toBe(false);
-    expect(view?.history).toEqual([]);
-    expect("serial" in (view?.item as object)).toBe(false);
-    expect("location" in (view?.item as object)).toBe(false);
+it("gives a signed-in non-staff user no history and no staff fields", async () => {
+  const admin = await makeUser(`dtl-a2-${Date.now()}@x.com`, "admin");
+  const student = await makeUser(`dtl-s2-${Date.now()}@x.com`, "user");
+  const item = await makeItem({ notes: "Locker B4, code 1180." });
+  await transitionItem(admin, {
+    itemId: item.id,
+    nextStatus: "maintenance",
   });
 
-  it("gives staff the history and the staff fields", async () => {
-    const admin = await makeUser(`dtl-a3-${Date.now()}@x.com`, "admin");
-    const item = await makeItem({ notes: "Locker B4, code 1180." });
-    await transitionItem(admin, {
-      itemId: item.id,
-      nextStatus: "maintenance",
-    });
+  const view = await getInventoryItemDetailAs(student, { id: item.id });
+  expect(view?.viewerIsStaff).toBe(false);
+  expect(view?.history).toEqual([]);
+  expect("serial" in (view?.item as object)).toBe(false);
+  expect("location" in (view?.item as object)).toBe(false);
+});
 
-    const view = await getInventoryItemDetailAs(admin, { id: item.id });
-    expect(view?.viewerIsStaff).toBe(true);
-    expect(view?.history.length).toBeGreaterThan(0);
-    expect((view?.item as unknown as { notes: string }).notes).toBe(
-      "Locker B4, code 1180."
-    );
+it("gives staff the history and the staff fields", async () => {
+  const admin = await makeUser(`dtl-a3-${Date.now()}@x.com`, "admin");
+  const item = await makeItem({ notes: "Locker B4, code 1180." });
+  await transitionItem(admin, {
+    itemId: item.id,
+    nextStatus: "maintenance",
   });
 
-  it("returns null for a retired item viewed by a non-staff user", async () => {
-    const admin = await makeUser(`dtl-a4-${Date.now()}@x.com`, "admin");
-    const student = await makeUser(`dtl-s4-${Date.now()}@x.com`, "user");
-    const item = await makeItem();
-    await transitionItem(admin, { itemId: item.id, nextStatus: "retired" });
+  const view = await getInventoryItemDetailAs(admin, { id: item.id });
+  expect(view?.viewerIsStaff).toBe(true);
+  expect(view?.history.length).toBeGreaterThan(0);
+  expect((view?.item as unknown as { notes: string }).notes).toBe(
+    "Locker B4, code 1180."
+  );
+});
 
-    expect(await getInventoryItemDetailAs(student, { id: item.id })).toBeNull();
-    expect(await getInventoryItemDetailAs(null, { id: item.id })).toBeNull();
-    expect(
-      (await getInventoryItemDetailAs(admin, { id: item.id }))?.item.status
-    ).toBe("retired");
-  });
+it("returns null for a retired item viewed by a non-staff user", async () => {
+  const admin = await makeUser(`dtl-a4-${Date.now()}@x.com`, "admin");
+  const student = await makeUser(`dtl-s4-${Date.now()}@x.com`, "user");
+  const item = await makeItem();
+  await transitionItem(admin, { itemId: item.id, nextStatus: "retired" });
 
-  it("returns null for an item that does not exist", async () => {
-    const admin = await makeUser(`dtl-a5-${Date.now()}@x.com`, "admin");
-    const missing = "00000000-0000-0000-0000-0000000000ff";
-    expect(await getInventoryItemDetailAs(admin, { id: missing })).toBeNull();
-  });
+  expect(await getInventoryItemDetailAs(student, { id: item.id })).toBeNull();
+  expect(await getInventoryItemDetailAs(null, { id: item.id })).toBeNull();
+  expect(
+    (await getInventoryItemDetailAs(admin, { id: item.id }))?.item.status
+  ).toBe("retired");
+});
+
+it("returns null for an item that does not exist", async () => {
+  const admin = await makeUser(`dtl-a5-${Date.now()}@x.com`, "admin");
+  const missing = "00000000-0000-0000-0000-0000000000ff";
+  expect(await getInventoryItemDetailAs(admin, { id: missing })).toBeNull();
+});
 ```
 
 Add `getInventoryItemDetailAs` to the existing import block from `#/server/_internal/inventory` at the top of that file (keep the list alphabetical: it goes immediately after `getInventoryItemAs`).
@@ -229,6 +234,7 @@ Do **not** delete `getItemHistory` yet — its caller still exists until Task 2.
 ## Task 2: Merge the item detail page
 
 **Files:**
+
 - Create: `src/components/staff-inventory-panel.tsx`
 - Modify: `src/routes/inventory/$itemId.tsx` (whole file)
 - Modify: `src/routes/_authed/admin/inventory/index.tsx:203` (row link)
@@ -237,6 +243,7 @@ Do **not** delete `getItemHistory` yet — its caller still exists until Task 2.
 - Modify: `src/server/inventory.ts` (remove `getItemHistory`), `src/server/_internal/inventory.ts` (remove `getItemHistoryForCurrentUser`)
 
 **Interfaces:**
+
 - Consumes: `getInventoryItemDetail` from Task 1; existing `InventoryLifecyclePanel` (props: `{ history: HistoryRow[]; holderName?: string | null; item: { id, name, status, currentHolderId, currentHolderName?, currentHolderEmail?, currentHolderLabel, currentRequestItemId } }`) and its exported `HistoryRow` type.
 - Produces: `<StaffInventoryPanel item={StaffPanelItem} history={HistoryRow[]} />`. No later task consumes it.
 
@@ -471,13 +478,13 @@ In `src/server/_internal/inventory.ts`, delete `getItemHistoryForCurrentUser` (~
 In `src/routes/_authed/admin/inventory/index.tsx`, the row-name `<Link>` (~line 203):
 
 ```tsx
-                  <Link
-                    className="hover:underline"
-                    params={{ itemId: row.id }}
-                    to="/inventory/$itemId"
-                  >
-                    {row.name}
-                  </Link>
+<Link
+  className="hover:underline"
+  params={{ itemId: row.id }}
+  to="/inventory/$itemId"
+>
+  {row.name}
+</Link>;
 ```
 
 - [ ] **Step 5: Repoint the a11y test**
@@ -528,12 +535,14 @@ Expected: no other errors. Do not commit yet; Task 3 completes this change set.
 ## Task 3: Move the edit route to `/inventory/$itemId/edit`
 
 **Files:**
+
 - Create: `src/routes/_authed/inventory/$itemId/edit.tsx`
 - Delete: `src/routes/_authed/admin/inventory/$itemId_.edit.tsx`
 - Modify: `src/routes/_authed/admin/inventory/index.tsx:228` (edit link)
 - Modify: `src/test/a11y/admin.a11y.test.ts:41-44`
 
 **Interfaces:**
+
 - Consumes: existing `InventoryForm` (props `initial`, `itemId`, `onSaved(itemId)`, `submitLabel`), `getInventoryItem`, `getSession`.
 - Produces: the route path `/inventory/$itemId/edit`, which Task 2's `StaffInventoryPanel` links to.
 
@@ -636,13 +645,13 @@ The filename contains `$`, so it must be quoted or escaped in a shell.
 In `src/routes/_authed/admin/inventory/index.tsx` (~line 228):
 
 ```tsx
-                <Link
-                  className="hover:underline"
-                  params={{ itemId: row.id }}
-                  to="/inventory/$itemId/edit"
-                >
-                  Edit
-                </Link>
+<Link
+  className="hover:underline"
+  params={{ itemId: row.id }}
+  to="/inventory/$itemId/edit"
+>
+  Edit
+</Link>;
 ```
 
 - [ ] **Step 4: Repoint the a11y test**
@@ -688,12 +697,14 @@ link into a build error. getItemHistory's only caller went with it."
 ## Task 4: Move the create route to `/inventory/new`
 
 **Files:**
+
 - Create: `src/routes/_authed/inventory/new.tsx`
 - Delete: `src/routes/_authed/admin/inventory/new.tsx`
 - Modify: `src/routes/_authed/admin/inventory/index.tsx:131` ("+ New item" link)
 - Modify: `src/test/a11y/admin.a11y.test.ts:31-34`
 
 **Interfaces:**
+
 - Consumes: existing `InventoryForm` (`onSaved`, `submitLabel`), `getSession`.
 - Produces: the route path `/inventory/new`.
 
@@ -752,7 +763,7 @@ git rm src/routes/_authed/admin/inventory/new.tsx
 In `src/routes/_authed/admin/inventory/index.tsx` (~line 131):
 
 ```tsx
-            <Link to="/inventory/new">+ New item</Link>
+<Link to="/inventory/new">+ New item</Link>;
 ```
 
 - [ ] **Step 3: Repoint the a11y test**
@@ -794,10 +805,12 @@ projects already have."
 ## Task 5: Project private panel
 
 **Files:**
+
 - Create: `src/components/project-private-panel.tsx`
 - Modify: `src/routes/projects/$projectId.tsx` (remove `PrivateNotesSection` and the two private `<section>` blocks; render the panel)
 
 **Interfaces:**
+
 - Consumes: existing `StatusTimeline` (props `{ rows: HistoryRow[] }` where `HistoryRow` is `{ changedBy, comment, createdAt, id, newStatus, oldStatus }`), `CommentThread` (props `{ comments, onChanged, projectId, viewerIsStaff }`), `SectionHeading`.
 - Produces: `<ProjectPrivatePanel notes history projectId comments viewerIsStaff onCommentsChanged />`. No later task consumes it.
 
@@ -887,54 +900,60 @@ In `src/routes/projects/$projectId.tsx`:
 3. Replace this block:
 
 ```tsx
-      <PrivateNotesSection
-        notes={(project.notes as string | null) ?? null}
-        visible={viewerIsStaff || viewerIsOwner}
-      />
+<PrivateNotesSection
+  notes={(project.notes as string | null) ?? null}
+  visible={viewerIsStaff || viewerIsOwner}
+/>;
 
-      {(viewerIsStaff || viewerIsOwner) && (
-        <section className="mt-8">
-          <SectionHeading>Status history</SectionHeading>
-          <div className="mt-3">
-            <StatusTimeline rows={history} />
-          </div>
-        </section>
-      )}
+{
+  (viewerIsStaff || viewerIsOwner) && (
+    <section className="mt-8">
+      <SectionHeading>Status history</SectionHeading>
+      <div className="mt-3">
+        <StatusTimeline rows={history} />
+      </div>
+    </section>
+  );
+}
 
-      {(viewerIsOwner || viewerIsStaff) && (
-        <section className="mt-8">
-          <SectionHeading>Comments</SectionHeading>
-          <div className="mt-3">
-            <CommentThread
-              comments={comments}
-              onChanged={() => {
-                void refreshComments();
-                void router.invalidate();
-              }}
-              projectId={project.id as string}
-              viewerIsStaff={viewerIsStaff}
-            />
-          </div>
-        </section>
-      )}
-```
-
-with:
-
-```tsx
-      {(viewerIsStaff || viewerIsOwner) && (
-        <ProjectPrivatePanel
+{
+  (viewerIsOwner || viewerIsStaff) && (
+    <section className="mt-8">
+      <SectionHeading>Comments</SectionHeading>
+      <div className="mt-3">
+        <CommentThread
           comments={comments}
-          history={history}
-          notes={(project.notes as string | null) ?? null}
-          onCommentsChanged={() => {
+          onChanged={() => {
             void refreshComments();
             void router.invalidate();
           }}
           projectId={project.id as string}
           viewerIsStaff={viewerIsStaff}
         />
-      )}
+      </div>
+    </section>
+  );
+}
+```
+
+with:
+
+```tsx
+{
+  (viewerIsStaff || viewerIsOwner) && (
+    <ProjectPrivatePanel
+      comments={comments}
+      history={history}
+      notes={(project.notes as string | null) ?? null}
+      onCommentsChanged={() => {
+        void refreshComments();
+        void router.invalidate();
+      }}
+      projectId={project.id as string}
+      viewerIsStaff={viewerIsStaff}
+    />
+  );
+}
 ```
 
 4. Add `import { ProjectPrivatePanel } from "#/components/project-private-panel";`
@@ -972,6 +991,7 @@ staff panel below it."
 ## Task 6: Documentation and full verification
 
 **Files:**
+
 - Modify: `PRD.md` (§5 Project Comments & Review, §12 Inventory Management)
 
 - [ ] **Step 1: Update the PRD inventory section**
@@ -1030,6 +1050,7 @@ npm run dev
 ```
 
 Confirm, signed in as an admin:
+
 1. `/inventory` → click an item → detail page shows the staff panel below the public block.
 2. The staff panel's Edit button opens `/inventory/$itemId/edit`; saving returns to the detail page.
 3. `/inventory/new` renders the create form; creating an item lands on its detail page.

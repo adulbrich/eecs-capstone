@@ -2,7 +2,6 @@
 
 > **Status (verified 2026-06-07):** ✅ **Implemented and shipped.** Verified against the codebase; all deliverables exist. The `- [ ]` checkboxes below were never ticked during execution; they are stale, not a sign of incomplete work.
 
-
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Fix all WCAG 2.1 AA violations surfaced by `npm run test:accessibility` so every page passes the axe scan in both light and dark color schemes.
@@ -15,15 +14,15 @@
 
 ## Files
 
-| File | Change |
-|------|--------|
-| `src/styles.css` | Darken `--status-warning` token in light mode `:root` |
-| `src/components/status-badge.tsx` | `published` fg: `brand-primary` → `brand-primary-dark` |
-| `src/components/inventory-status-badge.tsx` | `requested` color: `brand-primary` → `brand-primary-dark` |
-| `src/components/category-chip.tsx` | Type label: `text-tertiary` → `text-secondary` |
-| `src/components/project-card.tsx` | Published date: `text-tertiary` → `text-secondary` |
-| `src/components/project-row.tsx` | Published date: `text-tertiary` → `text-secondary` |
-| `src/components/ban-form.tsx` | Add `<Label>` for ban-reason textarea and ban-expires datetime input |
+| File                                        | Change                                                               |
+| ------------------------------------------- | -------------------------------------------------------------------- |
+| `src/styles.css`                            | Darken `--status-warning` token in light mode `:root`                |
+| `src/components/status-badge.tsx`           | `published` fg: `brand-primary` → `brand-primary-dark`               |
+| `src/components/inventory-status-badge.tsx` | `requested` color: `brand-primary` → `brand-primary-dark`            |
+| `src/components/category-chip.tsx`          | Type label: `text-tertiary` → `text-secondary`                       |
+| `src/components/project-card.tsx`           | Published date: `text-tertiary` → `text-secondary`                   |
+| `src/components/project-row.tsx`            | Published date: `text-tertiary` → `text-secondary`                   |
+| `src/components/ban-form.tsx`               | Add `<Label>` for ban-reason textarea and ban-expires datetime input |
 
 No new files are created.
 
@@ -33,9 +32,10 @@ No new files are created.
 
 **Why:** `--status-warning: #E65100` yields only ~3.3:1 contrast when used as text on `--status-warning-bg` (rgba(230,81,0,0.10) on white ≈ #FDEEE6). WCAG AA requires 4.5:1 for text at 12px. `#B84000` gives ~4.9:1 on the same background. The dark-mode override (`#FFA726`) is already correct and is not changed here.
 
-All uses of `--status-warning` as *text or icon fill* automatically get the fix: `StatusBadge` (changes_requested), `InventoryStatusBadge` (reserved), the "internal" badge in `CommentThread`, the bookmark star fill, and the notification dot. Border and left-accent uses are decorative and pass the UI-component 3:1 threshold at the old value anyway.
+All uses of `--status-warning` as _text or icon fill_ automatically get the fix: `StatusBadge` (changes_requested), `InventoryStatusBadge` (reserved), the "internal" badge in `CommentThread`, the bookmark star fill, and the notification dot. Border and left-accent uses are decorative and pass the UI-component 3:1 threshold at the old value anyway.
 
 **Files:**
+
 - Modify: `src/styles.css:46-48` (`:root` status tokens)
 
 ---
@@ -98,6 +98,7 @@ git commit -m "fix(a11y): darken status-warning token to pass 4.5:1 contrast in 
 **Why:** `StatusBadge` ("published") and `InventoryStatusBadge` ("requested") use `var(--brand-primary)` (#D73F09) as text color on `var(--brand-primary-tint)` (rgba(215,63,9,0.08) on white ≈ #FCEFEB). That yields ~4.1:1. The existing token `--brand-primary-dark` (#B83207) gives ~5.3:1 on the same tint background and is purpose-built for text/emphasis use in light mode. In dark mode, `--brand-primary-dark` resolves to #FF8C5A (the accessible link color), which gives >7:1 on dark surfaces.
 
 **Files:**
+
 - Modify: `src/components/status-badge.tsx:9`
 - Modify: `src/components/inventory-status-badge.tsx:43-44`
 
@@ -126,7 +127,10 @@ const STATUS_STYLES: Record<string, { fg: string; bg: string }> = {
     fg: "var(--status-warning)",
     bg: "var(--status-warning-bg)",
   },
-  published: { fg: "var(--brand-primary-dark)", bg: "var(--brand-primary-tint)" },
+  published: {
+    fg: "var(--brand-primary-dark)",
+    bg: "var(--brand-primary-tint)",
+  },
   archived: { fg: "var(--status-neutral)", bg: "var(--status-neutral-bg)" },
   deleted: { fg: "var(--status-error)", bg: "var(--status-error-bg)" },
 };
@@ -164,6 +168,7 @@ git commit -m "fix(a11y): use brand-primary-dark for badge text to meet 4.5:1 co
 **Why:** `--text-tertiary: #9A9490` gives only ~2.8:1 contrast on near-white surfaces, failing even the 3:1 minimum for large text. It is used in three places where the text conveys real information (category type label, published date on cards and rows). Switching to `--text-secondary` (#6B6560, ~5.2:1 on white) fixes all three without touching the design token itself. The token can remain for future purely-decorative use.
 
 **Files:**
+
 - Modify: `src/components/category-chip.tsx:16`
 - Modify: `src/components/project-card.tsx:70`
 - Modify: `src/components/project-row.tsx:36`
@@ -255,6 +260,7 @@ git commit -m "fix(a11y): replace text-tertiary with text-secondary in content t
 The fix wraps each control in a `<div>` with a `<Label htmlFor="...">` above it. The existing `<p>` description for the expiry input is folded into the label text so the label itself conveys the full context. The shadcn `Label` component generates a standard `<label>` element and is already used throughout the codebase.
 
 **Files:**
+
 - Modify: `src/components/ban-form.tsx` (add `Label` import, wrap two controls)
 
 ---
@@ -396,7 +402,13 @@ Expected: All 58 tests pass across both `chromium-light` and `chromium-dark` pro
 If failures remain, the violation summary includes the exact rule ID and failing element HTML. For example:
 
 ```json
-[{ "rule": "color-contrast", "impact": "serious", "elements": ["<span class=\"...\">..."] }]
+[
+  {
+    "rule": "color-contrast",
+    "impact": "serious",
+    "elements": ["<span class=\"...\">..."]
+  }
+]
 ```
 
 Use the rule ID and element HTML to identify which component or token still needs adjustment, fix it, and re-run.

@@ -2,7 +2,6 @@
 
 > **Status (verified 2026-06-07):** ✅ **Implemented and shipped.** Verified against the codebase; all deliverables exist. The `- [ ]` checkboxes below were never ticked during execution; they are stale, not a sign of incomplete work.
 
-
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Spec:** `docs/superpowers/specs/2026-05-16-project-domain-design.md`
@@ -117,7 +116,7 @@ export const projects = pgTable(
     index("projects_proposer_id_idx").on(t.proposerId),
     index("projects_program_id_idx").on(t.programId),
     index("projects_published_at_idx").on(t.publishedAt),
-  ],
+  ]
 );
 ```
 
@@ -138,7 +137,7 @@ export const projectComments = pgTable(
       .notNull(),
     parentId: uuid("parent_id").references(
       (): import("drizzle-orm/pg-core").AnyPgColumn => projectComments.id,
-      { onDelete: "cascade" },
+      { onDelete: "cascade" }
     ),
     content: text("content").notNull(),
     isInternal: boolean("is_internal").default(false),
@@ -146,9 +145,7 @@ export const projectComments = pgTable(
       .notNull()
       .defaultNow(),
   },
-  (t) => [
-    index("project_comments_project_idx").on(t.projectId, t.createdAt),
-  ],
+  (t) => [index("project_comments_project_idx").on(t.projectId, t.createdAt)]
 );
 ```
 
@@ -177,11 +174,8 @@ export const projectStatusHistory = pgTable(
       .defaultNow(),
   },
   (t) => [
-    index("project_status_history_project_idx").on(
-      t.projectId,
-      t.createdAt,
-    ),
-  ],
+    index("project_status_history_project_idx").on(t.projectId, t.createdAt),
+  ]
 );
 ```
 
@@ -212,9 +206,9 @@ export const notifications = pgTable(
     index("notifications_user_read_created_idx").on(
       t.userId,
       t.read,
-      t.createdAt,
+      t.createdAt
     ),
-  ],
+  ]
 );
 ```
 
@@ -240,9 +234,7 @@ export const projectEditLog = pgTable(
       .notNull()
       .defaultNow(),
   },
-  (t) => [
-    index("project_edit_log_project_idx").on(t.projectId, t.createdAt),
-  ],
+  (t) => [index("project_edit_log_project_idx").on(t.projectId, t.createdAt)]
 );
 ```
 
@@ -368,19 +360,13 @@ const forbiddenCases: Array<[Status, Status, ActorRole]> = [
 ];
 
 describe("canTransition", () => {
-  it.each(allowedCases)(
-    "%s -> %s is allowed for %s",
-    (from, to, role) => {
-      expect(canTransition(from, to, role)).toBe(true);
-    },
-  );
+  it.each(allowedCases)("%s -> %s is allowed for %s", (from, to, role) => {
+    expect(canTransition(from, to, role)).toBe(true);
+  });
 
-  it.each(forbiddenCases)(
-    "%s -> %s is forbidden for %s",
-    (from, to, role) => {
-      expect(canTransition(from, to, role)).toBe(false);
-    },
-  );
+  it.each(forbiddenCases)("%s -> %s is forbidden for %s", (from, to, role) => {
+    expect(canTransition(from, to, role)).toBe(false);
+  });
 
   it("returns false for self-transition", () => {
     expect(canTransition("draft", "draft", "owner")).toBe(false);
@@ -390,12 +376,14 @@ describe("canTransition", () => {
 
 describe("assertTransitionAllowed", () => {
   it("does not throw on an allowed transition", () => {
-    expect(() => assertTransitionAllowed("draft", "submitted", "owner")).not.toThrow();
+    expect(() =>
+      assertTransitionAllowed("draft", "submitted", "owner")
+    ).not.toThrow();
   });
 
   it("throws on a forbidden transition with a message naming from, to, role", () => {
     expect(() =>
-      assertTransitionAllowed("draft", "published", "owner"),
+      assertTransitionAllowed("draft", "published", "owner")
     ).toThrow(/draft.*published.*owner/);
   });
 });
@@ -451,7 +439,7 @@ const TRANSITIONS: Record<Status, Partial<Record<ActorRole, Status[]>>> = {
 export function canTransition(
   from: Status,
   to: Status,
-  role: ActorRole,
+  role: ActorRole
 ): boolean {
   return (TRANSITIONS[from][role] ?? []).includes(to);
 }
@@ -459,12 +447,10 @@ export function canTransition(
 export function assertTransitionAllowed(
   from: Status,
   to: Status,
-  role: ActorRole,
+  role: ActorRole
 ): void {
   if (!canTransition(from, to, role)) {
-    throw new Error(
-      `Transition ${from} -> ${to} not allowed for ${role}`,
-    );
+    throw new Error(`Transition ${from} -> ${to} not allowed for ${role}`);
   }
 }
 ```
@@ -548,13 +534,17 @@ describe("canSeeProject", () => {
   it("anon sees only published, non-deleted", () => {
     expect(canSeeProject(p({ status: "published" }), anon)).toBe(true);
     expect(canSeeProject(p({ status: "draft" }), anon)).toBe(false);
-    expect(canSeeProject(p({ status: "published", deletedAt: new Date() }), anon)).toBe(false);
+    expect(
+      canSeeProject(p({ status: "published", deletedAt: new Date() }), anon)
+    ).toBe(false);
   });
 
   it("owner sees own in any non-deleted status", () => {
     expect(canSeeProject(p({ status: "draft" }), owner)).toBe(true);
     expect(canSeeProject(p({ status: "archived" }), owner)).toBe(true);
-    expect(canSeeProject(p({ status: "draft", deletedAt: new Date() }), owner)).toBe(false);
+    expect(
+      canSeeProject(p({ status: "draft", deletedAt: new Date() }), owner)
+    ).toBe(false);
   });
 
   it("non-owner non-staff user sees only published non-deleted", () => {
@@ -564,7 +554,9 @@ describe("canSeeProject", () => {
 
   it("staff sees everything including soft-deleted", () => {
     expect(canSeeProject(p({ status: "draft" }), admin)).toBe(true);
-    expect(canSeeProject(p({ status: "published", deletedAt: new Date() }), admin)).toBe(true);
+    expect(
+      canSeeProject(p({ status: "published", deletedAt: new Date() }), admin)
+    ).toBe(true);
     expect(canSeeProject(p({ status: "draft" }), instructor)).toBe(true);
   });
 });
@@ -578,7 +570,9 @@ describe("canEditProject", () => {
     expect(canEditProject(p({ status: "draft" }), owner)).toBe(true);
     expect(canEditProject(p({ status: "submitted" }), owner)).toBe(true);
     expect(canEditProject(p({ status: "archived" }), owner)).toBe(false);
-    expect(canEditProject(p({ status: "draft", deletedAt: new Date() }), owner)).toBe(false);
+    expect(
+      canEditProject(p({ status: "draft", deletedAt: new Date() }), owner)
+    ).toBe(false);
   });
 
   it("non-owner non-staff cannot edit", () => {
@@ -591,7 +585,9 @@ describe("canEditProject", () => {
   });
 
   it("staff cannot edit a soft-deleted project (must restore first)", () => {
-    expect(canEditProject(p({ status: "draft", deletedAt: new Date() }), admin)).toBe(false);
+    expect(
+      canEditProject(p({ status: "draft", deletedAt: new Date() }), admin)
+    ).toBe(false);
   });
 });
 
@@ -671,7 +667,7 @@ function isOwner(project: VisibleProject, viewer: Viewer): boolean {
 
 export function canSeeProject(
   project: VisibleProject,
-  viewer: Viewer,
+  viewer: Viewer
 ): boolean {
   if (isStaff(viewer)) {
     return true;
@@ -687,7 +683,7 @@ export function canSeeProject(
 
 export function canEditProject(
   project: VisibleProject,
-  viewer: Viewer,
+  viewer: Viewer
 ): boolean {
   if (!viewer) return false;
   if (project.deletedAt) return false;
@@ -698,7 +694,7 @@ export function canEditProject(
 
 export function stripStaffOnlyFields<T extends VisibleProject>(
   project: T,
-  viewer: Viewer,
+  viewer: Viewer
 ): T {
   if (isStaff(viewer)) return project;
   return { ...project, notes: null };
@@ -706,7 +702,7 @@ export function stripStaffOnlyFields<T extends VisibleProject>(
 
 export function filterCommentsForViewer<T extends VisibleComment>(
   comments: T[],
-  viewer: Viewer,
+  viewer: Viewer
 ): T[] {
   if (isStaff(viewer)) return comments;
   return comments.filter((c) => !c.isInternal);
@@ -785,7 +781,7 @@ export async function recordStatusChangeNotifications(
   tx: Tx,
   project: Project,
   newStatus: string,
-  actorId: string,
+  actorId: string
 ): Promise<void> {
   if (project.proposerId === actorId) return;
   await tx.insert(notifications).values({
@@ -801,7 +797,7 @@ export async function recordSoftDeleteNotification(
   tx: Tx,
   project: Project,
   action: "soft-deleted" | "restored" | "hard-deleted",
-  actorId: string,
+  actorId: string
 ): Promise<void> {
   if (project.proposerId === actorId) return;
   await tx.insert(notifications).values({
@@ -816,7 +812,7 @@ export async function recordSoftDeleteNotification(
 export async function recordCommentNotifications(
   tx: Tx,
   project: Project,
-  comment: Comment,
+  comment: Comment
 ): Promise<void> {
   if (comment.isInternal) return;
 
@@ -832,8 +828,8 @@ export async function recordCommentNotifications(
       .where(
         and(
           eq(projectComments.id, comment.parentId),
-          eq(projectComments.projectId, project.id),
-        ),
+          eq(projectComments.projectId, project.id)
+        )
       );
     if (parent && parent.authorId !== comment.authorId) {
       recipients.add(parent.authorId);
@@ -904,11 +900,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { and, eq } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "#/db";
-import {
-  projects,
-  projectEditLog,
-  projectStatusHistory,
-} from "#/db/schema";
+import { projects, projectEditLog, projectStatusHistory } from "#/db/schema";
 import { requireUser } from "#/lib/auth-guards.server";
 import {
   type ActorRole,
@@ -930,7 +922,13 @@ const projectInputSchema = z.object({
   minQualifications: z.string().max(2000).nullable().optional(),
   prefQualifications: z.string().max(2000).nullable().optional(),
   url: z.string().url().max(500).nullable().optional().or(z.literal("")),
-  contactEmail: z.string().email().max(200).nullable().optional().or(z.literal("")),
+  contactEmail: z
+    .string()
+    .email()
+    .max(200)
+    .nullable()
+    .optional()
+    .or(z.literal("")),
   contactName: z.string().max(200).nullable().optional(),
   imageUrl: z.string().url().max(500).nullable().optional().or(z.literal("")),
   licenseRestrictions: z.string().max(1000).nullable().optional(),
@@ -963,7 +961,11 @@ const PROJECT_EDITABLE_FIELDS = [
   "notes",
 ] as const;
 
-function actorRole(user: { id: string }, project: { proposerId: string }, viewer: { role: string | null | undefined }): ActorRole {
+function actorRole(
+  user: { id: string },
+  project: { proposerId: string },
+  viewer: { role: string | null | undefined }
+): ActorRole {
   if (viewer.role === "admin" || viewer.role === "instructor") return "staff";
   if (project.proposerId === user.id) return "owner";
   return "owner";
@@ -979,7 +981,7 @@ export const createProject = createServerFn({ method: "POST" })
   .inputValidator((data: unknown) => projectInputSchema.parse(data))
   .handler(async ({ data }) => {
     const viewer = await requireUser();
-    const allowedNotes = isStaff(viewer) ? data.notes ?? null : null;
+    const allowedNotes = isStaff(viewer) ? (data.notes ?? null) : null;
     const [created] = await db
       .insert(projects)
       .values({
@@ -1068,12 +1070,15 @@ async function performTransition(
   id: string,
   target: Status,
   comment: string | undefined,
-  viewerOverride?: { id: string; role: string | null | undefined },
+  viewerOverride?: { id: string; role: string | null | undefined }
 ) {
   const viewer = viewerOverride ?? (await requireUser());
   const project = await loadProjectOr404(id);
-  const role: ActorRole =
-    isStaff(viewer) ? "staff" : project.proposerId === viewer.id ? "owner" : "owner";
+  const role: ActorRole = isStaff(viewer)
+    ? "staff"
+    : project.proposerId === viewer.id
+      ? "owner"
+      : "owner";
   if (!isStaff(viewer) && project.proposerId !== viewer.id) {
     throw new Error("Forbidden");
   }
@@ -1104,7 +1109,7 @@ async function performTransition(
       tx,
       { id: project.id, title: project.title, proposerId: project.proposerId },
       target,
-      viewer.id,
+      viewer.id
     );
   });
 
@@ -1113,31 +1118,45 @@ async function performTransition(
 
 export const submitProject = createServerFn({ method: "POST" })
   .inputValidator((data: unknown) => transitionInputSchema.parse(data))
-  .handler(async ({ data }) => performTransition(data.id, "submitted", data.comment));
+  .handler(async ({ data }) =>
+    performTransition(data.id, "submitted", data.comment)
+  );
 
 export const returnToDraft = createServerFn({ method: "POST" })
   .inputValidator((data: unknown) => transitionInputSchema.parse(data))
-  .handler(async ({ data }) => performTransition(data.id, "draft", data.comment));
+  .handler(async ({ data }) =>
+    performTransition(data.id, "draft", data.comment)
+  );
 
 export const requestChanges = createServerFn({ method: "POST" })
   .inputValidator((data: unknown) => transitionInputSchema.parse(data))
-  .handler(async ({ data }) => performTransition(data.id, "changes_requested", data.comment));
+  .handler(async ({ data }) =>
+    performTransition(data.id, "changes_requested", data.comment)
+  );
 
 export const approveProject = createServerFn({ method: "POST" })
   .inputValidator((data: unknown) => transitionInputSchema.parse(data))
-  .handler(async ({ data }) => performTransition(data.id, "approved", data.comment));
+  .handler(async ({ data }) =>
+    performTransition(data.id, "approved", data.comment)
+  );
 
 export const publishProject = createServerFn({ method: "POST" })
   .inputValidator((data: unknown) => transitionInputSchema.parse(data))
-  .handler(async ({ data }) => performTransition(data.id, "published", data.comment));
+  .handler(async ({ data }) =>
+    performTransition(data.id, "published", data.comment)
+  );
 
 export const archiveProject = createServerFn({ method: "POST" })
   .inputValidator((data: unknown) => transitionInputSchema.parse(data))
-  .handler(async ({ data }) => performTransition(data.id, "archived", data.comment));
+  .handler(async ({ data }) =>
+    performTransition(data.id, "archived", data.comment)
+  );
 
 export const restoreArchived = createServerFn({ method: "POST" })
   .inputValidator((data: unknown) => transitionInputSchema.parse(data))
-  .handler(async ({ data }) => performTransition(data.id, "published", data.comment));
+  .handler(async ({ data }) =>
+    performTransition(data.id, "published", data.comment)
+  );
 
 const idOnlySchema = z.object({ id: z.string().uuid() });
 
@@ -1147,7 +1166,8 @@ export const softDeleteProject = createServerFn({ method: "POST" })
     const viewer = await requireUser();
     if (!isStaff(viewer)) throw new Error("Forbidden");
     const project = await loadProjectOr404(data.id);
-    if (project.status === "draft") throw new Error("Cannot soft-delete a draft; hard-delete instead.");
+    if (project.status === "draft")
+      throw new Error("Cannot soft-delete a draft; hard-delete instead.");
     if (project.deletedAt) throw new Error("Already soft-deleted.");
     await db.transaction(async (tx) => {
       await tx
@@ -1156,9 +1176,13 @@ export const softDeleteProject = createServerFn({ method: "POST" })
         .where(eq(projects.id, data.id));
       await recordSoftDeleteNotification(
         tx,
-        { id: project.id, title: project.title, proposerId: project.proposerId },
+        {
+          id: project.id,
+          title: project.title,
+          proposerId: project.proposerId,
+        },
         "soft-deleted",
-        viewer.id,
+        viewer.id
       );
     });
     return { id: data.id };
@@ -1178,9 +1202,13 @@ export const restoreProject = createServerFn({ method: "POST" })
         .where(eq(projects.id, data.id));
       await recordSoftDeleteNotification(
         tx,
-        { id: project.id, title: project.title, proposerId: project.proposerId },
+        {
+          id: project.id,
+          title: project.title,
+          proposerId: project.proposerId,
+        },
         "restored",
-        viewer.id,
+        viewer.id
       );
     });
     return { id: data.id };
@@ -1191,7 +1219,8 @@ export const hardDeleteProject = createServerFn({ method: "POST" })
   .handler(async ({ data }) => {
     const viewer = await requireUser();
     const project = await loadProjectOr404(data.id);
-    if (project.status !== "draft") throw new Error("Hard delete only allowed on drafts.");
+    if (project.status !== "draft")
+      throw new Error("Hard delete only allowed on drafts.");
     const isOwner = project.proposerId === viewer.id;
     if (!isOwner && !isStaff(viewer)) throw new Error("Forbidden");
     await db.delete(projects).where(eq(projects.id, data.id));
@@ -1383,9 +1412,20 @@ export const getProject = createServerFn({ method: "GET" })
       .select()
       .from(projects)
       .where(eq(projects.id, data.id));
-    if (!project) return { project: null, history: [], canEdit: false, viewerIsStaff: false };
+    if (!project)
+      return {
+        project: null,
+        history: [],
+        canEdit: false,
+        viewerIsStaff: false,
+      };
     if (!canSeeProject(project, viewer)) {
-      return { project: null, history: [], canEdit: false, viewerIsStaff: false };
+      return {
+        project: null,
+        history: [],
+        canEdit: false,
+        viewerIsStaff: false,
+      };
     }
 
     const stripped = stripStaffOnlyFields(project, viewer);
@@ -1408,7 +1448,10 @@ export const getProject = createServerFn({ method: "GET" })
       project: stripped,
       history,
       canEdit:
-        !!viewer && !project.deletedAt && (viewerIsStaff || project.proposerId === viewer.id) && project.status !== "archived"
+        !!viewer &&
+        !project.deletedAt &&
+        (viewerIsStaff || project.proposerId === viewer.id) &&
+        project.status !== "archived"
           ? true
           : false,
       viewerIsStaff,
@@ -1541,8 +1584,8 @@ export const addComment = createServerFn({ method: "POST" })
         .where(
           and(
             eq(projectComments.id, data.parentId),
-            eq(projectComments.projectId, data.projectId),
-          ),
+            eq(projectComments.projectId, data.projectId)
+          )
         );
       if (!parent) throw new Error("Parent comment not found on this project");
       if (parent.parentId) throw new Error("Replies are one level deep");
@@ -1563,7 +1606,11 @@ export const addComment = createServerFn({ method: "POST" })
       created = row;
       await recordCommentNotifications(
         tx,
-        { id: project.id, title: project.title, proposerId: project.proposerId },
+        {
+          id: project.id,
+          title: project.title,
+          proposerId: project.proposerId,
+        },
         {
           id: row.id,
           projectId: row.projectId,
@@ -1571,7 +1618,7 @@ export const addComment = createServerFn({ method: "POST" })
           parentId: row.parentId,
           isInternal: row.isInternal,
           content: row.content,
-        },
+        }
       );
     });
     return { id: created!.id };
@@ -1624,27 +1671,31 @@ import { db } from "#/db";
 import { notifications } from "#/db/schema";
 import { requireUser } from "#/lib/auth-guards.server";
 
-export const listMyNotifications = createServerFn({ method: "GET" }).handler(async () => {
-  const viewer = await requireUser();
-  const rows = await db
-    .select()
-    .from(notifications)
-    .where(eq(notifications.userId, viewer.id))
-    .orderBy(desc(notifications.createdAt))
-    .limit(10);
-  return { rows };
-});
+export const listMyNotifications = createServerFn({ method: "GET" }).handler(
+  async () => {
+    const viewer = await requireUser();
+    const rows = await db
+      .select()
+      .from(notifications)
+      .where(eq(notifications.userId, viewer.id))
+      .orderBy(desc(notifications.createdAt))
+      .limit(10);
+    return { rows };
+  }
+);
 
-export const unreadCount = createServerFn({ method: "GET" }).handler(async () => {
-  const viewer = await requireUser();
-  const [{ value }] = await db
-    .select({ value: count() })
-    .from(notifications)
-    .where(
-      and(eq(notifications.userId, viewer.id), eq(notifications.read, false)),
-    );
-  return { count: value };
-});
+export const unreadCount = createServerFn({ method: "GET" }).handler(
+  async () => {
+    const viewer = await requireUser();
+    const [{ value }] = await db
+      .select({ value: count() })
+      .from(notifications)
+      .where(
+        and(eq(notifications.userId, viewer.id), eq(notifications.read, false))
+      );
+    return { count: value };
+  }
+);
 
 const idSchema = z.object({ id: z.string().uuid() });
 
@@ -1656,22 +1707,21 @@ export const markRead = createServerFn({ method: "POST" })
       .update(notifications)
       .set({ read: true })
       .where(
-        and(
-          eq(notifications.id, data.id),
-          eq(notifications.userId, viewer.id),
-        ),
+        and(eq(notifications.id, data.id), eq(notifications.userId, viewer.id))
       );
     return { id: data.id };
   });
 
-export const markAllRead = createServerFn({ method: "POST" }).handler(async () => {
-  const viewer = await requireUser();
-  await db
-    .update(notifications)
-    .set({ read: true })
-    .where(eq(notifications.userId, viewer.id));
-  return { ok: true };
-});
+export const markAllRead = createServerFn({ method: "POST" }).handler(
+  async () => {
+    const viewer = await requireUser();
+    await db
+      .update(notifications)
+      .set({ read: true })
+      .where(eq(notifications.userId, viewer.id));
+    return { ok: true };
+  }
+);
 ```
 
 - [ ] **Step 2: Type-check + lint**
@@ -1714,7 +1764,10 @@ EOF
 import { ZodError } from "zod";
 
 type FormLike = {
-  setFieldMeta: (field: string, updater: (prev: { errors?: string[] } | undefined) => { errors: string[] }) => void;
+  setFieldMeta: (
+    field: string,
+    updater: (prev: { errors?: string[] } | undefined) => { errors: string[] }
+  ) => void;
 };
 
 export function applyServerErrors(form: FormLike, err: unknown): boolean {
@@ -1775,10 +1828,11 @@ const COLORS: Record<string, string> = {
 };
 
 export function StatusBadge({ status }: { status: string }) {
-  const className =
-    COLORS[status] ?? "bg-neutral-200 text-neutral-800";
+  const className = COLORS[status] ?? "bg-neutral-200 text-neutral-800";
   return (
-    <span className={`inline-block px-2 py-0.5 text-xs font-medium ${className}`}>
+    <span
+      className={`inline-block px-2 py-0.5 text-xs font-medium ${className}`}
+    >
       {status.replace(/_/g, " ")}
     </span>
   );
@@ -1808,7 +1862,11 @@ export function StatusTimeline({ rows }: { rows: HistoryRow[] }) {
       {rows.map((r) => (
         <li key={r.id} className="border-l-2 border-neutral-300 pl-3">
           <div className="flex items-center gap-2 text-sm">
-            {r.oldStatus ? <StatusBadge status={r.oldStatus} /> : <span className="text-xs text-neutral-500">created</span>}
+            {r.oldStatus ? (
+              <StatusBadge status={r.oldStatus} />
+            ) : (
+              <span className="text-xs text-neutral-500">created</span>
+            )}
             <span>-&gt;</span>
             <StatusBadge status={r.newStatus} />
             <span className="text-xs text-neutral-500">
@@ -1816,7 +1874,9 @@ export function StatusTimeline({ rows }: { rows: HistoryRow[] }) {
             </span>
           </div>
           {r.comment && (
-            <p className="mt-1 text-sm text-neutral-700 whitespace-pre-wrap">{r.comment}</p>
+            <p className="mt-1 text-sm text-neutral-700 whitespace-pre-wrap">
+              {r.comment}
+            </p>
           )}
         </li>
       ))}
@@ -1851,7 +1911,9 @@ export function ProjectCard({ project }: { project: ProjectSummary }) {
         <StatusBadge status={project.status} />
       </div>
       {project.description && (
-        <p className="mt-2 line-clamp-3 text-sm text-neutral-600">{project.description}</p>
+        <p className="mt-2 line-clamp-3 text-sm text-neutral-600">
+          {project.description}
+        </p>
       )}
       {project.publishedAt && (
         <p className="mt-2 text-xs text-neutral-500">
@@ -1911,7 +1973,12 @@ type Props = {
   onChanged: () => void;
 };
 
-export function CommentThread({ projectId, comments, viewerIsStaff, onChanged }: Props) {
+export function CommentThread({
+  projectId,
+  comments,
+  viewerIsStaff,
+  onChanged,
+}: Props) {
   const topLevel = comments.filter((c) => !c.parentId);
   const repliesByParent = new Map<string, Comment[]>();
   for (const c of comments) {
@@ -1934,7 +2001,11 @@ export function CommentThread({ projectId, comments, viewerIsStaff, onChanged }:
           onChanged={onChanged}
         />
       ))}
-      <NewCommentForm projectId={projectId} viewerIsStaff={viewerIsStaff} onChanged={onChanged} />
+      <NewCommentForm
+        projectId={projectId}
+        viewerIsStaff={viewerIsStaff}
+        onChanged={onChanged}
+      />
     </div>
   );
 }
@@ -1966,7 +2037,9 @@ function CommentNode({
         <span>{comment.authorId.slice(0, 8)}</span>
         <span>{new Date(comment.createdAt).toLocaleString()}</span>
         {isInternal && (
-          <span className="bg-amber-200 px-1.5 py-0.5 text-amber-900">internal</span>
+          <span className="bg-amber-200 px-1.5 py-0.5 text-amber-900">
+            internal
+          </span>
         )}
       </div>
       <p className="mt-1 text-sm whitespace-pre-wrap">{comment.content}</p>
@@ -1987,7 +2060,9 @@ function CommentNode({
                 <span>{r.authorId.slice(0, 8)}</span>
                 <span>{new Date(r.createdAt).toLocaleString()}</span>
                 {r.isInternal && (
-                  <span className="bg-amber-200 px-1.5 py-0.5 text-amber-900">internal</span>
+                  <span className="bg-amber-200 px-1.5 py-0.5 text-amber-900">
+                    internal
+                  </span>
                 )}
               </div>
               <p className="mt-1 text-sm whitespace-pre-wrap">{r.content}</p>
@@ -2125,7 +2200,11 @@ function ReplyForm({
         <button type="submit" className="bg-black px-2 py-1 text-xs text-white">
           Post
         </button>
-        <button type="button" onClick={() => setOpen(false)} className="text-xs">
+        <button
+          type="button"
+          onClick={() => setOpen(false)}
+          className="text-xs"
+        >
           Cancel
         </button>
       </div>
@@ -2294,7 +2373,7 @@ Edit the `SignedIn` function in `src/components/site-header.tsx` to include the 
 ```tsx
 import { NotificationBell } from "./notification-bell";
 // ...inside SignedIn return, just before the <Link to="/profile">:
-<NotificationBell />
+<NotificationBell />;
 ```
 
 Concretely, add `import { NotificationBell } from "./notification-bell";` near the top (with the other `Link`/`authClient` imports) and insert `<NotificationBell />` between the conditional `isStaff` Admin link and the profile link.
@@ -2365,7 +2444,12 @@ type Props = {
   onSubmit: (values: ProjectFormValues) => Promise<unknown>;
 };
 
-export function ProjectForm({ initial, showNotes, submitLabel, onSubmit }: Props) {
+export function ProjectForm({
+  initial,
+  showNotes,
+  submitLabel,
+  onSubmit,
+}: Props) {
   const form = useForm({
     defaultValues: {
       title: initial?.title ?? "",
@@ -2391,7 +2475,7 @@ export function ProjectForm({ initial, showNotes, submitLabel, onSubmit }: Props
       } catch (err) {
         const handled = applyServerErrors(
           form as unknown as Parameters<typeof applyServerErrors>[0],
-          err,
+          err
         );
         if (!handled) throw err;
       }
@@ -2407,19 +2491,69 @@ export function ProjectForm({ initial, showNotes, submitLabel, onSubmit }: Props
       className="space-y-4"
     >
       <Field form={form} name="title" label="Title" />
-      <Field form={form} name="description" label="Description" textarea rows={4} />
-      <Field form={form} name="problemStatement" label="Problem statement" textarea rows={3} />
-      <Field form={form} name="objectives" label="Objectives / deliverables" textarea rows={3} />
-      <Field form={form} name="minQualifications" label="Minimum qualifications" textarea rows={2} />
-      <Field form={form} name="prefQualifications" label="Preferred qualifications" textarea rows={2} />
+      <Field
+        form={form}
+        name="description"
+        label="Description"
+        textarea
+        rows={4}
+      />
+      <Field
+        form={form}
+        name="problemStatement"
+        label="Problem statement"
+        textarea
+        rows={3}
+      />
+      <Field
+        form={form}
+        name="objectives"
+        label="Objectives / deliverables"
+        textarea
+        rows={3}
+      />
+      <Field
+        form={form}
+        name="minQualifications"
+        label="Minimum qualifications"
+        textarea
+        rows={2}
+      />
+      <Field
+        form={form}
+        name="prefQualifications"
+        label="Preferred qualifications"
+        textarea
+        rows={2}
+      />
       <Field form={form} name="url" label="URL" />
       <Field form={form} name="contactName" label="Contact name" />
       <Field form={form} name="contactEmail" label="Contact email" />
-      <Field form={form} name="imageUrl" label="Image URL (upload coming in Spec 4)" />
-      <Field form={form} name="licenseRestrictions" label="License / IP restrictions" textarea rows={2} />
-      <Field form={form} name="programId" label="Program ID (UUID; admin UI coming in Spec 3)" />
+      <Field
+        form={form}
+        name="imageUrl"
+        label="Image URL (upload coming in Spec 4)"
+      />
+      <Field
+        form={form}
+        name="licenseRestrictions"
+        label="License / IP restrictions"
+        textarea
+        rows={2}
+      />
+      <Field
+        form={form}
+        name="programId"
+        label="Program ID (UUID; admin UI coming in Spec 3)"
+      />
       {showNotes && (
-        <Field form={form} name="notes" label="Internal notes (staff only)" textarea rows={3} />
+        <Field
+          form={form}
+          name="notes"
+          label="Internal notes (staff only)"
+          textarea
+          rows={3}
+        />
       )}
 
       <form.Subscribe selector={(s) => [s.canSubmit, s.isSubmitting]}>
@@ -2647,16 +2781,52 @@ export function StaffProjectPanel({
   }
 
   const buttons: Array<{ id: ActionId; label: string; show: boolean }> = [
-    { id: "submit", label: "Submit", show: actionAllowed("submit", project.status as Status) },
-    { id: "draft", label: "Return to draft", show: actionAllowed("draft", project.status as Status) },
-    { id: "request_changes", label: "Request changes", show: actionAllowed("request_changes", project.status as Status) },
-    { id: "approve", label: "Approve", show: actionAllowed("approve", project.status as Status) },
-    { id: "publish", label: "Publish", show: actionAllowed("publish", project.status as Status) },
-    { id: "archive", label: "Archive", show: actionAllowed("archive", project.status as Status) },
-    { id: "restoreArchived", label: "Restore from archive", show: actionAllowed("restoreArchived", project.status as Status) },
-    { id: "softDelete", label: "Soft delete", show: !project.deletedAt && project.status !== "draft" },
+    {
+      id: "submit",
+      label: "Submit",
+      show: actionAllowed("submit", project.status as Status),
+    },
+    {
+      id: "draft",
+      label: "Return to draft",
+      show: actionAllowed("draft", project.status as Status),
+    },
+    {
+      id: "request_changes",
+      label: "Request changes",
+      show: actionAllowed("request_changes", project.status as Status),
+    },
+    {
+      id: "approve",
+      label: "Approve",
+      show: actionAllowed("approve", project.status as Status),
+    },
+    {
+      id: "publish",
+      label: "Publish",
+      show: actionAllowed("publish", project.status as Status),
+    },
+    {
+      id: "archive",
+      label: "Archive",
+      show: actionAllowed("archive", project.status as Status),
+    },
+    {
+      id: "restoreArchived",
+      label: "Restore from archive",
+      show: actionAllowed("restoreArchived", project.status as Status),
+    },
+    {
+      id: "softDelete",
+      label: "Soft delete",
+      show: !project.deletedAt && project.status !== "draft",
+    },
     { id: "restore", label: "Restore", show: !!project.deletedAt },
-    { id: "hardDelete", label: "Hard delete", show: project.status === "draft" && !project.deletedAt },
+    {
+      id: "hardDelete",
+      label: "Hard delete",
+      show: project.status === "draft" && !project.deletedAt,
+    },
   ];
 
   return (
@@ -2671,7 +2841,10 @@ export function StaffProjectPanel({
       )}
 
       <section className="mt-4 space-y-2">
-        <label htmlFor="staff-action-comment" className="block text-sm font-medium">
+        <label
+          htmlFor="staff-action-comment"
+          className="block text-sm font-medium"
+        >
           Optional comment (added to status history)
         </label>
         <textarea
@@ -2778,7 +2951,9 @@ export const Route = createFileRoute("/projects/")({
   validateSearch: searchSchema,
   loaderDeps: ({ search }) => ({ page: search.page }),
   loader: async ({ deps }) => {
-    return await listPublishedProjects({ data: { page: deps.page, pageSize: 20 } });
+    return await listPublishedProjects({
+      data: { page: deps.page, pageSize: 20 },
+    });
   },
   component: ProjectsList,
 });
@@ -2812,7 +2987,9 @@ function ProjectsList() {
           to="/projects"
           search={{ page: Math.min(totalPages, page + 1) }}
           disabled={page >= totalPages}
-          className={page >= totalPages ? "text-neutral-300" : "hover:underline"}
+          className={
+            page >= totalPages ? "text-neutral-300" : "hover:underline"
+          }
         >
           Next
         </Link>
@@ -2856,10 +3033,7 @@ import { CommentThread } from "#/components/comment-thread";
 import { StaffProjectPanel } from "#/components/staff-project-panel";
 import { StatusBadge } from "#/components/status-badge";
 import { StatusTimeline } from "#/components/status-timeline";
-import {
-  getProject,
-  listProjectComments,
-} from "#/server/projects-queries";
+import { getProject, listProjectComments } from "#/server/projects-queries";
 
 export const Route = createFileRoute("/projects/$projectId")({
   loader: async ({ params }) => {
@@ -2917,13 +3091,35 @@ function ProjectDetail() {
         />
       )}
 
-      <Section label="Description" body={project.description as string | null} />
-      <Section label="Problem statement" body={project.problemStatement as string | null} />
+      <Section
+        label="Description"
+        body={project.description as string | null}
+      />
+      <Section
+        label="Problem statement"
+        body={project.problemStatement as string | null}
+      />
       <Section label="Objectives" body={project.objectives as string | null} />
-      <Section label="Minimum qualifications" body={project.minQualifications as string | null} />
-      <Section label="Preferred qualifications" body={project.prefQualifications as string | null} />
-      <Section label="Contact" body={[project.contactName, project.contactEmail].filter(Boolean).join(" - ") || null} />
-      <Section label="License / IP" body={project.licenseRestrictions as string | null} />
+      <Section
+        label="Minimum qualifications"
+        body={project.minQualifications as string | null}
+      />
+      <Section
+        label="Preferred qualifications"
+        body={project.prefQualifications as string | null}
+      />
+      <Section
+        label="Contact"
+        body={
+          [project.contactName, project.contactEmail]
+            .filter(Boolean)
+            .join(" - ") || null
+        }
+      />
+      <Section
+        label="License / IP"
+        body={project.licenseRestrictions as string | null}
+      />
       <Section label="URL" body={project.url as string | null} />
 
       <section className="mt-8">
@@ -3125,7 +3321,10 @@ function EditProject() {
                 notes: viewerIsStaff ? values.notes || null : null,
               },
             });
-            navigate({ to: "/projects/$projectId", params: { projectId: project.id } });
+            navigate({
+              to: "/projects/$projectId",
+              params: { projectId: project.id },
+            });
           }}
         />
       </div>
@@ -3189,7 +3388,15 @@ export const Route = createFileRoute("/_authed/my/projects")({
   component: MyProjects,
 });
 
-const STATUSES = ["all", "draft", "submitted", "approved", "changes_requested", "published", "archived"] as const;
+const STATUSES = [
+  "all",
+  "draft",
+  "submitted",
+  "approved",
+  "changes_requested",
+  "published",
+  "archived",
+] as const;
 
 function MyProjects() {
   const { rows } = Route.useLoaderData();
@@ -3198,7 +3405,10 @@ function MyProjects() {
     <div className="mx-auto max-w-3xl p-8">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-semibold">My Projects</h1>
-        <Link to="/projects/new" className="bg-black px-3 py-1.5 text-sm text-white">
+        <Link
+          to="/projects/new"
+          className="bg-black px-3 py-1.5 text-sm text-white"
+        >
           New project
         </Link>
       </div>
@@ -3290,16 +3500,30 @@ export const Route = createFileRoute("/_authed/admin/projects/")({
       throw redirect({ to: "/" });
     }
   },
-  loaderDeps: ({ search }) => ({ status: search.status, includeSoftDeleted: search.includeSoftDeleted }),
+  loaderDeps: ({ search }) => ({
+    status: search.status,
+    includeSoftDeleted: search.includeSoftDeleted,
+  }),
   loader: async ({ deps }) => {
     return await listAdminProjects({
-      data: { status: deps.status, includeSoftDeleted: deps.includeSoftDeleted },
+      data: {
+        status: deps.status,
+        includeSoftDeleted: deps.includeSoftDeleted,
+      },
     });
   },
   component: AdminProjects,
 });
 
-const STATUSES = ["all", "draft", "submitted", "approved", "changes_requested", "published", "archived"] as const;
+const STATUSES = [
+  "all",
+  "draft",
+  "submitted",
+  "approved",
+  "changes_requested",
+  "published",
+  "archived",
+] as const;
 
 function AdminProjects() {
   const { rows } = Route.useLoaderData();
@@ -3324,7 +3548,10 @@ function AdminProjects() {
         ))}
         <Link
           to="/admin/projects"
-          search={(prev) => ({ ...prev, includeSoftDeleted: !includeSoftDeleted })}
+          search={(prev) => ({
+            ...prev,
+            includeSoftDeleted: !includeSoftDeleted,
+          })}
           className="ml-4 border px-2 py-1"
         >
           {includeSoftDeleted ? "Hide soft-deleted" : "Show soft-deleted"}
@@ -3424,8 +3651,13 @@ import {
 } from "../projects";
 
 async function createUser(email: string, role: "user" | "admin") {
-  await auth.api.signUpEmail({ body: { email, password: "Password1!", name: email } });
-  await db.update(user).set({ emailVerified: true }).where(eq(user.email, email));
+  await auth.api.signUpEmail({
+    body: { email, password: "Password1!", name: email },
+  });
+  await db
+    .update(user)
+    .set({ emailVerified: true })
+    .where(eq(user.email, email));
   if (role !== "user") {
     await db.update(user).set({ role }).where(eq(user.email, email));
   }
@@ -3463,7 +3695,7 @@ export async function performTransitionAs(
   viewer: { id: string; role: string | null | undefined },
   id: string,
   target: Status,
-  comment?: string,
+  comment?: string
 ) {
   return performTransition(id, target, comment, viewer);
 }
@@ -3509,7 +3741,10 @@ async function makeUser(email: string, role: "user" | "admin") {
   await auth.api.signUpEmail({
     body: { email, password: "Password1!", name: email },
   });
-  await db.update(user).set({ emailVerified: true }).where(eq(user.email, email));
+  await db
+    .update(user)
+    .set({ emailVerified: true })
+    .where(eq(user.email, email));
   if (role !== "user") {
     await db.update(user).set({ role }).where(eq(user.email, email));
   }
@@ -3710,7 +3945,10 @@ async function makeUser(email: string, role: "user" | "admin") {
   await auth.api.signUpEmail({
     body: { email, password: "Password1!", name: email },
   });
-  await db.update(user).set({ emailVerified: true }).where(eq(user.email, email));
+  await db
+    .update(user)
+    .set({ emailVerified: true })
+    .where(eq(user.email, email));
   if (role !== "user") {
     await db.update(user).set({ role }).where(eq(user.email, email));
   }
@@ -3725,7 +3963,11 @@ describe("comments + notifications", () => {
     const { id: pid } = await createProjectAs(owner, baseProject());
     await performTransitionAs(owner, pid, "submitted");
 
-    await addCommentAs(admin, { projectId: pid, content: "please clarify", isInternal: false });
+    await addCommentAs(admin, {
+      projectId: pid,
+      content: "please clarify",
+      isInternal: false,
+    });
 
     const ownerNotifs = await db
       .select()
@@ -3741,7 +3983,11 @@ describe("comments + notifications", () => {
     const { id: pid } = await createProjectAs(owner, baseProject());
     await performTransitionAs(owner, pid, "submitted");
 
-    await addCommentAs(admin, { projectId: pid, content: "internal", isInternal: true });
+    await addCommentAs(admin, {
+      projectId: pid,
+      content: "internal",
+      isInternal: true,
+    });
 
     const ownerNotifs = await db
       .select()
@@ -3753,7 +3999,11 @@ describe("comments + notifications", () => {
   it("self-comment writes no notification", async () => {
     const owner = await makeUser(`o3-${Date.now()}@x.com`, "user");
     const { id: pid } = await createProjectAs(owner, baseProject());
-    await addCommentAs(owner, { projectId: pid, content: "my own note", isInternal: false });
+    await addCommentAs(owner, {
+      projectId: pid,
+      content: "my own note",
+      isInternal: false,
+    });
     const ownerNotifs = await db
       .select()
       .from(notifications)
@@ -3792,7 +4042,7 @@ describe("comments + notifications", () => {
     const owner = await makeUser(`o5-${Date.now()}@x.com`, "user");
     const { id: pid } = await createProjectAs(owner, baseProject());
     await expect(
-      addCommentAs(owner, { projectId: pid, content: "x", isInternal: true }),
+      addCommentAs(owner, { projectId: pid, content: "x", isInternal: true })
     ).rejects.toThrow();
   });
 
@@ -3818,7 +4068,7 @@ describe("comments + notifications", () => {
         content: "c",
         parentId: reply,
         isInternal: false,
-      }),
+      })
     ).rejects.toThrow();
   });
 });

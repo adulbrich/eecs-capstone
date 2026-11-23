@@ -33,27 +33,34 @@ The write side honors that. `resolveHolderId` (`src/server/_internal/inventory-t
 
 ## File Structure
 
-| File | Responsibility |
-| --- | --- |
-| `src/server/_internal/inventory.ts` (modify) | The hold query, the merged `active` union, the overdue pass. |
-| `src/routes/_authed/my/items.tsx` (modify) | Render both entry kinds in the Active tab. |
-| `src/server/__tests__/inventory.integration.test.ts` (extend) | Visibility, isolation, and dedupe tests. |
+| File                                                          | Responsibility                                               |
+| ------------------------------------------------------------- | ------------------------------------------------------------ |
+| `src/server/_internal/inventory.ts` (modify)                  | The hold query, the merged `active` union, the overdue pass. |
+| `src/routes/_authed/my/items.tsx` (modify)                    | Render both entry kinds in the Active tab.                   |
+| `src/server/__tests__/inventory.integration.test.ts` (extend) | Visibility, isolation, and dedupe tests.                     |
 
 ---
 
 ### Task 1: Surface holds in `listMyItemsAs`
 
 **Files:**
+
 - Modify: `src/server/_internal/inventory.ts:959-1022`
 - Test: `src/server/__tests__/inventory.integration.test.ts` (extend)
 
 **Interfaces:**
+
 - Consumes: nothing.
 - Produces: `listMyItemsAs` returns `{ cart, active, history }` where `active` is `ActiveEntry[]`:
 
 ```ts
 export type ActiveEntry =
-  | { kind: "request"; line: InventoryRequestItem; item: InventoryItem; request: InventoryRequest }
+  | {
+      kind: "request";
+      line: InventoryRequestItem;
+      item: InventoryItem;
+      request: InventoryRequest;
+    }
   | { kind: "hold"; item: InventoryItem };
 ```
 
@@ -69,7 +76,10 @@ describe("staff-assigned holds in my items", () => {
     const stamp = Date.now();
     const admin = await makeUser(`h-admin-${stamp}@x.com`, "admin");
     const holder = await makeUser(`h-holder-${stamp}@x.com`, "user");
-    const { id: itemId } = await createInventoryItemAs(admin, baseItem("Scope"));
+    const { id: itemId } = await createInventoryItemAs(
+      admin,
+      baseItem("Scope")
+    );
 
     await transitionItemAs(admin, {
       itemId,
@@ -90,7 +100,10 @@ describe("staff-assigned holds in my items", () => {
     const admin = await makeUser(`h2-admin-${stamp}@x.com`, "admin");
     const holder = await makeUser(`h2-holder-${stamp}@x.com`, "user");
     const other = await makeUser(`h2-other-${stamp}@x.com`, "user");
-    const { id: itemId } = await createInventoryItemAs(admin, baseItem("Meter"));
+    const { id: itemId } = await createInventoryItemAs(
+      admin,
+      baseItem("Meter")
+    );
 
     await transitionItemAs(admin, {
       itemId,
@@ -119,7 +132,10 @@ describe("staff-assigned holds in my items", () => {
   it("matches an unlinked hold by verified email", async () => {
     const stamp = Date.now();
     const admin = await makeUser(`h4-admin-${stamp}@x.com`, "admin");
-    const { id: itemId } = await createInventoryItemAs(admin, baseItem("Drill"));
+    const { id: itemId } = await createInventoryItemAs(
+      admin,
+      baseItem("Drill")
+    );
 
     // Assign to an address with no account yet, so resolveHolderId finds
     // nothing and current_holder_id stays null.
@@ -201,7 +217,9 @@ function byDeadline(a: ActiveEntry, b: ActiveEntry): number {
   const left = deadlineOf(a);
   const right = deadlineOf(b);
   if (left && right) {
-    return left.getTime() - right.getTime() || a.item.name.localeCompare(b.item.name);
+    return (
+      left.getTime() - right.getTime() || a.item.name.localeCompare(b.item.name)
+    );
   }
   if (left) {
     return -1;
@@ -216,13 +234,13 @@ function byDeadline(a: ActiveEntry, b: ActiveEntry): number {
 Inside `listMyItemsAs`, before the `Promise.all`, resolve the viewer's verified address:
 
 ```ts
-  // Only a verified address may claim a hold: otherwise anyone could take
-  // someone else's item by editing their own email in the profile form.
-  const [account] = await db
-    .select({ email: user.email, verified: user.emailVerified })
-    .from(user)
-    .where(eq(user.id, viewer.id));
-  const verifiedEmail = account?.verified ? account.email : null;
+// Only a verified address may claim a hold: otherwise anyone could take
+// someone else's item by editing their own email in the profile form.
+const [account] = await db
+  .select({ email: user.email, verified: user.emailVerified })
+  .from(user)
+  .where(eq(user.id, viewer.id));
+const verifiedEmail = account?.verified ? account.email : null;
 ```
 
 Add a fourth query to the `Promise.all`:
@@ -293,9 +311,11 @@ someone else's item."
 ### Task 2: Render both entry kinds
 
 **Files:**
+
 - Modify: `src/routes/_authed/my/items.tsx:134-180`
 
 **Interfaces:**
+
 - Consumes: `ActiveEntry` from Task 1.
 - Produces: nothing.
 
@@ -311,77 +331,75 @@ Expected: FAIL in `src/routes/_authed/my/items.tsx`, `Property 'line' does not e
 Replace the body of the `tab === "active"` block's `.map` with a branch. A hold renders its dates from the item's own `current*` columns and has no Cancel button: `cancelRequestItem` needs a `requestItemId` that does not exist, and releasing a hold is a staff action.
 
 ```tsx
-          {data.active.map((entry) => {
-            if (entry.kind === "hold") {
-              return (
-                <div
-                  className="flex items-center justify-between rounded-md border border-border bg-card p-3"
-                  key={entry.item.id}
-                >
-                  <div>
-                    <p className="font-medium">{entry.item.name}</p>
-                    <InventoryStatusBadge
-                      status={entry.item.status as "available"}
-                    />
-                    {entry.item.currentPickupBy && (
-                      <p className="text-muted-foreground text-xs">
-                        Pick up by{" "}
-                        <LocalTime dateOnly value={entry.item.currentPickupBy} />
-                      </p>
-                    )}
-                    {entry.item.currentDueAt && (
-                      <p className="text-muted-foreground text-xs">
-                        Due <LocalTime dateOnly value={entry.item.currentDueAt} />
-                      </p>
-                    )}
-                    <p className="text-muted-foreground text-xs">
-                      Assigned by staff
-                    </p>
-                  </div>
-                </div>
-              );
-            }
+{
+  data.active.map((entry) => {
+    if (entry.kind === "hold") {
+      return (
+        <div
+          className="flex items-center justify-between rounded-md border border-border bg-card p-3"
+          key={entry.item.id}
+        >
+          <div>
+            <p className="font-medium">{entry.item.name}</p>
+            <InventoryStatusBadge status={entry.item.status as "available"} />
+            {entry.item.currentPickupBy && (
+              <p className="text-muted-foreground text-xs">
+                Pick up by{" "}
+                <LocalTime dateOnly value={entry.item.currentPickupBy} />
+              </p>
+            )}
+            {entry.item.currentDueAt && (
+              <p className="text-muted-foreground text-xs">
+                Due <LocalTime dateOnly value={entry.item.currentDueAt} />
+              </p>
+            )}
+            <p className="text-muted-foreground text-xs">Assigned by staff</p>
+          </div>
+        </div>
+      );
+    }
 
-            const { line, item } = entry;
-            const canCancel =
-              (line.status === "pending" || line.status === "approved") &&
-              item.status !== "checked_out";
-            return (
-              <div
-                className="flex items-center justify-between rounded-md border border-border bg-card p-3"
-                key={line.id}
-              >
-                <div>
-                  <p className="font-medium">{item.name}</p>
-                  <InventoryStatusBadge status={item.status as "available"} />
-                  {line.pickupBy && (
-                    <p className="text-muted-foreground text-xs">
-                      Pick up by <LocalTime dateOnly value={line.pickupBy} />
-                    </p>
-                  )}
-                  {line.dueAt && (
-                    <p className="text-muted-foreground text-xs">
-                      Due <LocalTime dateOnly value={line.dueAt} />
-                    </p>
-                  )}
-                </div>
-                {canCancel && (
-                  <Button
-                    onClick={async () => {
-                      await cancelRequestItem({
-                        data: { requestItemId: line.id, note: null },
-                      });
-                      await refresh();
-                    }}
-                    size="sm"
-                    variant="outline"
-                  >
-                    Cancel
-                  </Button>
-                )}
-              </div>
-            );
-          })}
+    const { line, item } = entry;
+    const canCancel =
+      (line.status === "pending" || line.status === "approved") &&
+      item.status !== "checked_out";
+    return (
+      <div
+        className="flex items-center justify-between rounded-md border border-border bg-card p-3"
+        key={line.id}
+      >
+        <div>
+          <p className="font-medium">{item.name}</p>
+          <InventoryStatusBadge status={item.status as "available"} />
+          {line.pickupBy && (
+            <p className="text-muted-foreground text-xs">
+              Pick up by <LocalTime dateOnly value={line.pickupBy} />
+            </p>
+          )}
+          {line.dueAt && (
+            <p className="text-muted-foreground text-xs">
+              Due <LocalTime dateOnly value={line.dueAt} />
+            </p>
+          )}
+        </div>
+        {canCancel && (
+          <Button
+            onClick={async () => {
+              await cancelRequestItem({
+                data: { requestItemId: line.id, note: null },
+              });
+              await refresh();
+            }}
+            size="sm"
+            variant="outline"
+          >
+            Cancel
+          </Button>
+        )}
+      </div>
+    );
+  });
+}
 ```
 
 Keys stay unique across the two kinds because a hold entry has no request line and its item cannot also appear as a request line, which Task 1's disjointness test asserts.
@@ -391,13 +409,13 @@ Keys stay unique across the two kinds because a hold entry has no request line a
 The tab is no longer only requests. Replace:
 
 ```tsx
-            <p className="text-muted-foreground">No active requests.</p>
+<p className="text-muted-foreground">No active requests.</p>;
 ```
 
 with:
 
 ```tsx
-            <EmptyState>Nothing active.</EmptyState>
+<EmptyState>Nothing active.</EmptyState>;
 ```
 
 `EmptyState` is already imported in this file and is what the Cart and History tabs use; the Active tab was the odd one out.
@@ -405,6 +423,7 @@ with:
 - [ ] **Step 4: Verify in the running app**
 
 Run: `npm run dev`
+
 - As an admin, check an item out to a second account's address on `/admin/inventory`.
 - Sign in as that account and open `/my/items`: the item is in Active, marked "Assigned by staff", with its due date and no Cancel button.
 - Cart-request a different item as the same user: both appear, sorted with the sooner deadline first, and only the request has Cancel.
@@ -426,10 +445,12 @@ cancelRequestItem needs a request line that does not exist."
 ### Task 3: Overdue notifications for holds
 
 **Files:**
+
 - Modify: `src/server/_internal/inventory.ts:1285-1348`
 - Test: `src/server/__tests__/inventory.integration.test.ts` (extend)
 
 **Interfaces:**
+
 - Consumes: nothing from Tasks 1 and 2; independent but same root cause.
 - Produces: nothing.
 
@@ -445,7 +466,10 @@ describe("overdue notifications for staff holds", () => {
     const stamp = Date.now();
     const admin = await makeUser(`o-admin-${stamp}@x.com`, "admin");
     const holder = await makeUser(`o-holder-${stamp}@x.com`, "user");
-    const { id: itemId } = await createInventoryItemAs(admin, baseItem("Lathe"));
+    const { id: itemId } = await createInventoryItemAs(
+      admin,
+      baseItem("Lathe")
+    );
 
     await transitionItemAs(admin, {
       itemId,
@@ -470,7 +494,10 @@ describe("overdue notifications for staff holds", () => {
     const stamp = Date.now();
     const admin = await makeUser(`o2-admin-${stamp}@x.com`, "admin");
     const holder = await makeUser(`o2-holder-${stamp}@x.com`, "user");
-    const { id: itemId } = await createInventoryItemAs(admin, baseItem("Press"));
+    const { id: itemId } = await createInventoryItemAs(
+      admin,
+      baseItem("Press")
+    );
 
     await transitionItemAs(admin, {
       itemId,
@@ -504,55 +531,55 @@ Expected: FAIL, zero notifications recorded.
 In `recordOverdueNotificationsAs`, after the existing request-line scan builds its `values` array, add a second query and fold its results into the same array:
 
 ```ts
-  // Staff holds have no request line, so the scan above cannot see them.
-  // Restricted to holds with a resolved account: notifications.userId is a
-  // foreign key, and an email-matched hold has no id to attribute a message
-  // to. Resolving the address here would reintroduce, on a write path, the
-  // impersonation risk the read path in listMyItemsAs guards against.
-  const holdConditions = [
-    isNull(inventoryItems.currentRequestItemId),
-    isNotNull(inventoryItems.currentHolderId),
-    inArray(inventoryItems.status, ["reserved", "checked_out"]),
-  ];
-  if (opts.ownerId) {
-    holdConditions.push(eq(inventoryItems.currentHolderId, opts.ownerId));
-  }
-  const heldRows = await db
-    .select({
-      itemId: inventoryItems.id,
-      itemName: inventoryItems.name,
-      status: inventoryItems.status,
-      pickupBy: inventoryItems.currentPickupBy,
-      dueAt: inventoryItems.currentDueAt,
-      holderId: inventoryItems.currentHolderId,
-    })
-    .from(inventoryItems)
-    .where(and(...holdConditions));
+// Staff holds have no request line, so the scan above cannot see them.
+// Restricted to holds with a resolved account: notifications.userId is a
+// foreign key, and an email-matched hold has no id to attribute a message
+// to. Resolving the address here would reintroduce, on a write path, the
+// impersonation risk the read path in listMyItemsAs guards against.
+const holdConditions = [
+  isNull(inventoryItems.currentRequestItemId),
+  isNotNull(inventoryItems.currentHolderId),
+  inArray(inventoryItems.status, ["reserved", "checked_out"]),
+];
+if (opts.ownerId) {
+  holdConditions.push(eq(inventoryItems.currentHolderId, opts.ownerId));
+}
+const heldRows = await db
+  .select({
+    itemId: inventoryItems.id,
+    itemName: inventoryItems.name,
+    status: inventoryItems.status,
+    pickupBy: inventoryItems.currentPickupBy,
+    dueAt: inventoryItems.currentDueAt,
+    holderId: inventoryItems.currentHolderId,
+  })
+  .from(inventoryItems)
+  .where(and(...holdConditions));
 
-  for (const r of heldRows) {
-    if (!r.holderId) {
-      continue;
-    }
-    const { pickupOverdue, checkoutOverdue } = deriveDeadlineFlags(r);
-    if (pickupOverdue) {
-      values.push({
-        userId: r.holderId,
-        type: "inventory_pickup_overdue",
-        title: `Pickup window passed: ${r.itemName}`,
-        message: "Your reserved item is past its pickup window.",
-        link: `/inventory/${r.itemId}`,
-      });
-    }
-    if (checkoutOverdue) {
-      values.push({
-        userId: r.holderId,
-        type: "inventory_checkout_overdue",
-        title: `Overdue: ${r.itemName}`,
-        message: "Your checked-out item is past its due date.",
-        link: `/inventory/${r.itemId}`,
-      });
-    }
+for (const r of heldRows) {
+  if (!r.holderId) {
+    continue;
   }
+  const { pickupOverdue, checkoutOverdue } = deriveDeadlineFlags(r);
+  if (pickupOverdue) {
+    values.push({
+      userId: r.holderId,
+      type: "inventory_pickup_overdue",
+      title: `Pickup window passed: ${r.itemName}`,
+      message: "Your reserved item is past its pickup window.",
+      link: `/inventory/${r.itemId}`,
+    });
+  }
+  if (checkoutOverdue) {
+    values.push({
+      userId: r.holderId,
+      type: "inventory_checkout_overdue",
+      title: `Overdue: ${r.itemName}`,
+      message: "Your checked-out item is past its due date.",
+      link: `/inventory/${r.itemId}`,
+    });
+  }
+}
 ```
 
 `deriveDeadlineFlags` takes `{ status, pickupBy, dueAt }` structurally, so it works unchanged here.

@@ -26,12 +26,12 @@ not the ones the extrapolation predicted.
 Not the configuration #524 was written against. #522 and #529 landed first, so the numbers in
 the issue's "what is already known" table describe a fleet that no longer exists.
 
-| | At the time of this run |
-| --- | --- |
-| Tasks | 2, autoscaling 2 to 4 on 50% average CPU, 60 s out, 600 s in |
-| Task size | 256 CPU units (0.25 vCPU), 1024 MB, Fargate ARM64 |
-| Database | `db.t4g.small`, resized from `db.t4g.micro` 35 minutes before the run |
-| Pool | 20 connections per task, 5 s acquire timeout (ADR-0034) |
+|           | At the time of this run                                               |
+| --------- | --------------------------------------------------------------------- |
+| Tasks     | 2, autoscaling 2 to 4 on 50% average CPU, 60 s out, 600 s in          |
+| Task size | 256 CPU units (0.25 vCPU), 1024 MB, Fargate ARM64                     |
+| Database  | `db.t4g.small`, resized from `db.t4g.micro` 35 minutes before the run |
+| Pool      | 20 connections per task, 5 s acquire timeout (ADR-0034)               |
 
 ## Results
 
@@ -43,17 +43,17 @@ hottest single task and runs several points higher. Comparing a peak against the
 would be comparing the wrong statistic. No phase dropped an iteration, so each ran at the rate
 it claims.
 
-| Phase | Rate | p50 | p95 | p99 | slowest | Errors | CPU avg | CPU peak | Mem avg | Mem peak | DB conns | Tasks |
-| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| 0. Baseline | 1/s | 70 ms | 179 ms | 266 ms | 370 ms | 0% | 6.5% | 8.8% | 9.8% | 11.1% | 6 | 2 |
-| 1a | 5/s | 62 ms | 154 ms | 243 ms | 605 ms | 0% | 21.9% | 24.9% | 15.2% | 16.1% | 6 | 2 |
-| 1b | 10/s | 61 ms | 173 ms | 389 ms | 771 ms | 0% | 39.8% | 47.6% | 17.8% | 18.0% | 10 | 2 |
-| 1c (Mon) | 25/s | 104 ms | 633 ms | 1.40 s | 3.87 s | 0.11% | 85.9% | 90.3% | 23.0% | 23.2% | 21 | 2 |
-| 2. Burst (Mon) | 42/s | 892 ms | 2.97 s | 4.25 s | 4.37 s | 0% | 12.9% | 55.6% | 14.9% | 17.4% | 40 | 2 |
-| 2. Burst, held (Mon) | 42/s | 4.12 s | 6.19 s | 6.68 s | 8.11 s | 0.07% | 99.7% | 99.9% | 22.2% | 22.5% | 40 | 2 |
-| 1d | 50/s | not run, stopped on 5XX | | | | | | | | | | |
-| 1e | 75/s | not run, stopped on 5XX | | | | | | | | | | |
-| 2. Tail | 8/s | not run, stopped on 5XX | | | | | | | | | | |
+| Phase                | Rate | p50                     | p95    | p99    | slowest | Errors | CPU avg | CPU peak | Mem avg | Mem peak | DB conns | Tasks |
+| -------------------- | ---- | ----------------------- | ------ | ------ | ------- | ------ | ------- | -------- | ------- | -------- | -------- | ----- |
+| 0. Baseline          | 1/s  | 70 ms                   | 179 ms | 266 ms | 370 ms  | 0%     | 6.5%    | 8.8%     | 9.8%    | 11.1%    | 6        | 2     |
+| 1a                   | 5/s  | 62 ms                   | 154 ms | 243 ms | 605 ms  | 0%     | 21.9%   | 24.9%    | 15.2%   | 16.1%    | 6        | 2     |
+| 1b                   | 10/s | 61 ms                   | 173 ms | 389 ms | 771 ms  | 0%     | 39.8%   | 47.6%    | 17.8%   | 18.0%    | 10       | 2     |
+| 1c (Mon)             | 25/s | 104 ms                  | 633 ms | 1.40 s | 3.87 s  | 0.11%  | 85.9%   | 90.3%    | 23.0%   | 23.2%    | 21       | 2     |
+| 2. Burst (Mon)       | 42/s | 892 ms                  | 2.97 s | 4.25 s | 4.37 s  | 0%     | 12.9%   | 55.6%    | 14.9%   | 17.4%    | 40       | 2     |
+| 2. Burst, held (Mon) | 42/s | 4.12 s                  | 6.19 s | 6.68 s | 8.11 s  | 0.07%  | 99.7%   | 99.9%    | 22.2%   | 22.5%    | 40       | 2     |
+| 1d                   | 50/s | not run, stopped on 5XX |        |        |         |        |         |          |         |          |          |       |
+| 1e                   | 75/s | not run, stopped on 5XX |        |        |         |        |         |          |         |          |          |       |
+| 2. Tail              | 8/s  | not run, stopped on 5XX |        |        |         |        |         |          |         |          |          |       |
 
 The two burst rows are the same phase twice. The first ran under #524's `p99 < 3s` abort and
 stopped after 8 seconds, which reports that the phase degraded and nothing about how. The second
@@ -82,15 +82,15 @@ the evidence that `runningCount` held at 2 through every Monday phase and the la
 activity on the service was from Sunday 19:24. Both readings were taken before the scaler
 acted. It did fire. `describe-alarm-history` and `describe-scaling-activities` say so:
 
-| Minute (PDT) | What the console shows |
-| --- | --- |
-| 06:36, 06:37 | first two breaching minutes, 56.9% and 99.7% |
-| 06:38 | 13.6%, the gap between two phases, which breaks the run of three |
+| Minute (PDT)        | What the console shows                                             |
+| ------------------- | ------------------------------------------------------------------ |
+| 06:36, 06:37        | first two breaching minutes, 56.9% and 99.7%                       |
+| 06:38               | 13.6%, the gap between two phases, which breaks the run of three   |
 | 06:39, 06:40, 06:41 | 72.8%, 85.9%, 82.0%, the first three consecutive breaching minutes |
-| 06:42 | load stops |
-| 06:44:43 | `AlarmHigh` to ALARM, policy sets the desired count to 4 |
-| 06:45:13, 06:45:22 | the two new tasks log themselves listening |
-| 06:59:08, 07:10:08 | `AlarmLow` winds them back to 3, then to 2 |
+| 06:42               | load stops                                                         |
+| 06:44:43            | `AlarmHigh` to ALARM, policy sets the desired count to 4           |
+| 06:45:13, 06:45:22  | the two new tasks log themselves listening                         |
+| 06:59:08, 07:10:08  | `AlarmLow` winds them back to 3, then to 2                         |
 
 The third breaching datapoint is stamped 06:41 and covers the minute ending 06:42, so the
 operational fact, measured rather than predicted, is: **the alarm fired 2 minutes 43 seconds

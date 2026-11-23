@@ -48,41 +48,41 @@ The navigation is reorganized at the same time: top nav becomes `Projects | Inve
 
 Same client-safe wrapper + server-only `_internal/` impl pattern as prior specs.
 
-| Path | Responsibility |
-| --- | --- |
-| `src/server/inventory.ts` | `createServerFn` wrappers for catalog + browse + cart + requests + holds. Zod schemas for input validation. Each handler does one dynamic import and forwards to the impl with `(viewer, input)`. |
-| `src/server/_internal/inventory.ts` | Catalog reads/writes, browse query (with privacy stripping based on viewer role), cart ops, request submission, cancel. Exposes `*As(viewer, ...)` for tests and `*ForCurrentUser(...)` for the wrappers. |
+| Path                                            | Responsibility                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
+| ----------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `src/server/inventory.ts`                       | `createServerFn` wrappers for catalog + browse + cart + requests + holds. Zod schemas for input validation. Each handler does one dynamic import and forwards to the impl with `(viewer, input)`.                                                                                                                                                                                                                                                                                                                                                |
+| `src/server/_internal/inventory.ts`             | Catalog reads/writes, browse query (with privacy stripping based on viewer role), cart ops, request submission, cancel. Exposes `*As(viewer, ...)` for tests and `*ForCurrentUser(...)` for the wrappers.                                                                                                                                                                                                                                                                                                                                        |
 | `src/server/_internal/inventory-transitions.ts` | The status-transition primitive. Single function `transitionItem(viewer, itemId, nextStatus, { requestItemId?, holderId?, holderLabel?, comment?, pickupBy?, dueAt? })` that runs in a `db.transaction`, updates `inventory_items`, writes one `inventory_item_status_history` row, syncs `current_holder_id` / `current_holder_label` / `current_request_item_id`, and (when applicable) updates the linked `inventory_request_items` row. **Every** mutation that touches item status goes through this function. No ad-hoc updates elsewhere. |
 
 The recommended-lifecycle UI calls `transitionItem` with the obvious next state; the "Change status to..." override calls the same function with any state. The function itself enforces the role gate and the data invariants (e.g., `due_at` only allowed on a `checked_out` transition), not the suggested order.
 
 ### 4.2 Client modules
 
-| Path | Responsibility |
-| --- | --- |
-| `src/routes/inventory/index.tsx` | Public-but-prefer-signed-in browse listing. Card grid (mobile-first) + row/card `ViewToggle` (desktop). Reuses `category-chip`, the filter-bar pattern from `projects-filter-bar`, and the `?view=card\|row` URL param shape. Status filter chips. Search input (300ms debounce, tsvector match). `Add to cart` button visible only on `available` items and only when signed in. |
-| `src/routes/inventory/$itemId.tsx` | Item detail. Image, name, description, category, location, status badge. `Add to cart` action on `available`. No holder identity. "Past pickup window" / "Overdue" badge if applicable. |
-| `src/routes/_authed/my/items.tsx` | "My Items" page. Three tabs: Cart, Active, History. Cart tab lists addable items with a `Submit request` action that opens a confirm dialog with an optional note textarea and then calls `submitCart`. Active tab lists current request lines with status, deadlines, and a cancel button (when allowed). History tab lists terminal lines. |
-| `src/routes/_authed/admin/inventory/index.tsx` | Admin catalog list. Reuses `AdminTable` with `data-label` mobile cards. Columns: thumb + name, status, holder, location, category, edit-link. "+ New item" button. |
-| `src/routes/_authed/admin/inventory/new.tsx` | New-item form. |
-| `src/routes/_authed/admin/inventory/$itemId.tsx` | Admin item detail + lifecycle controls. Status stepper with recommended next-action button + status override dropdown. Checkout dialog (user picker or text label, due-date picker). Holder block. Status history list. Hard-delete button (with confirmation modal) visible only when status ∈ `available | retired`. |
-| `src/routes/_authed/admin/inventory/$itemId.edit.tsx` | Edit-item form. |
-| `src/routes/_authed/admin/inventory/requests.tsx` | Request queue. Tabs: Pending, All. Grouped by batch with batch header (user + submitted-at + optional note) and per-line rows. Per-line approve / reject (reason required on reject) + bulk-within-batch checkboxes. |
+| Path                                                  | Responsibility                                                                                                                                                                                                                                                                                                                                                                    |
+| ----------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `src/routes/inventory/index.tsx`                      | Public-but-prefer-signed-in browse listing. Card grid (mobile-first) + row/card `ViewToggle` (desktop). Reuses `category-chip`, the filter-bar pattern from `projects-filter-bar`, and the `?view=card\|row` URL param shape. Status filter chips. Search input (300ms debounce, tsvector match). `Add to cart` button visible only on `available` items and only when signed in. |
+| `src/routes/inventory/$itemId.tsx`                    | Item detail. Image, name, description, category, location, status badge. `Add to cart` action on `available`. No holder identity. "Past pickup window" / "Overdue" badge if applicable.                                                                                                                                                                                           |
+| `src/routes/_authed/my/items.tsx`                     | "My Items" page. Three tabs: Cart, Active, History. Cart tab lists addable items with a `Submit request` action that opens a confirm dialog with an optional note textarea and then calls `submitCart`. Active tab lists current request lines with status, deadlines, and a cancel button (when allowed). History tab lists terminal lines.                                      |
+| `src/routes/_authed/admin/inventory/index.tsx`        | Admin catalog list. Reuses `AdminTable` with `data-label` mobile cards. Columns: thumb + name, status, holder, location, category, edit-link. "+ New item" button.                                                                                                                                                                                                                |
+| `src/routes/_authed/admin/inventory/new.tsx`          | New-item form.                                                                                                                                                                                                                                                                                                                                                                    |
+| `src/routes/_authed/admin/inventory/$itemId.tsx`      | Admin item detail + lifecycle controls. Status stepper with recommended next-action button + status override dropdown. Checkout dialog (user picker or text label, due-date picker). Holder block. Status history list. Hard-delete button (with confirmation modal) visible only when status ∈ `available                                                                        | retired`. |
+| `src/routes/_authed/admin/inventory/$itemId.edit.tsx` | Edit-item form.                                                                                                                                                                                                                                                                                                                                                                   |
+| `src/routes/_authed/admin/inventory/requests.tsx`     | Request queue. Tabs: Pending, All. Grouped by batch with batch header (user + submitted-at + optional note) and per-line rows. Per-line approve / reject (reason required on reject) + bulk-within-batch checkboxes.                                                                                                                                                              |
 
 ### 4.3 New components
 
-| Path | Responsibility |
-| --- | --- |
-| `src/components/inventory-card.tsx` | Browse-grid card. Image, name, status badge, category chip, location. Add-to-cart button when applicable. Past-pickup / overdue badge when applicable. |
-| `src/components/inventory-row.tsx` | Row-view list item, sibling to `project-row`. |
-| `src/components/inventory-status-badge.tsx` | Six-state colored badge using existing status-color tokens. |
-| `src/components/inventory-filter-bar.tsx` | Mirrors `projects-filter-bar` shape: search input, status chips, category select, view toggle. |
-| `src/components/inventory-form.tsx` | Shared form for new + edit, mirrors `project-form`. Includes `InventoryImageUploader` wrapping the existing `ImageUploader`. |
-| `src/components/inventory-image-uploader.tsx` | Thin wrapper around `image-uploader.tsx`, like `project-image-uploader.tsx`. |
+| Path                                           | Responsibility                                                                                                                                                       |
+| ---------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `src/components/inventory-card.tsx`            | Browse-grid card. Image, name, status badge, category chip, location. Add-to-cart button when applicable. Past-pickup / overdue badge when applicable.               |
+| `src/components/inventory-row.tsx`             | Row-view list item, sibling to `project-row`.                                                                                                                        |
+| `src/components/inventory-status-badge.tsx`    | Six-state colored badge using existing status-color tokens.                                                                                                          |
+| `src/components/inventory-filter-bar.tsx`      | Mirrors `projects-filter-bar` shape: search input, status chips, category select, view toggle.                                                                       |
+| `src/components/inventory-form.tsx`            | Shared form for new + edit, mirrors `project-form`. Includes `InventoryImageUploader` wrapping the existing `ImageUploader`.                                         |
+| `src/components/inventory-image-uploader.tsx`  | Thin wrapper around `image-uploader.tsx`, like `project-image-uploader.tsx`.                                                                                         |
 | `src/components/inventory-lifecycle-panel.tsx` | Admin item-detail control. Recommended action button, status override `<Select>`, checkout dialog (user picker or text label, due-date picker), status history list. |
-| `src/components/cart-button.tsx` | Header element. Cart icon + count badge. Mounted in `site-header.tsx` next to `NotificationBell` for signed-in users. |
-| `src/components/user-menu.tsx` | New dropdown that replaces the inline `My Projects` / `Bookmarks` links. Uses `shadcn` `DropdownMenu` (added with `npm dlx shadcn@latest add dropdown-menu`). |
-| `src/components/admin-request-queue-row.tsx` | One line in the request queue with approve / reject actions and a reason textarea. |
+| `src/components/cart-button.tsx`               | Header element. Cart icon + count badge. Mounted in `site-header.tsx` next to `NotificationBell` for signed-in users.                                                |
+| `src/components/user-menu.tsx`                 | New dropdown that replaces the inline `My Projects` / `Bookmarks` links. Uses `shadcn` `DropdownMenu` (added with `npm dlx shadcn@latest add dropdown-menu`).        |
+| `src/components/admin-request-queue-row.tsx`   | One line in the request queue with approve / reject actions and a reason textarea.                                                                                   |
 
 ### 4.4 Existing files changed
 
@@ -114,13 +114,16 @@ export const inventoryItemStatusEnum = pgEnum("inventory_item_status", [
 ]);
 
 // REPLACES the existing inventory_request_status enum
-export const inventoryRequestItemStatusEnum = pgEnum("inventory_request_item_status", [
-  "pending",
-  "approved",   // line is active; the item carries the in-flight state
-  "rejected",   // terminal: admin denied while pending
-  "cancelled",  // terminal: closed before fulfillment (student cancelled OR admin released)
-  "returned",   // terminal: closed after fulfillment (item came back from checkout)
-]);
+export const inventoryRequestItemStatusEnum = pgEnum(
+  "inventory_request_item_status",
+  [
+    "pending",
+    "approved", // line is active; the item carries the in-flight state
+    "rejected", // terminal: admin denied while pending
+    "cancelled", // terminal: closed before fulfillment (student cancelled OR admin released)
+    "returned", // terminal: closed after fulfillment (item came back from checkout)
+  ]
+);
 ```
 
 ### 5.2 `inventory_items` (extended)
@@ -135,9 +138,9 @@ export const inventoryItems = pgTable(
     name: text("name").notNull(),
     description: text("description"),
     category: text("category"), // free text in v1; picker shows distinct values
-    serial: text("serial"),     // optional; soft-unique via app-level guard, not SQL UNIQUE
+    serial: text("serial"), // optional; soft-unique via app-level guard, not SQL UNIQUE
     location: text("location"),
-    notes: text("notes"),       // admin-only; stripped from student-facing reads
+    notes: text("notes"), // admin-only; stripped from student-facing reads
     imageUrl: text("image_url"),
 
     status: inventoryItemStatusEnum("status").notNull().default("available"),
@@ -150,18 +153,22 @@ export const inventoryItems = pgTable(
     searchVector: tsvector("search_vector")
       .notNull()
       .generatedAlwaysAs(
-        sql`setweight(to_tsvector('english', coalesce(name, '')), 'A') || setweight(to_tsvector('english', coalesce(description, '')), 'B') || setweight(to_tsvector('english', coalesce(category, '')), 'C')`,
+        sql`setweight(to_tsvector('english', coalesce(name, '')), 'A') || setweight(to_tsvector('english', coalesce(description, '')), 'B') || setweight(to_tsvector('english', coalesce(category, '')), 'C')`
       ),
 
-    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
-    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
   },
   (t) => [
     index("inventory_items_status_idx").on(t.status),
     index("inventory_items_category_idx").on(t.category),
     index("inventory_items_current_holder_idx").on(t.currentHolderId),
     // GIN index on searchVector added in migration SQL (not expressible in Drizzle DSL)
-  ],
+  ]
 );
 ```
 
@@ -182,9 +189,13 @@ export const inventoryRequests = pgTable(
       .references(() => user.id, { onDelete: "restrict" })
       .notNull(),
     note: text("note"), // optional, student-supplied free-text on submit
-    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
   },
-  (t) => [index("inventory_requests_user_created_idx").on(t.userId, t.createdAt)],
+  (t) => [
+    index("inventory_requests_user_created_idx").on(t.userId, t.createdAt),
+  ]
 );
 ```
 
@@ -202,26 +213,36 @@ export const inventoryRequestItems = pgTable(
       .references(() => inventoryItems.id, { onDelete: "restrict" })
       .notNull(),
 
-    status: inventoryRequestItemStatusEnum("status").notNull().default("pending"),
-    reviewedBy: text("reviewed_by").references(() => user.id, { onDelete: "set null" }),
+    status: inventoryRequestItemStatusEnum("status")
+      .notNull()
+      .default("pending"),
+    reviewedBy: text("reviewed_by").references(() => user.id, {
+      onDelete: "set null",
+    }),
     reviewedAt: timestamp("reviewed_at", { withTimezone: true }),
     reviewComment: text("review_comment"), // required when status === 'rejected'
 
-    pickupBy: timestamp("pickup_by", { withTimezone: true }),  // set on approve
-    dueAt: timestamp("due_at", { withTimezone: true }),        // set on checkout
+    pickupBy: timestamp("pickup_by", { withTimezone: true }), // set on approve
+    dueAt: timestamp("due_at", { withTimezone: true }), // set on checkout
 
-    closedAt: timestamp("closed_at", { withTimezone: true }),  // set on terminal transition
-    closedBy: text("closed_by").references(() => user.id, { onDelete: "set null" }),
+    closedAt: timestamp("closed_at", { withTimezone: true }), // set on terminal transition
+    closedBy: text("closed_by").references(() => user.id, {
+      onDelete: "set null",
+    }),
     closedReason: text("closed_reason"), // e.g., "Past pickup window", student-supplied cancel note
 
-    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
-    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
   },
   (t) => [
     index("inventory_request_items_request_idx").on(t.requestId),
     index("inventory_request_items_item_idx").on(t.itemId),
     index("inventory_request_items_status_idx").on(t.status),
-  ],
+  ]
 );
 ```
 
@@ -239,9 +260,11 @@ export const inventoryCartItems = pgTable(
     itemId: uuid("item_id")
       .references(() => inventoryItems.id, { onDelete: "cascade" })
       .notNull(),
-    addedAt: timestamp("added_at", { withTimezone: true }).notNull().defaultNow(),
+    addedAt: timestamp("added_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
   },
-  (t) => [primaryKey({ columns: [t.userId, t.itemId] })],
+  (t) => [primaryKey({ columns: [t.userId, t.itemId] })]
 );
 ```
 
@@ -257,21 +280,30 @@ export const inventoryItemStatusHistory = pgTable(
       .notNull(),
     oldStatus: inventoryItemStatusEnum("old_status"),
     newStatus: inventoryItemStatusEnum("new_status").notNull(),
-    changedBy: text("changed_by").references(() => user.id, { onDelete: "set null" }),
+    changedBy: text("changed_by").references(() => user.id, {
+      onDelete: "set null",
+    }),
     comment: text("comment"),
 
     // Snapshot of the in-flight context at the moment of the transition
-    requestItemId: uuid("request_item_id").references(() => inventoryRequestItems.id, {
+    requestItemId: uuid("request_item_id").references(
+      () => inventoryRequestItems.id,
+      {
+        onDelete: "set null",
+      }
+    ),
+    holderId: text("holder_id").references(() => user.id, {
       onDelete: "set null",
     }),
-    holderId: text("holder_id").references(() => user.id, { onDelete: "set null" }),
     holderLabel: text("holder_label"),
 
-    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
   },
   (t) => [
     index("inventory_item_status_history_item_idx").on(t.itemId, t.createdAt),
-  ],
+  ]
 );
 ```
 
@@ -291,9 +323,11 @@ export const inventoryItemEditLog = pgTable(
     changedFields: text("changed_fields").array().notNull(),
     oldValues: jsonb("old_values").notNull(),
     newValues: jsonb("new_values").notNull(),
-    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
   },
-  (t) => [index("inventory_item_edit_log_item_idx").on(t.itemId, t.createdAt)],
+  (t) => [index("inventory_item_edit_log_item_idx").on(t.itemId, t.createdAt)]
 );
 ```
 
@@ -393,14 +427,14 @@ Three tabs (URL-driven `?tab=cart|active|history`, default `cart` if non-empty e
 
 ### 7.6 Status badge palette
 
-| Status | Token / style |
-| --- | --- |
-| `available` | `var(--status-success)` background tint, dark text |
-| `requested` | `var(--brand-primary-tint)` background, brand-foreground text |
-| `reserved` | `var(--status-warning)` background tint |
-| `checked_out` | neutral filled (`bg-secondary`, `text-foreground`) |
-| `maintenance` | muted (`bg-muted`, `text-muted-foreground`) |
-| `retired` | hidden from students; shown to staff as `bg-destructive/10` `text-destructive` |
+| Status        | Token / style                                                                  |
+| ------------- | ------------------------------------------------------------------------------ |
+| `available`   | `var(--status-success)` background tint, dark text                             |
+| `requested`   | `var(--brand-primary-tint)` background, brand-foreground text                  |
+| `reserved`    | `var(--status-warning)` background tint                                        |
+| `checked_out` | neutral filled (`bg-secondary`, `text-foreground`)                             |
+| `maintenance` | muted (`bg-muted`, `text-muted-foreground`)                                    |
+| `retired`     | hidden from students; shown to staff as `bg-destructive/10` `text-destructive` |
 
 `InventoryStatusBadge` is the single component that picks the right variant from status. Uses `<Badge>` from `#/components/ui/badge`.
 
@@ -445,15 +479,15 @@ The existing `Sheet` reorganizes into two sections separated by a divider:
 
 All notifications written via the existing `notifications` table. New `type` values:
 
-| Event | Recipient | Type | Title |
-| --- | --- | --- | --- |
-| Line approved (`pending → approved`, item → `reserved`) | requester | `inventory_request_approved` | "Reserved: $itemName. Pick up by $pickupBy." |
-| Line rejected | requester | `inventory_request_rejected` | "Request denied: $itemName" (body: reason) |
-| Item checked out to requester | requester | `inventory_item_checked_out` | "Checked out: $itemName. Due $dueAt." |
-| Item returned (closes the line as `returned`) | requester | `inventory_item_returned` | "Returned: $itemName" |
-| Line closed by staff before fulfillment | requester | `inventory_request_closed` | "Request closed: $itemName" (body: reason) |
-| Past pickup window detected (created lazily once per item per requester after `pickup_by`) | requester | `inventory_pickup_overdue` | "Pickup window passed: $itemName" |
-| Past due date (lazily, same rule) | requester | `inventory_checkout_overdue` | "Overdue: $itemName" |
+| Event                                                                                      | Recipient | Type                         | Title                                        |
+| ------------------------------------------------------------------------------------------ | --------- | ---------------------------- | -------------------------------------------- |
+| Line approved (`pending → approved`, item → `reserved`)                                    | requester | `inventory_request_approved` | "Reserved: $itemName. Pick up by $pickupBy." |
+| Line rejected                                                                              | requester | `inventory_request_rejected` | "Request denied: $itemName" (body: reason)   |
+| Item checked out to requester                                                              | requester | `inventory_item_checked_out` | "Checked out: $itemName. Due $dueAt."        |
+| Item returned (closes the line as `returned`)                                              | requester | `inventory_item_returned`    | "Returned: $itemName"                        |
+| Line closed by staff before fulfillment                                                    | requester | `inventory_request_closed`   | "Request closed: $itemName" (body: reason)   |
+| Past pickup window detected (created lazily once per item per requester after `pickup_by`) | requester | `inventory_pickup_overdue`   | "Pickup window passed: $itemName"            |
+| Past due date (lazily, same rule)                                                          | requester | `inventory_checkout_overdue` | "Overdue: $itemName"                         |
 
 Each notification's `link` deep-links into `/my/items?tab=active` or the item detail. Re-firing is suppressed by a unique lookup on `(userId, type, related_item_id)` so we do not double-send.
 

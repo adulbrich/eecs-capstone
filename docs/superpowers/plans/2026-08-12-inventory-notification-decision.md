@@ -21,14 +21,14 @@
 
 ## File Structure
 
-| File | Responsibility |
-| --- | --- |
-| `src/lib/inventory-notifications.ts` | new; `NotificationRow`, `notificationFor`, `overdueNotifications` |
-| `src/lib/__tests__/inventory-notifications.test.ts` | new; one case per branch, plus the dedupe |
-| `src/server/_internal/inventory-transitions.ts` | `maybeNotify` deleted, its caller does decision-plus-insert |
-| `src/server/_internal/inventory.ts` | overdue mapping delegated |
-| `scripts/seed-dev.ts` | lifecycle driven through the real helpers |
-| `docs/QUIRKS.md` | records the module and the seed's new contract |
+| File                                                | Responsibility                                                    |
+| --------------------------------------------------- | ----------------------------------------------------------------- |
+| `src/lib/inventory-notifications.ts`                | new; `NotificationRow`, `notificationFor`, `overdueNotifications` |
+| `src/lib/__tests__/inventory-notifications.test.ts` | new; one case per branch, plus the dedupe                         |
+| `src/server/_internal/inventory-transitions.ts`     | `maybeNotify` deleted, its caller does decision-plus-insert       |
+| `src/server/_internal/inventory.ts`                 | overdue mapping delegated                                         |
+| `scripts/seed-dev.ts`                               | lifecycle driven through the real helpers                         |
+| `docs/QUIRKS.md`                                    | records the module and the seed's new contract                    |
 
 ---
 
@@ -137,7 +137,11 @@ describe("notificationFor", () => {
   });
 
   it("thanks a returner but closes a request otherwise", () => {
-    const held = { ...item, currentHolderId: "u-holder", status: "checked_out" as const };
+    const held = {
+      ...item,
+      currentHolderId: "u-holder",
+      status: "checked_out" as const,
+    };
     const returned = notificationFor(
       held,
       { nextStatus: "available" },
@@ -178,8 +182,22 @@ describe("overdueNotifications", () => {
     // same person the row comes back twice.
     const rows = overdueNotifications(
       [
-        { dueAt: past, itemId: "i-1", itemName: "Pi", pickupBy: null, status: "checked_out", userId: "u-1" },
-        { dueAt: past, itemId: "i-1", itemName: "Pi", pickupBy: null, status: "checked_out", userId: "u-1" },
+        {
+          dueAt: past,
+          itemId: "i-1",
+          itemName: "Pi",
+          pickupBy: null,
+          status: "checked_out",
+          userId: "u-1",
+        },
+        {
+          dueAt: past,
+          itemId: "i-1",
+          itemName: "Pi",
+          pickupBy: null,
+          status: "checked_out",
+          userId: "u-1",
+        },
       ],
       NOW
     );
@@ -189,8 +207,22 @@ describe("overdueNotifications", () => {
   it("keeps two different people for the same item", () => {
     const rows = overdueNotifications(
       [
-        { dueAt: past, itemId: "i-1", itemName: "Pi", pickupBy: null, status: "checked_out", userId: "u-1" },
-        { dueAt: past, itemId: "i-1", itemName: "Pi", pickupBy: null, status: "checked_out", userId: "u-2" },
+        {
+          dueAt: past,
+          itemId: "i-1",
+          itemName: "Pi",
+          pickupBy: null,
+          status: "checked_out",
+          userId: "u-1",
+        },
+        {
+          dueAt: past,
+          itemId: "i-1",
+          itemName: "Pi",
+          pickupBy: null,
+          status: "checked_out",
+          userId: "u-2",
+        },
       ],
       NOW
     );
@@ -200,7 +232,16 @@ describe("overdueNotifications", () => {
   it("emits nothing for a deadline that has not passed", () => {
     expect(
       overdueNotifications(
-        [{ dueAt: new Date("2026-12-01"), itemId: "i-1", itemName: "Pi", pickupBy: null, status: "checked_out", userId: "u-1" }],
+        [
+          {
+            dueAt: new Date("2026-12-01"),
+            itemId: "i-1",
+            itemName: "Pi",
+            pickupBy: null,
+            status: "checked_out",
+            userId: "u-1",
+          },
+        ],
         NOW
       )
     ).toEqual([]);
@@ -265,10 +306,10 @@ git commit -m "feat(inventory): give the notification decision a module"
 - [ ] **Step 2: replace the call at `:493`.**
 
 ```ts
-  const row = notificationFor(current, input, holdAccountId(hold), closed);
-  if (row) {
-    await tx.insert(notifications).values(row);
-  }
+const row = notificationFor(current, input, holdAccountId(hold), closed);
+if (row) {
+  await tx.insert(notifications).values(row);
+}
 ```
 
 Import `notificationFor` from `#/lib/inventory-notifications`. `current` already carries the five fields `TransitionSubject` needs, and `input` satisfies `TransitionNotice` structurally.
@@ -289,7 +330,7 @@ git commit -m "refactor(inventory): decide the notification, then insert it"
 - [ ] **Step 1: replace the pure region** in `recordOverdueNotificationsAs` (`inventory.ts:1627-1662`) with a call:
 
 ```ts
-  const values = overdueNotifications(candidates);
+const values = overdueNotifications(candidates);
 ```
 
 Delete the local `OverdueCandidate` interface (`:1551-1558`) and import the module's, or keep the local one if the query's inferred shape needs it and let the module's type accept it structurally. Delete the `seen`/`push` closure and the `overdueFlags` loop; the module owns both now. `candidates` is already built and null-filtered above, and the `onConflictDoNothing` insert below is unchanged.
@@ -317,17 +358,17 @@ Build a synthetic admin viewer from the seeded admin: `{ id: u.admin.id, role: "
 
 - [ ] **Step 3: produce the nine states.** Dates relative to `Date.now()`.
 
-| Case | How |
-| --- | --- |
-| Overdue checkout | `transitionItem(admin, { itemId, nextStatus: "checked_out", holderId: student.id, dueAt: daysFromNow(-9) })` |
-| Overdue pickup | `transitionItem(admin, { itemId, nextStatus: "reserved", holderId: student.id, pickupBy: daysFromNow(-3) })` |
-| Healthy hold | same as the first, `dueAt: daysFromNow(10)` |
-| Pending request | `addToCartAs(sam, ...)` then `submitCartAs(sam, { note })`, leave the line alone |
-| Approved request | cart, submit, then `approveRequestItemAs(admin, { requestItemId, pickupBy: daysFromNow(5) })` |
+| Case                        | How                                                                                                                                                           |
+| --------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Overdue checkout            | `transitionItem(admin, { itemId, nextStatus: "checked_out", holderId: student.id, dueAt: daysFromNow(-9) })`                                                  |
+| Overdue pickup              | `transitionItem(admin, { itemId, nextStatus: "reserved", holderId: student.id, pickupBy: daysFromNow(-3) })`                                                  |
+| Healthy hold                | same as the first, `dueAt: daysFromNow(10)`                                                                                                                   |
+| Pending request             | `addToCartAs(sam, ...)` then `submitCartAs(sam, { note })`, leave the line alone                                                                              |
+| Approved request            | cart, submit, then `approveRequestItemAs(admin, { requestItemId, pickupBy: daysFromNow(5) })`                                                                 |
 | Requester is not the holder | Sam requests and it is approved, then `transitionItem(admin, { nextStatus: "checked_out", requestItemId, holderEmail: jordan.email, dueAt: daysFromNow(7) })` |
-| History: returned | checkout, then `transitionItem(admin, { nextStatus: "available" })` |
-| History: rejected | cart, submit, then `rejectRequestItemAs(admin, { requestItemId, reviewComment: "Reserved for the senior design cohort this term." })` |
-| History: cancelled | cart, submit, then `cancelRequestItemAs(jordan, { requestItemId, note: null })` |
+| History: returned           | checkout, then `transitionItem(admin, { nextStatus: "available" })`                                                                                           |
+| History: rejected           | cart, submit, then `rejectRequestItemAs(admin, { requestItemId, reviewComment: "Reserved for the senior design cohort this term." })`                         |
+| History: cancelled          | cart, submit, then `cancelRequestItemAs(jordan, { requestItemId, note: null })`                                                                               |
 
 Read each request line id back from `inventory_request_items` by `itemId` after submitting, the way the integration tests do.
 
@@ -366,10 +407,10 @@ git commit -m "feat(seed): produce the inventory flows through the real write pa
 
 ## Risks
 
-| Risk | Mitigation |
-| --- | --- |
-| The move is not verbatim and a message or recipient changes | Phase 2 Step 3: all twelve notification integration tests must pass with no edits. That is the whole check |
-| The guard order gets reshuffled during the move | The rejection-first comment moves with the code and the unit test "answers the denial before asking who holds the item" pins it |
-| The seed's lifecycle leaves items in a state later seed sections assume | Phase 4 Step 2 removes the direct hold writes, so there is one source of truth. Run the seed twice (Step 6) |
-| Seeding through app helpers is slow | Nine transitions on a local database. If it is noticeably slower, say so in the PR rather than reverting to direct writes |
-| `scripts/` is not linted, so prose rules slip | Phase 4 Step 7 says to read it. Check for emdashes by hand |
+| Risk                                                                    | Mitigation                                                                                                                      |
+| ----------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
+| The move is not verbatim and a message or recipient changes             | Phase 2 Step 3: all twelve notification integration tests must pass with no edits. That is the whole check                      |
+| The guard order gets reshuffled during the move                         | The rejection-first comment moves with the code and the unit test "answers the denial before asking who holds the item" pins it |
+| The seed's lifecycle leaves items in a state later seed sections assume | Phase 4 Step 2 removes the direct hold writes, so there is one source of truth. Run the seed twice (Step 6)                     |
+| Seeding through app helpers is slow                                     | Nine transitions on a local database. If it is noticeably slower, say so in the PR rather than reverting to direct writes       |
+| `scripts/` is not linted, so prose rules slip                           | Phase 4 Step 7 says to read it. Check for emdashes by hand                                                                      |

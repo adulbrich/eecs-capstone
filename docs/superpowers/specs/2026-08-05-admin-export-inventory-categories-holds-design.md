@@ -37,14 +37,14 @@ the gate its own listing carries: staff for five of them, admin-only for
 
 Six routes render `AdminDataTable`. Their loaders differ in ways that matter:
 
-| Route | Rows fetched | Projection | Gate | Export needs a server function? |
-| --- | --- | --- | --- | --- |
-| `/admin/projects` | all matching | `adminProjectSummarySelect` (partial) | staff | **yes** — projection is a summary |
-| `/admin/users` | one page of 25 | six columns only | **admin** | **yes** — pagination truncates, projection is partial |
-| `/admin/mentors` | all matching | five columns only | staff | **yes** — projection is a summary |
-| `/admin/inventory` | all matching | `fullForStaff`, complete | staff | no |
-| `/admin/programs` | all | `select()`, complete | staff | no |
-| `/admin/categories` | all | `select()`, complete | staff | no |
+| Route               | Rows fetched   | Projection                            | Gate      | Export needs a server function?                       |
+| ------------------- | -------------- | ------------------------------------- | --------- | ----------------------------------------------------- |
+| `/admin/projects`   | all matching   | `adminProjectSummarySelect` (partial) | staff     | **yes** — projection is a summary                     |
+| `/admin/users`      | one page of 25 | six columns only                      | **admin** | **yes** — pagination truncates, projection is partial |
+| `/admin/mentors`    | all matching   | five columns only                     | staff     | **yes** — projection is a summary                     |
+| `/admin/inventory`  | all matching   | `fullForStaff`, complete              | staff     | no                                                    |
+| `/admin/programs`   | all            | `select()`, complete                  | staff     | no                                                    |
+| `/admin/categories` | all            | `select()`, complete                  | staff     | no                                                    |
 
 Each row above was read rather than assumed, because the projections do not
 match what the page appears to show:
@@ -87,13 +87,13 @@ export function toCsv<T>(columns: CsvColumn<T>[], rows: T[]): string;
 
 Serialization rules, in order of application per cell:
 
-| Input | Output |
-| --- | --- |
-| `null`, `undefined` | empty string |
-| `Date` | ISO 8601 (`toISOString()`) |
-| `boolean` | `true` / `false` |
-| array | elements joined with `"; "` |
-| anything else | `String(value)` |
+| Input               | Output                      |
+| ------------------- | --------------------------- |
+| `null`, `undefined` | empty string                |
+| `Date`              | ISO 8601 (`toISOString()`)  |
+| `boolean`           | `true` / `false`            |
+| array               | elements joined with `"; "` |
+| anything else       | `String(value)`             |
 
 Then two escapes:
 
@@ -176,16 +176,16 @@ match.
 
 So each affected module extracts its condition builder first:
 
-| Module | Extract | New export function | Gate |
-| --- | --- | --- | --- |
-| `src/server/_internal/projects-queries.ts` | `buildAdminProjectListConditions(data)` from `listAdminProjectsAs` | `exportAdminProjectsAs(viewer, data)` | `isStaff` throw |
-| `src/server/_internal/users.ts` | `buildUserConditions(data)` from `listUsersImpl` | `exportUsersImpl(data)` + `exportUsersForCurrentUser(data)` | `assertAdmin` |
-| `src/server/_internal/users.ts` | `buildMentorConditions(data)` from `listMentorsAs` | `exportMentorsAs(viewer, data)` | `assertStaff` |
+| Module                                     | Extract                                                            | New export function                                         | Gate            |
+| ------------------------------------------ | ------------------------------------------------------------------ | ----------------------------------------------------------- | --------------- |
+| `src/server/_internal/projects-queries.ts` | `buildAdminProjectListConditions(data)` from `listAdminProjectsAs` | `exportAdminProjectsAs(viewer, data)`                       | `isStaff` throw |
+| `src/server/_internal/users.ts`            | `buildUserConditions(data)` from `listUsersImpl`                   | `exportUsersImpl(data)` + `exportUsersForCurrentUser(data)` | `assertAdmin`   |
+| `src/server/_internal/users.ts`            | `buildMentorConditions(data)` from `listMentorsAs`                 | `exportMentorsAs(viewer, data)`                             | `assertStaff`   |
 
 Three module-specific notes:
 
 - **Extract `listConditions`, not `scope`.** `listAdminProjectsAs` maintains
-  *two* condition lists: `scope` (status, soft-delete, program), which also
+  _two_ condition lists: `scope` (status, soft-delete, program), which also
   feeds the proposer dropdown and deliberately excludes both `q` and the
   proposer filter, and `listConditions` (`scope` plus proposer plus `q`), which
   selects the rows. The export takes **`listConditions`**, which is why the
@@ -446,15 +446,17 @@ A fourth query joins the existing three:
 ```ts
 db.select({ item: inventoryItems })
   .from(inventoryItems)
-  .where(and(
-    isNull(inventoryItems.currentRequestItemId),
-    inArray(inventoryItems.status, ["reserved", "checked_out"]),
-    holderMatch
-  ))
+  .where(
+    and(
+      isNull(inventoryItems.currentRequestItemId),
+      inArray(inventoryItems.status, ["reserved", "checked_out"]),
+      holderMatch
+    )
+  );
 ```
 
 `currentRequestItemId IS NULL` is what makes this disjoint from the request-line
-query. An item held *through* a request line is already in `active` and must not
+query. An item held _through_ a request line is already in `active` and must not
 appear twice.
 
 Statuses are `reserved` and `checked_out` only. `requested` implies a request
@@ -475,7 +477,7 @@ const holderMatch = or(
 ```
 
 The first arm is the normal case. The second covers the walk-in whose account
-was created *after* staff assigned the hold: `resolveHolderId` found no match at
+was created _after_ staff assigned the hold: `resolveHolderId` found no match at
 write time, so `currentHolderId` stayed null and would stay null forever.
 
 `verifiedEmail` comes from a single lookup on `user` by `viewer.id`, selecting

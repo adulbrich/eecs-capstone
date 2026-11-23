@@ -30,10 +30,12 @@ and edit screens.
 ### Server
 
 `src/server/inventory.ts`
+
 - Add `label: z.string().max(120).nullable().default(null)` to `itemPayloadSchema`.
   `updatePayloadSchema` extends it, so create and update are both covered.
 
 `src/server/_internal/inventory.ts`
+
 - `InventoryItemStaff` type gains `label: string | null`.
 - `fullForStaff` returns `label: row.label`.
 - `stripForPublic` is unchanged, so the label never reaches public viewers.

@@ -2,7 +2,6 @@
 
 > **Status (verified 2026-06-07):** ✅ **Implemented and shipped.** Verified against the codebase; all deliverables exist. The `- [ ]` checkboxes below were never ticked during execution; they are stale, not a sign of incomplete work.
 
-
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking. Read `docs/QUIRKS.md` before starting; it documents every framework gotcha this codebase has hit.
 
 **Spec:** `docs/superpowers/specs/2026-05-21-inventory-system-design.md`
@@ -50,7 +49,7 @@ export const inventoryItemStatusEnum = pgEnum("inventory_item_status", [
 
 export const inventoryRequestItemStatusEnum = pgEnum(
   "inventory_request_item_status",
-  ["pending", "approved", "rejected", "cancelled", "returned"],
+  ["pending", "approved", "rejected", "cancelled", "returned"]
 );
 
 export const inventoryItems = pgTable(
@@ -75,7 +74,7 @@ export const inventoryItems = pgTable(
     searchVector: tsvector("search_vector")
       .notNull()
       .generatedAlwaysAs(
-        sql`setweight(to_tsvector('english', coalesce(name, '')), 'A') || setweight(to_tsvector('english', coalesce(description, '')), 'B') || setweight(to_tsvector('english', coalesce(category, '')), 'C')`,
+        sql`setweight(to_tsvector('english', coalesce(name, '')), 'A') || setweight(to_tsvector('english', coalesce(description, '')), 'B') || setweight(to_tsvector('english', coalesce(category, '')), 'C')`
       ),
 
     createdAt: timestamp("created_at", { withTimezone: true })
@@ -89,7 +88,7 @@ export const inventoryItems = pgTable(
     index("inventory_items_status_idx").on(t.status),
     index("inventory_items_category_idx").on(t.category),
     index("inventory_items_current_holder_idx").on(t.currentHolderId),
-  ],
+  ]
 );
 
 export const inventoryRequests = pgTable(
@@ -106,7 +105,7 @@ export const inventoryRequests = pgTable(
   },
   (t) => [
     index("inventory_requests_user_created_idx").on(t.userId, t.createdAt),
-  ],
+  ]
 );
 
 export const inventoryRequestItems = pgTable(
@@ -149,7 +148,7 @@ export const inventoryRequestItems = pgTable(
     index("inventory_request_items_request_idx").on(t.requestId),
     index("inventory_request_items_item_idx").on(t.itemId),
     index("inventory_request_items_status_idx").on(t.status),
-  ],
+  ]
 );
 
 export const inventoryCartItems = pgTable(
@@ -165,7 +164,7 @@ export const inventoryCartItems = pgTable(
       .notNull()
       .defaultNow(),
   },
-  (t) => [primaryKey({ columns: [t.userId, t.itemId] })],
+  (t) => [primaryKey({ columns: [t.userId, t.itemId] })]
 );
 
 export const inventoryItemStatusHistory = pgTable(
@@ -183,7 +182,7 @@ export const inventoryItemStatusHistory = pgTable(
     comment: text("comment"),
     requestItemId: uuid("request_item_id").references(
       () => inventoryRequestItems.id,
-      { onDelete: "set null" },
+      { onDelete: "set null" }
     ),
     holderId: text("holder_id").references(() => user.id, {
       onDelete: "set null",
@@ -195,7 +194,7 @@ export const inventoryItemStatusHistory = pgTable(
   },
   (t) => [
     index("inventory_item_status_history_item_idx").on(t.itemId, t.createdAt),
-  ],
+  ]
 );
 
 export const inventoryItemEditLog = pgTable(
@@ -215,9 +214,7 @@ export const inventoryItemEditLog = pgTable(
       .notNull()
       .defaultNow(),
   },
-  (t) => [
-    index("inventory_item_edit_log_item_idx").on(t.itemId, t.createdAt),
-  ],
+  (t) => [index("inventory_item_edit_log_item_idx").on(t.itemId, t.createdAt)]
 );
 ```
 
@@ -363,19 +360,19 @@ function validateInvariants(input: TransitionInput) {
     case "retired":
       if (holderId || holderLabel || requestItemId) {
         throw new Error(
-          `Cannot set holder or request on transition to ${nextStatus}`,
+          `Cannot set holder or request on transition to ${nextStatus}`
         );
       }
       if (pickupBy || dueAt) {
         throw new Error(
-          `pickupBy / dueAt not allowed on transition to ${nextStatus}`,
+          `pickupBy / dueAt not allowed on transition to ${nextStatus}`
         );
       }
       return;
     case "requested":
       if (!requestItemId || !holderId || holderLabel) {
         throw new Error(
-          "requested status requires requestItemId + holderId, no label",
+          "requested status requires requestItemId + holderId, no label"
         );
       }
       return;
@@ -388,7 +385,7 @@ function validateInvariants(input: TransitionInput) {
       const hasLabel = !!holderLabel;
       if (hasUser === hasLabel) {
         throw new Error(
-          `${nextStatus} requires exactly one of holderId or holderLabel`,
+          `${nextStatus} requires exactly one of holderId or holderLabel`
         );
       }
       if (nextStatus === "checked_out" && !dueAt) {
@@ -411,7 +408,7 @@ function validateInvariants(input: TransitionInput) {
 export async function transitionItem(
   viewer: Viewer,
   input: TransitionInput,
-  externalTx?: Tx,
+  externalTx?: Tx
 ) {
   assertStaff(viewer);
   validateInvariants(input);
@@ -427,7 +424,7 @@ export async function transitionItem(
 async function transitionItemInTx(
   tx: Tx,
   viewer: Viewer,
-  input: TransitionInput,
+  input: TransitionInput
 ) {
   {
     const [current] = await tx
@@ -443,7 +440,7 @@ async function transitionItemInTx(
     // overwriting current_request_item_id silently.
     if (input.nextStatus === "requested" && current.status !== "available") {
       throw new Error(
-        `Cannot move item to requested from ${current.status}; release the existing hold first`,
+        `Cannot move item to requested from ${current.status}; release the existing hold first`
       );
     }
 
@@ -479,7 +476,7 @@ async function transitionItemInTx(
         current.currentRequestItemId,
         viewer.id,
         current.status,
-        input.comment ?? null,
+        input.comment ?? null
       );
     }
 
@@ -519,7 +516,7 @@ async function closeRequestItemOnRelease(
   requestItemId: string,
   actorId: string,
   prevStatus: ItemStatus,
-  comment: string | null,
+  comment: string | null
 ) {
   // Fulfillment ended in the user's hands then came back: returned.
   // Otherwise (reserved abandoned, sent to maintenance/retired before pickup): cancelled.
@@ -538,13 +535,18 @@ async function closeRequestItemOnRelease(
 
 async function maybeNotify(
   tx: Tx,
-  prev: { id: string; name: string; status: ItemStatus; currentHolderId: string | null; currentRequestItemId: string | null },
-  input: TransitionInput,
+  prev: {
+    id: string;
+    name: string;
+    status: ItemStatus;
+    currentHolderId: string | null;
+    currentRequestItemId: string | null;
+  },
+  input: TransitionInput
 ) {
   // Identify a "release-from-hold" path: no new request context provided AND
   // the item was holding one. The original holder is then the recipient.
-  const isReleaseFromHold =
-    !input.requestItemId && !!prev.currentRequestItemId;
+  const isReleaseFromHold = !input.requestItemId && !!prev.currentRequestItemId;
 
   const recipientId =
     input.holderId ?? (isReleaseFromHold ? prev.currentHolderId : null);
@@ -592,7 +594,8 @@ async function maybeNotify(
           type: "inventory_request_closed",
           title: `Request closed: ${prev.name}`,
           message:
-            input.comment ?? `Your request for ${prev.name} was closed by staff.`,
+            input.comment ??
+            `Your request for ${prev.name} was closed by staff.`,
           link: `/my/items?tab=history`,
         });
       }
@@ -658,10 +661,7 @@ import {
 import { auth } from "#/lib/auth";
 import { transitionItem } from "#/server/_internal/inventory-transitions";
 
-async function makeUser(
-  email: string,
-  role: "user" | "admin" | "instructor",
-) {
+async function makeUser(email: string, role: "user" | "admin" | "instructor") {
   await auth.api.signUpEmail({
     body: { email, password: "Password1!", name: email },
   });
@@ -673,7 +673,9 @@ async function makeUser(
   return { id: u.id, role: u.role };
 }
 
-async function makeItem(overrides: Partial<typeof inventoryItems.$inferInsert> = {}) {
+async function makeItem(
+  overrides: Partial<typeof inventoryItems.$inferInsert> = {}
+) {
   const [item] = await db
     .insert(inventoryItems)
     .values({ name: `Item-${Date.now()}-${Math.random()}`, ...overrides })
@@ -701,7 +703,7 @@ describe("transitionItem", () => {
       transitionItem(student, {
         itemId: item.id,
         nextStatus: "maintenance",
-      }),
+      })
     ).rejects.toThrow(/Forbidden/);
   });
 
@@ -734,7 +736,7 @@ describe("transitionItem", () => {
     const admin = await makeUser(`a-${Date.now()}@x.com`, "admin");
     const item = await makeItem();
     await expect(
-      transitionItem(admin, { itemId: item.id, nextStatus: "reserved" }),
+      transitionItem(admin, { itemId: item.id, nextStatus: "reserved" })
     ).rejects.toThrow(/requestItemId/);
     const student = await makeUser(`s-${Date.now()}@x.com`, "user");
     const { line } = await makeRequestLine(student.id, item.id);
@@ -745,7 +747,7 @@ describe("transitionItem", () => {
         requestItemId: line.id,
         holderId: student.id,
         holderLabel: "X",
-      }),
+      })
     ).rejects.toThrow(/exactly one of holderId or holderLabel/);
   });
 
@@ -772,9 +774,9 @@ describe("transitionItem", () => {
       .select()
       .from(notifications)
       .where(eq(notifications.userId, student.id));
-    expect(
-      notifs.some((n) => n.type === "inventory_request_approved"),
-    ).toBe(true);
+    expect(notifs.some((n) => n.type === "inventory_request_approved")).toBe(
+      true
+    );
   });
 
   it("checked_out requires dueAt", async () => {
@@ -788,7 +790,7 @@ describe("transitionItem", () => {
         nextStatus: "checked_out",
         requestItemId: line.id,
         holderId: student.id,
-      }),
+      })
     ).rejects.toThrow(/dueAt/);
   });
 
@@ -875,9 +877,7 @@ describe("transitionItem", () => {
       .select()
       .from(notifications)
       .where(eq(notifications.userId, student.id));
-    expect(
-      notifs.some((n) => n.type === "inventory_item_returned"),
-    ).toBe(true);
+    expect(notifs.some((n) => n.type === "inventory_item_returned")).toBe(true);
   });
 
   it("released reserved item to retired notifies requester with inventory_request_closed", async () => {
@@ -901,9 +901,9 @@ describe("transitionItem", () => {
       .select()
       .from(notifications)
       .where(eq(notifications.userId, student.id));
-    expect(
-      notifs.some((n) => n.type === "inventory_request_closed"),
-    ).toBe(true);
+    expect(notifs.some((n) => n.type === "inventory_request_closed")).toBe(
+      true
+    );
   });
 
   it("rejects requested transition when item is not available (overwrite guard)", async () => {
@@ -924,7 +924,7 @@ describe("transitionItem", () => {
         nextStatus: "requested",
         requestItemId: line2.id,
         holderId: student.id,
-      }),
+      })
     ).rejects.toThrow(/Cannot move item to requested/);
   });
 });
@@ -972,7 +972,13 @@ type Viewer = { id: string; role?: string | null | undefined } | null;
 
 export type ListInventoryInput = {
   q: string;
-  status: "available" | "requested" | "reserved" | "checked_out" | "maintenance" | null;
+  status:
+    | "available"
+    | "requested"
+    | "reserved"
+    | "checked_out"
+    | "maintenance"
+    | null;
   category: string | null;
   page: number;
   pageSize: number;
@@ -987,7 +993,7 @@ export type InventoryItemPublic = {
   imageUrl: string | null;
   status: string;
   pickupBy: Date | null; // populated from the active line when status is reserved
-  dueAt: Date | null;    // populated from the active line when status is checked_out
+  dueAt: Date | null; // populated from the active line when status is checked_out
 };
 
 export type InventoryItemStaff = InventoryItemPublic & {
@@ -1002,7 +1008,9 @@ function isStaff(viewer: Viewer): boolean {
   return viewer?.role === "admin" || viewer?.role === "instructor";
 }
 
-function stripForPublic(row: typeof inventoryItems.$inferSelect): InventoryItemPublic {
+function stripForPublic(
+  row: typeof inventoryItems.$inferSelect
+): InventoryItemPublic {
   return {
     id: row.id,
     name: row.name,
@@ -1016,7 +1024,9 @@ function stripForPublic(row: typeof inventoryItems.$inferSelect): InventoryItemP
   };
 }
 
-function fullForStaff(row: typeof inventoryItems.$inferSelect): InventoryItemStaff {
+function fullForStaff(
+  row: typeof inventoryItems.$inferSelect
+): InventoryItemStaff {
   return {
     ...stripForPublic(row),
     serial: row.serial,
@@ -1027,16 +1037,20 @@ function fullForStaff(row: typeof inventoryItems.$inferSelect): InventoryItemSta
   };
 }
 
-export async function listInventoryAs(viewer: Viewer, data: ListInventoryInput) {
+export async function listInventoryAs(
+  viewer: Viewer,
+  data: ListInventoryInput
+) {
   const conditions = [ne(inventoryItems.status, "retired")];
   if (data.status) conditions.push(eq(inventoryItems.status, data.status));
-  if (data.category) conditions.push(eq(inventoryItems.category, data.category));
+  if (data.category)
+    conditions.push(eq(inventoryItems.category, data.category));
   if (data.q) {
     conditions.push(
       or(
         sql`${inventoryItems.searchVector} @@ websearch_to_tsquery('english', ${data.q})`,
-        ilike(inventoryItems.name, `%${data.q}%`),
-      )!,
+        ilike(inventoryItems.name, `%${data.q}%`)
+      )!
     );
   }
   const where = and(...conditions);
@@ -1287,7 +1301,7 @@ function assertStaff(viewer: Viewer) {
 
 export async function createInventoryItemAs(
   viewer: Viewer,
-  data: CreateInventoryItemInput,
+  data: CreateInventoryItemInput
 ) {
   assertStaff(viewer);
   const [row] = await db
@@ -1321,7 +1335,7 @@ const EDITABLE_FIELDS = [
 
 export async function updateInventoryItemAs(
   viewer: Viewer,
-  data: UpdateInventoryItemInput,
+  data: UpdateInventoryItemInput
 ) {
   assertStaff(viewer);
   return db.transaction(async (tx) => {
@@ -1381,7 +1395,7 @@ export async function updateInventoryItemAs(
 
 export async function hardDeleteInventoryItemAs(
   viewer: Viewer,
-  data: { id: string; confirmName: string },
+  data: { id: string; confirmName: string }
 ) {
   assertStaff(viewer);
   const [row] = await db
@@ -1393,7 +1407,9 @@ export async function hardDeleteInventoryItemAs(
     throw new Error("Name confirmation does not match");
   }
   if (row.status !== "available" && row.status !== "retired") {
-    throw new Error("Hard delete only allowed when status is available or retired");
+    throw new Error(
+      "Hard delete only allowed when status is available or retired"
+    );
   }
   // Pre-check the RESTRICT FK on inventory_request_items.item_id so the
   // caller gets a friendly error instead of a raw Postgres 23503.
@@ -1404,7 +1420,7 @@ export async function hardDeleteInventoryItemAs(
     .limit(1);
   if (historical) {
     throw new Error(
-      "Cannot hard delete; this item has historical request records. Retire it instead.",
+      "Cannot hard delete; this item has historical request records. Retire it instead."
     );
   }
   await db.delete(inventoryItems).where(eq(inventoryItems.id, data.id));
@@ -1486,14 +1502,14 @@ export const hardDeleteInventoryItem = createServerFn({ method: "POST" })
 
 ```ts
 export async function createInventoryItemForCurrentUser(
-  data: CreateInventoryItemInput,
+  data: CreateInventoryItemInput
 ) {
   const viewer = await requireUser();
   return createInventoryItemAs(viewer, data);
 }
 
 export async function updateInventoryItemForCurrentUser(
-  data: UpdateInventoryItemInput,
+  data: UpdateInventoryItemInput
 ) {
   const viewer = await requireUser();
   return updateInventoryItemAs(viewer, data);
@@ -1551,16 +1567,19 @@ describe("catalog CRUD", () => {
       imageUrl: null,
     };
     await expect(createInventoryItemAs(student, blank)).rejects.toThrow(
-      /Forbidden/,
+      /Forbidden/
     );
     await expect(
-      updateInventoryItemAs(student, { id: "00000000-0000-0000-0000-000000000000", ...blank }),
+      updateInventoryItemAs(student, {
+        id: "00000000-0000-0000-0000-000000000000",
+        ...blank,
+      })
     ).rejects.toThrow(/Forbidden/);
     await expect(
       hardDeleteInventoryItemAs(student, {
         id: "00000000-0000-0000-0000-000000000000",
         confirmName: "X",
-      }),
+      })
     ).rejects.toThrow(/Forbidden/);
   });
 
@@ -1583,10 +1602,16 @@ describe("catalog CRUD", () => {
       .where(eq(inventoryItemEditLog.itemId, item.id));
     expect(logs).toHaveLength(1);
     expect(new Set(logs[0].changedFields)).toEqual(
-      new Set(["name", "location"]),
+      new Set(["name", "location"])
     );
-    expect(logs[0].oldValues).toMatchObject({ name: "Old", location: "Shelf A" });
-    expect(logs[0].newValues).toMatchObject({ name: "New", location: "Shelf B" });
+    expect(logs[0].oldValues).toMatchObject({
+      name: "Old",
+      location: "Shelf A",
+    });
+    expect(logs[0].newValues).toMatchObject({
+      name: "New",
+      location: "Shelf B",
+    });
   });
 
   it("hard-delete refuses when status is checked_out", async () => {
@@ -1609,7 +1634,7 @@ describe("catalog CRUD", () => {
       dueAt: new Date(Date.now() + 7 * 86400000),
     });
     await expect(
-      hardDeleteInventoryItemAs(admin, { id: item.id, confirmName: "Scope" }),
+      hardDeleteInventoryItemAs(admin, { id: item.id, confirmName: "Scope" })
     ).rejects.toThrow(/available or retired/);
   });
 
@@ -1619,7 +1644,7 @@ describe("catalog CRUD", () => {
     // Retire first so the status gate cannot fire instead and mask a name-gate bug.
     await transitionItem(admin, { itemId: item.id, nextStatus: "retired" });
     await expect(
-      hardDeleteInventoryItemAs(admin, { id: item.id, confirmName: "Wrong" }),
+      hardDeleteInventoryItemAs(admin, { id: item.id, confirmName: "Wrong" })
     ).rejects.toThrow(/confirmation/);
   });
 
@@ -1645,7 +1670,7 @@ describe("catalog CRUD", () => {
     await makeRequestLine(student.id, item.id); // pending, never resolved
     await transitionItem(admin, { itemId: item.id, nextStatus: "retired" });
     await expect(
-      hardDeleteInventoryItemAs(admin, { id: item.id, confirmName: "Cabled" }),
+      hardDeleteInventoryItemAs(admin, { id: item.id, confirmName: "Cabled" })
     ).rejects.toThrow(/historical/i);
   });
 });
@@ -1695,10 +1720,7 @@ export async function getCartAs(viewer: Viewer) {
       status: inventoryItems.status,
     })
     .from(inventoryCartItems)
-    .innerJoin(
-      inventoryItems,
-      eq(inventoryCartItems.itemId, inventoryItems.id),
-    )
+    .innerJoin(inventoryItems, eq(inventoryCartItems.itemId, inventoryItems.id))
     .where(eq(inventoryCartItems.userId, viewer.id))
     .orderBy(desc(inventoryCartItems.addedAt));
   return rows;
@@ -1723,7 +1745,7 @@ export async function addToCartAs(viewer: Viewer, data: { itemId: string }) {
 
 export async function removeFromCartAs(
   viewer: Viewer,
-  data: { itemId: string },
+  data: { itemId: string }
 ) {
   if (!viewer) throw new Error("Sign in required");
   await db
@@ -1731,15 +1753,15 @@ export async function removeFromCartAs(
     .where(
       and(
         eq(inventoryCartItems.userId, viewer.id),
-        eq(inventoryCartItems.itemId, data.itemId),
-      ),
+        eq(inventoryCartItems.itemId, data.itemId)
+      )
     );
   return { ok: true as const };
 }
 
 export async function submitCartAs(
   viewer: Viewer,
-  data: { note: string | null },
+  data: { note: string | null }
 ) {
   if (!viewer) throw new Error("Sign in required");
 
@@ -1797,7 +1819,7 @@ export async function submitCartAs(
           requestId: req.id,
           itemId: s.itemId,
           status: "pending" as const,
-        })),
+        }))
       )
       .returning();
 
@@ -1884,11 +1906,10 @@ Co-Authored-By: Claude Opus 4.7 <noreply@anthropic.com>"
 - [ ] **Step 1: Append.**
 
 ```ts
-export const getCart = createServerFn({ method: "GET" })
-  .handler(async () => {
-    const { getCartForCurrentUser } = await import("./_internal/inventory");
-    return getCartForCurrentUser();
-  });
+export const getCart = createServerFn({ method: "GET" }).handler(async () => {
+  const { getCartForCurrentUser } = await import("./_internal/inventory");
+  return getCartForCurrentUser();
+});
 
 const addToCartSchema = z.object({ itemId: z.string().uuid() });
 
@@ -1902,13 +1923,15 @@ export const addToCart = createServerFn({ method: "POST" })
 export const removeFromCart = createServerFn({ method: "POST" })
   .inputValidator((d: unknown) => addToCartSchema.parse(d))
   .handler(async ({ data }) => {
-    const { removeFromCartForCurrentUser } = await import("./_internal/inventory");
+    const { removeFromCartForCurrentUser } = await import(
+      "./_internal/inventory"
+    );
     return removeFromCartForCurrentUser(data);
   });
 
 export const submitCart = createServerFn({ method: "POST" })
   .inputValidator((d: unknown) =>
-    z.object({ note: z.string().max(2000).nullable().default(null) }).parse(d),
+    z.object({ note: z.string().max(2000).nullable().default(null) }).parse(d)
   )
   .handler(async ({ data }) => {
     const { submitCartForCurrentUser } = await import("./_internal/inventory");
@@ -1936,10 +1959,7 @@ Co-Authored-By: Claude Opus 4.7 <noreply@anthropic.com>"
 - [ ] **Step 1: Append.**
 
 ```ts
-import {
-  addToCartAs,
-  submitCartAs,
-} from "#/server/_internal/inventory";
+import { addToCartAs, submitCartAs } from "#/server/_internal/inventory";
 import { inventoryCartItems } from "#/db/schema";
 
 describe("cart", () => {
@@ -1951,9 +1971,9 @@ describe("cart", () => {
       itemId: item.id,
       nextStatus: "maintenance",
     });
-    await expect(
-      addToCartAs(student, { itemId: item.id }),
-    ).rejects.toThrow(/available/);
+    await expect(addToCartAs(student, { itemId: item.id })).rejects.toThrow(
+      /available/
+    );
   });
 
   it("submit happy path: one request, N lines, items move to requested", async () => {
@@ -2034,7 +2054,7 @@ function defaultPickupBy(): Date {
 
 export async function approveRequestItemAs(
   viewer: Viewer,
-  data: { requestItemId: string; pickupBy: Date | null },
+  data: { requestItemId: string; pickupBy: Date | null }
 ) {
   assertStaff(viewer);
   const { transitionItem } = await import("./inventory-transitions");
@@ -2051,7 +2071,7 @@ export async function approveRequestItemAs(
       .from(inventoryRequestItems)
       .innerJoin(
         inventoryRequests,
-        eq(inventoryRequestItems.requestId, inventoryRequests.id),
+        eq(inventoryRequestItems.requestId, inventoryRequests.id)
       )
       .where(eq(inventoryRequestItems.id, data.requestItemId))
       .for("update");
@@ -2078,7 +2098,7 @@ export async function approveRequestItemAs(
         holderId: line.requesterId,
         pickupBy: data.pickupBy ?? defaultPickupBy(),
       },
-      tx,
+      tx
     );
     return { ok: true as const };
   });
@@ -2086,7 +2106,7 @@ export async function approveRequestItemAs(
 
 export async function rejectRequestItemAs(
   viewer: Viewer,
-  data: { requestItemId: string; reviewComment: string },
+  data: { requestItemId: string; reviewComment: string }
 ) {
   assertStaff(viewer);
   if (!data.reviewComment.trim()) {
@@ -2105,7 +2125,7 @@ export async function rejectRequestItemAs(
       .from(inventoryRequestItems)
       .innerJoin(
         inventoryRequests,
-        eq(inventoryRequestItems.requestId, inventoryRequests.id),
+        eq(inventoryRequestItems.requestId, inventoryRequests.id)
       )
       .where(eq(inventoryRequestItems.id, data.requestItemId))
       .for("update");
@@ -2162,7 +2182,7 @@ export async function rejectRequestItemAs(
 
 export async function cancelRequestItemAs(
   viewer: Viewer,
-  data: { requestItemId: string; note: string | null },
+  data: { requestItemId: string; note: string | null }
 ) {
   if (!viewer) throw new Error("Sign in required");
   return db.transaction(async (tx) => {
@@ -2176,7 +2196,7 @@ export async function cancelRequestItemAs(
       .from(inventoryRequestItems)
       .innerJoin(
         inventoryRequests,
-        eq(inventoryRequestItems.requestId, inventoryRequests.id),
+        eq(inventoryRequestItems.requestId, inventoryRequests.id)
       )
       .where(eq(inventoryRequestItems.id, data.requestItemId))
       .for("update");
@@ -2344,13 +2364,18 @@ describe("request lifecycle", () => {
     const item = await makeItem({ name: "Scope" });
     await addToCartAs(student, { itemId: item.id });
     const result = await submitCartAs(student, { note: null });
-    const lineId = result.submitted[0] && (
-      await db
-        .select()
-        .from(inventoryRequestItems)
-        .where(eq(inventoryRequestItems.itemId, item.id))
-    )[0].id;
-    await approveRequestItemAs(admin, { requestItemId: lineId, pickupBy: null });
+    const lineId =
+      result.submitted[0] &&
+      (
+        await db
+          .select()
+          .from(inventoryRequestItems)
+          .where(eq(inventoryRequestItems.itemId, item.id))
+      )[0].id;
+    await approveRequestItemAs(admin, {
+      requestItemId: lineId,
+      pickupBy: null,
+    });
     const [after] = await db
       .select()
       .from(inventoryItems)
@@ -2366,9 +2391,9 @@ describe("request lifecycle", () => {
       .select()
       .from(notifications)
       .where(eq(notifications.userId, student.id));
-    expect(
-      notifs.some((n) => n.type === "inventory_request_approved"),
-    ).toBe(true);
+    expect(notifs.some((n) => n.type === "inventory_request_approved")).toBe(
+      true
+    );
   });
 
   it("reject requires reason and returns item to available", async () => {
@@ -2385,7 +2410,7 @@ describe("request lifecycle", () => {
       rejectRequestItemAs(admin, {
         requestItemId: line.id,
         reviewComment: "",
-      }),
+      })
     ).rejects.toThrow(/required/);
     await rejectRequestItemAs(admin, {
       requestItemId: line.id,
@@ -2447,7 +2472,7 @@ describe("request lifecycle", () => {
       cancelRequestItemAs(student, {
         requestItemId: lineB.id,
         note: null,
-      }),
+      })
     ).rejects.toThrow(/checkout/);
   });
 });
@@ -2491,17 +2516,17 @@ export async function listMyItemsAs(viewer: Viewer) {
       .from(inventoryRequestItems)
       .innerJoin(
         inventoryRequests,
-        eq(inventoryRequestItems.requestId, inventoryRequests.id),
+        eq(inventoryRequestItems.requestId, inventoryRequests.id)
       )
       .innerJoin(
         inventoryItems,
-        eq(inventoryRequestItems.itemId, inventoryItems.id),
+        eq(inventoryRequestItems.itemId, inventoryItems.id)
       )
       .where(
         and(
           eq(inventoryRequests.userId, viewer.id),
-          inArray(inventoryRequestItems.status, ["pending", "approved"]),
-        ),
+          inArray(inventoryRequestItems.status, ["pending", "approved"])
+        )
       )
       .orderBy(desc(inventoryRequestItems.createdAt)),
     db
@@ -2513,11 +2538,11 @@ export async function listMyItemsAs(viewer: Viewer) {
       .from(inventoryRequestItems)
       .innerJoin(
         inventoryRequests,
-        eq(inventoryRequestItems.requestId, inventoryRequests.id),
+        eq(inventoryRequestItems.requestId, inventoryRequests.id)
       )
       .innerJoin(
         inventoryItems,
-        eq(inventoryRequestItems.itemId, inventoryItems.id),
+        eq(inventoryRequestItems.itemId, inventoryItems.id)
       )
       .where(
         and(
@@ -2526,8 +2551,8 @@ export async function listMyItemsAs(viewer: Viewer) {
             "rejected",
             "cancelled",
             "returned",
-          ]),
-        ),
+          ])
+        )
       )
       .orderBy(desc(inventoryRequestItems.updatedAt))
       .limit(50),
@@ -2537,7 +2562,7 @@ export async function listMyItemsAs(viewer: Viewer) {
 
 export async function listInventoryRequestsAs(
   viewer: Viewer,
-  data: { tab: "pending" | "all" },
+  data: { tab: "pending" | "all" }
 ) {
   assertStaff(viewer);
   const statusFilter =
@@ -2555,11 +2580,11 @@ export async function listInventoryRequestsAs(
     .from(inventoryRequestItems)
     .innerJoin(
       inventoryRequests,
-      eq(inventoryRequestItems.requestId, inventoryRequests.id),
+      eq(inventoryRequestItems.requestId, inventoryRequests.id)
     )
     .innerJoin(
       inventoryItems,
-      eq(inventoryRequestItems.itemId, inventoryItems.id),
+      eq(inventoryRequestItems.itemId, inventoryItems.id)
     )
     .innerJoin(user, eq(inventoryRequests.userId, user.id))
     .where(statusFilter)
@@ -2629,11 +2654,12 @@ Co-Authored-By: Claude Opus 4.7 <noreply@anthropic.com>"
 - [ ] **Step 1: Append.**
 
 ```ts
-export const listMyItems = createServerFn({ method: "GET" })
-  .handler(async () => {
+export const listMyItems = createServerFn({ method: "GET" }).handler(
+  async () => {
     const { listMyItemsForCurrentUser } = await import("./_internal/inventory");
     return listMyItemsForCurrentUser();
-  });
+  }
+);
 
 const requestQueueSchema = z.object({
   tab: z.enum(["pending", "all"]).default("pending"),
@@ -2671,7 +2697,9 @@ Co-Authored-By: Claude Opus 4.7 <noreply@anthropic.com>"
 - [ ] **Step 1: Extend the public/staff shapes** so `listMyItemsAs` and the admin queue include deadline-derived fields. Replace the existing `stripForPublic` and `fullForStaff` functions with:
 
 ```ts
-function stripForPublic(row: typeof inventoryItems.$inferSelect): InventoryItemPublic {
+function stripForPublic(
+  row: typeof inventoryItems.$inferSelect
+): InventoryItemPublic {
   return {
     id: row.id,
     name: row.name,
@@ -2701,9 +2729,7 @@ export function deriveDeadlineFlags(row: {
       !!row.pickupBy &&
       row.pickupBy.getTime() < now,
     checkoutOverdue:
-      row.status === "checked_out" &&
-      !!row.dueAt &&
-      row.dueAt.getTime() < now,
+      row.status === "checked_out" && !!row.dueAt && row.dueAt.getTime() < now,
   };
 }
 
@@ -2721,7 +2747,7 @@ export function deriveDeadlineFlags(row: {
  */
 export async function recordOverdueNotificationsAs(
   viewer: Viewer,
-  opts: { ownerId?: string } = {},
+  opts: { ownerId?: string } = {}
 ) {
   if (!viewer) return;
   const conditions = [eq(inventoryRequestItems.status, "approved")];
@@ -2740,11 +2766,11 @@ export async function recordOverdueNotificationsAs(
     .from(inventoryRequestItems)
     .innerJoin(
       inventoryRequests,
-      eq(inventoryRequestItems.requestId, inventoryRequests.id),
+      eq(inventoryRequestItems.requestId, inventoryRequests.id)
     )
     .innerJoin(
       inventoryItems,
-      eq(inventoryRequestItems.itemId, inventoryItems.id),
+      eq(inventoryRequestItems.itemId, inventoryItems.id)
     )
     .where(and(...conditions));
 
@@ -2977,7 +3003,11 @@ export function InventoryCard({ item, signedIn, onAddToCart }: Props) {
   const img = getPublicUrl(item.imageUrl);
   return (
     <div className="rounded-lg border border-border bg-card p-3">
-      <Link to="/inventory/$itemId" params={{ itemId: item.id }} className="block">
+      <Link
+        to="/inventory/$itemId"
+        params={{ itemId: item.id }}
+        className="block"
+      >
         <div className="aspect-video w-full overflow-hidden rounded bg-(--surface-sunken)">
           {img ? (
             <img src={img} alt="" className="h-full w-full object-cover" />
@@ -2990,7 +3020,8 @@ export function InventoryCard({ item, signedIn, onAddToCart }: Props) {
             <span
               className="rounded px-2 py-0.5 text-xs"
               style={{
-                background: "color-mix(in srgb, var(--destructive) 12%, transparent)",
+                background:
+                  "color-mix(in srgb, var(--destructive) 12%, transparent)",
                 color: "var(--destructive)",
               }}
             >
@@ -3001,7 +3032,8 @@ export function InventoryCard({ item, signedIn, onAddToCart }: Props) {
             <span
               className="rounded px-2 py-0.5 text-xs"
               style={{
-                background: "color-mix(in srgb, var(--destructive) 12%, transparent)",
+                background:
+                  "color-mix(in srgb, var(--destructive) 12%, transparent)",
                 color: "var(--destructive)",
               }}
             >
@@ -3154,7 +3186,7 @@ export function InventoryFilterBar(props: Props) {
             type="button"
             onClick={() =>
               props.onStatusChange(
-                props.status === opt.value ? null : opt.value,
+                props.status === opt.value ? null : opt.value
               )
             }
             className={
@@ -3269,22 +3301,20 @@ function InventoryIndex() {
           category={search.category}
           view={search.view}
           categories={[]}
-          onQChange={(q) =>
-            navigate({ search: (s) => ({ ...s, q, page: 1 }) })
-          }
+          onQChange={(q) => navigate({ search: (s) => ({ ...s, q, page: 1 }) })}
           onStatusChange={(status) =>
             navigate({ search: (s) => ({ ...s, status, page: 1 }) })
           }
           onCategoryChange={(category) =>
             navigate({ search: (s) => ({ ...s, category, page: 1 }) })
           }
-          onViewChange={(view) =>
-            navigate({ search: (s) => ({ ...s, view }) })
-          }
+          onViewChange={(view) => navigate({ search: (s) => ({ ...s, view }) })}
         />
       </div>
       {data.rows.length === 0 ? (
-        <p className="mt-8 text-center text-muted-foreground">No items match.</p>
+        <p className="mt-8 text-center text-muted-foreground">
+          No items match.
+        </p>
       ) : search.view === "row" ? (
         <ul className="mt-4 flex flex-col gap-2">
           {data.rows.map((it) => (
@@ -3384,7 +3414,9 @@ function ItemDetail() {
             )}
           </div>
           {item.location && (
-            <p className="mt-1 text-sm text-muted-foreground">{item.location}</p>
+            <p className="mt-1 text-sm text-muted-foreground">
+              {item.location}
+            </p>
           )}
           {item.description && (
             <p className="mt-4 whitespace-pre-wrap">{item.description}</p>
@@ -3471,7 +3503,8 @@ function MyItems() {
   const qc = useQueryClient();
   const [note, setNote] = useState("");
 
-  const tab = data.cart.length > 0 && search.tab === "active" ? "cart" : search.tab;
+  const tab =
+    data.cart.length > 0 && search.tab === "active" ? "cart" : search.tab;
 
   return (
     <div className="mx-auto max-w-4xl px-4 py-6 md:p-8">
@@ -3488,7 +3521,9 @@ function MyItems() {
                 : "px-2 py-1 text-muted-foreground hover:text-foreground"
             }
             style={
-              t === tab ? { borderBottomColor: "var(--brand-primary)" } : undefined
+              t === tab
+                ? { borderBottomColor: "var(--brand-primary)" }
+                : undefined
             }
           >
             {t === "cart"
@@ -3542,7 +3577,7 @@ function MyItems() {
                   await qc.invalidateQueries();
                   if (result.skipped.length > 0) {
                     alert(
-                      `Submitted ${result.submitted.length}; skipped ${result.skipped.length} (no longer available).`,
+                      `Submitted ${result.submitted.length}; skipped ${result.skipped.length} (no longer available).`
                     );
                   }
                   navigate({ search: () => ({ tab: "active" }) });
@@ -3614,7 +3649,9 @@ function MyItems() {
               className="rounded-md border border-border bg-card p-3"
             >
               <p className="font-medium">{item.name}</p>
-              <p className="text-xs text-muted-foreground">Status: {line.status}</p>
+              <p className="text-xs text-muted-foreground">
+                Status: {line.status}
+              </p>
               {line.closedReason && (
                 <p className="mt-1 text-sm">{line.closedReason}</p>
               )}
@@ -3725,7 +3762,9 @@ export const transitionInventoryItem = createServerFn({ method: "POST" })
   .inputValidator((d: unknown) => transitionSchema.parse(d))
   .handler(async ({ data }) => {
     const { requireUser } = await import("#/lib/_internal/auth-guards");
-    const { transitionItem } = await import("./_internal/inventory-transitions");
+    const { transitionItem } = await import(
+      "./_internal/inventory-transitions"
+    );
     const viewer = await requireUser();
     await transitionItem(viewer, data);
     return { ok: true as const };
@@ -4047,7 +4086,7 @@ describe("bulk approve in a batch is atomic", () => {
             pickupBy: null,
           });
         }
-      }),
+      })
     ).rejects.toThrow();
     // First item should NOT be reserved.
     const [aAfter] = await db
@@ -4081,8 +4120,8 @@ describe("past pickup window: lazy detection + idempotent notification", () => {
       .where(
         and(
           eq(notifications.userId, student.id),
-          eq(notifications.type, "inventory_pickup_overdue"),
-        ),
+          eq(notifications.type, "inventory_pickup_overdue")
+        )
       );
     expect(notifs).toHaveLength(1);
     // Status unchanged (no auto-flip).
@@ -4106,7 +4145,7 @@ describe("defense in depth: impl re-checks role even if wrapper would have block
         location: null,
         notes: null,
         imageUrl: null,
-      }),
+      })
     ).rejects.toThrow(/Forbidden/);
   });
 
@@ -4114,7 +4153,7 @@ describe("defense in depth: impl re-checks role even if wrapper would have block
     const student = await makeUser(`s-${Date.now()}@x.com`, "user");
     const item = await makeItem();
     await expect(
-      transitionItem(student, { itemId: item.id, nextStatus: "retired" }),
+      transitionItem(student, { itemId: item.id, nextStatus: "retired" })
     ).rejects.toThrow(/Forbidden/);
   });
 
@@ -4131,13 +4170,13 @@ describe("defense in depth: impl re-checks role even if wrapper would have block
       approveRequestItemAs(student, {
         requestItemId: line.id,
         pickupBy: null,
-      }),
+      })
     ).rejects.toThrow(/Forbidden/);
     await expect(
       rejectRequestItemAs(student, {
         requestItemId: line.id,
         reviewComment: "no",
-      }),
+      })
     ).rejects.toThrow(/Forbidden/);
   });
 });
@@ -4176,7 +4215,7 @@ describe("InventoryStatusBadge", () => {
   });
   it("shows retired when showRetired is true", () => {
     const { getByText } = render(
-      <InventoryStatusBadge status="retired" showRetired />,
+      <InventoryStatusBadge status="retired" showRetired />
     );
     expect(getByText("Retired")).toBeDefined();
   });
@@ -4216,7 +4255,7 @@ describe("InventoryFilterBar", () => {
         onStatusChange={() => {}}
         onCategoryChange={() => {}}
         onViewChange={() => {}}
-      />,
+      />
     );
     fireEvent.change(getByPlaceholderText("Search inventory"), {
       target: { value: "arduino" },
@@ -4242,7 +4281,7 @@ describe("InventoryFilterBar", () => {
         onStatusChange={onStatusChange}
         onCategoryChange={() => {}}
         onViewChange={() => {}}
-      />,
+      />
     );
     fireEvent.click(getByText("Available"));
     expect(onStatusChange).toHaveBeenCalledWith(null);
@@ -4275,7 +4314,7 @@ describe("CartButton", () => {
     const { findByText } = render(
       <QueryClientProvider client={qc}>
         <CartButton />
-      </QueryClientProvider>,
+      </QueryClientProvider>
     );
     expect(await findByText("2")).toBeDefined();
   });
@@ -4286,7 +4325,7 @@ describe("CartButton", () => {
     const { queryByText } = render(
       <QueryClientProvider client={qc}>
         <CartButton />
-      </QueryClientProvider>,
+      </QueryClientProvider>
     );
     expect(queryByText("0")).toBeNull();
   });
@@ -4324,9 +4363,7 @@ const rejectSchema = z.object({
 
 describe("inventory schemas", () => {
   it("itemPayload rejects empty name", () => {
-    expect(() =>
-      itemPayloadSchema.parse({ name: "" }),
-    ).toThrow();
+    expect(() => itemPayloadSchema.parse({ name: "" })).toThrow();
   });
 
   it("approveSchema coerces ISO date string", () => {
@@ -4342,7 +4379,7 @@ describe("inventory schemas", () => {
       rejectSchema.parse({
         requestItemId: "00000000-0000-0000-0000-000000000000",
         reviewComment: "",
-      }),
+      })
     ).toThrow();
   });
 });

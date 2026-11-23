@@ -46,12 +46,12 @@ freely.
 
 ## Decisions
 
-| Question | Decision |
-|---|---|
-| How to know an account is behind the address | `projects.proposer_id is not null` |
-| When the field locks | Whenever `proposerId` is set. External proposers stay editable |
-| Late linking | Yes, but only on a **verified** address |
-| Sequencing | Own spec and plan, same branch as the review emails |
+| Question                                     | Decision                                                       |
+| -------------------------------------------- | -------------------------------------------------------------- |
+| How to know an account is behind the address | `projects.proposer_id is not null`                             |
+| When the field locks                         | Whenever `proposerId` is set. External proposers stay editable |
+| Late linking                                 | Yes, but only on a **verified** address                        |
+| Sequencing                                   | Own spec and plan, same branch as the review emails            |
 
 **Verification is the security boundary.** Claiming projects on account creation
 alone would let anyone sign up with a colleague's address and take their
@@ -114,7 +114,7 @@ deprecated only because it is becoming unconditional.
 
 Two consequences for this design, both favourable:
 
-- **No double claim.** Linking attaches a second `account` row to the *existing*
+- **No double claim.** Linking attaches a second `account` row to the _existing_
   user; no new user is created, so `databaseHooks.user.create.after` does not
   fire on that path.
 - **No ordering hazard.** Because linking demands the local row already be
@@ -161,7 +161,7 @@ staying as an alias.
 export async function claimProjectsForVerifiedUser(
   userId: string,
   email: string
-): Promise<number>
+): Promise<number>;
 ```
 
 Returns the number of projects claimed. Owns the case-insensitive match and the
@@ -208,11 +208,11 @@ mismatch class as the approve-row controls fixed earlier.
 
 ## Error handling
 
-| Failure | Behavior |
-|---|---|
-| Claim query fails during verification | Caught, logged, verification still succeeds |
-| Claim query fails during OAuth user creation | Caught, logged, sign-in still succeeds |
-| `getProposerForEdit` fails in the picker | Field degrades to unlinked free text, which is today's behavior |
+| Failure                                       | Behavior                                                                   |
+| --------------------------------------------- | -------------------------------------------------------------------------- |
+| Claim query fails during verification         | Caught, logged, verification still succeeds                                |
+| Claim query fails during OAuth user creation  | Caught, logged, sign-in still succeeds                                     |
+| `getProposerForEdit` fails in the picker      | Field degrades to unlinked free text, which is today's behavior            |
 | Staff re-assign to an address with no account | `proposerId` becomes null, field unlocks, project has an external proposer |
 
 ## Testing

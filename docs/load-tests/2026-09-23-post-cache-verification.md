@@ -34,15 +34,15 @@ three. See "Four tasks, not three" below before quoting them against the earlier
 
 ## Configuration under test
 
-| | At the time of this run |
-| --- | --- |
-| Tasks | 3 at the start, 4 from 07:18; autoscaling 3 to 4 on 50% average CPU (ADR-0040) |
-| Task size | 256 CPU units (0.25 vCPU), 1024 MB, Fargate ARM64 |
-| Database | `db.t4g.small`, `CPUCreditBalance` 576 |
-| Pool | 45 connections per task, 5 s acquire timeout (ADR-0034, ADR-0043) |
-| Listing | filter options cached per task for 60 s (ADR-0051); the search itself is not cached |
-| Deploy | task definition revision 88, rollout completed 07:02:33 |
-| Baseline | zero ELB 5XX and zero target 5XX in the preceding 3 hours |
+|           | At the time of this run                                                             |
+| --------- | ----------------------------------------------------------------------------------- |
+| Tasks     | 3 at the start, 4 from 07:18; autoscaling 3 to 4 on 50% average CPU (ADR-0040)      |
+| Task size | 256 CPU units (0.25 vCPU), 1024 MB, Fargate ARM64                                   |
+| Database  | `db.t4g.small`, `CPUCreditBalance` 576                                              |
+| Pool      | 45 connections per task, 5 s acquire timeout (ADR-0034, ADR-0043)                   |
+| Listing   | filter options cached per task for 60 s (ADR-0051); the search itself is not cached |
+| Deploy    | task definition revision 88, rollout completed 07:02:33                             |
+| Baseline  | zero ELB 5XX and zero target 5XX in the preceding 3 hours                           |
 
 The deploy finished ten minutes before the first phase. Phase 1c waited until the
 youngest task was ten minutes old, because the 2026-09-21 run lost its first attempt to
@@ -50,26 +50,26 @@ warm-up at seven.
 
 ## Results
 
-| Phase | Rate | Tasks | p50 | p95 | p99 | max | Absorbed | Dropped | Target 5XX |
-| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| 1c | 25/s, 3m | 3 | 67 ms | 356 ms | 786 ms | 3.80 s | 24.3/s | 0 | 0 |
-| 2. Burst, first | 42/s, aborted at 17 s | 4, one new | 171 ms | 1.58 s | 3.76 s | 5.92 s | 35.3/s | n/a | **1** |
-| 2. Burst | 42/s, 90s | 4 | 92 ms | 520 ms | 846 ms | 2.66 s | 39.7/s | 0 | 0 |
-| 2. Tail | 8/s, 10m | 4 | 60 ms | 138 ms | 198 ms | 669 ms | 7.9/s | 0 | 0 |
-| 2. Burst, three tasks | 42/s, aborted at 27 s | 3 | 589 ms | 1.88 s | 4.08 s | 6.66 s | 35.6/s | 7 | **1** |
+| Phase                 | Rate                  | Tasks      | p50    | p95    | p99    | max    | Absorbed | Dropped | Target 5XX |
+| --------------------- | --------------------- | ---------- | ------ | ------ | ------ | ------ | -------- | ------- | ---------- |
+| 1c                    | 25/s, 3m              | 3          | 67 ms  | 356 ms | 786 ms | 3.80 s | 24.3/s   | 0       | 0          |
+| 2. Burst, first       | 42/s, aborted at 17 s | 4, one new | 171 ms | 1.58 s | 3.76 s | 5.92 s | 35.3/s   | n/a     | **1**      |
+| 2. Burst              | 42/s, 90s             | 4          | 92 ms  | 520 ms | 846 ms | 2.66 s | 39.7/s   | 0       | 0          |
+| 2. Tail               | 8/s, 10m              | 4          | 60 ms  | 138 ms | 198 ms | 669 ms | 7.9/s    | 0       | 0          |
+| 2. Burst, three tasks | 42/s, aborted at 27 s | 3          | 589 ms | 1.88 s | 4.08 s | 6.66 s | 35.6/s   | 7       | **1**      |
 
 Every completed phase passed every check: 9000, 7560 and 9608 of them, every response a
 200 and an origin miss. ELB 5XX was zero throughout.
 
 The highest one minute datapoint inside each phase:
 
-| Phase | `PoolWaiting` | `PoolTotal` per task | `DatabaseConnections` | Task CPU avg / max | RDS CPU | Memory |
-| --- | --- | --- | --- | --- | --- | --- |
-| 1c | 0 | 11 | 17 | 60.5% / 96.2% | 9.1% | 20.8% |
-| 2. Burst, first | 0 | 31 | n/a, 17 s | 23.8% / 99.6% | n/a | 20.6% |
-| 2. Burst | 0 | 11 | 25 | 71.3% / 94.3% | 12.1% | 21.3% |
-| 2. Tail | 0 | 2 | 9 | 16.3% / 23.2% | 6.4% | 21.7% |
-| 2. Burst, three tasks | 0 | 22 | 38 | 38.9% / 99.6% | 7.7% | 21.1% |
+| Phase                 | `PoolWaiting` | `PoolTotal` per task | `DatabaseConnections` | Task CPU avg / max | RDS CPU | Memory |
+| --------------------- | ------------- | -------------------- | --------------------- | ------------------ | ------- | ------ |
+| 1c                    | 0             | 11                   | 17                    | 60.5% / 96.2%      | 9.1%    | 20.8%  |
+| 2. Burst, first       | 0             | 31                   | n/a, 17 s             | 23.8% / 99.6%      | n/a     | 20.6%  |
+| 2. Burst              | 0             | 11                   | 25                    | 71.3% / 94.3%      | 12.1%   | 21.3%  |
+| 2. Tail               | 0             | 2                    | 9                     | 16.3% / 23.2%      | 6.4%    | 21.7%  |
+| 2. Burst, three tasks | 0             | 22                   | 38                    | 38.9% / 99.6%      | 7.7%    | 21.1%  |
 
 The three-task burst ran for 27 s of its minute, so its fleet CPU average is diluted by idle
 seconds; the per-task maximum is the number to read.
@@ -80,13 +80,13 @@ second of any phase.
 
 Against 2026-09-21, on the same script and the same rates:
 
-| | 2026-09-21, 3 tasks, pool 20 | 2026-09-23, pool 45 and the cache |
-| --- | --- | --- |
-| 1c p50 / p95 / p99 | 41 ms / 287 ms / 661 ms | 67 ms / 356 ms / 786 ms (3 tasks) |
-| Burst p50 / p95 / p99 | 151 ms / 1.01 s / 1.99 s | 92 ms / 520 ms / 846 ms (4 tasks) |
-| Burst absorbed | 39.6/s, 2 dropped | 39.7/s, 0 dropped |
-| `DatabaseConnections` peak | 59 of 60 | 25 of 180 |
-| Session lookups failing on acquire | yes, at 21:53:05 | no failed query in the log, 07:10 to 07:40 |
+|                                    | 2026-09-21, 3 tasks, pool 20 | 2026-09-23, pool 45 and the cache          |
+| ---------------------------------- | ---------------------------- | ------------------------------------------ |
+| 1c p50 / p95 / p99                 | 41 ms / 287 ms / 661 ms      | 67 ms / 356 ms / 786 ms (3 tasks)          |
+| Burst p50 / p95 / p99              | 151 ms / 1.01 s / 1.99 s     | 92 ms / 520 ms / 846 ms (4 tasks)          |
+| Burst absorbed                     | 39.6/s, 2 dropped            | 39.7/s, 0 dropped                          |
+| `DatabaseConnections` peak         | 59 of 60                     | 25 of 180                                  |
+| Session lookups failing on acquire | yes, at 21:53:05             | no failed query in the log, 07:10 to 07:40 |
 
 Phase 1c on three tasks was a little slower than on 2026-09-21, not faster. Neither run
 queued on the pool at 25 requests per second, so the pool change should not show there;
@@ -99,14 +99,14 @@ those.
 On four warm tasks, five of the six hold and the sixth misses by 20 ms. On three, which
 is what a term start meets, three miss.
 
-| #524 criterion at 42 requests per second | 2026-09-21, 3 tasks | 2026-09-23, 4 tasks | 2026-09-23, 3 tasks |
-| --- | --- | --- | --- |
-| p95 under 500 ms | 1.01 s, miss | 520 ms, **miss by 20 ms** | 1.88 s, **miss** |
-| p99 under 1500 ms | 1.99 s, miss | 846 ms, pass | 4.08 s, **miss** |
-| Zero 5XX | 0, pass | 0, pass | 1, **miss** (#601) |
-| `DatabaseConnections` stays below the pool maximum | 59 of 60, miss | 25 of 180, pass | 38 of 135, pass |
-| ECS `MemoryUtilization` under 75% | 23.8%, pass | 21.3%, pass | 21.1%, pass |
-| `runningCount` never drops | held at 3, pass | held at 4, pass | held at 3, pass |
+| #524 criterion at 42 requests per second           | 2026-09-21, 3 tasks | 2026-09-23, 4 tasks       | 2026-09-23, 3 tasks |
+| -------------------------------------------------- | ------------------- | ------------------------- | ------------------- |
+| p95 under 500 ms                                   | 1.01 s, miss        | 520 ms, **miss by 20 ms** | 1.88 s, **miss**    |
+| p99 under 1500 ms                                  | 1.99 s, miss        | 846 ms, pass              | 4.08 s, **miss**    |
+| Zero 5XX                                           | 0, pass             | 0, pass                   | 1, **miss** (#601)  |
+| `DatabaseConnections` stays below the pool maximum | 59 of 60, miss      | 25 of 180, pass           | 38 of 135, pass     |
+| ECS `MemoryUtilization` under 75%                  | 23.8%, pass         | 21.3%, pass               | 21.1%, pass         |
+| `runningCount` never drops                         | held at 3, pass     | held at 4, pass           | held at 3, pass     |
 
 What limits the burst now is task CPU, not the pool: a task reached 94% on four tasks and
 99.6% on three while `PoolWaiting` stayed at 0 and RDS stayed under 13%. The three-task

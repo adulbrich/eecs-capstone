@@ -23,33 +23,35 @@
 
 ## Seams under test
 
-| Seam | Kind |
-| --- | --- |
-| Grouped-ness derived from `sort` versus `defaultSort` | unit, jsdom |
-| One `tbody` per group, `th scope="rowgroup"`, header colspan against hidden columns | unit, jsdom |
-| Groups formed from the sorted model, not the input | unit, jsdom |
-| `highlightedRowId` inside a group | unit, jsdom |
-| Flat path with no `group` renders one `tbody` and no `th` in it | unit, jsdom |
-| Mobile card gap across a group boundary and the strip header; desktop bottom rule | browser preview, by eye, both widths |
+| Seam                                                                                | Kind                                 |
+| ----------------------------------------------------------------------------------- | ------------------------------------ |
+| Grouped-ness derived from `sort` versus `defaultSort`                               | unit, jsdom                          |
+| One `tbody` per group, `th scope="rowgroup"`, header colspan against hidden columns | unit, jsdom                          |
+| Groups formed from the sorted model, not the input                                  | unit, jsdom                          |
+| `highlightedRowId` inside a group                                                   | unit, jsdom                          |
+| Flat path with no `group` renders one `tbody` and no `th` in it                     | unit, jsdom                          |
+| Mobile card gap across a group boundary and the strip header; desktop bottom rule   | browser preview, by eye, both widths |
 
 ## File Structure
 
-| File | Responsibility |
-| --- | --- |
-| `src/components/admin-data-table.tsx` | the `group` prop, `AdminTableGroup<T>` type, the `grouped` derivation, the grouped render branch, a `renderRow` helper shared by both branches |
-| `src/styles.css` | the admin-table rules under both breakpoints, made safe for several `tbody`s, plus the group header row |
-| `src/test/admin-data-table.test.tsx` | the unit tests above |
-| `docs/UI-CONVENTIONS.md`, "Admin tables" | the prop, that grouped-ness derives from the sort, the `header(rows)` denormalization constraint |
+| File                                     | Responsibility                                                                                                                                 |
+| ---------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
+| `src/components/admin-data-table.tsx`    | the `group` prop, `AdminTableGroup<T>` type, the `grouped` derivation, the grouped render branch, a `renderRow` helper shared by both branches |
+| `src/styles.css`                         | the admin-table rules under both breakpoints, made safe for several `tbody`s, plus the group header row                                        |
+| `src/test/admin-data-table.test.tsx`     | the unit tests above                                                                                                                           |
+| `docs/UI-CONVENTIONS.md`, "Admin tables" | the prop, that grouped-ness derives from the sort, the `header(rows)` denormalization constraint                                               |
 
 ---
 
 ### Task 1: The `group` prop and the grouped render path
 
 **Files:**
+
 - Modify: `src/components/admin-data-table.tsx:191-258` (props), `:422` (rows), `:589-643` (body)
 - Test: `src/test/admin-data-table.test.tsx`
 
 **Interfaces:**
+
 - Produces:
 
 ```ts
@@ -132,10 +134,7 @@ describe("group", () => {
   it("renders one tbody per group under the default sort, headed by a rowgroup th", () => {
     const { container } = renderGrouped();
     const bodies = [...container.querySelectorAll("tbody")];
-    expect(bodies.map((b) => b.getAttribute("data-group"))).toEqual([
-      "A",
-      "B",
-    ]);
+    expect(bodies.map((b) => b.getAttribute("data-group"))).toEqual(["A", "B"]);
     for (const body of bodies) {
       const th = body.querySelector("tr:first-child th");
       expect(th?.getAttribute("scope")).toBe("rowgroup");
@@ -203,9 +202,7 @@ describe("group", () => {
     const { container } = renderGrouped({ highlightedRowId: "3" });
     const highlighted = container.querySelector("[data-highlighted]");
     expect(highlighted?.textContent).toContain("beta");
-    expect(highlighted?.closest("tbody")?.getAttribute("data-group")).toBe(
-      "B"
-    );
+    expect(highlighted?.closest("tbody")?.getAttribute("data-group")).toBe("B");
   });
 
   it("renders the no-match row in one plain tbody when a filter empties the table", () => {
@@ -281,117 +278,117 @@ Add to `AdminDataTableProps<T>` after `getRowId`:
 Destructure `group` in the component. After `const rows = table.getRowModel().rows;` add:
 
 ```ts
-  // Grouped only while the sort is the page default. Compared by value, so a
-  // direction flip on the default column also drops grouping: descending by
-  // date is not the order the groups were formed in.
-  const grouped =
-    !!group && sort.id === defaultSort.id && sort.desc === defaultSort.desc;
-  const groups = useMemo(() => {
-    if (!grouped) {
-      return [];
+// Grouped only while the sort is the page default. Compared by value, so a
+// direction flip on the default column also drops grouping: descending by
+// date is not the order the groups were formed in.
+const grouped =
+  !!group && sort.id === defaultSort.id && sort.desc === defaultSort.desc;
+const groups = useMemo(() => {
+  if (!grouped) {
+    return [];
+  }
+  // Insertion order: a group is placed where its first row lands in the
+  // sorted model, and every later row with the same key joins it there.
+  const byKey = new Map<string, Row<T>[]>();
+  for (const row of rows) {
+    const key = group.key(row.original);
+    const bucket = byKey.get(key);
+    if (bucket) {
+      bucket.push(row);
+    } else {
+      byKey.set(key, [row]);
     }
-    // Insertion order: a group is placed where its first row lands in the
-    // sorted model, and every later row with the same key joins it there.
-    const byKey = new Map<string, Row<T>[]>();
-    for (const row of rows) {
-      const key = group.key(row.original);
-      const bucket = byKey.get(key);
-      if (bucket) {
-        bucket.push(row);
-      } else {
-        byKey.set(key, [row]);
-      }
-    }
-    return [...byKey.entries()].map(([key, groupRows]) => ({
-      key,
-      rows: groupRows,
-    }));
-  }, [group, grouped, rows]);
-  const visibleColumnCount = table.getVisibleLeafColumns().length;
+  }
+  return [...byKey.entries()].map(([key, groupRows]) => ({
+    key,
+    rows: groupRows,
+  }));
+}, [group, grouped, rows]);
+const visibleColumnCount = table.getVisibleLeafColumns().length;
 ```
 
 Import `type Row` from `@tanstack/react-table`. Extract the existing row JSX (the `rows.map` body, lines 605-641) into a function inside the component:
 
 ```tsx
-  const renderRow = (row: Row<T>) => {
-    const isHighlighted = !!highlightedRowId && row.id === highlightedRowId;
-    return (
-      <TableRow
-        // The documented highlight token, not a colour of its own.
-        className={isHighlighted ? "bg-[var(--brand-primary-tint)]" : undefined}
-        data-highlighted={isHighlighted ? "" : undefined}
-        key={row.id}
-        ref={isHighlighted ? highlighted : undefined}
-      >
-        {row.getVisibleCells().map((cell) => {
-          // A card-header cell carries no data-label on purpose: the mobile
-          // field name is drawn from that attribute, and this cell is the
-          // card's title rather than one of its fields.
-          const isCardHeader = cardHeaderIds.has(cell.column.id);
-          return (
-            <TableCell
-              data-card-header={isCardHeader ? "" : undefined}
-              data-label={
-                isCardHeader ? undefined : (labels.get(cell.column.id) ?? "")
-              }
-              key={cell.id}
-            >
-              {flexRender(cell.column.columnDef.cell, cell.getContext())}
-            </TableCell>
-          );
-        })}
-      </TableRow>
-    );
-  };
+const renderRow = (row: Row<T>) => {
+  const isHighlighted = !!highlightedRowId && row.id === highlightedRowId;
+  return (
+    <TableRow
+      // The documented highlight token, not a colour of its own.
+      className={isHighlighted ? "bg-[var(--brand-primary-tint)]" : undefined}
+      data-highlighted={isHighlighted ? "" : undefined}
+      key={row.id}
+      ref={isHighlighted ? highlighted : undefined}
+    >
+      {row.getVisibleCells().map((cell) => {
+        // A card-header cell carries no data-label on purpose: the mobile
+        // field name is drawn from that attribute, and this cell is the
+        // card's title rather than one of its fields.
+        const isCardHeader = cardHeaderIds.has(cell.column.id);
+        return (
+          <TableCell
+            data-card-header={isCardHeader ? "" : undefined}
+            data-label={
+              isCardHeader ? undefined : (labels.get(cell.column.id) ?? "")
+            }
+            key={cell.id}
+          >
+            {flexRender(cell.column.columnDef.cell, cell.getContext())}
+          </TableCell>
+        );
+      })}
+    </TableRow>
+  );
+};
 ```
 
 Replace the `<TableBody>` block with:
 
 ```tsx
-          {grouped && groups.length > 0 ? (
-            groups.map(({ key, rows: groupRows }) => (
-              <TableBody data-group={key} key={key}>
-                {/*
+{
+  grouped && groups.length > 0 ? (
+    groups.map(({ key, rows: groupRows }) => (
+      <TableBody data-group={key} key={key}>
+        {/*
                   A bare tr and th rather than TableRow and TableHead: the
                   shared classes (hover tint, h-10, border-b) are for data
                   rows and column headers, and a group header is neither.
                   `src/styles.css` styles it through data-group-header.
                 */}
-                <tr data-group-header="">
-                  <th colSpan={visibleColumnCount} scope="rowgroup">
-                    <div className="flex flex-wrap items-center justify-between gap-2">
-                      <div className="min-w-0">
-                        {group.header(groupRows.map((row) => row.original))}
-                      </div>
-                      {group.actions && (
-                        <div className="flex shrink-0 items-center gap-2">
-                          {group.actions(
-                            groupRows.map((row) => row.original)
-                          )}
-                        </div>
-                      )}
-                    </div>
-                  </th>
-                </tr>
-                {groupRows.map(renderRow)}
-              </TableBody>
-            ))
-          ) : (
-            <TableBody>
-              {rows.length === 0 && (
-                <TableRow>
-                  {/* unchanged no-match row */}
-                  <TableCell
-                    className="justify-center py-8 text-center text-muted-foreground text-sm"
-                    colSpan={visibleColumnCount}
-                  >
-                    {noMatchMessage}
-                  </TableCell>
-                </TableRow>
+        <tr data-group-header="">
+          <th colSpan={visibleColumnCount} scope="rowgroup">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div className="min-w-0">
+                {group.header(groupRows.map((row) => row.original))}
+              </div>
+              {group.actions && (
+                <div className="flex shrink-0 items-center gap-2">
+                  {group.actions(groupRows.map((row) => row.original))}
+                </div>
               )}
-              {rows.map(renderRow)}
-            </TableBody>
-          )}
+            </div>
+          </th>
+        </tr>
+        {groupRows.map(renderRow)}
+      </TableBody>
+    ))
+  ) : (
+    <TableBody>
+      {rows.length === 0 && (
+        <TableRow>
+          {/* unchanged no-match row */}
+          <TableCell
+            className="justify-center py-8 text-center text-muted-foreground text-sm"
+            colSpan={visibleColumnCount}
+          >
+            {noMatchMessage}
+          </TableCell>
+        </TableRow>
+      )}
+      {rows.map(renderRow)}
+    </TableBody>
+  );
+}
 ```
 
 The `group.header` and `group.actions` calls need `group` narrowed: `grouped` implies `group`, but TypeScript cannot see that through a boolean. Keep the narrowing explicit: compute `groups` only when `group` is defined and render `group && grouped && groups.length > 0 ? ... : ...`.
@@ -415,9 +412,11 @@ git commit -m "feat(admin-table): group rows under the default sort"
 ### Task 2: CSS under both breakpoints
 
 **Files:**
+
 - Modify: `src/styles.css:439-503`
 
 **Interfaces:**
+
 - Consumes: `tbody[data-group]`, `tr[data-group-header] > th` from Task 1.
 
 - [ ] **Step 1: Write the mobile rules**
@@ -425,29 +424,29 @@ git commit -m "feat(admin-table): group rows under the default sort"
 Under `@media (max-width: 767px)`, after `.admin-table tbody { ... }`:
 
 ```css
-  /* One tbody per group when the table is grouped. The gap above is inside
+/* One tbody per group when the table is grouped. The gap above is inside
      each tbody, so two adjacent tbodies would otherwise butt together. */
-  .admin-table tbody + tbody {
-    margin-top: 0.5rem;
-  }
+.admin-table tbody + tbody {
+  margin-top: 0.5rem;
+}
 ```
 
 After `.admin-table tbody tr { ... }`:
 
 ```css
-  /* A group header is a strip above its cards, not a card of its own: no
+/* A group header is a strip above its cards, not a card of its own: no
      border, no radius, no surface. The th carries its own padding because
      none of the td rules below reach it. */
-  .admin-table tbody tr[data-group-header] {
-    border: none;
-    border-radius: 0;
-    background: transparent;
-  }
-  .admin-table tbody tr[data-group-header] th {
-    display: block;
-    padding: 0.25rem 0.25rem 0.5rem;
-    text-align: left;
-  }
+.admin-table tbody tr[data-group-header] {
+  border: none;
+  border-radius: 0;
+  background: transparent;
+}
+.admin-table tbody tr[data-group-header] th {
+  display: block;
+  padding: 0.25rem 0.25rem 0.5rem;
+  text-align: left;
+}
 ```
 
 - [ ] **Step 2: Write the desktop rules**
@@ -495,11 +494,12 @@ git commit -m "style(admin-table): keep the card gap and the bottom rule right a
 ### Task 3: Document the prop
 
 **Files:**
+
 - Modify: `docs/UI-CONVENTIONS.md`, "Admin tables", after the `cardHeader` paragraph (around line 355)
 
 - [ ] **Step 1: Write the section**
 
-```markdown
+````markdown
 ### Grouping rows that arrived together
 
 `group` renders one `tbody` per group with a `th scope="rowgroup"` header across
@@ -516,6 +516,7 @@ Absent means the flat table every other admin route renders.
   {...tableProps}
 />
 ```
+````
 
 Grouped-ness is derived from the sort, never stored: rows are grouped while the
 table's sort equals its `defaultSort` and flat the moment the reader sorts by
@@ -533,7 +534,8 @@ it. `getRowId` and `highlightedRowId` keep addressing data rows, so a deep link
 still lands inside a group. On mobile the header renders as a strip above its
 cards rather than a card of its own. One level only: no nesting, collapsing or
 sorting within a group. CSV export is per-route and unaffected.
-```
+
+````
 
 - [ ] **Step 2: Prose check and commit**
 
@@ -542,7 +544,7 @@ Run: `npm run check:prose`
 ```bash
 git add docs/UI-CONVENTIONS.md
 git commit -m "docs(ui): document the admin table grouping mode"
-```
+````
 
 ---
 

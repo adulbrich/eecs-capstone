@@ -29,16 +29,16 @@
 
 ## File Structure
 
-| File | Responsibility |
-| --- | --- |
-| `src/lib/hold.ts` | **new**: the `Hold` union, its constructor, precedence and display rules |
-| `src/lib/__tests__/hold.test.ts` | **new**: unit tests for every rule above |
-| `src/server/_internal/inventory-transitions.ts` | named authority, line outcome, reject notify arm, Hold at the write path, `validateInvariants` arm deleted |
-| `src/server/_internal/inventory.ts` | reject and cancel routed through `transitionItem`, `submitCartAs` on the shared helper, read paths on Hold |
-| `src/components/inventory-lifecycle-panel.tsx` | `holderFields` and `formatHolderDisplay` call Hold |
-| `src/routes/_authed/admin/inventory/index.tsx` | Holder column calls Hold |
-| `src/server/__tests__/inventory.integration.test.ts` | new assertions only, no rewrites |
-| `docs/QUIRKS.md` | the `Hold` term, the corrected sole-writer claim |
+| File                                                 | Responsibility                                                                                             |
+| ---------------------------------------------------- | ---------------------------------------------------------------------------------------------------------- |
+| `src/lib/hold.ts`                                    | **new**: the `Hold` union, its constructor, precedence and display rules                                   |
+| `src/lib/__tests__/hold.test.ts`                     | **new**: unit tests for every rule above                                                                   |
+| `src/server/_internal/inventory-transitions.ts`      | named authority, line outcome, reject notify arm, Hold at the write path, `validateInvariants` arm deleted |
+| `src/server/_internal/inventory.ts`                  | reject and cancel routed through `transitionItem`, `submitCartAs` on the shared helper, read paths on Hold |
+| `src/components/inventory-lifecycle-panel.tsx`       | `holderFields` and `formatHolderDisplay` call Hold                                                         |
+| `src/routes/_authed/admin/inventory/index.tsx`       | Holder column calls Hold                                                                                   |
+| `src/server/__tests__/inventory.integration.test.ts` | new assertions only, no rewrites                                                                           |
+| `docs/QUIRKS.md`                                     | the `Hold` term, the corrected sole-writer claim                                                           |
 
 ---
 
@@ -99,10 +99,10 @@
 
 ## Risks
 
-| Risk | Mitigation |
-| --- | --- |
-| A behavior change hides inside a "behavior-preserving" refactor | Phase 2 is a checkpoint: the union must pass the whole integration suite with zero test edits before any interface changes |
-| The authority field opens a hole | Default-deny. Absent means `assertStaff`. Only two literal values are accepted, and any other value is rejected rather than ignored |
-| `transitionInventoryItem` loses its only guard | Nothing in this plan removes `assertStaff` from `transitionItem`. Phase 6 documents that the endpoint depends on it |
-| `submitCartAs` deadlocks against its own locks | The shared helper receives an open `Tx` and must not re-lock rows the caller already holds. Called out explicitly in Phase 4 |
-| CSV export headers change | `InventoryItemStaff` keeps its five flat fields; the union is internal only |
+| Risk                                                            | Mitigation                                                                                                                          |
+| --------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
+| A behavior change hides inside a "behavior-preserving" refactor | Phase 2 is a checkpoint: the union must pass the whole integration suite with zero test edits before any interface changes          |
+| The authority field opens a hole                                | Default-deny. Absent means `assertStaff`. Only two literal values are accepted, and any other value is rejected rather than ignored |
+| `transitionInventoryItem` loses its only guard                  | Nothing in this plan removes `assertStaff` from `transitionItem`. Phase 6 documents that the endpoint depends on it                 |
+| `submitCartAs` deadlocks against its own locks                  | The shared helper receives an open `Tx` and must not re-lock rows the caller already holds. Called out explicitly in Phase 4        |
+| CSV export headers change                                       | `InventoryItemStaff` keeps its five flat fields; the union is internal only                                                         |

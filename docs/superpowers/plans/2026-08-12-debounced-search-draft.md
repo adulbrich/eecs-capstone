@@ -22,14 +22,14 @@
 
 ## File Structure
 
-| File | Responsibility |
-| --- | --- |
-| `src/lib/use-debounced-draft.ts` | new; the whole mirror |
-| `src/lib/__tests__/use-debounced-draft.test.tsx` | new; fake timers, including the Back regression |
-| `src/routes/_authed/admin/{projects,users,inventory,mentors}/index.tsx` | adopt the hook |
-| `src/components/projects-filter-bar.tsx` | adopt the hook |
-| `src/components/inventory-filter-bar.tsx` | adopt the hook, which fixes both its bugs |
-| `src/components/proposer-picker.tsx` | cancellation guard |
+| File                                                                    | Responsibility                                  |
+| ----------------------------------------------------------------------- | ----------------------------------------------- |
+| `src/lib/use-debounced-draft.ts`                                        | new; the whole mirror                           |
+| `src/lib/__tests__/use-debounced-draft.test.tsx`                        | new; fake timers, including the Back regression |
+| `src/routes/_authed/admin/{projects,users,inventory,mentors}/index.tsx` | adopt the hook                                  |
+| `src/components/projects-filter-bar.tsx`                                | adopt the hook                                  |
+| `src/components/inventory-filter-bar.tsx`                               | adopt the hook, which fixes both its bugs       |
+| `src/components/proposer-picker.tsx`                                    | cancellation guard                              |
 
 ---
 
@@ -90,10 +90,9 @@ describe("useDebouncedDraft", () => {
     // holding the previous value must not be committed over the top of it
     // 300ms later. inventory-filter-bar did exactly that.
     const commit = vi.fn();
-    const { rerender } = renderHook(
-      ({ v }) => useDebouncedDraft(v, commit),
-      { initialProps: { v: "old" } }
-    );
+    const { rerender } = renderHook(({ v }) => useDebouncedDraft(v, commit), {
+      initialProps: { v: "old" },
+    });
 
     rerender({ v: "new" });
     act(() => vi.advanceTimersByTime(500));
@@ -180,13 +179,13 @@ No behaviour change here. Each site loses a `useState`, a sync effect and a debo
 - [ ] **Step 1: `src/routes/_authed/admin/projects/index.tsx`** (`:386-395`). Replace the draft state and both effects:
 
 ```ts
-  const commitQuery = useCallback(
-    (next: string) => {
-      navigate({ search: (prev) => ({ ...prev, q: next }) });
-    },
-    [navigate]
-  );
-  const [queryDraft, setQueryDraft] = useDebouncedDraft(q, commitQuery);
+const commitQuery = useCallback(
+  (next: string) => {
+    navigate({ search: (prev) => ({ ...prev, q: next }) });
+  },
+  [navigate]
+);
+const [queryDraft, setQueryDraft] = useDebouncedDraft(q, commitQuery);
 ```
 
 Keep the existing `navigate({ search: ... })` body exactly as it is, including whether it spreads `prev`.
@@ -219,7 +218,7 @@ Behaviour change. Own commit.
 - [ ] **Step 1: replace `InventoryFilterBar`'s draft and effect** (`src/components/inventory-filter-bar.tsx:43-51`):
 
 ```ts
-  const [localQ, setLocalQ] = useDebouncedDraft(props.q, props.onQChange);
+const [localQ, setLocalQ] = useDebouncedDraft(props.q, props.onQChange);
 ```
 
 Both bugs go: the sync-back arrives with the hook, and the dependency array stops including `props`.
@@ -266,9 +265,9 @@ No `QUIRKS.md` entry: the hook's JSDoc carries the one fact a future reader need
 
 ## Risks
 
-| Risk | Mitigation |
-| --- | --- |
-| A call site passes an unstable `commit` and the timer re-arms per render | The contract is in the JSDoc, and Phase 3 Step 2 explicitly checks the one caller that passes it as a prop |
-| The sync effect and the commit effect fight, committing on mount | The `draft === value` guard makes the mount tick a no-op, which is what the five correct sites already relied on. Test four pins it |
-| A route's `navigate` body changes shape during the move | Phase 2 says to keep each body exactly as written, including whether it spreads `prev` |
-| The Back fix is asserted vacuously | Phase 3 Step 4 says to confirm it fails when Step 1 is reverted |
+| Risk                                                                     | Mitigation                                                                                                                          |
+| ------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------- |
+| A call site passes an unstable `commit` and the timer re-arms per render | The contract is in the JSDoc, and Phase 3 Step 2 explicitly checks the one caller that passes it as a prop                          |
+| The sync effect and the commit effect fight, committing on mount         | The `draft === value` guard makes the mount tick a no-op, which is what the five correct sites already relied on. Test four pins it |
+| A route's `navigate` body changes shape during the move                  | Phase 2 says to keep each body exactly as written, including whether it spreads `prev`                                              |
+| The Back fix is asserted vacuously                                       | Phase 3 Step 4 says to confirm it fails when Step 1 is reverted                                                                     |

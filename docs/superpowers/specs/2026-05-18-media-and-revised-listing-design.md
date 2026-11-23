@@ -41,24 +41,24 @@ Sharp is server-only and never reaches the browser. The client uses the built-in
 
 ### 4.1 Server modules
 
-| Path | Responsibility |
-| --- | --- |
-| `src/lib/_internal/storage.ts` | Server-only. `ObjectStorage` interface + `S3Storage` impl using `@aws-sdk/client-s3`. `getObjectStorage()` singleton built from env. `forcePathStyle: true` when `S3_ENDPOINT` is set (RustFS); virtual-host style otherwise. Bucket name from `S3_BUCKET`. |
-| `src/lib/_internal/image-processing.ts` | Server-only. `processImage(input: Buffer, opts: { maxWidth, maxHeight })` returns `{ buffer, contentType: "image/webp", width, height }`. Uses Sharp. Auto-rotates by EXIF, fits within bounds (preserves aspect), strips metadata, re-encodes WebP quality 85. |
-| `src/server/uploads.ts` + `src/server/_internal/uploads.ts` | Two server fns: `uploadProjectImage` and `uploadAvatar`. Wrappers do the standard one-dynamic-import-per-handler pattern. Impls validate type + size, run Sharp, write to bucket, update the row, return the new key. |
-| `scripts/storage-init.ts` | One-shot bootstrap. Reads env, calls `CreateBucketCommand`. Idempotent (catches `BucketAlreadyOwnedByYou` and `BucketAlreadyExists`). New npm script `storage:init`. |
+| Path                                                        | Responsibility                                                                                                                                                                                                                                                  |
+| ----------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `src/lib/_internal/storage.ts`                              | Server-only. `ObjectStorage` interface + `S3Storage` impl using `@aws-sdk/client-s3`. `getObjectStorage()` singleton built from env. `forcePathStyle: true` when `S3_ENDPOINT` is set (RustFS); virtual-host style otherwise. Bucket name from `S3_BUCKET`.     |
+| `src/lib/_internal/image-processing.ts`                     | Server-only. `processImage(input: Buffer, opts: { maxWidth, maxHeight })` returns `{ buffer, contentType: "image/webp", width, height }`. Uses Sharp. Auto-rotates by EXIF, fits within bounds (preserves aspect), strips metadata, re-encodes WebP quality 85. |
+| `src/server/uploads.ts` + `src/server/_internal/uploads.ts` | Two server fns: `uploadProjectImage` and `uploadAvatar`. Wrappers do the standard one-dynamic-import-per-handler pattern. Impls validate type + size, run Sharp, write to bucket, update the row, return the new key.                                           |
+| `scripts/storage-init.ts`                                   | One-shot bootstrap. Reads env, calls `CreateBucketCommand`. Idempotent (catches `BucketAlreadyOwnedByYou` and `BucketAlreadyExists`). New npm script `storage:init`.                                                                                            |
 
 ### 4.2 Client modules
 
-| Path | Responsibility |
-| --- | --- |
-| `src/lib/storage.ts` | Client-safe. Exports `STORAGE_PUBLIC_BASE` (from `import.meta.env.VITE_STORAGE_PUBLIC_BASE`) and `getPublicUrl(key: string \| null \| undefined): string \| null`. Passthrough for legacy `http://...` strings. |
-| `src/components/image-uploader.tsx` | Self-contained widget. Props: `currentKey: string \| null`, `aspect?: number`, `maxWidth: number`, `maxHeight: number`, `onUploaded(key: string): void`, `onClear(): void`, `upload: (file: File) => Promise<{ key: string }>`. Internal flow: open file picker, react-image-crop modal, confirm, resize crop canvas, toBlob, call `upload`. Renders the current image preview via `getPublicUrl(currentKey)`. |
-| `src/components/avatar-uploader.tsx` | Thin specialization: aspect 1, max 512x512, calls `uploadAvatar` via TanStack Start's server fn. |
-| `src/components/project-image-uploader.tsx` | Thin specialization: aspect 16/9 (hint, free crop allowed), max 1600x900, calls `uploadProjectImage`. Takes `projectId` as prop. |
-| `src/components/project-row.tsx` | Row variant for `/projects` listing. 80x60 thumbnail left, status badge + 1-line description. |
-| `src/components/project-list-item.tsx` | Tiny dispatcher: `<ProjectListItem project={p} mode={"card" \| "row"} />` renders either `<ProjectCard>` or `<ProjectRow>`. |
-| `src/components/view-toggle.tsx` | Pair of icon buttons (heroicons `Squares2X2Icon` / `Bars3Icon`). Driven by URL `view` param via TanStack Router navigate. |
+| Path                                        | Responsibility                                                                                                                                                                                                                                                                                                                                                                                                 |
+| ------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `src/lib/storage.ts`                        | Client-safe. Exports `STORAGE_PUBLIC_BASE` (from `import.meta.env.VITE_STORAGE_PUBLIC_BASE`) and `getPublicUrl(key: string \| null \| undefined): string \| null`. Passthrough for legacy `http://...` strings.                                                                                                                                                                                                |
+| `src/components/image-uploader.tsx`         | Self-contained widget. Props: `currentKey: string \| null`, `aspect?: number`, `maxWidth: number`, `maxHeight: number`, `onUploaded(key: string): void`, `onClear(): void`, `upload: (file: File) => Promise<{ key: string }>`. Internal flow: open file picker, react-image-crop modal, confirm, resize crop canvas, toBlob, call `upload`. Renders the current image preview via `getPublicUrl(currentKey)`. |
+| `src/components/avatar-uploader.tsx`        | Thin specialization: aspect 1, max 512x512, calls `uploadAvatar` via TanStack Start's server fn.                                                                                                                                                                                                                                                                                                               |
+| `src/components/project-image-uploader.tsx` | Thin specialization: aspect 16/9 (hint, free crop allowed), max 1600x900, calls `uploadProjectImage`. Takes `projectId` as prop.                                                                                                                                                                                                                                                                               |
+| `src/components/project-row.tsx`            | Row variant for `/projects` listing. 80x60 thumbnail left, status badge + 1-line description.                                                                                                                                                                                                                                                                                                                  |
+| `src/components/project-list-item.tsx`      | Tiny dispatcher: `<ProjectListItem project={p} mode={"card" \| "row"} />` renders either `<ProjectCard>` or `<ProjectRow>`.                                                                                                                                                                                                                                                                                    |
+| `src/components/view-toggle.tsx`            | Pair of icon buttons (heroicons `Squares2X2Icon` / `Bars3Icon`). Driven by URL `view` param via TanStack Router navigate.                                                                                                                                                                                                                                                                                      |
 
 ### 4.3 Existing files changed
 
@@ -91,7 +91,10 @@ export interface ObjectStorage {
 }
 
 class S3Storage implements ObjectStorage {
-  constructor(private bucket: string, private client: S3Client) {}
+  constructor(
+    private bucket: string,
+    private client: S3Client
+  ) {}
   async put(key, body, contentType) {
     await this.client.send(
       new PutObjectCommand({
@@ -99,12 +102,12 @@ class S3Storage implements ObjectStorage {
         Key: key,
         Body: body,
         ContentType: contentType,
-      }),
+      })
     );
   }
   async delete(key) {
     await this.client.send(
-      new DeleteObjectCommand({ Bucket: this.bucket, Key: key }),
+      new DeleteObjectCommand({ Bucket: this.bucket, Key: key })
     );
   }
 }
@@ -134,9 +137,7 @@ export function getObjectStorage(): ObjectStorage {
 export const STORAGE_PUBLIC_BASE =
   import.meta.env.VITE_STORAGE_PUBLIC_BASE ?? "/storage";
 
-export function getPublicUrl(
-  key: string | null | undefined,
-): string | null {
+export function getPublicUrl(key: string | null | undefined): string | null {
   if (!key) return null;
   if (key.startsWith("http://") || key.startsWith("https://")) return key;
   return `${STORAGE_PUBLIC_BASE}/${key}`;
@@ -185,10 +186,7 @@ try {
   console.log(`Created bucket ${bucket}`);
 } catch (err) {
   const name = (err as { name?: string })?.name ?? "";
-  if (
-    name === "BucketAlreadyOwnedByYou" ||
-    name === "BucketAlreadyExists"
-  ) {
+  if (name === "BucketAlreadyOwnedByYou" || name === "BucketAlreadyExists") {
     console.log(`Bucket ${bucket} already exists`);
   } else {
     throw err;
@@ -220,11 +218,15 @@ ctx.imageSmoothingQuality = "high";
 ctx.drawImage(cropCanvas, 0, 0, out.width, out.height);
 
 const blob: Blob = await new Promise((resolve, reject) =>
-  out.toBlob((b) => (b ? resolve(b) : reject(new Error("toBlob failed"))), "image/webp", 0.85),
+  out.toBlob(
+    (b) => (b ? resolve(b) : reject(new Error("toBlob failed"))),
+    "image/webp",
+    0.85
+  )
 );
 
 const file = new File([blob], "upload.webp", { type: "image/webp" });
-const { key } = await props.upload(file);  // calls the server fn
+const { key } = await props.upload(file); // calls the server fn
 props.onUploaded(key);
 ```
 
@@ -266,7 +268,9 @@ export async function uploadProjectImageForCurrentUser(form: FormData) {
   if (!(file instanceof File)) throw new Error("Missing file");
 
   // Validate MIME + size
-  if (!["image/jpeg", "image/png", "image/webp", "image/gif"].includes(file.type)) {
+  if (
+    !["image/jpeg", "image/png", "image/webp", "image/gif"].includes(file.type)
+  ) {
     throw new Error("Unsupported image type");
   }
   if (file.size > 10 * 1024 * 1024) {
@@ -274,7 +278,10 @@ export async function uploadProjectImageForCurrentUser(form: FormData) {
   }
 
   // Permission: viewer must be able to edit this project
-  const [project] = await db.select().from(projects).where(eq(projects.id, projectId));
+  const [project] = await db
+    .select()
+    .from(projects)
+    .where(eq(projects.id, projectId));
   if (!project) throw new Error("Project not found");
   if (!canEditProject(project, { id: viewer.id, role: viewer.role ?? null })) {
     throw new Error("Forbidden");
@@ -295,11 +302,16 @@ export async function uploadProjectImageForCurrentUser(form: FormData) {
 
   // Update row
   const previousKey = project.imageUrl;
-  await db.update(projects).set({ imageUrl: key, updatedAt: new Date() }).where(eq(projects.id, projectId));
+  await db
+    .update(projects)
+    .set({ imageUrl: key, updatedAt: new Date() })
+    .where(eq(projects.id, projectId));
 
   // Best-effort cleanup of old key (only if it's a key, not a legacy URL)
   if (previousKey && !previousKey.startsWith("http")) {
-    getObjectStorage().delete(previousKey).catch((e) => console.warn("orphan delete", previousKey, e));
+    getObjectStorage()
+      .delete(previousKey)
+      .catch((e) => console.warn("orphan delete", previousKey, e));
   }
 
   return { key };
@@ -316,10 +328,10 @@ import sharp from "sharp";
 
 export async function processImage(
   input: Buffer,
-  opts: { maxWidth: number; maxHeight: number },
+  opts: { maxWidth: number; maxHeight: number }
 ) {
   const pipeline = sharp(input)
-    .rotate()  // auto-orient by EXIF
+    .rotate() // auto-orient by EXIF
     .resize({
       width: opts.maxWidth,
       height: opts.maxHeight,
@@ -327,7 +339,7 @@ export async function processImage(
       withoutEnlargement: true,
     })
     .webp({ quality: 85 })
-    .withMetadata({});  // strip EXIF / orientation tag
+    .withMetadata({}); // strip EXIF / orientation tag
 
   const buffer = await pipeline.toBuffer();
   const { width, height } = await sharp(buffer).metadata();
@@ -376,22 +388,22 @@ Filter changes still reset `page` to 1; toggle changes leave page alone (differe
 
 ## 9. Routes touched
 
-| Path | Change |
-| --- | --- |
-| `/projects` | Add `view` to search schema; render via `<ProjectListItem mode={view}>`; mount `<ViewToggle>` in filter bar. |
-| `/projects/$projectId` | Render `getPublicUrl(project.imageUrl)` as a 16:9 hero image when present. |
-| `/projects/$projectId/edit` | Replace `<ProjectImageUploader projectId={...} />` (the form's existing imageUrl key is preloaded). |
-| `/projects/new` | Generates `projectId = crypto.randomUUID()` on mount, passes it to both `<ProjectImageUploader>` and (on submit) to `createProject({ data: { id: projectId, ... } })`. Image upload works immediately; user can upload before filling any other field. |
-| `/profile` | Mount `<AvatarUploader currentKey={user.image} ...>` near the top. |
+| Path                        | Change                                                                                                                                                                                                                                                 |
+| --------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `/projects`                 | Add `view` to search schema; render via `<ProjectListItem mode={view}>`; mount `<ViewToggle>` in filter bar.                                                                                                                                           |
+| `/projects/$projectId`      | Render `getPublicUrl(project.imageUrl)` as a 16:9 hero image when present.                                                                                                                                                                             |
+| `/projects/$projectId/edit` | Replace `<ProjectImageUploader projectId={...} />` (the form's existing imageUrl key is preloaded).                                                                                                                                                    |
+| `/projects/new`             | Generates `projectId = crypto.randomUUID()` on mount, passes it to both `<ProjectImageUploader>` and (on submit) to `createProject({ data: { id: projectId, ... } })`. Image upload works immediately; user can upload before filling any other field. |
+| `/profile`                  | Mount `<AvatarUploader currentKey={user.image} ...>` near the top.                                                                                                                                                                                     |
 
 ## 10. Testing
 
-| Layer | Coverage | Tooling |
-| --- | --- | --- |
-| Unit (pure) | `getPublicUrl(null)` returns null; `getPublicUrl("https://x")` passthrough; `getPublicUrl("foo.webp")` returns base + key. | Vitest. |
-| Unit (pure, runs Sharp) | `processImage(fixtureBuffer, { maxWidth: 100, maxHeight: 100 })` returns a WebP buffer no wider/taller than 100. Auto-rotate test: source has EXIF orientation 6, output has equivalent rotated content (assert via output dimensions matching the EXIF-rotated source). | Vitest + tiny fixture JPEG and EXIF-tagged JPEG in `src/lib/__tests__/fixtures/`. |
-| Integration | `uploadProjectImageForCurrentUser`: writes a real object to the docker RustFS bucket. Reads it back via the S3 client (HEAD) to verify Content-Type and non-zero size. Updates `projects.imageUrl` to the new key. Refuses when viewer is not allowed to edit. | Vitest + docker RustFS (already in `docker compose`). Requires the bucket to exist; the test setup calls `storage-init` once before the suite via a `globalSetup` hook in `vitest.integration.config.ts`. |
-| Integration | `uploadAvatarForCurrentUser`: writes a real object. Updates `user.image`. | Same harness. |
+| Layer                   | Coverage                                                                                                                                                                                                                                                                 | Tooling                                                                                                                                                                                                   |
+| ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Unit (pure)             | `getPublicUrl(null)` returns null; `getPublicUrl("https://x")` passthrough; `getPublicUrl("foo.webp")` returns base + key.                                                                                                                                               | Vitest.                                                                                                                                                                                                   |
+| Unit (pure, runs Sharp) | `processImage(fixtureBuffer, { maxWidth: 100, maxHeight: 100 })` returns a WebP buffer no wider/taller than 100. Auto-rotate test: source has EXIF orientation 6, output has equivalent rotated content (assert via output dimensions matching the EXIF-rotated source). | Vitest + tiny fixture JPEG and EXIF-tagged JPEG in `src/lib/__tests__/fixtures/`.                                                                                                                         |
+| Integration             | `uploadProjectImageForCurrentUser`: writes a real object to the docker RustFS bucket. Reads it back via the S3 client (HEAD) to verify Content-Type and non-zero size. Updates `projects.imageUrl` to the new key. Refuses when viewer is not allowed to edit.           | Vitest + docker RustFS (already in `docker compose`). Requires the bucket to exist; the test setup calls `storage-init` once before the suite via a `globalSetup` hook in `vitest.integration.config.ts`. |
+| Integration             | `uploadAvatarForCurrentUser`: writes a real object. Updates `user.image`.                                                                                                                                                                                                | Same harness.                                                                                                                                                                                             |
 
 No new browser/E2E tests. Manual smoke at Section 13.
 

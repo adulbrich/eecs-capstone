@@ -36,21 +36,21 @@ Build the admin user-management surface at `/admin/users` (list, search by email
 
 Same pattern as prior specs: client-safe wrapper + server-only `_internal/` impl.
 
-| Path | Responsibility |
-| --- | --- |
-| `src/server/users.ts` | createServerFn wrappers (`listUsers`, `getUser`, `setUserRole`, `banUser`, `unbanUser`). Each does one dynamic import per handler and forwards to the impl. Schemas (Zod) live here for input validation. |
+| Path                            | Responsibility                                                                                                                                                                                                                                                                              |
+| ------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `src/server/users.ts`           | createServerFn wrappers (`listUsers`, `getUser`, `setUserRole`, `banUser`, `unbanUser`). Each does one dynamic import per handler and forwards to the impl. Schemas (Zod) live here for input validation.                                                                                   |
 | `src/server/_internal/users.ts` | Impls. Direct Drizzle reads/writes against `user` and `session`. Exposes `*As(viewer, ...)` helpers for tests and `*ForCurrentUser(...)` for the wrappers. Self-action guards inline. The ban impl wraps writes in `db.transaction` so the session-revoke is atomic with the column update. |
 
 The admin role gate is enforced two ways: a `requireRole(["admin"])` at the wrapper boundary AND an `assertAdmin(viewer)` at the top of every impl (defense in depth, matching the project's "guard at both layers" rule).
 
 ### 4.2 Client modules
 
-| Path | Responsibility |
-| --- | --- |
-| `src/routes/_authed/admin/users/index.tsx` | List with paginated table. Search input (debounced 300ms; same pattern as `projects-filter-bar`), role filter dropdown, include-banned checkbox. URL-driven via `validateSearch`. Reuses `AdminTable`. |
-| `src/routes/_authed/admin/users/$userId.tsx` | Detail view. Profile block, ban status block (Banned banner when active, with reason + expiry), `<RoleSelect />`, `<BanForm />`. Loads projects + bookmarks counts. |
-| `src/components/role-select.tsx` | Three-option `<select>` with onChange + a small Save button. Hidden when target is the viewer. |
-| `src/components/ban-form.tsx` | When `target.banned` is false: reason textarea + optional expiry datetime-local input + Ban button. When `target.banned` is true: shows current reason + expiry + Unban button. Hidden when target is the viewer. |
+| Path                                         | Responsibility                                                                                                                                                                                                    |
+| -------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `src/routes/_authed/admin/users/index.tsx`   | List with paginated table. Search input (debounced 300ms; same pattern as `projects-filter-bar`), role filter dropdown, include-banned checkbox. URL-driven via `validateSearch`. Reuses `AdminTable`.            |
+| `src/routes/_authed/admin/users/$userId.tsx` | Detail view. Profile block, ban status block (Banned banner when active, with reason + expiry), `<RoleSelect />`, `<BanForm />`. Loads projects + bookmarks counts.                                               |
+| `src/components/role-select.tsx`             | Three-option `<select>` with onChange + a small Save button. Hidden when target is the viewer.                                                                                                                    |
+| `src/components/ban-form.tsx`                | When `target.banned` is false: reason textarea + optional expiry datetime-local input + Ban button. When `target.banned` is true: shows current reason + expiry + Unban button. Hidden when target is the viewer. |
 
 ### 4.3 Existing files changed
 
@@ -162,22 +162,22 @@ effect:
 
 ## 7. Routes
 
-| Path | Layout | Component | Notes |
-| --- | --- | --- | --- |
-| `/admin/users` | `_authed/admin` | `_authed/admin/users/index.tsx` | List with URL-driven search/filter/page. |
+| Path                   | Layout          | Component                         | Notes                                                      |
+| ---------------------- | --------------- | --------------------------------- | ---------------------------------------------------------- |
+| `/admin/users`         | `_authed/admin` | `_authed/admin/users/index.tsx`   | List with URL-driven search/filter/page.                   |
 | `/admin/users/$userId` | `_authed/admin` | `_authed/admin/users/$userId.tsx` | Detail + role + ban controls. Notfound when id is missing. |
 
 Both routes add their OWN `beforeLoad` that requires `role === "admin"` (the parent `_authed/admin.tsx` only requires admin OR instructor). Instructors visiting `/admin/users` are redirected to `/admin`. Each server fn additionally re-checks `requireRole(["admin"])` so mutations are admin-only at the data boundary too.
 
 ## 8. Testing
 
-| Layer | What we cover | Tooling |
-| --- | --- | --- |
+| Layer       | What we cover                                                                                                                                                  | Tooling                         |
+| ----------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------- |
 | Integration | listUsersImpl: q matches by email AND name (separately and combined). role filter restricts. includeBanned=false hides banned. Pagination + total are correct. | Vitest against docker Postgres. |
-| Integration | setUserRoleAs: round-trips through user.role. Refuses when target == actor. Refuses when actor role !== "admin" (e.g., instructor). | Same. |
-| Integration | banUserAs: updates the three columns AND deletes the target's sessions. Refuses when target == actor. Refuses when actor is not admin. | Same. |
-| Integration | unbanUserAs: clears the three columns. Allowed when target == actor (no-op in practice). | Same. |
-| Integration | getUserImpl: returns project count + recent 5 + bookmark count. Admin gate enforced. | Same. |
+| Integration | setUserRoleAs: round-trips through user.role. Refuses when target == actor. Refuses when actor role !== "admin" (e.g., instructor).                            | Same.                           |
+| Integration | banUserAs: updates the three columns AND deletes the target's sessions. Refuses when target == actor. Refuses when actor is not admin.                         | Same.                           |
+| Integration | unbanUserAs: clears the three columns. Allowed when target == actor (no-op in practice).                                                                       | Same.                           |
+| Integration | getUserImpl: returns project count + recent 5 + bookmark count. Admin gate enforced.                                                                           | Same.                           |
 
 No new browser tests. Manual smoke at Section 10.
 

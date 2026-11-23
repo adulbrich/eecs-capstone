@@ -26,31 +26,31 @@
 
 **Part A**
 
-| File | Responsibility |
-| --- | --- |
-| `src/db/schema.ts` | add `project_categories_category_idx` |
-| `src/server/_internal/categories.ts` | `listCategoriesWithUsageAs`, the `usageCount` SQL fragment |
-| `src/server/categories.ts` | `listCategoriesWithUsage` server function |
-| `src/routes/_authed/admin/categories/index.tsx` | count column per tab, CSV column, loader switch |
-| `src/server/__tests__/categories.integration.test.ts` | count semantics |
+| File                                                  | Responsibility                                             |
+| ----------------------------------------------------- | ---------------------------------------------------------- |
+| `src/db/schema.ts`                                    | add `project_categories_category_idx`                      |
+| `src/server/_internal/categories.ts`                  | `listCategoriesWithUsageAs`, the `usageCount` SQL fragment |
+| `src/server/categories.ts`                            | `listCategoriesWithUsage` server function                  |
+| `src/routes/_authed/admin/categories/index.tsx`       | count column per tab, CSV column, loader switch            |
+| `src/server/__tests__/categories.integration.test.ts` | count semantics                                            |
 
 **Part B**
 
-| File | Responsibility |
-| --- | --- |
-| `src/db/schema.ts` | five new nullable text columns |
-| `src/server/_internal/inventory-transitions.ts` | `resolveHolder`, the new invariant, history writes |
-| `src/server/_internal/inventory.ts` | `submitCartAs` address, `holderNameOf`, `listMyItemsAs` guard, overdue scan, `collectedByForRequestItems`, `getItemHistoryAs` projection |
-| `src/server/inventory.ts` | `transitionSchema` loses `holderId`, gains name and program |
-| `src/components/holder-field.tsx` | **new**: the email-or-label input, replaces `user-picker.tsx` |
-| `src/components/inventory-lifecycle-panel.tsx` | dialog rewrite, holder display, history holder line |
-| `src/components/admin-request-queue-row.tsx` | "Collected by" line |
-| `src/routes/_authed/admin/inventory/requests.tsx` | pass `collectedBy` through |
-| `src/routes/_authed/my/items.tsx` | "Collected by" on active and history entries |
-| `src/routes/_authed/admin/inventory/index.tsx` | CSV column for `currentHolderProgram` |
-| `src/test/holder-field.test.tsx` | **new**, replaces `src/test/user-picker.test.tsx` |
-| `src/server/__tests__/inventory.integration.test.ts` | cross-person checkout, overdue, collected-by |
-| `docs/QUIRKS.md` | overdue-scan disjointness entry rewritten |
+| File                                                 | Responsibility                                                                                                                           |
+| ---------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
+| `src/db/schema.ts`                                   | five new nullable text columns                                                                                                           |
+| `src/server/_internal/inventory-transitions.ts`      | `resolveHolder`, the new invariant, history writes                                                                                       |
+| `src/server/_internal/inventory.ts`                  | `submitCartAs` address, `holderNameOf`, `listMyItemsAs` guard, overdue scan, `collectedByForRequestItems`, `getItemHistoryAs` projection |
+| `src/server/inventory.ts`                            | `transitionSchema` loses `holderId`, gains name and program                                                                              |
+| `src/components/holder-field.tsx`                    | **new**: the email-or-label input, replaces `user-picker.tsx`                                                                            |
+| `src/components/inventory-lifecycle-panel.tsx`       | dialog rewrite, holder display, history holder line                                                                                      |
+| `src/components/admin-request-queue-row.tsx`         | "Collected by" line                                                                                                                      |
+| `src/routes/_authed/admin/inventory/requests.tsx`    | pass `collectedBy` through                                                                                                               |
+| `src/routes/_authed/my/items.tsx`                    | "Collected by" on active and history entries                                                                                             |
+| `src/routes/_authed/admin/inventory/index.tsx`       | CSV column for `currentHolderProgram`                                                                                                    |
+| `src/test/holder-field.test.tsx`                     | **new**, replaces `src/test/user-picker.test.tsx`                                                                                        |
+| `src/server/__tests__/inventory.integration.test.ts` | cross-person checkout, overdue, collected-by                                                                                             |
+| `docs/QUIRKS.md`                                     | overdue-scan disjointness entry rewritten                                                                                                |
 
 Part A (Tasks 1 to 2) and Part B (Tasks 3 to 10) are independent and may be done in either order.
 
@@ -59,12 +59,14 @@ Part A (Tasks 1 to 2) and Part B (Tasks 3 to 10) are independent and may be done
 ## Task 1: Category usage counts on the server
 
 **Files:**
+
 - Modify: `src/db/schema.ts:187-198` (the `projectCategories` table)
 - Modify: `src/server/_internal/categories.ts` (add after `listCategoriesImpl`, which ends at line 55)
 - Modify: `src/server/categories.ts` (add after `listCategories`, which ends at line 59)
 - Test: `src/server/__tests__/categories.integration.test.ts`
 
 **Interfaces:**
+
 - Consumes: `assertStaff(viewer)` and the `AuthUser` interface, both already in `src/server/_internal/categories.ts:21-34`.
 - Produces: `listCategoriesWithUsage` server function, returning `{ rows: Array<{ id: string; name: string; domain: "project" | "inventory"; type: string | null; createdAt: Date; usageCount: number }> }`. Task 2 consumes this exact shape.
 
@@ -162,13 +164,13 @@ Expected: FAIL, `listCategoriesWithUsageAs is not a function` (or an import erro
 In `src/db/schema.ts`, replace the `projectCategories` definition's final argument:
 
 ```ts
-  (t) => [
-    primaryKey({ columns: [t.projectId, t.categoryId] }),
-    // The primary key only serves project -> categories. Counting "how many
-    // projects carry this category" reads the other way, exactly as
-    // inventory_item_categories_category_idx already serves the item side.
-    index("project_categories_category_idx").on(t.categoryId),
-  ]
+(t) => [
+  primaryKey({ columns: [t.projectId, t.categoryId] }),
+  // The primary key only serves project -> categories. Counting "how many
+  // projects carry this category" reads the other way, exactly as
+  // inventory_item_categories_category_idx already serves the item side.
+  index("project_categories_category_idx").on(t.categoryId),
+];
 ```
 
 - [ ] **Step 4: Generate and apply the migration**
@@ -315,9 +317,11 @@ the inventory junction table already had."
 ## Task 2: Usage count column in /admin/categories
 
 **Files:**
+
 - Modify: `src/routes/_authed/admin/categories/index.tsx`
 
 **Interfaces:**
+
 - Consumes: `listCategoriesWithUsage` from Task 1, returning rows with `usageCount: number`.
 - Produces: nothing consumed by later tasks.
 
@@ -337,10 +341,10 @@ import {
 Then the loader body (line 76-79):
 
 ```ts
-    const [{ rows }, { types }] = await Promise.all([
-      listCategoriesWithUsage({ data: listData }),
-      listCategoryTypes(),
-    ]);
+const [{ rows }, { types }] = await Promise.all([
+  listCategoriesWithUsage({ data: listData }),
+  listCategoryTypes(),
+]);
 ```
 
 And the row type (line 85):
@@ -441,10 +445,12 @@ sorted and both in the CSV export."
 ## Task 3: Holder columns migration
 
 **Files:**
+
 - Modify: `src/db/schema.ts:325-370` (`inventoryItems`) and `:466-494` (`inventoryItemStatusHistory`)
 - Create: `drizzle/00NN_*.sql` (generated)
 
 **Interfaces:**
+
 - Produces: `inventoryItems.currentHolderName`, `inventoryItems.currentHolderProgram`, `inventoryItemStatusHistory.holderEmail`, `.holderName`, `.holderProgram`. Every later Part B task reads or writes these.
 
 - [ ] **Step 1: Add the item columns**
@@ -523,10 +529,12 @@ address was written into holder_label."
 ## Task 4: resolveHolder and the email-or-label invariant
 
 **Files:**
+
 - Modify: `src/server/_internal/inventory-transitions.ts:22-33` (`TransitionInput`), `:46-97` (`validateInvariants`), `:99-119` (`resolveHolderId`), `:150-228` (`transitionItemInTx`), `:280-300` (`maybeNotify`)
 - Test: `src/server/__tests__/inventory.integration.test.ts`
 
 **Interfaces:**
+
 - Consumes: the columns from Task 3.
 - Produces: `TransitionInput` with `holderName` and `holderProgram` added and `holderId` retained; `resolveHolder(tx, input): Promise<{ email: string | null; id: string | null }>`. Tasks 5 through 10 depend on `transitionItem` writing `current_holder_email` for every person hold.
 
@@ -672,9 +680,9 @@ describe("holder resolution", () => {
       .select()
       .from(notifications)
       .where(eq(notifications.userId, student.id));
-    expect(
-      notes.some((n) => n.type === "inventory_request_approved")
-    ).toBe(true);
+    expect(notes.some((n) => n.type === "inventory_request_approved")).toBe(
+      true
+    );
   });
 });
 ```
@@ -942,8 +950,8 @@ async function maybeNotify(
 and:
 
 ```ts
-  const recipientId =
-    holderId ?? (isReleaseFromHold ? prev.currentHolderId : null);
+const recipientId =
+  holderId ?? (isReleaseFromHold ? prev.currentHolderId : null);
 ```
 
 The rest of the function is unchanged.
@@ -976,11 +984,13 @@ smuggling it into holder_label."
 ## Task 5: Request holds carry an address too
 
 **Files:**
+
 - Modify: `src/server/_internal/inventory.ts:708-816` (`submitCartAs`), `:99-128` (`fullForStaff`, `holderEmailOf`), `:212-221` and `:273-279` (the two staff projections)
 - Modify: `src/routes/_authed/admin/inventory/index.tsx` (`EXPORT_COLUMNS`)
 - Test: `src/server/__tests__/inventory.integration.test.ts`
 
 **Interfaces:**
+
 - Consumes: Task 3's columns, Task 4's invariant.
 - Produces: `holderNameOf(row)`; `InventoryItemStaff` gains `currentHolderProgram: string | null`. Task 10 renders it.
 
@@ -1021,42 +1031,42 @@ Expected: FAIL, `currentHolderEmail` is null.
 `submitCartAs` writes the requested transition inline rather than through `transitionItem`, so it has to satisfy the invariant itself. Add the lookup immediately after the survivors loop and before the request envelope insert (around line 762):
 
 ```ts
-    // The invariant applies to every person hold, including one a student
-    // created for themselves. Fetched once here rather than as a correlated
-    // subselect inside each item update below.
-    const [requester] = await tx
-      .select({ email: user.email })
-      .from(user)
-      .where(eq(user.id, viewer.id));
+// The invariant applies to every person hold, including one a student
+// created for themselves. Fetched once here rather than as a correlated
+// subselect inside each item update below.
+const [requester] = await tx
+  .select({ email: user.email })
+  .from(user)
+  .where(eq(user.id, viewer.id));
 ```
 
 Then in the per-line loop, change the item update and the history insert:
 
 ```ts
-      await tx
-        .update(inventoryItems)
-        .set({
-          status: "requested",
-          currentHolderId: viewer.id,
-          currentHolderEmail: requester?.email ?? null,
-          currentHolderLabel: null,
-          currentHolderName: null,
-          currentHolderProgram: null,
-          currentPickupBy: null,
-          currentDueAt: null,
-          currentRequestItemId: line.id,
-          updatedAt: new Date(),
-        })
-        .where(eq(inventoryItems.id, line.itemId));
-      await tx.insert(inventoryItemStatusHistory).values({
-        itemId: line.itemId,
-        oldStatus: survivor.oldStatus,
-        newStatus: "requested",
-        changedBy: viewer.id,
-        requestItemId: line.id,
-        holderId: viewer.id,
-        holderEmail: requester?.email ?? null,
-      });
+await tx
+  .update(inventoryItems)
+  .set({
+    status: "requested",
+    currentHolderId: viewer.id,
+    currentHolderEmail: requester?.email ?? null,
+    currentHolderLabel: null,
+    currentHolderName: null,
+    currentHolderProgram: null,
+    currentPickupBy: null,
+    currentDueAt: null,
+    currentRequestItemId: line.id,
+    updatedAt: new Date(),
+  })
+  .where(eq(inventoryItems.id, line.itemId));
+await tx.insert(inventoryItemStatusHistory).values({
+  itemId: line.itemId,
+  oldStatus: survivor.oldStatus,
+  newStatus: "requested",
+  changedBy: viewer.id,
+  requestItemId: line.id,
+  holderId: viewer.id,
+  holderEmail: requester?.email ?? null,
+});
 ```
 
 - [ ] **Step 4: Surface the stored name and program to staff**
@@ -1155,10 +1165,12 @@ account's name wins, the stored one covers a holder with no account."
 ## Task 6: The picker sees the item in /my/items
 
 **Files:**
+
 - Modify: `src/server/_internal/inventory.ts:1179-1203` (the holds query inside `listMyItemsAs`)
 - Test: `src/server/__tests__/inventory.integration.test.ts`
 
 **Interfaces:**
+
 - Consumes: Task 4's invariant.
 - Produces: nothing new; changes which rows `listMyItemsAs` returns.
 
@@ -1309,11 +1321,13 @@ pickup from the person holding it."
 ## Task 7: Both parties hear that an item is overdue
 
 **Files:**
+
 - Modify: `src/server/_internal/inventory.ts:1517-1614` (`recordOverdueNotificationsAs`)
 - Modify: `docs/QUIRKS.md:537-539`
 - Test: `src/server/__tests__/inventory.integration.test.ts`
 
 **Interfaces:**
+
 - Consumes: Task 6's read path.
 - Produces: nothing consumed by later tasks.
 
@@ -1411,19 +1425,19 @@ Expected: the two-party case FAILS with only the requester's id present.
 In `recordOverdueNotificationsAs`, replace `holdConditions` (lines 1554-1558) and the comment above it:
 
 ```ts
-  // The hold scan and the request scan used to be disjoint, because a held
-  // item always had either a request line or a holder, never both meaningfully.
-  // Now that a teammate can collect someone else's requested item, the two
-  // deliberately overlap: the requester is accountable for the request and the
-  // picker is holding the thing, so both are told. Restricted to holds with a
-  // resolved account (current_holder_id IS NOT NULL): notifications.userId is
-  // a foreign key, and an email-matched hold has no id to attribute a message
-  // to. Resolving the address here would reintroduce, on a write path, the
-  // impersonation risk the read path in listMyItemsAs guards against.
-  const holdConditions = [
-    isNotNull(inventoryItems.currentHolderId),
-    inArray(inventoryItems.status, ["reserved", "checked_out"]),
-  ];
+// The hold scan and the request scan used to be disjoint, because a held
+// item always had either a request line or a holder, never both meaningfully.
+// Now that a teammate can collect someone else's requested item, the two
+// deliberately overlap: the requester is accountable for the request and the
+// picker is holding the thing, so both are told. Restricted to holds with a
+// resolved account (current_holder_id IS NOT NULL): notifications.userId is
+// a foreign key, and an email-matched hold has no id to attribute a message
+// to. Resolving the address here would reintroduce, on a write path, the
+// impersonation risk the read path in listMyItemsAs guards against.
+const holdConditions = [
+  isNotNull(inventoryItems.currentHolderId),
+  inArray(inventoryItems.status, ["reserved", "checked_out"]),
+];
 ```
 
 - [ ] **Step 4: Dedupe before inserting**
@@ -1431,40 +1445,40 @@ In `recordOverdueNotificationsAs`, replace `holdConditions` (lines 1554-1558) an
 The unique index on `(user_id, type, link)` cannot collapse the two-party case, because the user ids differ, and it should not: that case wants two rows. It also cannot be relied on to collapse the same-person case cleanly, so do that explicitly. Replace the `values` construction (lines 1582-1603):
 
 ```ts
-  const values: (typeof notifications.$inferInsert)[] = [];
-  const seen = new Set<string>();
-  const push = (row: typeof notifications.$inferInsert) => {
-    // Requester and picker are the same person on most checkouts, so the two
-    // scans return the same row twice. One notice, not two.
-    const key = `${row.userId}|${row.type}|${row.link}`;
-    if (seen.has(key)) {
-      return;
-    }
-    seen.add(key);
-    values.push(row);
-  };
-
-  for (const r of candidates) {
-    const { pickupOverdue, checkoutOverdue } = deriveDeadlineFlags(r);
-    if (pickupOverdue) {
-      push({
-        userId: r.userId,
-        type: "inventory_pickup_overdue",
-        title: `Pickup window passed: ${r.itemName}`,
-        message: "Your reserved item is past its pickup window.",
-        link: `/inventory/${r.itemId}`,
-      });
-    }
-    if (checkoutOverdue) {
-      push({
-        userId: r.userId,
-        type: "inventory_checkout_overdue",
-        title: `Overdue: ${r.itemName}`,
-        message: "Your checked-out item is past its due date.",
-        link: `/inventory/${r.itemId}`,
-      });
-    }
+const values: (typeof notifications.$inferInsert)[] = [];
+const seen = new Set<string>();
+const push = (row: typeof notifications.$inferInsert) => {
+  // Requester and picker are the same person on most checkouts, so the two
+  // scans return the same row twice. One notice, not two.
+  const key = `${row.userId}|${row.type}|${row.link}`;
+  if (seen.has(key)) {
+    return;
   }
+  seen.add(key);
+  values.push(row);
+};
+
+for (const r of candidates) {
+  const { pickupOverdue, checkoutOverdue } = deriveDeadlineFlags(r);
+  if (pickupOverdue) {
+    push({
+      userId: r.userId,
+      type: "inventory_pickup_overdue",
+      title: `Pickup window passed: ${r.itemName}`,
+      message: "Your reserved item is past its pickup window.",
+      link: `/inventory/${r.itemId}`,
+    });
+  }
+  if (checkoutOverdue) {
+    push({
+      userId: r.userId,
+      type: "inventory_checkout_overdue",
+      title: `Overdue: ${r.itemName}`,
+      message: "Your checked-out item is past its due date.",
+      link: `/inventory/${r.itemId}`,
+    });
+  }
+}
 ```
 
 - [ ] **Step 5: Run to verify it passes**
@@ -1510,10 +1524,12 @@ overlap on purpose, with same-person duplicates collapsed in JS."
 ## Task 8: Who collected it, read from history
 
 **Files:**
+
 - Modify: `src/server/_internal/inventory.ts` (new export beside `listInventoryRequestsAs` at line 1241; wire into `listInventoryRequestsAs` and `listMyItemsAs`)
 - Test: `src/server/__tests__/inventory.integration.test.ts`
 
 **Interfaces:**
+
 - Consumes: Task 4's `holder_email` history column.
 - Produces:
   - `export interface CollectedBy { email: string | null; name: string | null }`
@@ -1558,9 +1574,7 @@ describe("collected by", () => {
     });
 
     const collected = await collectedByForRequestItems([line.id]);
-    expect(collected.get(line.id)?.email).toBe(
-      "walkin-collector@nowhere.test"
-    );
+    expect(collected.get(line.id)?.email).toBe("walkin-collector@nowhere.test");
     expect(collected.get(line.id)?.name).toBe("Walk In Collector");
   });
 
@@ -1683,11 +1697,11 @@ export async function collectedByForRequestItems(
 In `listInventoryRequestsAs`, after the `rows` query and before the grouping loop:
 
 ```ts
-  const collected = await collectedByForRequestItems(rows.map((r) => r.line.id));
-  const enriched = rows.map((r) => ({
-    ...r,
-    collectedBy: collected.get(r.line.id) ?? null,
-  }));
+const collected = await collectedByForRequestItems(rows.map((r) => r.line.id));
+const enriched = rows.map((r) => ({
+  ...r,
+  collectedBy: collected.get(r.line.id) ?? null,
+}));
 ```
 
 Change the `byRequest` map's value type from `lines: typeof rows` to `lines: typeof enriched`, and iterate `enriched` instead of `rows` in the grouping loop.
@@ -1697,10 +1711,10 @@ Change the `byRequest` map's value type from `lines: typeof rows` to `lines: typ
 In `listMyItemsAs`, after the `Promise.all` destructuring:
 
 ```ts
-  const collected = await collectedByForRequestItems([
-    ...activeLines.map((r) => r.line.id),
-    ...history.map((r) => r.line.id),
-  ]);
+const collected = await collectedByForRequestItems([
+  ...activeLines.map((r) => r.line.id),
+  ...history.map((r) => r.line.id),
+]);
 ```
 
 Change the `ActiveEntry` union's request variant to carry it:
@@ -1767,6 +1781,7 @@ copy on inventory_request_items to keep in sync."
 ## Task 9: The email-or-label assign dialog
 
 **Files:**
+
 - Create: `src/components/holder-field.tsx`
 - Delete: `src/components/user-picker.tsx`
 - Delete: `src/test/user-picker.test.tsx`
@@ -1775,6 +1790,7 @@ copy on inventory_request_items to keep in sync."
 - Modify: `src/server/inventory.ts:241-260` (`transitionSchema`)
 
 **Interfaces:**
+
 - Consumes: Task 4's server-side invariant.
 - Produces: `HolderField` with props `{ email, label, name, program, onEmailChange, onLabelChange, onNameChange, onProgramChange }`, all strings and string callbacks.
 
@@ -2036,8 +2052,8 @@ export function HolderField({
             />
           </div>
           <p className="text-muted-foreground text-xs">
-            No account matches this address yet. The hold is still recorded,
-            and it links itself if that address signs up later.
+            No account matches this address yet. The hold is still recorded, and
+            it links itself if that address signs up later.
           </p>
         </>
       )}
@@ -2087,134 +2103,134 @@ Delete `AssignMode`, `initialAssignMode`, `selectedHolder`, `AssignFields`, and 
 Replace the assign state (lines 321-324):
 
 ```ts
-  const [assignEmail, setAssignEmail] = useState("");
-  const [assignName, setAssignName] = useState("");
-  const [assignProgram, setAssignProgram] = useState("");
-  const [assignLabel, setAssignLabel] = useState("");
+const [assignEmail, setAssignEmail] = useState("");
+const [assignName, setAssignName] = useState("");
+const [assignProgram, setAssignProgram] = useState("");
+const [assignLabel, setAssignLabel] = useState("");
 ```
 
 Replace `runTransition`'s input type and body to send the new fields (lines 336-368), dropping `holderId` entirely:
 
 ```ts
-  async function runTransition(input: {
-    nextStatus: Status;
-    requestItemId?: string | null;
-    holderEmail?: string | null;
-    holderLabel?: string | null;
-    holderName?: string | null;
-    holderProgram?: string | null;
-    pickupBy?: Date | null;
-    dueAt?: Date | null;
-    comment?: string | null;
-  }) {
-    setBusy(true);
-    setError(null);
-    try {
-      await transitionInventoryItem({
-        data: {
-          itemId: item.id,
-          nextStatus: input.nextStatus,
-          requestItemId: input.requestItemId ?? null,
-          holderEmail: input.holderEmail ?? null,
-          holderLabel: input.holderLabel ?? null,
-          holderName: input.holderName ?? null,
-          holderProgram: input.holderProgram ?? null,
-          pickupBy: input.pickupBy ?? null,
-          dueAt: input.dueAt ?? null,
-          comment: input.comment ?? null,
-        },
-      });
-      await router.invalidate();
-    } catch (e) {
-      setError((e as Error)?.message || "Transition failed");
-    } finally {
-      setBusy(false);
-    }
+async function runTransition(input: {
+  nextStatus: Status;
+  requestItemId?: string | null;
+  holderEmail?: string | null;
+  holderLabel?: string | null;
+  holderName?: string | null;
+  holderProgram?: string | null;
+  pickupBy?: Date | null;
+  dueAt?: Date | null;
+  comment?: string | null;
+}) {
+  setBusy(true);
+  setError(null);
+  try {
+    await transitionInventoryItem({
+      data: {
+        itemId: item.id,
+        nextStatus: input.nextStatus,
+        requestItemId: input.requestItemId ?? null,
+        holderEmail: input.holderEmail ?? null,
+        holderLabel: input.holderLabel ?? null,
+        holderName: input.holderName ?? null,
+        holderProgram: input.holderProgram ?? null,
+        pickupBy: input.pickupBy ?? null,
+        dueAt: input.dueAt ?? null,
+        comment: input.comment ?? null,
+      },
+    });
+    await router.invalidate();
+  } catch (e) {
+    setError((e as Error)?.message || "Transition failed");
+  } finally {
+    setBusy(false);
   }
+}
 ```
 
 Replace `openDialogFor`'s prefill block (lines 370-392):
 
 ```ts
-  function openDialogFor(target: Status) {
-    setDlgTargetStatus(target);
-    // Prefilled with whoever the item is already associated with, so a
-    // reserved to checked-out step does not silently reassign the hold, and
-    // a teammate's pickup starts from the requester's address rather than a
-    // blank field.
-    setAssignEmail(item.currentHolderEmail ?? "");
-    setAssignName(item.currentHolderName ?? "");
-    setAssignProgram(item.currentHolderProgram ?? "");
-    setAssignLabel(item.currentHolderLabel ?? "");
-    setDueDate(toDateInput(item.dueAt));
-    setPickupDate(toDateInput(item.pickupBy));
-    setDlgComment("");
-    setError(null);
-    setDlgOpen(true);
-  }
+function openDialogFor(target: Status) {
+  setDlgTargetStatus(target);
+  // Prefilled with whoever the item is already associated with, so a
+  // reserved to checked-out step does not silently reassign the hold, and
+  // a teammate's pickup starts from the requester's address rather than a
+  // blank field.
+  setAssignEmail(item.currentHolderEmail ?? "");
+  setAssignName(item.currentHolderName ?? "");
+  setAssignProgram(item.currentHolderProgram ?? "");
+  setAssignLabel(item.currentHolderLabel ?? "");
+  setDueDate(toDateInput(item.dueAt));
+  setPickupDate(toDateInput(item.pickupBy));
+  setDlgComment("");
+  setError(null);
+  setDlgOpen(true);
+}
 ```
 
 Replace `onConfirmDialog`'s validation and payload (lines 394-430):
 
 ```ts
-  async function onConfirmDialog() {
-    const needsHolder =
-      dlgTargetStatus === "reserved" || dlgTargetStatus === "checked_out";
-    const email = assignEmail.trim();
-    const label = assignLabel.trim();
-    if (needsHolder && !(email || label)) {
-      setError(
-        "Enter an email address, or a label if the item is not going to a person."
-      );
-      return;
-    }
-    if (dlgTargetStatus === "checked_out" && !dueDate) {
-      setError("A due date is required to check out an item.");
-      return;
-    }
-    await runTransition({
-      nextStatus: dlgTargetStatus,
-      requestItemId: needsHolder ? item.currentRequestItemId : null,
-      holderEmail: email || null,
-      // The label input is only rendered while the address is blank, so these
-      // are mutually exclusive by construction as well as by validation.
-      holderLabel: email ? null : label || null,
-      holderName: email ? assignName.trim() || null : null,
-      holderProgram: email ? assignProgram.trim() || null : null,
-      pickupBy:
-        dlgTargetStatus === "reserved" && pickupDate
-          ? new Date(pickupDate)
-          : null,
-      dueAt:
-        dlgTargetStatus === "checked_out" && dueDate ? new Date(dueDate) : null,
-      comment: dlgComment || null,
-    });
-    setDlgOpen(false);
+async function onConfirmDialog() {
+  const needsHolder =
+    dlgTargetStatus === "reserved" || dlgTargetStatus === "checked_out";
+  const email = assignEmail.trim();
+  const label = assignLabel.trim();
+  if (needsHolder && !(email || label)) {
+    setError(
+      "Enter an email address, or a label if the item is not going to a person."
+    );
+    return;
   }
+  if (dlgTargetStatus === "checked_out" && !dueDate) {
+    setError("A due date is required to check out an item.");
+    return;
+  }
+  await runTransition({
+    nextStatus: dlgTargetStatus,
+    requestItemId: needsHolder ? item.currentRequestItemId : null,
+    holderEmail: email || null,
+    // The label input is only rendered while the address is blank, so these
+    // are mutually exclusive by construction as well as by validation.
+    holderLabel: email ? null : label || null,
+    holderName: email ? assignName.trim() || null : null,
+    holderProgram: email ? assignProgram.trim() || null : null,
+    pickupBy:
+      dlgTargetStatus === "reserved" && pickupDate
+        ? new Date(pickupDate)
+        : null,
+    dueAt:
+      dlgTargetStatus === "checked_out" && dueDate ? new Date(dueDate) : null,
+    comment: dlgComment || null,
+  });
+  setDlgOpen(false);
+}
 ```
 
 Replace the radio fieldset and `AssignFields` in the dialog body (lines 567-605) with:
 
 ```tsx
-            <HolderField
-              email={assignEmail}
-              label={assignLabel}
-              name={assignName}
-              onEmailChange={setAssignEmail}
-              onLabelChange={setAssignLabel}
-              onNameChange={setAssignName}
-              onProgramChange={setAssignProgram}
-              program={assignProgram}
-            />
+<HolderField
+  email={assignEmail}
+  label={assignLabel}
+  name={assignName}
+  onEmailChange={setAssignEmail}
+  onLabelChange={setAssignLabel}
+  onNameChange={setAssignName}
+  onProgramChange={setAssignProgram}
+  program={assignProgram}
+/>;
 ```
 
 And update the dialog description (line 561-564):
 
 ```tsx
-            <DialogDescription>
-              Assign the item to a person by email address, or to a place or
-              team by label. No prior request is needed.
-            </DialogDescription>
+<DialogDescription>
+  Assign the item to a person by email address, or to a place or team by label.
+  No prior request is needed.
+</DialogDescription>;
 ```
 
 Finally add `currentHolderProgram?: string | null;` to the `item` prop type (around line 63-74).
@@ -2287,6 +2303,7 @@ the address is blank. transitionSchema no longer accepts a holder id."
 ## Task 10: Show the second person everywhere they matter
 
 **Files:**
+
 - Modify: `src/server/_internal/inventory.ts:1319-1344` (`getItemHistoryAs`)
 - Modify: `src/components/inventory-lifecycle-panel.tsx` (`HistoryRow`, `formatHolderDisplay`, the history list)
 - Modify: `src/components/staff-inventory-panel.tsx` (`StaffPanelItem`, the props it forwards)
@@ -2295,6 +2312,7 @@ the address is blank. transitionSchema no longer accepts a holder id."
 - Modify: `src/routes/_authed/my/items.tsx`
 
 **Interfaces:**
+
 - Consumes: `CollectedBy` and the enriched shapes from Task 8; the history columns from Task 3.
 
 - [ ] **Step 1: Project the new history columns**
@@ -2312,20 +2330,22 @@ In `getItemHistoryAs`, add to the select:
 In `src/components/inventory-lifecycle-panel.tsx`, add to `HistoryRow` (line 48-58):
 
 ```ts
-  holderEmail: string | null;
-  holderName: string | null;
-  holderProgram: string | null;
+holderEmail: string | null;
+holderName: string | null;
+holderProgram: string | null;
 ```
 
 Replace the history holder line (lines 206-210), which prints a raw user id today whenever the hold came from the account picker:
 
 ```tsx
-                {(h.holderEmail || h.holderLabel) && (
-                  <p className="mt-1 text-muted-foreground text-xs">
-                    Holder: {h.holderName ?? h.holderEmail ?? h.holderLabel}
-                    {h.holderName && h.holderEmail ? ` (${h.holderEmail})` : ""}
-                  </p>
-                )}
+{
+  (h.holderEmail || h.holderLabel) && (
+    <p className="mt-1 text-muted-foreground text-xs">
+      Holder: {h.holderName ?? h.holderEmail ?? h.holderLabel}
+      {h.holderName && h.holderEmail ? ` (${h.holderEmail})` : ""}
+    </p>
+  );
+}
 ```
 
 - [ ] **Step 3: Simplify the current-holder display**
@@ -2339,7 +2359,9 @@ function formatHolderDisplay(
 ): string | null {
   const name = holderName ?? item.currentHolderName;
   if (item.currentHolderEmail) {
-    return name ? `${name} (${item.currentHolderEmail})` : item.currentHolderEmail;
+    return name
+      ? `${name} (${item.currentHolderEmail})`
+      : item.currentHolderEmail;
   }
   return item.currentHolderLabel ?? null;
 }
@@ -2361,11 +2383,11 @@ In `src/components/admin-request-queue-row.tsx`, add to `Props`:
 and render it inside the existing metadata row (after the `line: {line.status}` span):
 
 ```tsx
-            {collectedBy && collectedBy.email !== requesterEmail && (
-              <span>
-                collected by {collectedBy.name ?? collectedBy.email}
-              </span>
-            )}
+{
+  collectedBy && collectedBy.email !== requesterEmail && (
+    <span>collected by {collectedBy.name ?? collectedBy.email}</span>
+  );
+}
 ```
 
 Destructure `collectedBy` and `requesterEmail` in the component signature.
@@ -2373,17 +2395,17 @@ Destructure `collectedBy` and `requesterEmail` in the component signature.
 In `src/routes/_authed/admin/inventory/requests.tsx`, pass them:
 
 ```tsx
-                <AdminRequestQueueRow
-                  collectedBy={row.collectedBy}
-                  item={{
-                    id: row.item.id,
-                    name: row.item.name,
-                    status: row.item.status,
-                  }}
-                  key={row.line.id}
-                  line={{ id: row.line.id, status: row.line.status }}
-                  requesterEmail={batch.requester.email}
-                />
+<AdminRequestQueueRow
+  collectedBy={row.collectedBy}
+  item={{
+    id: row.item.id,
+    name: row.item.name,
+    status: row.item.status,
+  }}
+  key={row.line.id}
+  line={{ id: row.line.id, status: row.line.status }}
+  requesterEmail={batch.requester.email}
+/>;
 ```
 
 - [ ] **Step 6: Show the collector in /my/items**
@@ -2391,22 +2413,25 @@ In `src/routes/_authed/admin/inventory/requests.tsx`, pass them:
 In `src/routes/_authed/my/items.tsx`, inside the active-tab request branch, after the due date paragraph:
 
 ```tsx
-                  {entry.collectedBy && (
-                    <p className="text-muted-foreground text-xs">
-                      Collected by{" "}
-                      {entry.collectedBy.name ?? entry.collectedBy.email}
-                    </p>
-                  )}
+{
+  entry.collectedBy && (
+    <p className="text-muted-foreground text-xs">
+      Collected by {entry.collectedBy.name ?? entry.collectedBy.email}
+    </p>
+  );
+}
 ```
 
 and in the history tab, after the status line:
 
 ```tsx
-              {collectedBy && (
-                <p className="text-muted-foreground text-xs">
-                  Collected by {collectedBy.name ?? collectedBy.email}
-                </p>
-              )}
+{
+  collectedBy && (
+    <p className="text-muted-foreground text-xs">
+      Collected by {collectedBy.name ?? collectedBy.email}
+    </p>
+  );
+}
 ```
 
 destructuring it in the map: `{data.history.map(({ line, item, collectedBy }) => (`.
@@ -2428,7 +2453,8 @@ npm run db:seed:dev
 npm run dev
 ```
 
-As a student, cart an item and submit. As an admin, approve it at `/admin/inventory/requests`, then open the item and check it out to a *different* student's address. Expected:
+As a student, cart an item and submit. As an admin, approve it at `/admin/inventory/requests`, then open the item and check it out to a _different_ student's address. Expected:
+
 - The queue's "All" tab shows "collected by" the second student.
 - The first student's `/my/items` Active tab shows the request with "Collected by".
 - The second student's `/my/items` Active tab shows the item as a hold.

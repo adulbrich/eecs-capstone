@@ -19,36 +19,36 @@ own success criteria" below before reading this run as a green light for term.
 
 ## Configuration under test
 
-| | At the time of this run |
-| --- | --- |
-| Tasks | 3, autoscaling 3 to 4 on 50% average CPU (ADR-0040) |
-| Task size | 256 CPU units (0.25 vCPU), 1024 MB, Fargate ARM64 |
-| Database | `db.t4g.small`, `CPUCreditBalance` 371 and rising, surplus 0 |
-| Pool | 20 connections per task, 5 s acquire timeout (ADR-0034) |
-| Keep-alive | 65 s, above the ALB's 60 s `idle_timeout` (ADR-0041) |
-| Baseline | zero ELB 5XX and zero target 5XX in the preceding 3 hours |
+|            | At the time of this run                                      |
+| ---------- | ------------------------------------------------------------ |
+| Tasks      | 3, autoscaling 3 to 4 on 50% average CPU (ADR-0040)          |
+| Task size  | 256 CPU units (0.25 vCPU), 1024 MB, Fargate ARM64            |
+| Database   | `db.t4g.small`, `CPUCreditBalance` 371 and rising, surplus 0 |
+| Pool       | 20 connections per task, 5 s acquire timeout (ADR-0034)      |
+| Keep-alive | 65 s, above the ALB's 60 s `idle_timeout` (ADR-0041)         |
+| Baseline   | zero ELB 5XX and zero target 5XX in the preceding 3 hours    |
 
 Tasks had been running 7 minutes when the first phase started, which matters below.
 
 ## Results
 
-| Phase | Rate | p50 | p95 | p99 | max | Absorbed | Dropped | ELB 5XX | CPU avg | CPU peak |
-| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| 1c | 25/s, 3m | 41 ms | 287 ms | 661 ms | 2.14 s | 24.3/s | 0 | **0** | 61.3% | 70.4% |
-| 2. Burst | 42/s, 90s | 151 ms | 1.01 s | 1.99 s | 4.27 s | 39.6/s | 2 | **0** | 91.5% | 98.3% |
+| Phase    | Rate      | p50    | p95    | p99    | max    | Absorbed | Dropped | ELB 5XX | CPU avg | CPU peak |
+| -------- | --------- | ------ | ------ | ------ | ------ | -------- | ------- | ------- | ------- | -------- |
+| 1c       | 25/s, 3m  | 41 ms  | 287 ms | 661 ms | 2.14 s | 24.3/s   | 0       | **0**   | 61.3%   | 70.4%    |
+| 2. Burst | 42/s, 90s | 151 ms | 1.01 s | 1.99 s | 4.27 s | 39.6/s   | 2       | **0**   | 91.5%   | 98.3%    |
 
 All 16552 checks passed, every response an origin miss, `server_errors` 0 in both
 phases. 8276 requests through the origin against the morning's roughly 7200.
 
 Against the two-task baseline, on the same script and the same rates:
 
-| | Two tasks (06:39 PDT) | Three tasks (21:47 UTC) |
-| --- | --- | --- |
-| 1c p50 / p95 / p99 | 104 ms / 633 ms / 1.40 s | 41 ms / 287 ms / 661 ms |
-| 1c errors | 0.11% | 0 |
-| Burst absorbed | 26.3/s, 267 iterations dropped | 39.6/s, 2 dropped |
-| Burst p50 | 4.12 s | 151 ms |
-| ELB 5XX over the sitting | 7 | 0 |
+|                          | Two tasks (06:39 PDT)          | Three tasks (21:47 UTC) |
+| ------------------------ | ------------------------------ | ----------------------- |
+| 1c p50 / p95 / p99       | 104 ms / 633 ms / 1.40 s       | 41 ms / 287 ms / 661 ms |
+| 1c errors                | 0.11%                          | 0                       |
+| Burst absorbed           | 26.3/s, 267 iterations dropped | 39.6/s, 2 dropped       |
+| Burst p50                | 4.12 s                         | 151 ms                  |
+| ELB 5XX over the sitting | 7                              | 0                       |
 
 ADR-0040 predicted three tasks at "about 39" requests per second from the measured
 26.3 on two. The burst absorbed 39.6. The arithmetic held, which is worth saying
@@ -63,14 +63,14 @@ came with a p50 of 4.12 s. At 39.6 the p50 was 151 ms.
 #524 asks five things of phase 2 and says "if those hold, the app is ready for
 term". Three hold and two do not, so on its own terms the answer is not yet.
 
-| #524 criterion at 42 requests per second | Measured | |
-| --- | --- | --- |
-| p95 under 500 ms | 1.01 s | **miss** |
-| p99 under 1500 ms | 1.99 s | **miss** |
-| Zero 5XX | 0 | pass |
-| `DatabaseConnections` stays below the pool maximum rather than pinning to it | 59 of 60 | **miss** |
-| ECS `MemoryUtilization` under 75% | 23.8% | pass |
-| `runningCount` never drops | held at 3 | pass |
+| #524 criterion at 42 requests per second                                     | Measured  |          |
+| ---------------------------------------------------------------------------- | --------- | -------- |
+| p95 under 500 ms                                                             | 1.01 s    | **miss** |
+| p99 under 1500 ms                                                            | 1.99 s    | **miss** |
+| Zero 5XX                                                                     | 0         | pass     |
+| `DatabaseConnections` stays below the pool maximum rather than pinning to it | 59 of 60  | **miss** |
+| ECS `MemoryUtilization` under 75%                                            | 23.8%     | pass     |
+| `runningCount` never drops                                                   | held at 3 | pass     |
 
 The latency misses and the connection miss are probably the same fact rather than
 two. A request that waits on the pool is a slow request, and the pool ran out at

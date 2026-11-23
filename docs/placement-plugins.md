@@ -15,16 +15,16 @@ network request.
 
 `src/lib/placement/plugins/types.ts` has it. In short:
 
-| Field | What it is |
-| --- | --- |
-| `id` | Unique across every plugin, and stable: a workspace stores it when staff choose "Read as", so renaming one sends saved choices back to detection. |
-| `label` | The source's name on the page: "Converted from the `label` file.csv." and "Problems in the `label` file". |
-| `dataset` | `"projects"`, `"roster"` or `"bids"`: whose standard CSV the plugin writes. |
-| `input` | `"file"` for an upload the plugin detects, `"chosen"` for an upload staff choose to read through it ([custom mapping](#custom-mapping) is the one), `"paste"` for the text box. |
-| `detect(text)` | A `"file"` plugin's only: true when the text is this plugin's source. Never true for any standard template or another plugin's source. |
-| `menuLabel` | Optional: the option's name in "Read as", when it is not `label`. |
-| `toStandard(text, { projects, mapping })` | The standard CSV and the issues the plugin found. `mapping` is the column mapping stored with the file, which only custom mapping reads. |
-| `description` | Optional prose shown while a file is read through the plugin, for a rule staff would not guess. |
+| Field                                     | What it is                                                                                                                                                                      |
+| ----------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `id`                                      | Unique across every plugin, and stable: a workspace stores it when staff choose "Read as", so renaming one sends saved choices back to detection.                               |
+| `label`                                   | The source's name on the page: "Converted from the `label` file.csv." and "Problems in the `label` file".                                                                       |
+| `dataset`                                 | `"projects"`, `"roster"` or `"bids"`: whose standard CSV the plugin writes.                                                                                                     |
+| `input`                                   | `"file"` for an upload the plugin detects, `"chosen"` for an upload staff choose to read through it ([custom mapping](#custom-mapping) is the one), `"paste"` for the text box. |
+| `detect(text)`                            | A `"file"` plugin's only: true when the text is this plugin's source. Never true for any standard template or another plugin's source.                                          |
+| `menuLabel`                               | Optional: the option's name in "Read as", when it is not `label`.                                                                                                               |
+| `toStandard(text, { projects, mapping })` | The standard CSV and the issues the plugin found. `mapping` is the column mapping stored with the file, which only custom mapping reads.                                        |
+| `description`                             | Optional prose shown while a file is read through the plugin, for a rule staff would not guess.                                                                                 |
 
 ## The rules
 
@@ -230,14 +230,14 @@ and lives beside the Canvas roster import.
 `EXPORT_PLUGINS` in `index.ts` is its own list, so nothing on the import side, from
 detection to Read as, ever sees one.
 
-| Field | What it is |
-| --- | --- |
-| `id` | Unique across every plugin, import or export, and never `standard`, which the Read as and Download as selects use for the standard format (`STANDARD_OPTION`; the contract test checks). |
-| `label` | The option's name in "Download as". |
-| `dataset` | `"placement"` or `"bids"`: whose standard CSV the plugin reads. |
-| `description` | Shown while the option is chosen: what the other tool does with the file, and what the file leaves out. Required, because staff need it before they import. |
-| `requiredColumns` | The columns the other tool needs. The contract test checks the plugin writes them. |
-| `fromStandard(text, { filename })` | The file, the name to save it under (derive it from `filename`, the standard download's name), and the issues it found. |
+| Field                              | What it is                                                                                                                                                                               |
+| ---------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `id`                               | Unique across every plugin, import or export, and never `standard`, which the Read as and Download as selects use for the standard format (`STANDARD_OPTION`; the contract test checks). |
+| `label`                            | The option's name in "Download as".                                                                                                                                                      |
+| `dataset`                          | `"placement"` or `"bids"`: whose standard CSV the plugin reads.                                                                                                                          |
+| `description`                      | Shown while the option is chosen: what the other tool does with the file, and what the file leaves out. Required, because staff need it before they import.                              |
+| `requiredColumns`                  | The columns the other tool needs. The contract test checks the plugin writes them.                                                                                                       |
+| `fromStandard(text, { filename })` | The file, the name to save it under (derive it from `filename`, the standard download's name), and the issues it found.                                                                  |
 
 Read cells with `cell` from `csv.ts`, which takes off the spreadsheet guard
 `toCsv` put on, and write with `toCsv` or `writeFormat`, which puts it back, so a

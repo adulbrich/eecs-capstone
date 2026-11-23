@@ -22,17 +22,17 @@
 
 ## File Structure
 
-| File | Responsibility |
-| --- | --- |
-| `src/lib/inventory-visibility.ts` | gains `HoldItemRow`, `HoldItemView`, `holdItemView`, `RequestLineRow`, `MyRequestLineView`, `myRequestLineView` |
-| `src/lib/__tests__/inventory-visibility.test.ts` | carries-only and omits-staff-fields pairs for both new views |
-| `src/lib/inventory-deadlines.ts` | `DeadlineEntry` arms reshaped, `deadlinePairOf` and `recencyOf` follow, stale comment corrected |
-| `src/lib/__tests__/inventory-deadlines.test.ts` | four fixture builders updated |
-| `src/test/overdue-badge.test.tsx` | two fixture literals updated |
-| `src/server/_internal/inventory.ts` | `ActiveEntry` and a new `HistoryEntry`; `listMyItemsAs` projects before sorting |
-| `src/routes/_authed/my/items.tsx` | reads the projected fields; two casts go |
-| `src/server/__tests__/inventory.integration.test.ts` | existing assertions remapped, plus the key-set guards |
-| `docs/QUIRKS.md` | the false claim corrected and recorded |
+| File                                                 | Responsibility                                                                                                  |
+| ---------------------------------------------------- | --------------------------------------------------------------------------------------------------------------- |
+| `src/lib/inventory-visibility.ts`                    | gains `HoldItemRow`, `HoldItemView`, `holdItemView`, `RequestLineRow`, `MyRequestLineView`, `myRequestLineView` |
+| `src/lib/__tests__/inventory-visibility.test.ts`     | carries-only and omits-staff-fields pairs for both new views                                                    |
+| `src/lib/inventory-deadlines.ts`                     | `DeadlineEntry` arms reshaped, `deadlinePairOf` and `recencyOf` follow, stale comment corrected                 |
+| `src/lib/__tests__/inventory-deadlines.test.ts`      | four fixture builders updated                                                                                   |
+| `src/test/overdue-badge.test.tsx`                    | two fixture literals updated                                                                                    |
+| `src/server/_internal/inventory.ts`                  | `ActiveEntry` and a new `HistoryEntry`; `listMyItemsAs` projects before sorting                                 |
+| `src/routes/_authed/my/items.tsx`                    | reads the projected fields; two casts go                                                                        |
+| `src/server/__tests__/inventory.integration.test.ts` | existing assertions remapped, plus the key-set guards                                                           |
+| `docs/QUIRKS.md`                                     | the false claim corrected and recorded                                                                          |
 
 ---
 
@@ -458,10 +458,10 @@ git commit -m "docs(quirks): correct the inventory payload claim"
 
 ## Risks
 
-| Risk | Mitigation |
-| --- | --- |
-| The `DeadlineEntry` reshape ripples further than the four listed files | Phase 2 Step 11 runs typecheck across the repo; anything missed is a compile error, not a silent bug |
-| An integration assertion reaches `.item` on a request entry and was missed in Step 10 | Same: it is a typecheck failure. Step 11 says to fix and note rather than work around |
-| The key-set assertion passes vacuously | Phase 3 Step 2 makes it fail on purpose before trusting it |
-| `searchVector` turns out not to be on the payload, making the spec's table wrong | Checked and confirmed: the emitted SQL names `"search_vector"` and the row carries it, `generatedAlwaysAs` notwithstanding. The spec's hedge is now a statement |
-| Sorting after projecting changes the order | `compareByDeadline` reads the same four values before and after, only under new names. The existing ordering tests at `inventory.integration.test.ts:1981-2092` cover it |
+| Risk                                                                                  | Mitigation                                                                                                                                                               |
+| ------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| The `DeadlineEntry` reshape ripples further than the four listed files                | Phase 2 Step 11 runs typecheck across the repo; anything missed is a compile error, not a silent bug                                                                     |
+| An integration assertion reaches `.item` on a request entry and was missed in Step 10 | Same: it is a typecheck failure. Step 11 says to fix and note rather than work around                                                                                    |
+| The key-set assertion passes vacuously                                                | Phase 3 Step 2 makes it fail on purpose before trusting it                                                                                                               |
+| `searchVector` turns out not to be on the payload, making the spec's table wrong      | Checked and confirmed: the emitted SQL names `"search_vector"` and the row carries it, `generatedAlwaysAs` notwithstanding. The spec's hedge is now a statement          |
+| Sorting after projecting changes the order                                            | `compareByDeadline` reads the same four values before and after, only under new names. The existing ordering tests at `inventory.integration.test.ts:1981-2092` cover it |

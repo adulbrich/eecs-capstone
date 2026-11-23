@@ -43,7 +43,7 @@ was written.
 (`user.additionalFields`), generated `drizzle/0018_user_deleted_at.sql` and meta.
 
 - [ ] Add `deletedAt: timestamp("deleted_at", { withTimezone: true })` to `user`, and
-  `deletedAt: { type: "date", required: false, input: false }` to `additionalFields`.
+      `deletedAt: { type: "date", required: false, input: false }` to `additionalFields`.
 - [ ] `npx drizzle-kit generate --name user_deleted_at`; expect one `ADD COLUMN
   "deleted_at" timestamp with time zone`. `npm run db:migrate`, `npm run typecheck`.
 - [ ] Commit `feat(auth): add user.deleted_at`.
@@ -56,14 +56,21 @@ was written.
 **Produces:**
 
 ```ts
-export interface AccountViewer { email: string; id: string; image?: string | null; role?: string | null }
+export interface AccountViewer {
+  email: string;
+  id: string;
+  image?: string | null;
+  role?: string | null;
+}
 export interface DeletionPreview {
   blockers: { items: { id: string; name: string }[]; lastAdmin: boolean };
   email: string;
   programs: { courseId: string; courseName: string; id: string }[];
 }
-export async function getAccountDeletionPreviewAs(viewer: AccountViewer): Promise<DeletionPreview>
-export async function getAccountDeletionPreviewForCurrentUser(): Promise<DeletionPreview>
+export async function getAccountDeletionPreviewAs(
+  viewer: AccountViewer
+): Promise<DeletionPreview>;
+export async function getAccountDeletionPreviewForCurrentUser(): Promise<DeletionPreview>;
 ```
 
 Held items: `inventory_items` in `reserved` or `checked_out` where `current_holder_id`
@@ -72,7 +79,7 @@ viewer's `approved` request lines. `lastAdmin`: viewer role is `admin` and
 `count(*) where role = 'admin'` is 1. Programs: join `program_instructors` to `programs`.
 
 - [ ] Tests first: held item blocks; approved line blocks; a returned line does not; last
-  admin blocks; a second admin unblocks; instructor rows list their programs.
+      admin blocks; a second admin unblocks; instructor rows list their programs.
 - [ ] Implement; server function `getAccountDeletionPreview` (GET, `authenticated`).
 - [ ] Commit `feat(account): preview what deleting an account will do`.
 
@@ -83,8 +90,13 @@ viewer's `approved` request lines. `lastAdmin`: viewer role is `admin` and
 **Produces:**
 
 ```ts
-export async function deleteAccountAs(viewer: AccountViewer, data: { confirmEmail: string }): Promise<{ ok: true }>
-export async function deleteAccountForCurrentUser(data: { confirmEmail: string }): Promise<{ ok: true }>
+export async function deleteAccountAs(
+  viewer: AccountViewer,
+  data: { confirmEmail: string }
+): Promise<{ ok: true }>;
+export async function deleteAccountForCurrentUser(data: {
+  confirmEmail: string;
+}): Promise<{ ok: true }>;
 ```
 
 Order: `confirmEmail` must equal `viewer.email` case-insensitively or throw `Email does
@@ -98,14 +110,14 @@ set `proposer_email = null` where `proposer_id = id`, update `projects` set `men
 `deleteOwnedObject(previousImage, avatarKeys(id))`.
 
 - [ ] Tests first, per the spec's list, including the cascade-edge pin: read
-  `src/db/schema.ts` and `auth-schema.ts` off disk, collect every table whose FK into
-  `user.id` says `onDelete: "cascade"`, and assert the list equals the one the impl
-  exports as `CASCADE_TABLES`.
+      `src/db/schema.ts` and `auth-schema.ts` off disk, collect every table whose FK into
+      `user.id` says `onDelete: "cascade"`, and assert the list equals the one the impl
+      exports as `CASCADE_TABLES`.
 - [ ] A separate `account-storage.integration.test.ts` that `vi.mock`s
-  `#/lib/_internal/storage` so `getObjectStorage().delete` throws, and asserts the row is
-  still scrubbed.
+      `#/lib/_internal/storage` so `getObjectStorage().delete` throws, and asserts the row is
+      still scrubbed.
 - [ ] Implement; server function `deleteAccount` (POST, `authenticated`, Zod
-  `{ confirmEmail: z.string().max(320) }`).
+      `{ confirmEmail: z.string().max(320) }`).
 - [ ] Commit `feat(account): let a user delete their own account`.
 
 ### Task 4: the dialog
@@ -122,18 +134,18 @@ and always when blocked. On confirm: `deleteAccount({ data: { confirmEmail } })`
 `onDeleted()`; the profile page sets `window.location.href = "/"`.
 
 - [ ] Tests first: gate disabled until the email matches; programs listed; blocked state
-  shows the item names and no gate; confirm calls the server function.
+      shows the item names and no gate; confirm calls the server function.
 - [ ] Implement; profile page loads the preview in an effect and renders a "Danger zone"
-  section below the privacy link.
+      section below the privacy link.
 - [ ] Commit `feat(profile): add the delete account dialog`.
 
 ### Task 5: docs, verification, PR
 
 - [ ] PRD line under Authentication & Accounts; QUIRKS entry under Better Auth ("Deleting
-  an account anonymizes the row; the cascade rule") cross-referencing the privacy entry;
-  README "Better Auth schema" needs nothing new.
+      an account anonymizes the row; the cascade rule") cross-referencing the privacy entry;
+      README "Better Auth schema" needs nothing new.
 - [ ] `npm run check`, `npm run typecheck`, `npm test`, `npm run test:integration` with no
-  other session running, `npm run test:smoke` if the profile flow is in it (check the
-  job comment in `ci.yml`).
+      other session running, `npm run test:smoke` if the profile flow is in it (check the
+      job comment in `ci.yml`).
 - [ ] Push, PR closing #84, review loop with `mattpocock-skills:code-review` until a pass
-  raises nothing new.
+      raises nothing new.

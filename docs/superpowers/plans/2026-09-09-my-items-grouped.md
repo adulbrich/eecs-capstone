@@ -23,32 +23,32 @@
 
 ## Seams under test
 
-| Seam | Kind |
-| --- | --- |
-| `myRequestLineView` with the two dates | unit |
-| `isOpenRow`, `matchesMyItemsFilter` | unit |
-| `SubmitBorrowListDialog` | unit, jsdom, server fn mocked |
-| `NeedsAttention` link | unit (existing test rewritten) |
-| `listMyItemsAs` order, group identity, exact key sets | integration (existing describes rewritten) |
-| notification links | unit and integration (existing assertions rewritten) |
-| `/my/items` each filter, the sheet, the submit dialog | accessibility suite (user tests rewritten) |
-| borrow list to request, cancel, overdue | e2e (three specs rewritten) |
+| Seam                                                  | Kind                                                 |
+| ----------------------------------------------------- | ---------------------------------------------------- |
+| `myRequestLineView` with the two dates                | unit                                                 |
+| `isOpenRow`, `matchesMyItemsFilter`                   | unit                                                 |
+| `SubmitBorrowListDialog`                              | unit, jsdom, server fn mocked                        |
+| `NeedsAttention` link                                 | unit (existing test rewritten)                       |
+| `listMyItemsAs` order, group identity, exact key sets | integration (existing describes rewritten)           |
+| notification links                                    | unit and integration (existing assertions rewritten) |
+| `/my/items` each filter, the sheet, the submit dialog | accessibility suite (user tests rewritten)           |
+| borrow list to request, cancel, overdue               | e2e (three specs rewritten)                          |
 
 ## File Structure
 
-| File | Responsibility |
-| --- | --- |
-| `src/lib/inventory-visibility.ts` | `MyRequestLineView` gains `closedAt`, `reviewedAt` |
-| `src/lib/my-items-filter.ts`, `src/lib/__tests__/my-items-filter.test.ts` | `MyItemsFilter`, `isOpenRow`, `matchesMyItemsFilter` |
-| `src/server/_internal/inventory-holdings.ts` | `MyItemsRow`, `listMyItemsAs` returning `MyItemsRow[]` |
-| `src/components/submit-borrow-list-dialog.tsx`, `src/test/submit-borrow-list-dialog.test.tsx` | Submit on the header, note in a dialog, calls `submitCart` |
-| `src/components/borrow-list-panel.tsx`, `src/test/borrow-list-panel.test.tsx` | deleted |
-| `src/routes/_authed/my/items.tsx` | search schema, columns, groups, filter, sheet |
-| `src/lib/inventory-notifications.ts`, `src/components/borrow-list-button.tsx`, `src/components/user-menu.tsx`, `src/components/my-items-attention.tsx` | `?filter=` links |
-| `src/lib/__tests__/inventory-notifications.test.ts`, `src/test/my-items-attention.test.tsx`, `src/server/__tests__/inventory.integration.test.ts` | asserted links, key sets, order |
-| `src/test/e2e/locators.ts`, `inventory.e2e.test.ts`, `inventory-requests.e2e.test.ts`, `inventory-overdue.e2e.test.ts` | `entryFor` scoped to the table; `goto` calls; submit through the dialog |
-| `src/test/a11y/user.a11y.test.ts` | the three `/my/items` scans over filters instead of tabs |
-| `docs/QUIRKS.md`, `docs/UI-CONVENTIONS.md` | sorting disabled on purpose; the page-width paragraph |
+| File                                                                                                                                                   | Responsibility                                                          |
+| ------------------------------------------------------------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------- |
+| `src/lib/inventory-visibility.ts`                                                                                                                      | `MyRequestLineView` gains `closedAt`, `reviewedAt`                      |
+| `src/lib/my-items-filter.ts`, `src/lib/__tests__/my-items-filter.test.ts`                                                                              | `MyItemsFilter`, `isOpenRow`, `matchesMyItemsFilter`                    |
+| `src/server/_internal/inventory-holdings.ts`                                                                                                           | `MyItemsRow`, `listMyItemsAs` returning `MyItemsRow[]`                  |
+| `src/components/submit-borrow-list-dialog.tsx`, `src/test/submit-borrow-list-dialog.test.tsx`                                                          | Submit on the header, note in a dialog, calls `submitCart`              |
+| `src/components/borrow-list-panel.tsx`, `src/test/borrow-list-panel.test.tsx`                                                                          | deleted                                                                 |
+| `src/routes/_authed/my/items.tsx`                                                                                                                      | search schema, columns, groups, filter, sheet                           |
+| `src/lib/inventory-notifications.ts`, `src/components/borrow-list-button.tsx`, `src/components/user-menu.tsx`, `src/components/my-items-attention.tsx` | `?filter=` links                                                        |
+| `src/lib/__tests__/inventory-notifications.test.ts`, `src/test/my-items-attention.test.tsx`, `src/server/__tests__/inventory.integration.test.ts`      | asserted links, key sets, order                                         |
+| `src/test/e2e/locators.ts`, `inventory.e2e.test.ts`, `inventory-requests.e2e.test.ts`, `inventory-overdue.e2e.test.ts`                                 | `entryFor` scoped to the table; `goto` calls; submit through the dialog |
+| `src/test/a11y/user.a11y.test.ts`                                                                                                                      | the three `/my/items` scans over filters instead of tabs                |
+| `docs/QUIRKS.md`, `docs/UI-CONVENTIONS.md`                                                                                                             | sorting disabled on purpose; the page-width paragraph                   |
 
 ## Interfaces
 
@@ -88,19 +88,25 @@ Group keys: `"cart"`, `` `request:${requestId}` ``, `"holds"`. Headers: "Not sub
 ---
 
 ### Task 1: `MyRequestLineView` dates and the filter module
+
 - [ ] Unit tests: `myRequestLineView` equals the six fields plus `reviewedAt` and `closedAt`; `isOpenRow` for each kind and status; `matchesMyItemsFilter` for the three filters. Run, fail. Implement. Pass. Commit `feat(lib): derive the my items filter, and give the requester line its two dates`.
 
 ### Task 2: `listMyItemsAs` as rows in display order
+
 - [ ] Rewrite the integration describes that read `cart`, `active`, `history` (`my items payload names every field it returns`, `active tab ordering`, `staff-assigned holds in my items`, `listMyItemsAs collectedBy gate`, `a teammate collects`, `disjointness invariant`, and any other reader: grep `listMyItemsAs(`). Assert the order and the exact key sets per kind. Run, fail. Implement. Pass. Commit `feat(inventory): return my items as grouped rows in display order`.
 
 ### Task 3: `SubmitBorrowListDialog`
+
 - [ ] jsdom test with `submitCart` mocked: opens, sends the note (empty becomes null), reports the result; a server error shows inside. Implement. Commit `feat(components): submit the borrow list from its group header`.
 
 ### Task 4: The route, the links, the deletions
+
 - [ ] Rewrite `src/routes/_authed/my/items.tsx`; rewrite the four link writers; delete `borrow-list-panel.tsx` and its test; rewrite `my-items-attention.test.tsx` and `inventory-notifications.test.ts` assertions; update the integration link assertion. `npm run check`, `npm run typecheck`, `npm test`. Browser check through the a11y user session. Commit `feat(my-items): one grouped table with an open, closed, all filter`.
 
 ### Task 5: Browser suites
+
 - [ ] `locators.ts`: `entryFor` scoped to `page.getByRole("table", { name: "My items" })`. Rewrite the three e2e specs' `goto` calls and the submit flow. Rewrite the three `/my/items` a11y tests. Run `npm run test:accessibility -- --grep "my items"`, `npm run test:accessibility:smoke`, `npm run test:e2e -- --grep inventory`. Commit `test(my-items): drive the grouped table instead of the tabs`.
 
 ### Task 6: Docs, PR, review loop
+
 - [ ] QUIRKS Inventory: sorting disabled so the grouped view cannot be sorted away from under Submit; amend "/my/items has its own two projections". UI-CONVENTIONS page-width paragraph. PR against `feat/request-queue-grouped`; `mattpocock-skills:code-review` until clean.

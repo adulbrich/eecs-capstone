@@ -40,13 +40,13 @@ nothing at all. Email reaches them.
 
 ## Decisions
 
-| Question | Decision |
-|---|---|
-| Which transition is "rejected" | `changes_requested`, reusing its mandatory comment |
-| Where the staff address lives | New `EMAIL_REVIEW_INBOX` env var, not `EMAIL_REPLY_TO` |
+| Question                          | Decision                                                              |
+| --------------------------------- | --------------------------------------------------------------------- |
+| Which transition is "rejected"    | `changes_requested`, reusing its mandatory comment                    |
+| Where the staff address lives     | New `EMAIL_REVIEW_INBOX` env var, not `EMAIL_REPLY_TO`                |
 | The "you won't be notified" claim | Worded as no further **email**; the in-app publish notification stays |
-| Does `forceTransitionAs` email | Yes, same rule as `performTransitionAs` |
-| Can staff skip the email | Yes, per action, opt-out with the box checked by default |
+| Does `forceTransitionAs` email    | Yes, same rule as `performTransitionAs`                               |
+| Can staff skip the email          | Yes, per action, opt-out with the box checked by default              |
 
 `EMAIL_REVIEW_INBOX` equals `EMAIL_REPLY_TO` today but means something
 different: one is where replies land, the other is who reviews submissions.
@@ -91,7 +91,9 @@ touches no transport code.
 `ses-sender.ts:78` builds HTML by raw interpolation:
 
 ```ts
-Html: { Data: `<p>${content.intro}</p><p><a href="${msg.url}">${content.cta}</a></p>` }
+Html: {
+  Data: `<p>${content.intro}</p><p><a href="${msg.url}">${content.cta}</a></p>`;
+}
 ```
 
 Safe today only because every value is a constant or a server-generated URL.
@@ -156,11 +158,11 @@ must never become optional.
 
 ```ts
 export async function notifyTransitionByEmail(
-  project: { id, title, description, proposerId, proposerEmail },
+  project: { id; title; description; proposerId; proposerEmail },
   target: Status,
   comment: string | null,
-  sendEmail: boolean,
-): Promise<void>
+  sendEmail: boolean
+): Promise<void>;
 ```
 
 Owns recipient resolution, `EMAIL_REVIEW_INBOX`, link construction, and the
@@ -233,12 +235,12 @@ take; the props gain it.
 
 ## Error handling
 
-| Failure | Behavior |
-|---|---|
-| SES rejects or times out | Caught in `notifyTransitionByEmail`, logged, transition already committed and stands |
-| `EMAIL_REVIEW_INBOX` unset | Submission email skipped, logged once, no throw |
-| Proposer has no address | Proposer email skipped, no throw, UI already said so |
-| `EMAIL_FROM` unset under `ses` | Unchanged: throws at boot, by design |
+| Failure                        | Behavior                                                                             |
+| ------------------------------ | ------------------------------------------------------------------------------------ |
+| SES rejects or times out       | Caught in `notifyTransitionByEmail`, logged, transition already committed and stands |
+| `EMAIL_REVIEW_INBOX` unset     | Submission email skipped, logged once, no throw                                      |
+| Proposer has no address        | Proposer email skipped, no throw, UI already said so                                 |
+| `EMAIL_FROM` unset under `ses` | Unchanged: throws at boot, by design                                                 |
 
 No retries and no queue. At capstone volume a lost review email is recoverable
 by looking at the queue in the app, and a retry layer is not worth its failure

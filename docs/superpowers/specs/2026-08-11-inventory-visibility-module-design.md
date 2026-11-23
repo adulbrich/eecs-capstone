@@ -22,13 +22,13 @@ The governing principle:
 across **seven non-project domains**: categories, programs, users, comments,
 uploads, admin, bookmarks. Inventory keeps a private copy.
 
-| | Count | Where |
-| --- | --- | --- |
-| `isStaff` definitions | 2 | `project-visibility.ts` (exported), `_internal/inventory.ts` (private) |
-| `assertStaff` definitions | 5 | inventory, inventory-transitions, programs, categories, users |
+|                           | Count | Where                                                                  |
+| ------------------------- | ----- | ---------------------------------------------------------------------- |
+| `isStaff` definitions     | 2     | `project-visibility.ts` (exported), `_internal/inventory.ts` (private) |
+| `assertStaff` definitions | 5     | inventory, inventory-transitions, programs, categories, users          |
 
 Three of the five `assertStaff` wrap the shared `isStaff`; two inline the role
-comparison. The module's *name* is also wrong for seven of its consumers, and
+comparison. The module's _name_ is also wrong for seven of its consumers, and
 that is a symptom rather than the disease: a domain module owns something that
 is not domain-specific.
 
@@ -36,10 +36,10 @@ is not domain-specific.
 
 This is the substantive bug, not just duplication.
 
-| Where | Rule |
-| --- | --- |
-| SQL, `buildInventoryScope` | `ne(status, "retired")`, applied to the public listing **and** `listAdminInventoryAs` |
-| JS, `loadInventoryItemRowFor` | retired hidden from non-staff only; staff may open one |
+| Where                         | Rule                                                                                  |
+| ----------------------------- | ------------------------------------------------------------------------------------- |
+| SQL, `buildInventoryScope`    | `ne(status, "retired")`, applied to the public listing **and** `listAdminInventoryAs` |
+| JS, `loadInventoryItemRowFor` | retired hidden from non-staff only; staff may open one                                |
 
 So staff can read a retired item by URL but cannot find one in any listing.
 That matters because `hardDeleteInventoryItemAs` permits deletion only when the
@@ -52,11 +52,11 @@ and then given no way to list them afterwards.
 The review's original framing was that inventory should mirror projects. On the
 leak axis that is backwards:
 
-| | Projects | Inventory |
-| --- | --- | --- |
-| Shape | one type, fields nulled for non-staff | two types, public built field by field |
-| A new staff-only column | **leaks by default**, rides the SSR payload unless nulled | cannot leak, it is not copied |
-| Hazard documented in `QUIRKS.md` | yes, an entry exists warning about it | none needed |
+|                                  | Projects                                                  | Inventory                              |
+| -------------------------------- | --------------------------------------------------------- | -------------------------------------- |
+| Shape                            | one type, fields nulled for non-staff                     | two types, public built field by field |
+| A new staff-only column          | **leaks by default**, rides the SSR payload unless nulled | cannot leak, it is not copied          |
+| Hazard documented in `QUIRKS.md` | yes, an entry exists warning about it                     | none needed                            |
 
 What inventory is missing is not the strategy, it is the **seam**. The strategy
 moves out unchanged. Whether projects should later adopt the explicit shape is

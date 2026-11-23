@@ -28,18 +28,18 @@
 
 ## File Structure
 
-| File | Responsibility |
-| --- | --- |
-| `src/lib/viewer.ts` | **new**: `isStaff`, `assertStaff` |
-| `src/lib/__tests__/viewer.test.ts` | **new**: role matrix |
-| `src/lib/inventory-visibility.ts` | **new**: `canSeeRetired`, `visibleStatuses`, `canReadInventoryItem`, `publicItemView`, `staffItemView`, the two view types |
-| `src/lib/__tests__/inventory-visibility.test.ts` | **new** |
-| `src/lib/project-visibility.ts` | re-exports `isStaff` from `viewer.ts` rather than defining it |
-| `src/server/_internal/inventory.ts` | loses its private predicates and projections; scope builder derives from `visibleStatuses` |
-| `src/server/_internal/{inventory-transitions,programs,categories,users}.ts` | drop their local `assertStaff` |
-| `src/server/inventory.ts` | `listAdminInventorySchema` gains `retiredOnly` |
-| `src/routes/_authed/admin/inventory/index.tsx` | the switch, the disabled status control |
-| `src/server/__tests__/inventory.integration.test.ts` | retired visibility, both viewers |
+| File                                                                        | Responsibility                                                                                                             |
+| --------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------- |
+| `src/lib/viewer.ts`                                                         | **new**: `isStaff`, `assertStaff`                                                                                          |
+| `src/lib/__tests__/viewer.test.ts`                                          | **new**: role matrix                                                                                                       |
+| `src/lib/inventory-visibility.ts`                                           | **new**: `canSeeRetired`, `visibleStatuses`, `canReadInventoryItem`, `publicItemView`, `staffItemView`, the two view types |
+| `src/lib/__tests__/inventory-visibility.test.ts`                            | **new**                                                                                                                    |
+| `src/lib/project-visibility.ts`                                             | re-exports `isStaff` from `viewer.ts` rather than defining it                                                              |
+| `src/server/_internal/inventory.ts`                                         | loses its private predicates and projections; scope builder derives from `visibleStatuses`                                 |
+| `src/server/_internal/{inventory-transitions,programs,categories,users}.ts` | drop their local `assertStaff`                                                                                             |
+| `src/server/inventory.ts`                                                   | `listAdminInventorySchema` gains `retiredOnly`                                                                             |
+| `src/routes/_authed/admin/inventory/index.tsx`                              | the switch, the disabled status control                                                                                    |
+| `src/server/__tests__/inventory.integration.test.ts`                        | retired visibility, both viewers                                                                                           |
 
 ---
 
@@ -85,9 +85,9 @@
 
 ## Risks
 
-| Risk | Mitigation |
-| --- | --- |
-| The SQL scope change alters results silently | Phase 2 is a checkpoint: the whole integration suite must pass with zero test edits before the filter is added |
-| `retiredOnly` leaks to the public listing | The param is not in `listInventorySchema`, and `visibleStatuses` ignores it for non-staff, so two independent things must both fail. A test asserts the second |
-| The five `assertStaff` call sites take different viewer shapes | Phase 1 typechecks each; three take `AuthUser`, two take a looser `Viewer` |
-| Moving the view types breaks `edit.tsx` | The re-export through `src/server/inventory.ts` stays, so its import path is unchanged |
+| Risk                                                           | Mitigation                                                                                                                                                     |
+| -------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| The SQL scope change alters results silently                   | Phase 2 is a checkpoint: the whole integration suite must pass with zero test edits before the filter is added                                                 |
+| `retiredOnly` leaks to the public listing                      | The param is not in `listInventorySchema`, and `visibleStatuses` ignores it for non-staff, so two independent things must both fail. A test asserts the second |
+| The five `assertStaff` call sites take different viewer shapes | Phase 1 typechecks each; three take `AuthUser`, two take a looser `Viewer`                                                                                     |
+| Moving the view types breaks `edit.tsx`                        | The re-export through `src/server/inventory.ts` stays, so its import path is unchanged                                                                         |

@@ -2,7 +2,6 @@
 
 > **Status (verified 2026-06-07):** ✅ **Implemented and shipped.** Verified against the codebase; all deliverables exist. The `- [ ]` checkboxes below were never ticked during execution; they are stale, not a sign of incomplete work.
 
-
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Add a synchronous "Review with AI" button to the project edit page that asks MiniMax M2.5 on AWS Bedrock to propose per-field rewrites, shown inline beneath each field and applied per field or all at once.
@@ -36,6 +35,7 @@ Spec: `docs/superpowers/specs/2026-05-29-bedrock-project-review-design.md`
 ## Task 1: Install dependency and add env config
 
 **Files:**
+
 - Modify: `package.json`, `package-lock.json` (via npm)
 - Modify: `.env.example`
 
@@ -74,6 +74,7 @@ git commit -m "chore: add @aws-sdk/client-bedrock-runtime and Bedrock env vars"
 ## Task 2: Client-safe field module and Bedrock client
 
 **Files:**
+
 - Create: `src/lib/project-review-fields.ts`
 - Create: `src/lib/_internal/bedrock.ts`
 - Test: `src/lib/__tests__/bedrock.test.ts`
@@ -144,7 +145,7 @@ export function getBedrockClient(): BedrockRuntimeClient {
 }
 
 export type ConverseFn = (
-  input: ConverseCommandInput,
+  input: ConverseCommandInput
 ) => Promise<ConverseCommandOutput>;
 
 export const bedrockConverse: ConverseFn = (input) =>
@@ -183,6 +184,7 @@ git commit -m "feat: add Bedrock client helper and shared review field module"
 ## Task 3: Review core (prompt, tool spec, parsing, runProjectReview)
 
 **Files:**
+
 - Create: `src/server/_internal/project-review-core.ts`
 - Test: `src/server/__tests__/project-review-core.test.ts`
 
@@ -234,7 +236,7 @@ describe("parseReviewResponse", () => {
         description: { suggestion: "Better desc.", rationale: "clearer" },
         objectives: { suggestion: "Better obj.", rationale: "specific" },
       }),
-      "test-model",
+      "test-model"
     );
     expect(result.model).toBe("test-model");
     expect(result.reviewedFields.sort()).toEqual(["description", "objectives"]);
@@ -251,11 +253,11 @@ describe("parseReviewResponse", () => {
         contactEmail: { suggestion: "x@y.com", rationale: "no" },
         description: { suggestion: "ok", rationale: "ok" },
       }),
-      "m",
+      "m"
     );
     expect(result.reviewedFields).toEqual(["description"]);
     expect(
-      (result.suggestions as Record<string, unknown>).contactEmail,
+      (result.suggestions as Record<string, unknown>).contactEmail
     ).toBeUndefined();
   });
 
@@ -271,8 +273,8 @@ describe("parseReviewResponse", () => {
     expect(() =>
       parseReviewResponse(
         toolResponse({ description: { suggestion: "missing rationale" } }),
-        "m",
-      ),
+        "m"
+      )
     ).toThrow();
   });
 });
@@ -282,7 +284,7 @@ describe("runProjectReview", () => {
     const invoke = vi.fn().mockResolvedValue(
       toolResponse({
         title: { suggestion: "Sharper Title", rationale: "punchier" },
-      }),
+      })
     );
     const result = await runProjectReview({ title: "old title" }, invoke);
     expect(invoke).toHaveBeenCalledTimes(1);
@@ -351,7 +353,7 @@ export const reviewToolSpec = {
       json: {
         type: "object",
         properties: Object.fromEntries(
-          IMPROVABLE_FIELDS.map((field) => [field, fieldProperty]),
+          IMPROVABLE_FIELDS.map((field) => [field, fieldProperty])
         ),
       },
     },
@@ -372,14 +374,14 @@ Your job: propose clearer, more complete, and more professional versions of the 
 Respond only by calling the ${TOOL_NAME} tool with the improved fields. For each field you include, provide the rewritten "suggestion" and a one-line "rationale" explaining what you improved.`;
 
 export function buildUserMessage(
-  fields: Partial<Record<ImprovableField, string>>,
+  fields: Partial<Record<ImprovableField, string>>
 ): string {
   const parts: string[] = [];
   for (const field of IMPROVABLE_FIELDS) {
     const value = fields[field]?.trim();
     if (!value) continue;
     parts.push(
-      `<field name="${field}" label="${FIELD_LABELS[field]}">\n${value}\n</field>`,
+      `<field name="${field}" label="${FIELD_LABELS[field]}">\n${value}\n</field>`
     );
   }
   return parts.join("\n\n");
@@ -387,7 +389,7 @@ export function buildUserMessage(
 
 export function parseReviewResponse(
   response: ConverseCommandOutput,
-  model: string,
+  model: string
 ): ReviewResult {
   const content = response.output?.message?.content ?? [];
   const toolBlock = content.find((block) => block.toolUse?.name === TOOL_NAME);
@@ -410,7 +412,7 @@ export function parseReviewResponse(
 
 export async function runProjectReview(
   fields: Partial<Record<ImprovableField, string>>,
-  invoke: ConverseFn = bedrockConverse,
+  invoke: ConverseFn = bedrockConverse
 ): Promise<ReviewResult> {
   const userMessage = buildUserMessage(fields);
   const response = await invoke({
@@ -441,6 +443,7 @@ git commit -m "feat: add AI project review core (prompt, tool spec, Zod parsing)
 ## Task 4: Auth wrapper and server function
 
 **Files:**
+
 - Create: `src/server/_internal/project-review.ts`
 - Create: `src/server/project-review.ts`
 - Test: `src/server/__tests__/project-review.integration.test.ts`
@@ -459,7 +462,9 @@ import { auth } from "#/lib/auth";
 // Mock the core so no real Bedrock call happens; we only test auth gating.
 vi.mock("../_internal/project-review-core", () => ({
   runProjectReview: vi.fn().mockResolvedValue({
-    suggestions: { description: { suggestion: "Better.", rationale: "clearer" } },
+    suggestions: {
+      description: { suggestion: "Better.", rationale: "clearer" },
+    },
     model: "test-model",
     reviewedFields: ["description"],
   }),
@@ -471,7 +476,10 @@ async function makeUser(email: string, role: "user" | "admin") {
   await auth.api.signUpEmail({
     body: { email, password: "Password1!", name: email },
   });
-  await db.update(user).set({ emailVerified: true }).where(eq(user.email, email));
+  await db
+    .update(user)
+    .set({ emailVerified: true })
+    .where(eq(user.email, email));
   if (role !== "user") {
     await db.update(user).set({ role }).where(eq(user.email, email));
   }
@@ -506,7 +514,7 @@ describe("reviewProjectAs", () => {
       reviewProjectAs(stranger, {
         projectId: project.id,
         fields: { description: "old" },
-      }),
+      })
     ).rejects.toThrow("Forbidden");
   });
 
@@ -516,7 +524,7 @@ describe("reviewProjectAs", () => {
       reviewProjectAs(someone, {
         projectId: "00000000-0000-0000-0000-000000000000",
         fields: { description: "old" },
-      }),
+      })
     ).rejects.toThrow("Project not found");
   });
 });
@@ -537,7 +545,10 @@ import { db } from "#/db";
 import { projects } from "#/db/schema";
 import { requireUser } from "#/lib/_internal/auth-guards";
 import { canEditProject } from "#/lib/project-visibility";
-import type { ImprovableField, ReviewResult } from "#/lib/project-review-fields";
+import type {
+  ImprovableField,
+  ReviewResult,
+} from "#/lib/project-review-fields";
 import { runProjectReview } from "./project-review-core";
 
 export type AuthUser = { id: string; role?: string | null | undefined };
@@ -549,7 +560,7 @@ export type ReviewProjectInput = {
 
 export async function reviewProjectAs(
   viewer: AuthUser,
-  input: ReviewProjectInput,
+  input: ReviewProjectInput
 ): Promise<ReviewResult> {
   const [project] = await db
     .select()
@@ -565,7 +576,7 @@ export async function reviewProjectAs(
 }
 
 export async function reviewProjectForCurrentUser(
-  input: ReviewProjectInput,
+  input: ReviewProjectInput
 ): Promise<ReviewResult> {
   const viewer = await requireUser();
   return reviewProjectAs(viewer, input);
@@ -620,6 +631,7 @@ git commit -m "feat: add reviewProject server function with canEdit auth gating"
 ## Task 5: ProjectForm review button and inline suggestion UI
 
 **Files:**
+
 - Modify: `src/components/project-form.tsx`
 - Test: `src/test/project-form-ai-review.test.tsx`
 
@@ -666,7 +678,7 @@ function renderForm() {
       showCategories={false}
       submitLabel="Save"
       onSubmit={vi.fn()}
-    />,
+    />
   );
 }
 
@@ -674,7 +686,10 @@ describe("ProjectForm AI review", () => {
   it("applies a single field suggestion into the form field", async () => {
     mockedReview.mockResolvedValue({
       suggestions: {
-        description: { suggestion: "Improved description.", rationale: "clearer" },
+        description: {
+          suggestion: "Improved description.",
+          rationale: "clearer",
+        },
       },
       model: "test-model",
       reviewedFields: ["description"],
@@ -688,7 +703,7 @@ describe("ProjectForm AI review", () => {
 
     await waitFor(() => {
       expect((getByLabelText("Description") as HTMLTextAreaElement).value).toBe(
-        "Improved description.",
+        "Improved description."
       );
     });
   });
@@ -710,10 +725,10 @@ describe("ProjectForm AI review", () => {
 
     await waitFor(() => {
       expect((getByLabelText("Title") as HTMLInputElement).value).toBe(
-        "New Title",
+        "New Title"
       );
       expect((getByLabelText("Description") as HTMLTextAreaElement).value).toBe(
-        "New Description",
+        "New Description"
       );
     });
   });
@@ -776,64 +791,64 @@ export function ProjectForm({
 In `src/components/project-form.tsx`, immediately after the existing `pendingImage` `useState` declaration (the block ending `useState<File | null | undefined>(undefined);`), add:
 
 ```tsx
-  const [suggestions, setSuggestions] = useState<
-    Partial<Record<ImprovableField, FieldSuggestion>>
-  >({});
-  const [reviewState, setReviewState] = useState<"idle" | "loading" | "empty">(
-    "idle",
-  );
-  const [reviewError, setReviewError] = useState<string | null>(null);
+const [suggestions, setSuggestions] = useState<
+  Partial<Record<ImprovableField, FieldSuggestion>>
+>({});
+const [reviewState, setReviewState] = useState<"idle" | "loading" | "empty">(
+  "idle"
+);
+const [reviewError, setReviewError] = useState<string | null>(null);
 ```
 
 Then, immediately after the `useForm({ ... })` call (after the closing `});` of `const form = useForm(...)`), add:
 
 ```tsx
-  async function handleReview() {
-    if (!projectId) return;
-    setReviewError(null);
-    setReviewState("loading");
-    try {
-      const v = form.state.values;
-      const result = await reviewProject({
-        data: {
-          projectId,
-          fields: {
-            title: v.title,
-            description: v.description,
-            problemStatement: v.problemStatement,
-            objectives: v.objectives,
-            minQualifications: v.minQualifications,
-            prefQualifications: v.prefQualifications,
-            licenseRestrictions: v.licenseRestrictions,
-          },
+async function handleReview() {
+  if (!projectId) return;
+  setReviewError(null);
+  setReviewState("loading");
+  try {
+    const v = form.state.values;
+    const result = await reviewProject({
+      data: {
+        projectId,
+        fields: {
+          title: v.title,
+          description: v.description,
+          problemStatement: v.problemStatement,
+          objectives: v.objectives,
+          minQualifications: v.minQualifications,
+          prefQualifications: v.prefQualifications,
+          licenseRestrictions: v.licenseRestrictions,
         },
-      });
-      setSuggestions(result.suggestions);
-      setReviewState(result.reviewedFields.length === 0 ? "empty" : "idle");
-    } catch (err) {
-      setReviewError((err as Error)?.message || "AI review failed");
-      setReviewState("idle");
-    }
-  }
-
-  function applyField(field: ImprovableField) {
-    const s = suggestions[field];
-    if (!s) return;
-    form.setFieldValue(field as never, s.suggestion as never);
-    setSuggestions((prev) => {
-      const next = { ...prev };
-      delete next[field];
-      return next;
+      },
     });
+    setSuggestions(result.suggestions);
+    setReviewState(result.reviewedFields.length === 0 ? "empty" : "idle");
+  } catch (err) {
+    setReviewError((err as Error)?.message || "AI review failed");
+    setReviewState("idle");
   }
+}
 
-  function applyAll() {
-    for (const field of Object.keys(suggestions) as ImprovableField[]) {
-      const s = suggestions[field];
-      if (s) form.setFieldValue(field as never, s.suggestion as never);
-    }
-    setSuggestions({});
+function applyField(field: ImprovableField) {
+  const s = suggestions[field];
+  if (!s) return;
+  form.setFieldValue(field as never, s.suggestion as never);
+  setSuggestions((prev) => {
+    const next = { ...prev };
+    delete next[field];
+    return next;
+  });
+}
+
+function applyAll() {
+  for (const field of Object.keys(suggestions) as ImprovableField[]) {
+    const s = suggestions[field];
+    if (s) form.setFieldValue(field as never, s.suggestion as never);
   }
+  setSuggestions({});
+}
 ```
 
 - [ ] **Step 5: Add the review panel to the form**
@@ -841,41 +856,43 @@ Then, immediately after the `useForm({ ... })` call (after the closing `});` of 
 In the returned `<form>`, immediately after the opening `<form ...>` tag's className block and before `<Field form={form} name="title" ... />`, add:
 
 ```tsx
-      {enableAiReview && (
-        <div className="rounded-md border p-3">
-          <div className="flex items-center justify-between gap-3">
-            <div>
-              <p className="text-sm font-medium">Improve with AI</p>
-              <p className="text-xs text-muted-foreground">
-                Suggests rewrites for the text fields. You review and apply each
-                change.
-              </p>
-            </div>
-            <div className="flex gap-2">
-              {Object.keys(suggestions).length > 0 && (
-                <Button type="button" variant="outline" onClick={applyAll}>
-                  Apply all
-                </Button>
-              )}
-              <Button
-                type="button"
-                onClick={handleReview}
-                disabled={reviewState === "loading"}
-              >
-                {reviewState === "loading" ? "Reviewing..." : "Review with AI"}
-              </Button>
-            </div>
-          </div>
-          {reviewError && (
-            <p className="mt-2 text-sm text-destructive">{reviewError}</p>
-          )}
-          {reviewState === "empty" && (
-            <p className="mt-2 text-sm text-muted-foreground">
-              No improvements suggested.
-            </p>
-          )}
+{
+  enableAiReview && (
+    <div className="rounded-md border p-3">
+      <div className="flex items-center justify-between gap-3">
+        <div>
+          <p className="text-sm font-medium">Improve with AI</p>
+          <p className="text-xs text-muted-foreground">
+            Suggests rewrites for the text fields. You review and apply each
+            change.
+          </p>
         </div>
+        <div className="flex gap-2">
+          {Object.keys(suggestions).length > 0 && (
+            <Button type="button" variant="outline" onClick={applyAll}>
+              Apply all
+            </Button>
+          )}
+          <Button
+            type="button"
+            onClick={handleReview}
+            disabled={reviewState === "loading"}
+          >
+            {reviewState === "loading" ? "Reviewing..." : "Review with AI"}
+          </Button>
+        </div>
+      </div>
+      {reviewError && (
+        <p className="mt-2 text-sm text-destructive">{reviewError}</p>
       )}
+      {reviewState === "empty" && (
+        <p className="mt-2 text-sm text-muted-foreground">
+          No improvements suggested.
+        </p>
+      )}
+    </div>
+  );
+}
 ```
 
 - [ ] **Step 6: Pass suggestions into improvable fields**
@@ -930,28 +947,28 @@ function Field({
 Inside `Field`, immediately after the closing of the existing error `<p>` block (the `{field.state.meta.errors.length > 0 && ( ... )}` expression) and before the closing `</div>` of the field wrapper, add:
 
 ```tsx
-          {suggestion && (
-            <div className="mt-2 rounded-md border border-primary/30 bg-primary/5 p-2">
-              <p className="text-xs font-medium text-primary">
-                Suggested change
-              </p>
-              <p className="mt-1 whitespace-pre-wrap text-sm">
-                {suggestion.suggestion}
-              </p>
-              <p className="mt-1 text-xs text-muted-foreground">
-                {suggestion.rationale}
-              </p>
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                className="mt-2"
-                onClick={onApply}
-              >
-                Apply
-              </Button>
-            </div>
-          )}
+{
+  suggestion && (
+    <div className="mt-2 rounded-md border border-primary/30 bg-primary/5 p-2">
+      <p className="text-xs font-medium text-primary">Suggested change</p>
+      <p className="mt-1 whitespace-pre-wrap text-sm">
+        {suggestion.suggestion}
+      </p>
+      <p className="mt-1 text-xs text-muted-foreground">
+        {suggestion.rationale}
+      </p>
+      <Button
+        type="button"
+        variant="outline"
+        size="sm"
+        className="mt-2"
+        onClick={onApply}
+      >
+        Apply
+      </Button>
+    </div>
+  );
+}
 ```
 
 - [ ] **Step 8: Run the test to verify it passes**
@@ -971,6 +988,7 @@ git commit -m "feat: add Review with AI button and inline suggestions to Project
 ## Task 6: Wire the edit route
 
 **Files:**
+
 - Modify: `src/routes/_authed/projects/$projectId/edit.tsx`
 
 - [ ] **Step 1: Pass the new props to ProjectForm**
@@ -978,8 +996,8 @@ git commit -m "feat: add Review with AI button and inline suggestions to Project
 In `src/routes/_authed/projects/$projectId/edit.tsx`, in the `<ProjectForm ... />` usage, add these two props alongside the existing ones (for example after `submitLabel="Save"`):
 
 ```tsx
-          enableAiReview
-          projectId={projectId}
+enableAiReview;
+projectId = { projectId };
 ```
 
 (`projectId` is already defined in the component as `const projectId = project.id as string;`.)

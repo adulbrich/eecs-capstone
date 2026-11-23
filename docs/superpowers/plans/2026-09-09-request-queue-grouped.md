@@ -23,40 +23,41 @@
 
 ## Seams under test
 
-| Seam | Kind |
-| --- | --- |
-| `lineTimeline` | unit |
-| `LineTimeline`, `LineSheet` | unit, jsdom |
-| `ApproveAllDialog` | unit, jsdom, server fn mocked |
-| `approveRequestLinesAs`: batch, partial group, race, overlap without deadlock | integration |
-| `listInventoryRequestsAs` reviewer and closer names | integration |
-| The grouped queue page, sheet open and closed | accessibility suite |
-| Approve and Reject per row (unchanged) | existing e2e, unchanged |
+| Seam                                                                          | Kind                          |
+| ----------------------------------------------------------------------------- | ----------------------------- |
+| `lineTimeline`                                                                | unit                          |
+| `LineTimeline`, `LineSheet`                                                   | unit, jsdom                   |
+| `ApproveAllDialog`                                                            | unit, jsdom, server fn mocked |
+| `approveRequestLinesAs`: batch, partial group, race, overlap without deadlock | integration                   |
+| `listInventoryRequestsAs` reviewer and closer names                           | integration                   |
+| The grouped queue page, sheet open and closed                                 | accessibility suite           |
+| Approve and Reject per row (unchanged)                                        | existing e2e, unchanged       |
 
 ## File Structure
 
-| File | Responsibility |
-| --- | --- |
-| `src/lib/inventory-timeline.ts` | `TimelineEvent`, `TimelineInput`, `lineTimeline` |
-| `src/lib/__tests__/inventory-timeline.test.ts` | its unit tests |
-| `src/components/line-timeline.tsx` | draws `TimelineEvent[]` as an ordered list |
-| `src/components/line-sheet.tsx` | the sheet shell: title, description, fields, timeline, actions slot |
-| `src/components/approve-all-dialog.tsx` | the batch dialog: item list, one pickup date, calls `approveRequestLines` |
-| `src/test/line-sheet.test.tsx`, `src/test/approve-all-dialog.test.tsx` | jsdom tests |
-| `src/server/_internal/inventory-requests.ts` | `approveLineInTx`, `approveRequestLinesAs`, `approveRequestLinesForCurrentUser` |
-| `src/server/inventory.ts` | `approveRequestLines` endpoint |
-| `src/server/_internal/inventory-holdings.ts` | `listInventoryRequestsAs` gains `reviewer` and `closer` |
-| `src/server/__tests__/access-contract.ts` | one line for the endpoint |
-| `src/server/__tests__/inventory.integration.test.ts` | batch cases, name join |
-| `src/routes/_authed/admin/inventory/requests.tsx` | `request` param, `group`, header, Requester link, Details button, sheet |
-| `scripts/seed-dev.ts` | one request with two pending lines, so the queue shows a real group |
-| `docs/QUIRKS.md`, `docs/UI-CONVENTIONS.md` | batch lock order; the line sheet |
+| File                                                                   | Responsibility                                                                  |
+| ---------------------------------------------------------------------- | ------------------------------------------------------------------------------- |
+| `src/lib/inventory-timeline.ts`                                        | `TimelineEvent`, `TimelineInput`, `lineTimeline`                                |
+| `src/lib/__tests__/inventory-timeline.test.ts`                         | its unit tests                                                                  |
+| `src/components/line-timeline.tsx`                                     | draws `TimelineEvent[]` as an ordered list                                      |
+| `src/components/line-sheet.tsx`                                        | the sheet shell: title, description, fields, timeline, actions slot             |
+| `src/components/approve-all-dialog.tsx`                                | the batch dialog: item list, one pickup date, calls `approveRequestLines`       |
+| `src/test/line-sheet.test.tsx`, `src/test/approve-all-dialog.test.tsx` | jsdom tests                                                                     |
+| `src/server/_internal/inventory-requests.ts`                           | `approveLineInTx`, `approveRequestLinesAs`, `approveRequestLinesForCurrentUser` |
+| `src/server/inventory.ts`                                              | `approveRequestLines` endpoint                                                  |
+| `src/server/_internal/inventory-holdings.ts`                           | `listInventoryRequestsAs` gains `reviewer` and `closer`                         |
+| `src/server/__tests__/access-contract.ts`                              | one line for the endpoint                                                       |
+| `src/server/__tests__/inventory.integration.test.ts`                   | batch cases, name join                                                          |
+| `src/routes/_authed/admin/inventory/requests.tsx`                      | `request` param, `group`, header, Requester link, Details button, sheet         |
+| `scripts/seed-dev.ts`                                                  | one request with two pending lines, so the queue shows a real group             |
+| `docs/QUIRKS.md`, `docs/UI-CONVENTIONS.md`                             | batch lock order; the line sheet                                                |
 
 ---
 
 ### Task 1: `inventory-timeline.ts`
 
 **Files:**
+
 - Create: `src/lib/inventory-timeline.ts`, `src/lib/__tests__/inventory-timeline.test.ts`
 
 **Interfaces (produced):**
@@ -100,16 +101,24 @@ Rules: `submitted` always. `decided` when `reviewedAt` is set and either `closed
 ### Task 2: `LineTimeline` and `LineSheet`
 
 **Files:**
+
 - Create: `src/components/line-timeline.tsx`, `src/components/line-sheet.tsx`, `src/test/line-sheet.test.tsx`
 
 **Interfaces (produced):**
 
 ```tsx
-export function LineTimeline({ events }: { events: TimelineEvent[] }): JSX.Element;
+export function LineTimeline({
+  events,
+}: {
+  events: TimelineEvent[];
+}): JSX.Element;
 // <ol aria-label="Timeline"> with one <li> per event: label, <LocalTime value={at} />,
 // "by {actor}" when set, the note in a whitespace-pre-wrap paragraph when set.
 
-export interface LineSheetField { label: string; value: ReactNode }
+export interface LineSheetField {
+  label: string;
+  value: ReactNode;
+}
 export function LineSheet(props: {
   actions?: ReactNode;
   description?: string;
@@ -132,6 +141,7 @@ export function LineSheet(props: {
 ### Task 3: The batch approval on the server
 
 **Files:**
+
 - Modify: `src/server/_internal/inventory-requests.ts`, `src/server/inventory.ts`, `src/server/__tests__/access-contract.ts`
 - Test: `src/server/__tests__/inventory.integration.test.ts`
 
@@ -143,9 +153,12 @@ export async function approveRequestLinesAs(
   viewer: Viewer,
   data: { requestItemIds: string[]; pickupBy: Date | null }
 ): Promise<{ approved: string[] }>;
-export async function approveRequestLinesForCurrentUser(data: { requestItemIds: string[]; pickupBy: Date | null });
+export async function approveRequestLinesForCurrentUser(data: {
+  requestItemIds: string[];
+  pickupBy: Date | null;
+});
 // inventory.ts
-export const approveRequestLines = createServerFn({ method: "POST" }) // schema below
+export const approveRequestLines = createServerFn({ method: "POST" }); // schema below
 ```
 
 Schema: `requestItemIds: z.array(z.string().uuid()).min(1).max(100)`, `pickupBy: z.coerce.date().nullable().default(null)`.
@@ -162,6 +175,7 @@ Implementation: extract the body of `approveRequestItemAs`'s transaction into `a
 ### Task 4: Reviewer and closer names on the queue rows
 
 **Files:**
+
 - Modify: `src/server/_internal/inventory-holdings.ts` (`listInventoryRequestsAs`)
 - Test: `src/server/__tests__/inventory.integration.test.ts`, `describe("listInventoryRequestsAs")`
 
@@ -175,6 +189,7 @@ Two aliased joins: `const reviewer = alias(user, "reviewer"); const closer = ali
 ### Task 5: `ApproveAllDialog`
 
 **Files:**
+
 - Create: `src/components/approve-all-dialog.tsx`, `src/test/approve-all-dialog.test.tsx`
 
 **Interfaces (produced):**
@@ -198,6 +213,7 @@ export function ApproveAllDialog(props: {
 ### Task 6: The route
 
 **Files:**
+
 - Modify: `src/routes/_authed/admin/inventory/requests.tsx`
 
 - `request: z.string().uuid().nullable().catch(null).default(null)` beside `line`; not in `loaderDeps`.
@@ -216,6 +232,7 @@ export function ApproveAllDialog(props: {
 ### Task 7: Seed one two-line request
 
 **Files:**
+
 - Modify: `scripts/seed-dev.ts`, the inventory flows section
 
 Add after case 4 a borrow list of two available items for Jordan submitted as one request with one note, left pending, so the queue shows a group with two lines and the accessibility scan covers the header with an Approve all. Pick two serials the later cases do not use.

@@ -48,13 +48,13 @@ export const brand = {
 
   // Color tokens — match the :root defaults in styles.css exactly.
   // BrandProvider writes these to :root at runtime so no build step is needed.
-  colorPrimary: "#D73F09",        // Beaver Orange
-  colorPrimaryDark: "#B83207",    // hover / pressed (~15% darker)
-  colorPrimaryLight: "#F5987A",   // tints, illustrations
+  colorPrimary: "#D73F09", // Beaver Orange
+  colorPrimaryDark: "#B83207", // hover / pressed (~15% darker)
+  colorPrimaryLight: "#F5987A", // tints, illustrations
   colorPrimaryTint: "rgba(215, 63, 9, 0.08)",
-  colorOnPrimary: "#FFFFFF",      // text/icons on orange
-  colorBlack: "#000000",          // Paddletail Black
-  colorWhite: "#FFFFFF",          // Bucktooth White
+  colorOnPrimary: "#FFFFFF", // text/icons on orange
+  colorBlack: "#000000", // Paddletail Black
+  colorWhite: "#FFFFFF", // Bucktooth White
 } as const;
 
 export type Brand = typeof brand;
@@ -71,17 +71,17 @@ export type Brand = typeof brand;
 Sets CSS custom properties on `:root` from `brand` using `element.style.setProperty()`. This approach has no XSS risk (values come from a static TypeScript constant, not user input; `setProperty` does not parse HTML). It runs after hydration, but since the `styles.css` defaults are identical to the `brand.ts` values, there is no flash of wrong color.
 
 ```tsx
-import { useEffect } from 'react';
-import { brand } from '~/lib/brand';
+import { useEffect } from "react";
+import { brand } from "~/lib/brand";
 
 export function BrandProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     const root = document.documentElement;
-    root.style.setProperty('--brand-primary',       brand.colorPrimary);
-    root.style.setProperty('--brand-primary-dark',  brand.colorPrimaryDark);
-    root.style.setProperty('--brand-primary-light', brand.colorPrimaryLight);
-    root.style.setProperty('--brand-primary-tint',  brand.colorPrimaryTint);
-    root.style.setProperty('--brand-on-primary',    brand.colorOnPrimary);
+    root.style.setProperty("--brand-primary", brand.colorPrimary);
+    root.style.setProperty("--brand-primary-dark", brand.colorPrimaryDark);
+    root.style.setProperty("--brand-primary-light", brand.colorPrimaryLight);
+    root.style.setProperty("--brand-primary-tint", brand.colorPrimaryTint);
+    root.style.setProperty("--brand-on-primary", brand.colorOnPrimary);
   }, []);
   return <>{children}</>;
 }
@@ -100,58 +100,58 @@ Replacement token set in `styles.css`:
 ```css
 :root {
   /* Brand defaults — must match brand.ts values exactly */
-  --brand-primary:        #D73F09;
-  --brand-primary-dark:   #B83207;
-  --brand-primary-light:  #F5987A;
-  --brand-primary-tint:   rgba(215, 63, 9, 0.08);
-  --brand-on-primary:     #FFFFFF;
+  --brand-primary: #d73f09;
+  --brand-primary-dark: #b83207;
+  --brand-primary-light: #f5987a;
+  --brand-primary-tint: rgba(215, 63, 9, 0.08);
+  --brand-on-primary: #ffffff;
 
   /* Surfaces */
-  --surface-base:         #F9F7F5;
-  --surface-raised:       #FFFFFF;
-  --surface-sunken:       #EFEDEB;
+  --surface-base: #f9f7f5;
+  --surface-raised: #ffffff;
+  --surface-sunken: #efedeb;
 
   /* Text */
-  --text-primary:         #1A1100;
-  --text-secondary:       #6B6560;
-  --text-tertiary:        #9A9490;
+  --text-primary: #1a1100;
+  --text-secondary: #6b6560;
+  --text-tertiary: #9a9490;
 
   /* Chrome */
-  --border:               rgba(26, 17, 0, 0.12);
-  --line:                 rgba(26, 17, 0, 0.10);
-  --focus-ring:           rgba(215, 63, 9, 0.40);
-  --inset-glint:          rgba(255, 255, 255, 0.82);
+  --border: rgba(26, 17, 0, 0.12);
+  --line: rgba(26, 17, 0, 0.1);
+  --focus-ring: rgba(215, 63, 9, 0.4);
+  --inset-glint: rgba(255, 255, 255, 0.82);
 
   /* Header / nav */
-  --header-bg:            rgba(249, 247, 245, 0.88);
+  --header-bg: rgba(249, 247, 245, 0.88);
 
   /* Chips */
-  --chip-bg:              rgba(255, 255, 255, 0.85);
-  --chip-line:            rgba(215, 63, 9, 0.18);
+  --chip-bg: rgba(255, 255, 255, 0.85);
+  --chip-line: rgba(215, 63, 9, 0.18);
 
   /* Hero gradient anchors */
-  --hero-a:               rgba(215, 63, 9, 0.18);
-  --hero-b:               rgba(26, 17, 0, 0.08);
+  --hero-a: rgba(215, 63, 9, 0.18);
+  --hero-b: rgba(26, 17, 0, 0.08);
 
   /* Status */
-  --status-success:       #2E7D32;
-  --status-success-bg:    rgba(46, 125, 50, 0.10);
-  --status-warning:       #E65100;
-  --status-warning-bg:    rgba(230, 81, 0, 0.10);
-  --status-error:         #C62828;
-  --status-error-bg:      rgba(198, 40, 40, 0.10);
-  --status-info:          #1565C0;
-  --status-info-bg:       rgba(21, 101, 192, 0.10);
-  --status-neutral:       #5C5550;
-  --status-neutral-bg:    rgba(92, 85, 80, 0.10);
+  --status-success: #2e7d32;
+  --status-success-bg: rgba(46, 125, 50, 0.1);
+  --status-warning: #e65100;
+  --status-warning-bg: rgba(230, 81, 0, 0.1);
+  --status-error: #c62828;
+  --status-error-bg: rgba(198, 40, 40, 0.1);
+  --status-info: #1565c0;
+  --status-info-bg: rgba(21, 101, 192, 0.1);
+  --status-neutral: #5c5550;
+  --status-neutral-bg: rgba(92, 85, 80, 0.1);
 
   /* shadcn token remapping */
-  --primary:              var(--brand-primary);
-  --primary-foreground:   var(--brand-on-primary);
-  --background:           var(--surface-base);
-  --foreground:           var(--text-primary);
-  --destructive:          var(--status-error);
-  --ring:                 var(--focus-ring);
+  --primary: var(--brand-primary);
+  --primary-foreground: var(--brand-on-primary);
+  --background: var(--surface-base);
+  --foreground: var(--text-primary);
+  --destructive: var(--status-error);
+  --ring: var(--focus-ring);
 }
 ```
 
@@ -161,25 +161,25 @@ Orange lightens to `#EF5713` against dark backgrounds to maintain contrast. The 
 
 ```css
 .dark {
-  --brand-primary:        #EF5713;
-  --brand-primary-dark:   #D73F09;
-  --brand-primary-tint:   rgba(239, 87, 19, 0.12);
+  --brand-primary: #ef5713;
+  --brand-primary-dark: #d73f09;
+  --brand-primary-tint: rgba(239, 87, 19, 0.12);
 
-  --surface-base:         #131313;
-  --surface-raised:       #1E1E1E;
-  --surface-sunken:       #252525;
+  --surface-base: #131313;
+  --surface-raised: #1e1e1e;
+  --surface-sunken: #252525;
 
-  --text-primary:         #F5F1EE;
-  --text-secondary:       #9A9490;
-  --text-tertiary:        #635E5A;
+  --text-primary: #f5f1ee;
+  --text-secondary: #9a9490;
+  --text-tertiary: #635e5a;
 
-  --border:               rgba(245, 241, 238, 0.12);
-  --line:                 rgba(245, 241, 238, 0.10);
-  --header-bg:            rgba(19, 19, 19, 0.88);
-  --chip-bg:              rgba(30, 30, 30, 0.90);
-  --chip-line:            rgba(239, 87, 19, 0.22);
-  --hero-a:               rgba(239, 87, 19, 0.14);
-  --hero-b:               rgba(26, 17, 0, 0.40);
+  --border: rgba(245, 241, 238, 0.12);
+  --line: rgba(245, 241, 238, 0.1);
+  --header-bg: rgba(19, 19, 19, 0.88);
+  --chip-bg: rgba(30, 30, 30, 0.9);
+  --chip-line: rgba(239, 87, 19, 0.22);
+  --hero-a: rgba(239, 87, 19, 0.14);
+  --hero-b: rgba(26, 17, 0, 0.4);
 }
 ```
 
@@ -193,24 +193,26 @@ No external font dependencies. System font stack for all text.
 
 ```css
 @theme inline {
-  --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto,
-               "Helvetica Neue", Arial, sans-serif;
-  --font-mono: ui-monospace, "JetBrains Mono", "Fira Code", "Cascadia Code",
-               Menlo, Consolas, monospace;
+  --font-sans:
+    ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto,
+    "Helvetica Neue", Arial, sans-serif;
+  --font-mono:
+    ui-monospace, "JetBrains Mono", "Fira Code", "Cascadia Code", Menlo,
+    Consolas, monospace;
 }
 ```
 
 ### Type Scale
 
-| Usage | Weight | Size | Line-height | Notes |
-|---|---|---|---|---|
-| `.display-title` | 800 | `clamp(2rem, 5vw, 3.5rem)` | 1.08 | Hero text |
-| `h1` | 700 | `2rem` | 1.2 | |
-| `h2` | 700 | `1.5rem` | 1.3 | |
-| `h3` | 600 | `1.125rem` | 1.4 | |
-| Body | 400 | `1rem` | 1.65 | |
-| `.island-kicker` | 700 | `0.6875rem` | — | `letter-spacing: 0.14em; text-transform: uppercase` |
-| Caption | 500 | `0.8125rem` | 1.5 | |
+| Usage            | Weight | Size                       | Line-height | Notes                                               |
+| ---------------- | ------ | -------------------------- | ----------- | --------------------------------------------------- |
+| `.display-title` | 800    | `clamp(2rem, 5vw, 3.5rem)` | 1.08        | Hero text                                           |
+| `h1`             | 700    | `2rem`                     | 1.2         |                                                     |
+| `h2`             | 700    | `1.5rem`                   | 1.3         |                                                     |
+| `h3`             | 600    | `1.125rem`                 | 1.4         |                                                     |
+| Body             | 400    | `1rem`                     | 1.65        |                                                     |
+| `.island-kicker` | 700    | `0.6875rem`                | —           | `letter-spacing: 0.14em; text-transform: uppercase` |
+| Caption          | 500    | `0.8125rem`                | 1.5         |                                                     |
 
 `.display-title` loses its serif rule. New: `font-weight: 800; letter-spacing: -0.01em`.
 
@@ -244,15 +246,15 @@ No external font dependencies. System font stack for all text.
 
 Status-to-token mapping:
 
-| Status | Foreground | Background |
-|---|---|---|
-| `draft` | `--status-neutral` | `--status-neutral-bg` |
-| `submitted` | `--status-info` | `--status-info-bg` |
-| `approved` | `--status-success` | `--status-success-bg` |
-| `changes-requested` | `--status-warning` | `--status-warning-bg` |
-| `published` | `--brand-primary` | `--brand-primary-tint` |
-| `archived` | `--status-neutral` | `--status-neutral-bg` |
-| `deleted` | `--status-error` | `--status-error-bg` |
+| Status              | Foreground         | Background             |
+| ------------------- | ------------------ | ---------------------- |
+| `draft`             | `--status-neutral` | `--status-neutral-bg`  |
+| `submitted`         | `--status-info`    | `--status-info-bg`     |
+| `approved`          | `--status-success` | `--status-success-bg`  |
+| `changes-requested` | `--status-warning` | `--status-warning-bg`  |
+| `published`         | `--brand-primary`  | `--brand-primary-tint` |
+| `archived`          | `--status-neutral` | `--status-neutral-bg`  |
+| `deleted`           | `--status-error`   | `--status-error-bg`    |
 
 ### `src/components/category-chip.tsx`
 
@@ -294,11 +296,11 @@ OSU logo asset. Must be supplied by the developer. `src/lib/brand.ts` imports it
 Breakpoints (Tailwind defaults, unchanged):
 
 | Name | Min-width |
-|---|---|
-| `sm` | 640px |
-| `md` | 768px |
-| `lg` | 1024px |
-| `xl` | 1280px |
+| ---- | --------- |
+| `sm` | 640px     |
+| `md` | 768px     |
+| `lg` | 1024px    |
+| `xl` | 1280px    |
 
 ---
 
