@@ -559,10 +559,6 @@ Inline ignores cover the Radix group headings in `ui/` and Biome 2.6 calling eve
 
 Biome's `useWhile` rejects `for (;;)` and offers `while (true)` as its safe fix, which `noUnnecessaryConditions` then rejects as always truthy. Give the loop a real condition instead, usually by reading the first item before the loop and the next at the end of its body, as `readCappedBody` in `traffic-request.ts` does.
 
-### The split-import autofix can break a default import
-
-`useImportType` wants `import type { A }` apart from the value import. Where one statement holds a default import, a `type` specifier and a value specifier, Biome's safe fix writes the default as `import type` too, and `npm run typecheck` fails. Split it by hand: `import type { A } from "x"`, then `import d, { b } from "x"`.
-
 ### Do not run `biome check --write --unsafe` blindly
 
 Its unsafe fixes changed behaviour here: `viewer!.id` became `viewer?.id`, and a `type` became an `interface` that broke a cast. Use `npm run format`, and review any unsafe fix diff by diff.
