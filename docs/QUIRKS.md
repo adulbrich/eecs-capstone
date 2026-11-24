@@ -643,7 +643,7 @@ If you discover a new framework behavior that surprised you, add it here. The ru
 
 Keep the structure: short headline, one-paragraph explanation, code example if relevant. The point of this file is grep-friendly recall, not narrative writing. History belongs in git and the PR; the rule belongs here.
 
-Three things do not go here. What Biome, the type checker, a test or a hook already reports, unless the failure does not say what to do: cause the mistake and read the output before writing. A decision (something chosen, with a trade-off, that a later reader would otherwise re-propose) goes in `docs/adr/`, and the section here that touches it gets a one-line pointer. An ADR is one paragraph under its title, with the consequences as its closing sentences and no `## Consequences` heading. A term goes in `CONTEXT.md`, with the synonyms to avoid. A rule that restates a module (a transition table, a notification decision) is a pointer at the module and its unit tests, not a copy.
+Four things do not go here. What Biome, the type checker, a test or a hook already reports, unless the failure does not say what to do: cause the mistake and read the output before writing. A decision (something chosen, with a trade-off, that a later reader would otherwise re-propose) goes in `docs/adr/`, and the section here that touches it gets a one-line pointer. An ADR is one paragraph under its title, with the consequences as its closing sentences and no `## Consequences` heading. A term goes in `CONTEXT.md`, with the synonyms to avoid. A rule that restates a module (a transition table, a notification decision) is a pointer at the module and its unit tests, not a copy.
 
 ## Inventory
 
