@@ -7,7 +7,7 @@
  * keep them agreeing is to have them read the same constant. This was three
  * copies with nothing keeping them in step, so adding a type to one silently
  * gave the app two upload policies depending on which form the user was
- * filling in. QUIRKS lists who reads this; do not repeat the list here.
+ * filling in.
  *
  * If a reason ever emerges for one surface to allow something another must
  * not, write the reason down here and split the constant deliberately rather

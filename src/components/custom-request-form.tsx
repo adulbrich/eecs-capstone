@@ -44,7 +44,7 @@ const emptyLine = (name = ""): CustomRequestFormValues["lines"][number] => ({
 });
 
 // Same localized `any` as `inventory-form.tsx`, for the same reason: the
-// `useForm` generics are unstable across releases (see docs/QUIRKS.md).
+// `useForm` generics are unstable across releases.
 // biome-ignore lint/suspicious/noExplicitAny: see above
 type AnyForm = any;
 
