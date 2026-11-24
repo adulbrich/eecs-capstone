@@ -44,11 +44,13 @@ the originating spec; the design doc records where the issue's picture of the tr
 ### Task 1: Schema columns and migration
 
 **Files:**
+
 - Modify: `src/db/schema.ts:148` (after `isSponsored`)
 - Create: `drizzle/0017_project_mentorship.sql` (generated)
 - Modify: `drizzle/meta/_journal.json`, `drizzle/meta/0017_snapshot.json` (generated)
 
 **Interfaces:**
+
 - Produces: `projects.studentProposed: boolean` (not null, default false) and
   `projects.mentorEmail: string | null` on the Drizzle table, used by every later task.
 
@@ -107,6 +109,7 @@ git commit -m "feat(projects): add the student-proposed and mentor columns"
 ### Task 2: Read path, the projection and the detail view
 
 **Files:**
+
 - Modify: `src/server/_internal/project-summary.ts`
 - Modify: `src/lib/project-visibility.ts:110-206`
 - Modify: `src/server/_internal/projects-queries.ts:258-267` (`getProjectAs`)
@@ -114,6 +117,7 @@ git commit -m "feat(projects): add the student-proposed and mentor columns"
 - Test: `src/server/__tests__/projects.integration.test.ts:280-320`
 
 **Interfaces:**
+
 - Consumes: the two columns from Task 1.
 - Produces: `mentorNameSql: SQL<string | null>` and `seekingMentorSql: SQL<boolean>`
   exported from `project-summary.ts`; `projectSummarySelect` and `ProjectDetailView` gain
@@ -138,18 +142,22 @@ and `"studentProposed"` to `DETAIL_KEYS` (keep the array sorted), add
 Add one test in the `projectDetailView` describe:
 
 ```ts
-  it("carries the mentor name and the seeking flag for every viewer, never the address", () => {
-    const seeking = row({ mentorEmail: null, seekingMentor: true, studentProposed: true });
-    for (const viewer of [anon, other, owner, admin]) {
-      const view = projectDetailView(seeking, viewer);
-      expect(view.studentProposed).toBe(true);
-      expect(view.seekingMentor).toBe(true);
-      expect(view.mentorName).toBeNull();
-      expect("mentorEmail" in view).toBe(false);
-    }
-    const named = row({ mentorName: "Dana Lee" });
-    expect(projectDetailView(named, anon).mentorName).toBe("Dana Lee");
+it("carries the mentor name and the seeking flag for every viewer, never the address", () => {
+  const seeking = row({
+    mentorEmail: null,
+    seekingMentor: true,
+    studentProposed: true,
   });
+  for (const viewer of [anon, other, owner, admin]) {
+    const view = projectDetailView(seeking, viewer);
+    expect(view.studentProposed).toBe(true);
+    expect(view.seekingMentor).toBe(true);
+    expect(view.mentorName).toBeNull();
+    expect("mentorEmail" in view).toBe(false);
+  }
+  const named = row({ mentorName: "Dana Lee" });
+  expect(projectDetailView(named, anon).mentorName).toBe("Dana Lee");
+});
 ```
 
 - [ ] **Step 2: Run it to see it fail**
@@ -215,20 +223,20 @@ The `sql` import already exists in that file. `user` is already imported.
 In `src/lib/project-visibility.ts`, add to `ProjectRow`:
 
 ```ts
-  mentorEmail: string | null;
-  mentorName: string | null;
-  seekingMentor: boolean;
-  studentProposed: boolean;
+mentorEmail: string | null;
+mentorName: string | null;
+seekingMentor: boolean;
+studentProposed: boolean;
 ```
 
 Add to `ProjectDetailView`:
 
 ```ts
-  /** The resolved account's name. Null when unset or when nobody has signed up at that address. */
-  mentorName: string | null;
-  /** `studentProposed` with no mentor address on file. Derived in SQL, never stored. */
-  seekingMentor: boolean;
-  studentProposed: boolean;
+/** The resolved account's name. Null when unset or when nobody has signed up at that address. */
+mentorName: string | null;
+/** `studentProposed` with no mentor address on file. Derived in SQL, never stored. */
+seekingMentor: boolean;
+studentProposed: boolean;
 ```
 
 Add to the object `projectDetailView` returns, after `isSponsored`:
@@ -286,7 +294,7 @@ In `src/server/__tests__/projects.integration.test.ts`, add `"mentorName"`,
 the `forAnon` assertions, add:
 
 ```ts
-    expect("mentorEmail" in (forAnon ?? {})).toBe(false);
+expect("mentorEmail" in (forAnon ?? {})).toBe(false);
 ```
 
 - [ ] **Step 7: Run unit, typecheck and the two suites**
@@ -311,12 +319,14 @@ git commit -m "feat(projects): carry the mentor name and seeking flag in public 
 ### Task 3: Write path, the staff-only mentorship update
 
 **Files:**
+
 - Modify: `src/server/projects.ts` (schema, type, server function)
 - Modify: `src/server/_internal/projects.ts` (seam and wrapper, after `updateProjectForCurrentUser`)
 - Modify: `src/server/__tests__/access-contract.ts:273`
 - Create: `src/server/__tests__/mentorship.integration.test.ts`
 
 **Interfaces:**
+
 - Consumes: `diffRowFields`, `loadProjectOr404`, `assertStaff`, `projectEditLog` (all present in `_internal/projects.ts`).
 - Produces: `MentorshipInput = { id: string; mentorEmail: string | null; studentProposed: boolean }`
   exported from `src/server/projects.ts`; `updateProjectMentorshipAs(viewer: Viewer, data: MentorshipInput): Promise<{ id: string; updated: boolean }>`;
@@ -470,7 +480,10 @@ describe("updateProjectMentorshipAs", () => {
 
 describe("the three public states", () => {
   async function publishedProject() {
-    const admin = await makeUser(`mp-${Date.now()}-${Math.random()}@x.com`, "admin");
+    const admin = await makeUser(
+      `mp-${Date.now()}-${Math.random()}@x.com`,
+      "admin"
+    );
     const { id } = await createProjectAs(admin, baseProject());
     await forceTransitionAs(admin, id, "published", undefined, {
       sendEmail: false,
@@ -689,12 +702,14 @@ git commit -m "feat(projects): let staff record a mentor and mark a project stud
 ### Task 4: Staff read of the raw mentorship record
 
 **Files:**
+
 - Modify: `src/server/_internal/projects-queries.ts` (after `getProposerForEditImpl`)
 - Modify: `src/server/projects-queries.ts` (type re-export and server function)
 - Modify: `src/server/__tests__/access-contract.ts`
 - Test: `src/server/__tests__/mentorship.integration.test.ts`
 
 **Interfaces:**
+
 - Consumes: `mentorNameSql` from Task 2.
 - Produces: `ProjectMentorship = { mentorEmail: string; mentorName: string | null; studentProposed: boolean }`
   re-exported from `src/server/projects-queries.ts`; `getProjectMentorshipAs(viewer, { projectId })`;
@@ -853,6 +868,7 @@ git commit -m "feat(projects): add the staff read of a project's mentorship reco
 ### Task 5: The badges on card, row and detail page
 
 **Files:**
+
 - Create: `src/components/mentorship-badges.tsx`
 - Create: `src/test/mentorship-badges.test.tsx`
 - Modify: `src/components/project-card.tsx`
@@ -861,6 +877,7 @@ git commit -m "feat(projects): add the staff read of a project's mentorship reco
 - Test: `src/test/project-card.test.tsx`, `src/test/project-row.test.tsx`
 
 **Interfaces:**
+
 - Consumes: `studentProposed`, `seekingMentor`, `mentorName` on the summary and detail payloads (Task 2).
 - Produces: `MentorshipBadges({ seekingMentor, studentProposed, className? })`, and
   `ProjectSummary` gains optional `seekingMentor?: boolean` and `studentProposed?: boolean`.
@@ -906,14 +923,16 @@ describe("MentorshipBadges", () => {
 Add to `src/test/project-card.test.tsx` inside the describe:
 
 ```tsx
-  it("shows the mentorship badges when the summary carries them", () => {
-    const { getByText, queryByText } = render(
-      <ProjectCard project={{ ...base, seekingMentor: true, studentProposed: true }} />
-    );
-    expect(getByText("Student proposed")).toBeTruthy();
-    expect(getByText("Seeking mentor")).toBeTruthy();
-    expect(queryByText("mentor@")).toBeNull();
-  });
+it("shows the mentorship badges when the summary carries them", () => {
+  const { getByText, queryByText } = render(
+    <ProjectCard
+      project={{ ...base, seekingMentor: true, studentProposed: true }}
+    />
+  );
+  expect(getByText("Student proposed")).toBeTruthy();
+  expect(getByText("Seeking mentor")).toBeTruthy();
+  expect(queryByText("mentor@")).toBeNull();
+});
 ```
 
 Add the same test to `src/test/project-row.test.tsx` with `ProjectRow`.
@@ -990,11 +1009,11 @@ Import `MentorshipBadges` from `./mentorship-badges`. In `ProjectCard`, directly
 title/status `div`:
 
 ```tsx
-          <MentorshipBadges
-            className="mt-2"
-            seekingMentor={project.seekingMentor ?? false}
-            studentProposed={project.studentProposed ?? false}
-          />
+<MentorshipBadges
+  className="mt-2"
+  seekingMentor={project.seekingMentor ?? false}
+  studentProposed={project.studentProposed ?? false}
+/>;
 ```
 
 In `src/components/project-row.tsx`, the same element after the title/status `div`, with
@@ -1006,17 +1025,17 @@ In `src/routes/projects/$projectId.tsx`, import `MentorshipBadges`. After the ti
 `div` at the top of the returned JSX:
 
 ```tsx
-      <MentorshipBadges
-        className="mt-3"
-        seekingMentor={project.seekingMentor}
-        studentProposed={project.studentProposed}
-      />
+<MentorshipBadges
+  className="mt-3"
+  seekingMentor={project.seekingMentor}
+  studentProposed={project.studentProposed}
+/>;
 ```
 
 After `<ContactSection ... />`:
 
 ```tsx
-      <MentorSection name={project.mentorName} />
+<MentorSection name={project.mentorName} />;
 ```
 
 Add beside `ContactSection`:
@@ -1060,10 +1079,12 @@ git commit -m "feat(projects): show student-proposed and mentor state on the cat
 ### Task 6: The Mentorship section in the staff panel
 
 **Files:**
+
 - Modify: `src/components/staff-project-panel.tsx`
 - Test: `src/test/staff-project-panel.test.tsx`
 
 **Interfaces:**
+
 - Consumes: `getProjectMentorship` and `ProjectMentorship` from `#/server/projects-queries` (Task 4), `updateProjectMentorship` from `#/server/projects` (Task 3).
 - Produces: nothing later tasks import.
 
@@ -1081,27 +1102,33 @@ mock, following the exact shape the file already uses.
 Add to `src/test/staff-project-panel.test.tsx`:
 
 ```tsx
-  it("saves the mentorship record and reports the account match", async () => {
-    const { getProjectMentorship } = await import("#/server/projects-queries");
-    const { updateProjectMentorship } = await import("#/server/projects");
-    (getProjectMentorship as ReturnType<typeof vi.fn>).mockResolvedValue({
-      mentorEmail: "mentor@x.test",
-      mentorName: "Dana Lee",
-      studentProposed: true,
-    });
-    render(<StaffProjectPanel onChanged={() => {}} project={project("draft")} />);
-    const input = (await screen.findByLabelText("Mentor email")) as HTMLInputElement;
-    expect(input.value).toBe("mentor@x.test");
-    expect(await screen.findByText("Account: Dana Lee")).toBeTruthy();
-
-    fireEvent.change(input, { target: { value: "other@x.test" } });
-    fireEvent.click(screen.getByRole("button", { name: "Save mentorship" }));
-    await waitFor(() =>
-      expect(updateProjectMentorship).toHaveBeenCalledWith({
-        data: { id: project("draft").id, mentorEmail: "other@x.test", studentProposed: true },
-      })
-    );
+it("saves the mentorship record and reports the account match", async () => {
+  const { getProjectMentorship } = await import("#/server/projects-queries");
+  const { updateProjectMentorship } = await import("#/server/projects");
+  (getProjectMentorship as ReturnType<typeof vi.fn>).mockResolvedValue({
+    mentorEmail: "mentor@x.test",
+    mentorName: "Dana Lee",
+    studentProposed: true,
   });
+  render(<StaffProjectPanel onChanged={() => {}} project={project("draft")} />);
+  const input = (await screen.findByLabelText(
+    "Mentor email"
+  )) as HTMLInputElement;
+  expect(input.value).toBe("mentor@x.test");
+  expect(await screen.findByText("Account: Dana Lee")).toBeTruthy();
+
+  fireEvent.change(input, { target: { value: "other@x.test" } });
+  fireEvent.click(screen.getByRole("button", { name: "Save mentorship" }));
+  await waitFor(() =>
+    expect(updateProjectMentorship).toHaveBeenCalledWith({
+      data: {
+        id: project("draft").id,
+        mentorEmail: "other@x.test",
+        studentProposed: true,
+      },
+    })
+  );
+});
 ```
 
 Use the file's existing helper that builds the `project` prop (it is named `project` or
@@ -1122,9 +1149,18 @@ In `src/components/staff-project-panel.tsx`:
 Imports:
 
 ```ts
-import type { ProjectMentorship, ProposerForEdit } from "#/server/projects-queries";
-import { updateProjectMentorship, /* existing names */ } from "#/server/projects";
-import { getProjectMentorship, getProposerForEdit, listProjectEditLog } from "#/server/projects-queries";
+import type {
+  ProjectMentorship,
+  ProposerForEdit,
+} from "#/server/projects-queries";
+import {
+  updateProjectMentorship /* existing names */,
+} from "#/server/projects";
+import {
+  getProjectMentorship,
+  getProposerForEdit,
+  listProjectEditLog,
+} from "#/server/projects-queries";
 import { Input } from "./ui/input";
 ```
 
@@ -1134,84 +1170,88 @@ the wrapper module above, so the component imports no server internals.
 State, beside the proposer state:
 
 ```ts
-  const [mentorship, setMentorship] = useState<ProjectMentorship | null>(null);
-  const [mentorEmail, setMentorEmail] = useState("");
-  const [studentProposed, setStudentProposed] = useState(false);
-  const [mentorshipBusy, setMentorshipBusy] = useState(false);
-  const [mentorshipError, setMentorshipError] = useState<string | null>(null);
+const [mentorship, setMentorship] = useState<ProjectMentorship | null>(null);
+const [mentorEmail, setMentorEmail] = useState("");
+const [studentProposed, setStudentProposed] = useState(false);
+const [mentorshipBusy, setMentorshipBusy] = useState(false);
+const [mentorshipError, setMentorshipError] = useState<string | null>(null);
 
-  const loadMentorship = useCallback(async () => {
-    try {
-      const record = await getProjectMentorship({
-        data: { projectId: project.id },
-      });
-      setMentorship(record);
-      setMentorEmail(record.mentorEmail);
-      setStudentProposed(record.studentProposed);
-    } catch {
-      // Staff-only endpoint; on failure the section stays at its defaults and
-      // a save still round-trips through the server's own gate.
-    }
-  }, [project.id]);
-
-  useEffect(() => {
-    void loadMentorship();
-  }, [loadMentorship]);
-
-  async function saveMentorship() {
-    setMentorshipBusy(true);
-    setMentorshipError(null);
-    try {
-      await updateProjectMentorship({
-        data: { id: project.id, mentorEmail: mentorEmail.trim(), studentProposed },
-      });
-      await loadMentorship();
-      onChanged();
-    } catch (e) {
-      setMentorshipError((e as Error)?.message || "Save failed");
-    } finally {
-      setMentorshipBusy(false);
-    }
+const loadMentorship = useCallback(async () => {
+  try {
+    const record = await getProjectMentorship({
+      data: { projectId: project.id },
+    });
+    setMentorship(record);
+    setMentorEmail(record.mentorEmail);
+    setStudentProposed(record.studentProposed);
+  } catch {
+    // Staff-only endpoint; on failure the section stays at its defaults and
+    // a save still round-trips through the server's own gate.
   }
+}, [project.id]);
+
+useEffect(() => {
+  void loadMentorship();
+}, [loadMentorship]);
+
+async function saveMentorship() {
+  setMentorshipBusy(true);
+  setMentorshipError(null);
+  try {
+    await updateProjectMentorship({
+      data: {
+        id: project.id,
+        mentorEmail: mentorEmail.trim(),
+        studentProposed,
+      },
+    });
+    await loadMentorship();
+    onChanged();
+  } catch (e) {
+    setMentorshipError((e as Error)?.message || "Save failed");
+  } finally {
+    setMentorshipBusy(false);
+  }
+}
 ```
 
 Add `useCallback` to the React import. The section, between the Proposer and Status sections:
 
 ```tsx
-      <PanelSection title="Mentorship">
-        <div className="space-y-3">
-          <Label className="font-normal">
-            <Checkbox
-              checked={studentProposed}
-              onCheckedChange={(checked) => setStudentProposed(checked === true)}
-            />
-            Student proposed
-          </Label>
-          <div className="space-y-1.5">
-            <Label htmlFor="mentor-email">Mentor email</Label>
-            <Input
-              autoComplete="off"
-              id="mentor-email"
-              onChange={(e) => setMentorEmail(e.target.value)}
-              placeholder="mentor@example.com"
-              type="email"
-              value={mentorEmail}
-            />
-            <MentorshipHint record={mentorship} />
-          </div>
-          {mentorshipError && (
-            <p className="text-destructive text-sm">{mentorshipError}</p>
-          )}
-          <Button
-            disabled={mentorshipBusy}
-            onClick={() => void saveMentorship()}
-            size="sm"
-            type="button"
-          >
-            {mentorshipBusy ? "Saving..." : "Save mentorship"}
-          </Button>
-        </div>
-      </PanelSection>
+<PanelSection title="Mentorship">
+  <div className="space-y-3">
+    <Label className="font-normal">
+      <Checkbox
+        checked={studentProposed}
+        onCheckedChange={(checked) => setStudentProposed(checked === true)}
+      />
+      Student proposed
+    </Label>
+    <div className="space-y-1.5">
+      <Label htmlFor="mentor-email">Mentor email</Label>
+      <Input
+        autoComplete="off"
+        id="mentor-email"
+        onChange={(e) => setMentorEmail(e.target.value)}
+        placeholder="mentor@example.com"
+        type="email"
+        value={mentorEmail}
+      />
+      <MentorshipHint record={mentorship} />
+    </div>
+    {mentorshipError && (
+      <p className="text-destructive text-sm">{mentorshipError}</p>
+    )}
+    <Button
+      disabled={mentorshipBusy}
+      onClick={() => void saveMentorship()}
+      size="sm"
+      type="button"
+    >
+      {mentorshipBusy ? "Saving..." : "Save mentorship"}
+    </Button>
+  </div>
+</PanelSection>;
 ```
 
 And, at module level below `STATUS_LABEL`:
@@ -1266,6 +1306,7 @@ git commit -m "feat(projects): edit mentorship from the staff panel"
 ### Task 7: Docs, full verification, PR
 
 **Files:**
+
 - Modify: `PRD.md` (the projects feature list near line 87)
 - Modify: `docs/QUIRKS.md` (the project domain rules section)
 

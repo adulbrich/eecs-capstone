@@ -2,7 +2,6 @@
 
 > **Status (verified 2026-06-07):** ✅ **Implemented and shipped.** Verified against the codebase; all deliverables exist. The `- [ ]` checkboxes below were never ticked during execution; they are stale, not a sign of incomplete work.
 
-
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Spec:** `docs/superpowers/specs/2026-05-15-auth-foundation-design.md`
@@ -140,7 +139,7 @@ git commit -m "reset migrations ahead of Better Auth schema integration"
 
 ### Task 4: Configure Better Auth so the CLI generates the right tables
 
-We update `src/lib/auth.ts` *before* running the schema generator so the CLI emits the admin-plugin columns and additionalFields.
+We update `src/lib/auth.ts` _before_ running the schema generator so the CLI emits the admin-plugin columns and additionalFields.
 
 **Files:**
 
@@ -224,7 +223,9 @@ describe("ConsoleEmailSender", () => {
   let stderrSpy: ReturnType<typeof vi.spyOn>;
 
   beforeEach(() => {
-    stderrSpy = vi.spyOn(process.stderr, "write").mockImplementation(() => true);
+    stderrSpy = vi
+      .spyOn(process.stderr, "write")
+      .mockImplementation(() => true);
   });
 
   afterEach(() => {
@@ -233,7 +234,10 @@ describe("ConsoleEmailSender", () => {
 
   it("writes a verification block containing the recipient and url", async () => {
     const sender = new ConsoleEmailSender();
-    await sender.sendVerification({ to: "a@b.com", url: "https://x/verify?t=abc" });
+    await sender.sendVerification({
+      to: "a@b.com",
+      url: "https://x/verify?t=abc",
+    });
     const output = stderrSpy.mock.calls.map((c) => String(c[0])).join("");
     expect(output).toContain("VERIFY EMAIL");
     expect(output).toContain("a@b.com");
@@ -242,7 +246,10 @@ describe("ConsoleEmailSender", () => {
 
   it("writes a password-reset block containing the recipient and url", async () => {
     const sender = new ConsoleEmailSender();
-    await sender.sendPasswordReset({ to: "a@b.com", url: "https://x/reset?t=abc" });
+    await sender.sendPasswordReset({
+      to: "a@b.com",
+      url: "https://x/reset?t=abc",
+    });
     const output = stderrSpy.mock.calls.map((c) => String(c[0])).join("");
     expect(output).toContain("RESET PASSWORD");
     expect(output).toContain("a@b.com");
@@ -455,7 +462,7 @@ export const programInstructors = pgTable(
       .references(() => user.id, { onDelete: "cascade" })
       .notNull(),
   },
-  (t) => [primaryKey({ columns: [t.programId, t.userId] })],
+  (t) => [primaryKey({ columns: [t.programId, t.userId] })]
 );
 ```
 
@@ -464,7 +471,6 @@ Drop the `id` column on each if present. Apply the same pattern to `projectColla
 - [ ] **Step 3:** Replace every existing `timestamp(...)` declaration with `timestamp("col_name", { withTimezone: true })`. For columns that are required (`createdAt`, `updatedAt`, `expiresAt`, `rank`-adjacent timestamps), chain `.notNull().defaultNow()`. For optional event timestamps (`publishedAt`, `archivedAt`, `deletedAt`, `reviewedAt`), keep them nullable but still `withTimezone`.
 
 - [ ] **Step 4:** Ensure these columns are `.notNull()` (defaulting where the existing schema relied on a default):
-
   - `programs.createdAt`, `programs.updatedAt`
   - `categories.createdAt`
   - `projects.createdAt`, `projects.updatedAt`
@@ -602,7 +608,8 @@ vi.mock("#/lib/auth", () => ({
 }));
 
 vi.mock("@tanstack/react-start/server", () => ({
-  getWebRequest: () => new Request("http://localhost/", { headers: { cookie: "x=1" } }),
+  getWebRequest: () =>
+    new Request("http://localhost/", { headers: { cookie: "x=1" } }),
 }));
 
 import { auth } from "#/lib/auth";
@@ -620,7 +627,9 @@ describe("requireUser", () => {
   });
 
   it("throws a redirect when no session", async () => {
-    (auth.api.getSession as ReturnType<typeof vi.fn>).mockResolvedValueOnce(null);
+    (auth.api.getSession as ReturnType<typeof vi.fn>).mockResolvedValueOnce(
+      null
+    );
 
     await expect(requireUser()).rejects.toMatchObject({ to: "/sign-in" });
   });
@@ -647,9 +656,13 @@ describe("requireRole", () => {
   });
 
   it("throws a sign-in redirect when no session", async () => {
-    (auth.api.getSession as ReturnType<typeof vi.fn>).mockResolvedValueOnce(null);
+    (auth.api.getSession as ReturnType<typeof vi.fn>).mockResolvedValueOnce(
+      null
+    );
 
-    await expect(requireRole(["admin"])).rejects.toMatchObject({ to: "/sign-in" });
+    await expect(requireRole(["admin"])).rejects.toMatchObject({
+      to: "/sign-in",
+    });
   });
 });
 ```
@@ -775,9 +788,27 @@ function SignUp() {
     <div className="mx-auto max-w-sm p-8">
       <h1 className="text-2xl font-semibold">Create an account</h1>
       <form onSubmit={onSubmit} className="mt-6 space-y-4">
-        <input name="name" placeholder="Name" required className="w-full border p-2" />
-        <input name="email" type="email" placeholder="Email" required className="w-full border p-2" />
-        <input name="password" type="password" placeholder="Password" required minLength={8} className="w-full border p-2" />
+        <input
+          name="name"
+          placeholder="Name"
+          required
+          className="w-full border p-2"
+        />
+        <input
+          name="email"
+          type="email"
+          placeholder="Email"
+          required
+          className="w-full border p-2"
+        />
+        <input
+          name="password"
+          type="password"
+          placeholder="Password"
+          required
+          minLength={8}
+          className="w-full border p-2"
+        />
         {error && <p className="text-sm text-red-600">{error}</p>}
         <button type="submit" className="w-full bg-black px-4 py-2 text-white">
           Sign up
@@ -819,7 +850,12 @@ git commit -m "add sign-up route"
 - [ ] **Step 1: Create the route**
 
 ```tsx
-import { createFileRoute, Link, useNavigate, useSearch } from "@tanstack/react-router";
+import {
+  createFileRoute,
+  Link,
+  useNavigate,
+  useSearch,
+} from "@tanstack/react-router";
 import { useState } from "react";
 import { z } from "zod";
 import { authClient } from "#/lib/auth-client";
@@ -855,8 +891,20 @@ function SignIn() {
     <div className="mx-auto max-w-sm p-8">
       <h1 className="text-2xl font-semibold">Sign in</h1>
       <form onSubmit={onSubmit} className="mt-6 space-y-4">
-        <input name="email" type="email" placeholder="Email" required className="w-full border p-2" />
-        <input name="password" type="password" placeholder="Password" required className="w-full border p-2" />
+        <input
+          name="email"
+          type="email"
+          placeholder="Email"
+          required
+          className="w-full border p-2"
+        />
+        <input
+          name="password"
+          type="password"
+          placeholder="Password"
+          required
+          className="w-full border p-2"
+        />
         {error && <p className="text-sm text-red-600">{error}</p>}
         <button type="submit" className="w-full bg-black px-4 py-2 text-white">
           Sign in
@@ -945,7 +993,13 @@ function ForgotPassword() {
     <div className="mx-auto max-w-sm p-8">
       <h1 className="text-2xl font-semibold">Forgot password</h1>
       <form onSubmit={onSubmit} className="mt-6 space-y-4">
-        <input name="email" type="email" placeholder="Email" required className="w-full border p-2" />
+        <input
+          name="email"
+          type="email"
+          placeholder="Email"
+          required
+          className="w-full border p-2"
+        />
         <button type="submit" className="w-full bg-black px-4 py-2 text-white">
           Send reset link
         </button>
@@ -973,7 +1027,11 @@ git commit -m "add forgot-password route"
 - [ ] **Step 1: Create the route**
 
 ```tsx
-import { createFileRoute, useNavigate, useSearch } from "@tanstack/react-router";
+import {
+  createFileRoute,
+  useNavigate,
+  useSearch,
+} from "@tanstack/react-router";
 import { useState } from "react";
 import { z } from "zod";
 import { authClient } from "#/lib/auth-client";
@@ -1009,7 +1067,14 @@ function ResetPassword() {
     <div className="mx-auto max-w-sm p-8">
       <h1 className="text-2xl font-semibold">Choose a new password</h1>
       <form onSubmit={onSubmit} className="mt-6 space-y-4">
-        <input name="password" type="password" placeholder="New password" required minLength={8} className="w-full border p-2" />
+        <input
+          name="password"
+          type="password"
+          placeholder="New password"
+          required
+          minLength={8}
+          className="w-full border p-2"
+        />
         {error && <p className="text-sm text-red-600">{error}</p>}
         <button type="submit" className="w-full bg-black px-4 py-2 text-white">
           Reset password
@@ -1073,7 +1138,11 @@ function VerifyEmail() {
     <div className="mx-auto max-w-sm p-8">
       <h1 className="text-2xl font-semibold">Email verified</h1>
       <p className="mt-4 text-sm">
-        Your account is active. <Link to="/" className="underline">Continue</Link>.
+        Your account is active.{" "}
+        <Link to="/" className="underline">
+          Continue
+        </Link>
+        .
       </p>
     </div>
   );
@@ -1217,7 +1286,9 @@ import { useState } from "react";
 import { authClient } from "#/lib/auth-client";
 import { updateProfile } from "#/server/profile";
 
-export const Route = createFileRoute("/_authed/profile")({ component: Profile });
+export const Route = createFileRoute("/_authed/profile")({
+  component: Profile,
+});
 
 function Profile() {
   const router = useRouter();
@@ -1266,26 +1337,66 @@ function Profile() {
   return (
     <div className="mx-auto max-w-md p-8">
       <h1 className="text-2xl font-semibold">Profile</h1>
-      <p className="mt-2 text-sm text-neutral-600">{user.email} ({user.role})</p>
+      <p className="mt-2 text-sm text-neutral-600">
+        {user.email} ({user.role})
+      </p>
 
       <form onSubmit={onSaveProfile} className="mt-6 space-y-3">
-        <input name="name" defaultValue={user.name ?? ""} placeholder="Name" required className="w-full border p-2" />
-        <input name="affiliation" defaultValue={user.affiliation ?? ""} placeholder="Affiliation" className="w-full border p-2" />
-        <input name="linkedin" defaultValue={user.linkedin ?? ""} placeholder="LinkedIn URL" type="url" className="w-full border p-2" />
-        <button type="submit" className="w-full bg-black px-4 py-2 text-white">Save</button>
+        <input
+          name="name"
+          defaultValue={user.name ?? ""}
+          placeholder="Name"
+          required
+          className="w-full border p-2"
+        />
+        <input
+          name="affiliation"
+          defaultValue={user.affiliation ?? ""}
+          placeholder="Affiliation"
+          className="w-full border p-2"
+        />
+        <input
+          name="linkedin"
+          defaultValue={user.linkedin ?? ""}
+          placeholder="LinkedIn URL"
+          type="url"
+          className="w-full border p-2"
+        />
+        <button type="submit" className="w-full bg-black px-4 py-2 text-white">
+          Save
+        </button>
       </form>
 
       <h2 className="mt-8 text-lg font-semibold">Change password</h2>
       <form onSubmit={onChangePassword} className="mt-3 space-y-3">
-        <input name="current" type="password" placeholder="Current password" required className="w-full border p-2" />
-        <input name="next" type="password" placeholder="New password" required minLength={8} className="w-full border p-2" />
-        <button type="submit" className="w-full bg-black px-4 py-2 text-white">Change password</button>
+        <input
+          name="current"
+          type="password"
+          placeholder="Current password"
+          required
+          className="w-full border p-2"
+        />
+        <input
+          name="next"
+          type="password"
+          placeholder="New password"
+          required
+          minLength={8}
+          className="w-full border p-2"
+        />
+        <button type="submit" className="w-full bg-black px-4 py-2 text-white">
+          Change password
+        </button>
       </form>
 
       {saved && <p className="mt-4 text-sm text-green-700">Saved.</p>}
       {error && <p className="mt-4 text-sm text-red-600">{error}</p>}
 
-      <button type="button" onClick={onSignOut} className="mt-8 w-full border px-4 py-2">
+      <button
+        type="button"
+        onClick={onSignOut}
+        className="mt-8 w-full border px-4 py-2"
+      >
         Sign out
       </button>
     </div>
@@ -1346,7 +1457,10 @@ async function main() {
   const [existing] = await db.select().from(user).where(eq(user.email, email));
   if (existing) {
     if (existing.role !== "admin") {
-      await db.update(user).set({ role: "admin" }).where(eq(user.id, existing.id));
+      await db
+        .update(user)
+        .set({ role: "admin" })
+        .where(eq(user.id, existing.id));
       console.log(`Promoted ${email} to admin`);
     } else {
       console.log(`${email} is already admin`);
@@ -1521,7 +1635,10 @@ git commit -m "add integration test harness with DB reset"
 import { describe, expect, it } from "vitest";
 import { auth } from "#/lib/auth";
 
-async function captureConsoleEmail(label: string, fn: () => Promise<unknown>): Promise<string> {
+async function captureConsoleEmail(
+  label: string,
+  fn: () => Promise<unknown>
+): Promise<string> {
   let captured = "";
   const orig = process.stderr.write.bind(process.stderr);
   process.stderr.write = ((chunk: unknown) => {
@@ -1533,8 +1650,13 @@ async function captureConsoleEmail(label: string, fn: () => Promise<unknown>): P
   } finally {
     process.stderr.write = orig;
   }
-  const match = captured.match(new RegExp(`\\[${label}\\][\\s\\S]*?url: (https?://\\S+)`));
-  if (!match) throw new Error(`No console email captured for ${label}. Got:\n${captured}`);
+  const match = captured.match(
+    new RegExp(`\\[${label}\\][\\s\\S]*?url: (https?://\\S+)`)
+  );
+  if (!match)
+    throw new Error(
+      `No console email captured for ${label}. Got:\n${captured}`
+    );
   return match[1];
 }
 
@@ -1544,7 +1666,9 @@ describe("auth integration", () => {
     const password = "Password1!";
 
     const verifyUrl = await captureConsoleEmail("VERIFY EMAIL", async () => {
-      await auth.api.signUpEmail({ body: { email, password, name: "It User" } });
+      await auth.api.signUpEmail({
+        body: { email, password, name: "It User" },
+      });
     });
 
     const token = new URL(verifyUrl).searchParams.get("token");
@@ -1605,7 +1729,10 @@ import { auth } from "#/lib/auth";
 describe("role gate", () => {
   async function signUpAndVerify(email: string, password: string) {
     await auth.api.signUpEmail({ body: { email, password, name: "Test" } });
-    await db.update(user).set({ emailVerified: true }).where(eq(user.email, email));
+    await db
+      .update(user)
+      .set({ emailVerified: true })
+      .where(eq(user.email, email));
     const { headers } = await auth.api.signInEmail({
       body: { email, password },
       asResponse: true,
@@ -1614,8 +1741,13 @@ describe("role gate", () => {
   }
 
   it("blocks a regular user from an admin-only check", async () => {
-    const cookie = await signUpAndVerify(`u-${Date.now()}@example.com`, "Password1!");
-    const session = await auth.api.getSession({ headers: new Headers({ cookie }) });
+    const cookie = await signUpAndVerify(
+      `u-${Date.now()}@example.com`,
+      "Password1!"
+    );
+    const session = await auth.api.getSession({
+      headers: new Headers({ cookie }),
+    });
     expect(session?.user.role).toBe("user");
     expect(["admin", "instructor"].includes(session!.user.role)).toBe(false);
   });
@@ -1624,7 +1756,9 @@ describe("role gate", () => {
     const email = `a-${Date.now()}@example.com`;
     const cookie = await signUpAndVerify(email, "Password1!");
     await db.update(user).set({ role: "admin" }).where(eq(user.email, email));
-    const session = await auth.api.getSession({ headers: new Headers({ cookie }) });
+    const session = await auth.api.getSession({
+      headers: new Headers({ cookie }),
+    });
     expect(session?.user.role).toBe("admin");
   });
 });

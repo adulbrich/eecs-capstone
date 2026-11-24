@@ -27,12 +27,12 @@ The governing principle, which every decision below follows from:
 `.update(inventoryItems)` paired with `insert(inventoryItemStatusHistory)`
 finds four production writers:
 
-| Writer | Location | Why it bypasses |
-| --- | --- | --- |
-| `transitionItem` | `inventory-transitions.ts:216` | the documented chokepoint |
-| `submitCartAs` | `inventory.ts:865` | runs as the student; `transitionItem` asserts staff |
-| `rejectRequestItemAs` | `inventory.ts:1036` | custom notification, custom line status |
-| `cancelRequestItemAs` | `inventory.ts:1119` | runs as the requester; emits no notification |
+| Writer                | Location                       | Why it bypasses                                     |
+| --------------------- | ------------------------------ | --------------------------------------------------- |
+| `transitionItem`      | `inventory-transitions.ts:216` | the documented chokepoint                           |
+| `submitCartAs`        | `inventory.ts:865`             | runs as the student; `transitionItem` asserts staff |
+| `rejectRequestItemAs` | `inventory.ts:1036`            | custom notification, custom line status             |
+| `cancelRequestItemAs` | `inventory.ts:1119`            | runs as the requester; emits no notification        |
 
 Two further sites write `inventoryItems` but touch attribute columns only
 (`updateInventoryItemAs:607`, `uploadInventoryImageAs:1697`). They are not
@@ -50,15 +50,15 @@ hand-written three times.
 address, with or without a matching account) or on a thing (a label), never
 both and never neither. Six places re-derive some part of it:
 
-| Location | What it decides |
-| --- | --- |
-| `inventory-transitions.ts:186` `resolveHolder` | a supplied address beats a supplied id |
-| `inventory-transitions.ts:248` | a resolved account beats a typed name and program |
-| `inventory.ts:144` `holderEmailOf` / `holderNameOf` | a joined account beats the stored columns |
-| `inventory.ts:179` `storedHolderIdentity` | stored columns, unreconciled |
-| `inventory-lifecycle-panel.tsx:100` `holderFields` | which fields the payload may carry |
-| `inventory-lifecycle-panel.tsx:159` `formatHolderDisplay` | name, then address, then label, rendered rich |
-| `admin/inventory/index.tsx:161` | name, then address, then label, rendered plain |
+| Location                                                  | What it decides                                   |
+| --------------------------------------------------------- | ------------------------------------------------- |
+| `inventory-transitions.ts:186` `resolveHolder`            | a supplied address beats a supplied id            |
+| `inventory-transitions.ts:248`                            | a resolved account beats a typed name and program |
+| `inventory.ts:144` `holderEmailOf` / `holderNameOf`       | a joined account beats the stored columns         |
+| `inventory.ts:179` `storedHolderIdentity`                 | stored columns, unreconciled                      |
+| `inventory-lifecycle-panel.tsx:100` `holderFields`        | which fields the payload may carry                |
+| `inventory-lifecycle-panel.tsx:159` `formatHolderDisplay` | name, then address, then label, rendered rich     |
+| `admin/inventory/index.tsx:161`                           | name, then address, then label, rendered plain    |
 
 The last two share a precedence order but not a format: the panel renders
 `Name (address) · Program` and the admin table renders a bare

@@ -16,10 +16,10 @@ window, no soft-delete-then-purge.
 
 `src/db/schema.ts` decides, not a hand-kept list. For each foreign key into `user.id`:
 
-| `onDelete` | What deletion does | Why |
-| --- | --- | --- |
-| `cascade` | delete the rows | a real DELETE would have taken them; they are the person's own data |
-| `restrict` | keep, pointing at the anonymized row | audit and authorship, the reason the row survives |
+| `onDelete` | What deletion does                   | Why                                                                    |
+| ---------- | ------------------------------------ | ---------------------------------------------------------------------- |
+| `cascade`  | delete the rows                      | a real DELETE would have taken them; they are the person's own data    |
+| `restrict` | keep, pointing at the anonymized row | audit and authorship, the reason the row survives                      |
 | `set null` | keep, pointing at the anonymized row | same, and `proposer_id` staying set is what makes projects unclaimable |
 
 Cascade edges today: `session`, `account`, `user_interests`, `program_instructors`,
@@ -29,18 +29,18 @@ cascade edge without a matching delete fails the build rather than leaking.
 
 ## The `user` row
 
-| Column | Action |
-| --- | --- |
-| `id`, `created_at`, `updated_at` | keep |
-| `name` | `"Deleted user"` |
-| `email` | `deleted-<id>@invalid` (RFC 2606, unique, undeliverable) |
-| `email_verified` | `false` |
-| `image` | `null`, and the S3 object is deleted after the commit |
-| `role` | `"user"` |
-| `banned`, `ban_reason`, `ban_expires` | `false`, `null`, `null` |
-| `affiliation`, `linkedin` | `null` |
-| `wants_to_mentor`, `mentor_team_count` | `false`, `1` |
-| `deleted_at` | now |
+| Column                                 | Action                                                   |
+| -------------------------------------- | -------------------------------------------------------- |
+| `id`, `created_at`, `updated_at`       | keep                                                     |
+| `name`                                 | `"Deleted user"`                                         |
+| `email`                                | `deleted-<id>@invalid` (RFC 2606, unique, undeliverable) |
+| `email_verified`                       | `false`                                                  |
+| `image`                                | `null`, and the S3 object is deleted after the commit    |
+| `role`                                 | `"user"`                                                 |
+| `banned`, `ban_reason`, `ban_expires`  | `false`, `null`, `null`                                  |
+| `affiliation`, `linkedin`              | `null`                                                   |
+| `wants_to_mentor`, `mentor_team_count` | `false`, `1`                                             |
+| `deleted_at`                           | now                                                      |
 
 `deleted_at` is a new `timestamp with time zone`, nullable, added to both
 `src/db/auth-schema.ts` and `user.additionalFields` in `src/lib/auth.ts` with

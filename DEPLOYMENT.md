@@ -235,12 +235,12 @@ re-issuing one costs a support ticket with multi-day turnaround.
 
 What exists today, created by hand:
 
-| Item | Value |
-| --- | --- |
-| Certificate | `*.eecs.oregonstate.edu`, ARN ending `f6cecdcc` |
-| Region | **us-east-1** (CloudFront only accepts viewer certs from us-east-1, regardless of `var.region`) |
-| Validation | DNS, `_7b5da3599a6223875e6bf5dee1000c5a.eecs.oregonstate.edu` |
-| Expires | 2027-02-13 |
+| Item        | Value                                                                                           |
+| ----------- | ----------------------------------------------------------------------------------------------- |
+| Certificate | `*.eecs.oregonstate.edu`, ARN ending `f6cecdcc`                                                 |
+| Region      | **us-east-1** (CloudFront only accepts viewer certs from us-east-1, regardless of `var.region`) |
+| Validation  | DNS, `_7b5da3599a6223875e6bf5dee1000c5a.eecs.oregonstate.edu`                                   |
+| Expires     | 2027-02-13                                                                                      |
 
 Two DNS records live in OSU's zone and must both stay in place:
 
@@ -263,7 +263,7 @@ The cutover to this hostname is done: `BETTER_AUTH_URL`, the `app_url` output,
 and the GitHub OAuth callback all point at it, and the old
 `*.cloudfront.net` URL no longer accepts logins. That last part is deliberate,
 not a regression. `better-auth` derives its trusted origins from
-`BETTER_AUTH_URL` and reads that env var *before* it will consider
+`BETTER_AUTH_URL` and reads that env var _before_ it will consider
 `x-forwarded-host`, so `trustHost` does not extend trust to a second hostname:
 requests from any other origin fail with `INVALID_ORIGIN`. Serving two
 hostnames would mean listing both in `trustedOrigins`, which this project has
@@ -571,7 +571,7 @@ value, but 7a is written to be run by hand, and an interactive shell only
 prints the message and carries on, so check both values before the first
 command that writes.
 
-That writes `$OUT/legacy-out/projects/<uuid>/<uuid>.webp` (paths that *are* the
+That writes `$OUT/legacy-out/projects/<uuid>/<uuid>.webp` (paths that _are_ the
 object-storage keys), plus `image-keys.json`. `prepare` counts every manifest
 row that converts, so what it prints depends on the manifest you hand it: the
 339-row file from 2026-09-16 gives `wrote 338 webp files`, and a manifest of
@@ -655,12 +655,12 @@ in `LEGACY_DATA_DIR`: both are read from the same place.
 The importer resolves four programs by `course_id` and attaches projects to
 them:
 
-| `course_id` | legacy course it receives | projects |
-| --- | --- | ---: |
-| `CS46X-CORVALLIS` | CS46X On Campus (9 Month) | 181 |
-| `ECE44X-CORVALLIS` | ECE44X (9 Month) | 81 |
-| `CS467-ECAMPUS` | CS467 (3 Month) | 11 |
-| `CS46X-ECAMPUS` | CS46X Online (9-month) | 0 |
+| `course_id`        | legacy course it receives | projects |
+| ------------------ | ------------------------- | -------: |
+| `CS46X-CORVALLIS`  | CS46X On Campus (9 Month) |      181 |
+| `ECE44X-CORVALLIS` | ECE44X (9 Month)          |       81 |
+| `CS467-ECAMPUS`    | CS467 (3 Month)           |       11 |
+| `CS46X-ECAMPUS`    | CS46X Online (9-month)    |        0 |
 
 All four already exist in production, so a correct run prints four `matched`
 lines and creates nothing. A `CREATED` line means an id has drifted and the
@@ -999,12 +999,12 @@ aws --profile aws-capstone1 ecs run-task --cluster "$CLUSTER" --launch-type FARG
 Each of these needs a decision that the import itself does not settle, and none
 is lost: the portal still holds them.
 
-| set | rows | where it is |
-| --- | ---: | --- |
-| Drafts, live and archived | 139 | the portal only |
-| Rejected, live and archived | 49 | the portal only, minus what 7a.8 takes |
-| Pending approval, archived only | 30 | the portal only |
-| DigiClips working notes | 11 | `archived-projects-excluded.jsonl` |
+| set                             | rows | where it is                            |
+| ------------------------------- | ---: | -------------------------------------- |
+| Drafts, live and archived       |  139 | the portal only                        |
+| Rejected, live and archived     |   49 | the portal only, minus what 7a.8 takes |
+| Pending approval, archived only |   30 | the portal only                        |
+| DigiClips working notes         |   11 | `archived-projects-excluded.jsonl`     |
 
 229 rows, against the 906 imported (702 archived and 204 live), which is the
 portal's 1135. The hidden archived projects used to be the first line of this
@@ -1333,16 +1333,16 @@ undoing.
 
 Eight alarms exist, all on the one topic:
 
-| Alarm | Fires when |
-| --- | --- |
-| `eecs-capstone-alb-5xx` | The load balancer returned more than 5 5XX in five minutes |
-| `eecs-capstone-app-5xx` | The app returned more than 5 5XX in five minutes |
-| `eecs-capstone-db-connections` | RDS held more than 60 connections for two minutes running (100 at term start, ADR-0064) |
+| Alarm                             | Fires when                                                                                                                                    |
+| --------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
+| `eecs-capstone-alb-5xx`           | The load balancer returned more than 5 5XX in five minutes                                                                                    |
+| `eecs-capstone-app-5xx`           | The app returned more than 5 5XX in five minutes                                                                                              |
+| `eecs-capstone-db-connections`    | RDS held more than 60 connections for two minutes running (100 at term start, ADR-0064)                                                       |
 | `eecs-capstone-fleet-below-floor` | Fewer targets passed the load balancer health check than a deploy keeps serving (one off season, two at term start) for three minutes running |
-| `eecs-capstone-db-memory` | RDS freeable memory stayed below 64 MiB for ten minutes |
-| `eecs-capstone-db-pool-waiting` | A request queued for a database connection in each of two consecutive minutes |
-| `eecs-capstone-ai-write-failures` | Automatic AI writes (project embedding, social summary, interest embedding) failed at least twice in three hours |
-| `eecs-capstone-email-failures` | An email the app tried to send (a sign-in code, or a project, inventory or account notice) failed, once in an hour |
+| `eecs-capstone-db-memory`         | RDS freeable memory stayed below 64 MiB for ten minutes                                                                                       |
+| `eecs-capstone-db-pool-waiting`   | A request queued for a database connection in each of two consecutive minutes                                                                 |
+| `eecs-capstone-ai-write-failures` | Automatic AI writes (project embedding, social summary, interest embedding) failed at least twice in three hours                              |
+| `eecs-capstone-email-failures`    | An email the app tried to send (a sign-in code, or a project, inventory or account notice) failed, once in an hour                            |
 
 The last two are not CloudWatch metrics AWS publishes: a metric filter on
 `/ecs/eecs-capstone` counts the log lines that report a failure, and
@@ -1489,7 +1489,7 @@ Unaligned mail is rejected outright, not spam-foldered. DKIM alignment is the
 whole game, which is why `EMAIL_FROM` derives from `var.domain_name`: the
 `From:` domain must match the DKIM `d=` domain.
 
-SPF alignment is not required. DMARC passes on either SPF *or* DKIM, and
+SPF alignment is not required. DMARC passes on either SPF _or_ DKIM, and
 without a custom MAIL FROM domain SES uses an `amazonses.com` envelope sender,
 which never aligns. A custom MAIL FROM domain adds robustness through
 forwarding but needs `MX` and `TXT` records, so treat it as a later
@@ -1514,7 +1514,7 @@ Send EECS IT all three records. Two things to state explicitly:
 - **They are permanent.** SES re-checks them and will mark the domain
   unverified if they disappear, silently killing sign-up.
 - **They sit below a name that is itself a CNAME** to CloudFront. A CNAME may
-  not share its own label with other records, but records at *descendant*
+  not share its own label with other records, but records at _descendant_
   names are a grey area that some DNS implementations refuse. Ask whether
   their tooling accepts it.
 
@@ -1550,10 +1550,10 @@ starts there again.
 
 Sandbox imposes three limits, and the third is the one that matters:
 
-| Limit | Sandbox | Effect here |
-|---|---|---|
-| Daily volume | 200 / day | Tolerable at capstone scale |
-| Send rate | 1 / second | Tolerable; sends are one-at-a-time |
+| Limit          | Sandbox                      | Effect here                                             |
+| -------------- | ---------------------------- | ------------------------------------------------------- |
+| Daily volume   | 200 / day                    | Tolerable at capstone scale                             |
+| Send rate      | 1 / second                   | Tolerable; sends are one-at-a-time                      |
 | **Recipients** | **Verified identities only** | **Every real student's verification email is rejected** |
 
 Request production access from the SES console (Account dashboard → Request
@@ -1685,15 +1685,15 @@ Rough monthly cost in us-west-2, by season
 ([ADR-0064](./docs/adr/0064-the-fleet-is-sized-per-season.md)). The term start
 column is October 2026's bill less Container Insights, which is now off.
 
-| Item | Off season ~$/mo | Term start ~$/mo |
-|------|------|------|
-| Internal ALB | 17 | 17 |
-| Fargate (0.25 vCPU / 1 GB) | 17 (2 tasks) | 26 (3 tasks) |
-| Public IPv4, one per task | 7 | 11 |
-| RDS + 20 GB gp3 | 14 (db.t4g.micro) | 26 (db.t4g.small) |
-| CloudWatch custom metrics and alarms | 2 | 2 |
-| CloudFront + S3 + ECR + Secrets Manager + GuardDuty | 3 to 7 | 3 to 7 |
-| **Total** | **~60 to 64** | **~85 to 89** |
+| Item                                                | Off season ~$/mo  | Term start ~$/mo  |
+| --------------------------------------------------- | ----------------- | ----------------- |
+| Internal ALB                                        | 17                | 17                |
+| Fargate (0.25 vCPU / 1 GB)                          | 17 (2 tasks)      | 26 (3 tasks)      |
+| Public IPv4, one per task                           | 7                 | 11                |
+| RDS + 20 GB gp3                                     | 14 (db.t4g.micro) | 26 (db.t4g.small) |
+| CloudWatch custom metrics and alarms                | 2                 | 2                 |
+| CloudFront + S3 + ECR + Secrets Manager + GuardDuty | 3 to 7            | 3 to 7            |
+| **Total**                                           | **~60 to 64**     | **~85 to 89**     |
 
 Off season the floor and the ceiling are both two tasks. At term start the
 Fargate line is the floor of three, and the service autoscales on CPU to four;
@@ -1724,7 +1724,7 @@ URL must be exactly
 `https://capstone.eecs.oregonstate.edu/api/auth/callback/github` and
 `BETTER_AUTH_URL` (task-def env) must be the same app host.
 
-**Login fails with `INVALID_ORIGIN`.** `BETTER_AUTH_URL` on the *running* task
+**Login fails with `INVALID_ORIGIN`.** `BETTER_AUTH_URL` on the _running_ task
 definition disagrees with the hostname in the browser. Editing `infra/ecs.tf`
 and applying is not enough; the service ignores task-definition changes, so
 check what is actually deployed:
@@ -1866,7 +1866,7 @@ publishes kept working and `og:description` fell back to the description.
 `src/lib/__tests__/reasoning-effort-contract.test.ts` now checks the defaults
 in `infra/variables.tf`, `.env.example` and `src` against the accepted set.
 
-Two values reach the *build* rather than the task, and both come from SSM
+Two values reach the _build_ rather than the task, and both come from SSM
 rather than from the task definition: `ASSETS_PUBLIC_BASE` and `SITE_URL`.
 `.github/workflows/deploy.yml` reads them before it builds, because
 `VITE_STORAGE_PUBLIC_BASE` and `VITE_SITE_URL` are baked into the client

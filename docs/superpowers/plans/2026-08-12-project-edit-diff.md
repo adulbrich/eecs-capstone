@@ -22,11 +22,11 @@
 
 ## File Structure
 
-| File | Responsibility |
-| --- | --- |
-| `src/lib/project-edit-diff.ts` | new; `PROJECT_EDITABLE_FIELDS` and `diffProjectFields` |
-| `src/lib/__tests__/project-edit-diff.test.ts` | new; the four rules, phantom-null guard first |
-| `src/server/_internal/projects.ts` | loses the constant, the loop and the suppression; gains a private `buildProjectValues` |
+| File                                          | Responsibility                                                                         |
+| --------------------------------------------- | -------------------------------------------------------------------------------------- |
+| `src/lib/project-edit-diff.ts`                | new; `PROJECT_EDITABLE_FIELDS` and `diffProjectFields`                                 |
+| `src/lib/__tests__/project-edit-diff.test.ts` | new; the four rules, phantom-null guard first                                          |
+| `src/server/_internal/projects.ts`            | loses the constant, the loop and the suppression; gains a private `buildProjectValues` |
 
 ---
 
@@ -232,9 +232,9 @@ No `QUIRKS.md` entry: this closes a TODO and adds no rule a future reader has to
 
 ## Risks
 
-| Risk | Mitigation |
-| --- | --- |
-| The field order changes and `changedFields` reorders | The constant moves verbatim; the unit test pins declared order explicitly |
-| Extracting the builder changes what gets written | Body moves verbatim. The two edit-log integration tests pass unedited, and `"does not let a proposer's save wipe notes staff added"` covers the conditional branch |
-| Complexity still fails after both extractions | The spike already ran this exact shape and came out clean. If it fails, stop and report the score rather than extracting a third thing to chase a number |
-| The `existing` cast in Step 3 hides a type error | It is the same cast the code does today at `:174`; the move does not introduce it |
+| Risk                                                 | Mitigation                                                                                                                                                         |
+| ---------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| The field order changes and `changedFields` reorders | The constant moves verbatim; the unit test pins declared order explicitly                                                                                          |
+| Extracting the builder changes what gets written     | Body moves verbatim. The two edit-log integration tests pass unedited, and `"does not let a proposer's save wipe notes staff added"` covers the conditional branch |
+| Complexity still fails after both extractions        | The spike already ran this exact shape and came out clean. If it fails, stop and report the score rather than extracting a third thing to chase a number           |
+| The `existing` cast in Step 3 hides a type error     | It is the same cast the code does today at `:174`; the move does not introduce it                                                                                  |

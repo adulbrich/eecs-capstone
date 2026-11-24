@@ -25,19 +25,19 @@
 
 ## File Structure
 
-| File | Responsibility |
-|---|---|
-| `src/server/_internal/claim-projects.ts` (new) | The claim query. Case-insensitive match, `proposer_id is null` guard, idempotent. |
-| `src/server/__tests__/claim-projects.integration.test.ts` (new) | Claim behavior and the verification boundary. |
-| `src/lib/auth.ts` (modify) | The two hooks, both swallowing failure. |
-| `src/server/_internal/projects-queries.ts` (modify) | `getProposerForEditImpl` returns the richer shape. |
-| `src/server/projects-queries.ts` (modify) | Wrapper renamed to `getProposerForEdit`. |
-| `src/routes/_authed/projects/$projectId/edit.tsx` (modify) | Loader returns the object rather than a string. |
-| `src/routes/_authed/projects/new.tsx` (modify) | Passes the unlinked default. |
-| `src/components/project-form.tsx` (modify) | Threads the shape to the picker. |
-| `src/components/proposer-picker.tsx` (modify) | Two modes, the re-assign modal, the height fix, corrected help text. |
-| `src/test/proposer-picker.test.tsx` (modify) | Both modes and the modal. |
-| `docs/QUIRKS.md` (modify) | Why claiming is tied to verification. |
+| File                                                            | Responsibility                                                                    |
+| --------------------------------------------------------------- | --------------------------------------------------------------------------------- |
+| `src/server/_internal/claim-projects.ts` (new)                  | The claim query. Case-insensitive match, `proposer_id is null` guard, idempotent. |
+| `src/server/__tests__/claim-projects.integration.test.ts` (new) | Claim behavior and the verification boundary.                                     |
+| `src/lib/auth.ts` (modify)                                      | The two hooks, both swallowing failure.                                           |
+| `src/server/_internal/projects-queries.ts` (modify)             | `getProposerForEditImpl` returns the richer shape.                                |
+| `src/server/projects-queries.ts` (modify)                       | Wrapper renamed to `getProposerForEdit`.                                          |
+| `src/routes/_authed/projects/$projectId/edit.tsx` (modify)      | Loader returns the object rather than a string.                                   |
+| `src/routes/_authed/projects/new.tsx` (modify)                  | Passes the unlinked default.                                                      |
+| `src/components/project-form.tsx` (modify)                      | Threads the shape to the picker.                                                  |
+| `src/components/proposer-picker.tsx` (modify)                   | Two modes, the re-assign modal, the height fix, corrected help text.              |
+| `src/test/proposer-picker.test.tsx` (modify)                    | Both modes and the modal.                                                         |
+| `docs/QUIRKS.md` (modify)                                       | Why claiming is tied to verification.                                             |
 
 ---
 
@@ -46,11 +46,13 @@
 Self-contained and server-side. Nothing in the UI depends on it.
 
 **Files:**
+
 - Create: `src/server/_internal/claim-projects.ts`
 - Test: `src/server/__tests__/claim-projects.integration.test.ts`
 - Modify: `src/lib/auth.ts`
 
 **Interfaces:**
+
 - Consumes: `projects` from `#/db/schema`, `db` from `#/db`.
 - Produces: `claimProjectsForVerifiedUser(userId: string, email: string): Promise<number>`, returning the number of projects claimed.
 
@@ -103,7 +105,10 @@ describe("claimProjectsForVerifiedUser", () => {
     const account = await makeAccount("claim1@x.edu");
     const project = await makeProject({ proposerEmail: "claim1@x.edu" });
 
-    const count = await claimProjectsForVerifiedUser(account.id, "claim1@x.edu");
+    const count = await claimProjectsForVerifiedUser(
+      account.id,
+      "claim1@x.edu"
+    );
 
     expect(count).toBe(1);
     expect((await statusOf(project.id)).proposerId).toBe(account.id);
@@ -148,8 +153,12 @@ describe("claimProjectsForVerifiedUser", () => {
     const account = await makeAccount("claim4@x.edu");
     await makeProject({ proposerEmail: "claim4@x.edu" });
 
-    expect(await claimProjectsForVerifiedUser(account.id, "claim4@x.edu")).toBe(1);
-    expect(await claimProjectsForVerifiedUser(account.id, "claim4@x.edu")).toBe(0);
+    expect(await claimProjectsForVerifiedUser(account.id, "claim4@x.edu")).toBe(
+      1
+    );
+    expect(await claimProjectsForVerifiedUser(account.id, "claim4@x.edu")).toBe(
+      0
+    );
   });
 
   it("claims nothing for a blank or non-matching address", async () => {
@@ -157,7 +166,9 @@ describe("claimProjectsForVerifiedUser", () => {
     await makeProject({ proposerEmail: "someone-else@x.edu" });
 
     expect(await claimProjectsForVerifiedUser(account.id, "")).toBe(0);
-    expect(await claimProjectsForVerifiedUser(account.id, "claim5@x.edu")).toBe(0);
+    expect(await claimProjectsForVerifiedUser(account.id, "claim5@x.edu")).toBe(
+      0
+    );
   });
 });
 
@@ -335,6 +346,7 @@ git commit -m "feat(projects): claim a proposer's projects when their address is
 ### Task 2: Expose whether an account is linked
 
 **Files:**
+
 - Modify: `src/server/_internal/projects-queries.ts:330-361`
 - Modify: `src/server/projects-queries.ts:61-70`
 - Modify: `src/routes/_authed/projects/$projectId/edit.tsx:37-46` and `:114`
@@ -343,6 +355,7 @@ git commit -m "feat(projects): claim a proposer's projects when their address is
 - Test: `src/server/__tests__/projects.integration.test.ts`
 
 **Interfaces:**
+
 - Consumes: nothing from Task 1.
 - Produces:
   - `interface ProposerForEdit { accountLinked: boolean; accountName: string | null; email: string }`
@@ -556,18 +569,20 @@ breaks the bundle; check which the codebase already does for shared types.
 Destructure `proposer` beside `showProposer`, and pass both new values down:
 
 ```tsx
-            {showProposer && (
-              <form.Field name="proposerEmail">
-                {(field: AnyForm) => (
-                  <ProposerPicker
-                    accountLinked={proposer?.accountLinked ?? false}
-                    accountName={proposer?.accountName ?? null}
-                    onChange={(email) => field.handleChange(email)}
-                    value={field.state.value as string}
-                  />
-                )}
-              </form.Field>
-            )}
+{
+  showProposer && (
+    <form.Field name="proposerEmail">
+      {(field: AnyForm) => (
+        <ProposerPicker
+          accountLinked={proposer?.accountLinked ?? false}
+          accountName={proposer?.accountName ?? null}
+          onChange={(email) => field.handleChange(email)}
+          value={field.state.value as string}
+        />
+      )}
+    </form.Field>
+  );
+}
 ```
 
 - [ ] **Step 7: Run the tests to verify they pass**
@@ -590,10 +605,12 @@ At this point `ProposerPicker` receives two props it ignores. Task 3 uses them.
 ### Task 3: The locked field and the re-assign modal
 
 **Files:**
+
 - Modify: `src/components/proposer-picker.tsx`
 - Test: `src/test/proposer-picker.test.tsx`
 
 **Interfaces:**
+
 - Consumes: `accountLinked` and `accountName` from Task 2.
 - Produces: no new exports.
 
@@ -743,9 +760,15 @@ function AccountSearch({ onPick }: { onPick: (email: string) => void }) {
         <CommandEmpty>No accounts found.</CommandEmpty>
         <CommandGroup>
           {matches.map((m) => (
-            <CommandItem key={m.id} onSelect={() => onPick(m.email)} value={m.email}>
+            <CommandItem
+              key={m.id}
+              onSelect={() => onPick(m.email)}
+              value={m.email}
+            >
               <span className="font-medium">{m.name}</span>
-              <span className="ml-2 text-muted-foreground text-xs">{m.email}</span>
+              <span className="ml-2 text-muted-foreground text-xs">
+                {m.email}
+              </span>
             </CommandItem>
           ))}
         </CommandGroup>
@@ -782,7 +805,9 @@ export function ProposerPicker({
       <Label htmlFor="proposerEmail">Proposer email</Label>
       <div className="flex gap-2">
         <Input
-          className={accountLinked ? "bg-muted text-muted-foreground" : undefined}
+          className={
+            accountLinked ? "bg-muted text-muted-foreground" : undefined
+          }
           id="proposerEmail"
           name="proposerEmail"
           onChange={(e) => onChange(e.target.value)}
@@ -919,6 +944,7 @@ git commit -m "feat(projects): gate the proposer field behind a re-assign modal"
 ### Task 4: Documentation
 
 **Files:**
+
 - Modify: `docs/QUIRKS.md`
 - Modify: `README.md`
 

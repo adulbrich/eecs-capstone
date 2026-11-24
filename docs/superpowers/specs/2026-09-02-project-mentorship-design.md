@@ -14,11 +14,11 @@ Two columns on `projects` and one derived public state:
 
 The public sees, in order of precedence:
 
-| `mentor_email` | Matching account | Public shows |
-| --- | --- | --- |
-| null | n/a | "Seeking mentor", only when `student_proposed` |
-| set | none | nothing |
-| set | found | that account's `name` |
+| `mentor_email` | Matching account | Public shows                                   |
+| -------------- | ---------------- | ---------------------------------------------- |
+| null           | n/a              | "Seeking mentor", only when `student_proposed` |
+| set            | none             | nothing                                        |
+| set            | found            | that account's `name`                          |
 
 The mentor is resolved at read time by `lower(user.email) = lower(projects.mentor_email)`.
 No `mentor_id`, no new caller of `claimProjectsForVerifiedUser`: mentorship grants no
@@ -135,12 +135,12 @@ nothing else.
 
 ## Visibility summary
 
-| Field | Public | Proposer | Staff | Edits |
-| --- | --- | --- | --- | --- |
-| `student_proposed` | yes | yes | yes | staff |
-| `mentor_email` | no | no | yes | staff |
-| resolved mentor name | yes | yes | yes | derived |
-| `seekingMentor` | yes | yes | yes | derived |
+| Field                | Public | Proposer | Staff | Edits   |
+| -------------------- | ------ | -------- | ----- | ------- |
+| `student_proposed`   | yes    | yes      | yes   | staff   |
+| `mentor_email`       | no     | no       | yes   | staff   |
+| resolved mentor name | yes    | yes      | yes   | derived |
+| `seekingMentor`      | yes    | yes      | yes   | derived |
 
 ## Tests
 

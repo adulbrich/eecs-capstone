@@ -40,34 +40,34 @@ Spec 3 will add discovery (full-text search, filters, public browse refinements)
 
 ### 4.1 Server modules
 
-| Path | Responsibility |
-| --- | --- |
-| `src/lib/project-workflow.ts` | Pure module. Exports the `Status`, `ActorRole`, `TRANSITIONS` table, and `canTransition(from, to, role)` plus `assertTransitionAllowed(...)`. No DB access. No I/O. |
-| `src/lib/project-visibility.ts` | Pure module. Exports `canSeeProject(project, viewer)`, `canEditProject(project, viewer)`, `stripStaffOnlyFields(project, viewer)`, `filterCommentsForViewer(comments, viewer)`. No DB. |
-| `src/server/projects.ts` | One `createServerFn` per workflow mutation: `createProject`, `updateProject`, `submitProject`, `requestChanges`, `approveProject`, `publishProject`, `archiveProject`, `restoreArchived`, `softDeleteProject`, `restoreProject`, `hardDeleteProject`. Each wraps its writes in `db.transaction` and emits the history + notification rows it owns. |
-| `src/server/projects-queries.ts` | Read-only `createServerFn` with `method: "GET"`: `listPublishedProjects(page, pageSize)`, `listMyProjects(filter)`, `listAdminProjects(filter)`, `getProject(id)`, `listProjectHistory(id)`, `listProjectEditLog(id)` (staff only). Applies visibility filtering before returning. |
-| `src/server/comments.ts` | `addComment({ projectId, content, parentId?, isInternal? })`, `listComments(projectId)`. Enforces "internal requires staff", "replies require parent in same project", "non-staff cannot post comments on a project they cannot see". |
-| `src/server/notifications.ts` | `listMyNotifications()`, `markRead(id)`, `markAllRead()`, `unreadCount()`. |
-| `src/server/_internal/notify.ts` | Internal helper (NOT a server function): `recordStatusChangeNotifications(tx, project, oldStatus, newStatus, actorId)` and `recordCommentNotifications(tx, project, comment)`. Called from inside the workflow and comment writes so notifications land in the same transaction. |
+| Path                             | Responsibility                                                                                                                                                                                                                                                                                                                                     |
+| -------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `src/lib/project-workflow.ts`    | Pure module. Exports the `Status`, `ActorRole`, `TRANSITIONS` table, and `canTransition(from, to, role)` plus `assertTransitionAllowed(...)`. No DB access. No I/O.                                                                                                                                                                                |
+| `src/lib/project-visibility.ts`  | Pure module. Exports `canSeeProject(project, viewer)`, `canEditProject(project, viewer)`, `stripStaffOnlyFields(project, viewer)`, `filterCommentsForViewer(comments, viewer)`. No DB.                                                                                                                                                             |
+| `src/server/projects.ts`         | One `createServerFn` per workflow mutation: `createProject`, `updateProject`, `submitProject`, `requestChanges`, `approveProject`, `publishProject`, `archiveProject`, `restoreArchived`, `softDeleteProject`, `restoreProject`, `hardDeleteProject`. Each wraps its writes in `db.transaction` and emits the history + notification rows it owns. |
+| `src/server/projects-queries.ts` | Read-only `createServerFn` with `method: "GET"`: `listPublishedProjects(page, pageSize)`, `listMyProjects(filter)`, `listAdminProjects(filter)`, `getProject(id)`, `listProjectHistory(id)`, `listProjectEditLog(id)` (staff only). Applies visibility filtering before returning.                                                                 |
+| `src/server/comments.ts`         | `addComment({ projectId, content, parentId?, isInternal? })`, `listComments(projectId)`. Enforces "internal requires staff", "replies require parent in same project", "non-staff cannot post comments on a project they cannot see".                                                                                                              |
+| `src/server/notifications.ts`    | `listMyNotifications()`, `markRead(id)`, `markAllRead()`, `unreadCount()`.                                                                                                                                                                                                                                                                         |
+| `src/server/_internal/notify.ts` | Internal helper (NOT a server function): `recordStatusChangeNotifications(tx, project, oldStatus, newStatus, actorId)` and `recordCommentNotifications(tx, project, comment)`. Called from inside the workflow and comment writes so notifications land in the same transaction.                                                                   |
 
 ### 4.2 Client modules
 
-| Path | Responsibility |
-| --- | --- |
-| `src/routes/projects/index.tsx` | Public list of published projects, paginated (offset, page size 20). |
-| `src/routes/projects/$projectId.tsx` | Public detail. Renders title, description, problem statement, objectives, qualifications, contact info, license, image. Status timeline below. Non-internal comments below the timeline. |
-| `src/routes/_authed/projects/new.tsx` | Create form. On success, navigates to `/projects/$id`. |
-| `src/routes/_authed/projects/$projectId/edit.tsx` | Edit form. Loader checks `canEditProject`; redirects on miss. |
-| `src/routes/_authed/my/projects.tsx` | My-projects list with status sub-filter. |
-| `src/routes/_authed/admin/projects/index.tsx` | Admin list with status filter and "include soft-deleted" toggle. Detail links go to canonical `/projects/$id`. |
-| `src/components/project-form.tsx` | Shared TanStack Form component used by new + edit. Single Zod schema. Submit handler is a prop (different server function per page). |
-| `src/components/staff-project-panel.tsx` | Staff-only sections rendered conditionally on the canonical detail page: internal notes, internal comments, edit log, transition action buttons keyed off `canTransition`. Returns `null` for non-staff viewers. |
-| `src/components/project-card.tsx` | List item. |
-| `src/components/status-badge.tsx` | Color-coded status pill (one color per status). |
-| `src/components/status-timeline.tsx` | Renders `project_status_history` rows as a vertical timeline with actor + comment. |
-| `src/components/comment-thread.tsx` | Renders top-level comments and one-deep replies. Internal comments visually distinct (yellow border, "internal" pill, staff-only). Inline reply form on each parent comment. |
-| `src/components/notification-bell.tsx` | Header bell with unread count. Dropdown of latest 10. Click navigates and marks read. |
-| `src/lib/apply-server-errors.ts` | Tiny client helper: maps a thrown `ZodError` from a server function back to TanStack Form's field-level errors. |
+| Path                                              | Responsibility                                                                                                                                                                                                   |
+| ------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `src/routes/projects/index.tsx`                   | Public list of published projects, paginated (offset, page size 20).                                                                                                                                             |
+| `src/routes/projects/$projectId.tsx`              | Public detail. Renders title, description, problem statement, objectives, qualifications, contact info, license, image. Status timeline below. Non-internal comments below the timeline.                         |
+| `src/routes/_authed/projects/new.tsx`             | Create form. On success, navigates to `/projects/$id`.                                                                                                                                                           |
+| `src/routes/_authed/projects/$projectId/edit.tsx` | Edit form. Loader checks `canEditProject`; redirects on miss.                                                                                                                                                    |
+| `src/routes/_authed/my/projects.tsx`              | My-projects list with status sub-filter.                                                                                                                                                                         |
+| `src/routes/_authed/admin/projects/index.tsx`     | Admin list with status filter and "include soft-deleted" toggle. Detail links go to canonical `/projects/$id`.                                                                                                   |
+| `src/components/project-form.tsx`                 | Shared TanStack Form component used by new + edit. Single Zod schema. Submit handler is a prop (different server function per page).                                                                             |
+| `src/components/staff-project-panel.tsx`          | Staff-only sections rendered conditionally on the canonical detail page: internal notes, internal comments, edit log, transition action buttons keyed off `canTransition`. Returns `null` for non-staff viewers. |
+| `src/components/project-card.tsx`                 | List item.                                                                                                                                                                                                       |
+| `src/components/status-badge.tsx`                 | Color-coded status pill (one color per status).                                                                                                                                                                  |
+| `src/components/status-timeline.tsx`              | Renders `project_status_history` rows as a vertical timeline with actor + comment.                                                                                                                               |
+| `src/components/comment-thread.tsx`               | Renders top-level comments and one-deep replies. Internal comments visually distinct (yellow border, "internal" pill, staff-only). Inline reply form on each parent comment.                                     |
+| `src/components/notification-bell.tsx`            | Header bell with unread count. Dropdown of latest 10. Click navigates and marks read.                                                                                                                            |
+| `src/lib/apply-server-errors.ts`                  | Tiny client helper: maps a thrown `ZodError` from a server function back to TanStack Form's field-level errors.                                                                                                  |
 
 ### 4.3 Why these boundaries
 
@@ -85,15 +85,15 @@ Spec 3 will add discovery (full-text search, filters, public browse refinements)
 
 `project_edit_log`:
 
-| Column | Type | Notes |
-| --- | --- | --- |
-| `id` | uuid PK, defaultRandom | |
-| `project_id` | uuid not null, FK -> `projects.id` ON DELETE CASCADE | |
-| `editor_id` | text not null, FK -> `user.id` ON DELETE RESTRICT | |
-| `changed_fields` | `text[]` not null | List of field names that actually changed in this update. |
-| `old_values` | `jsonb` not null | Map of `{field: oldValue}`, only the fields that changed. |
-| `new_values` | `jsonb` not null | Map of `{field: newValue}`, only the fields that changed. |
-| `created_at` | timestamptz not null defaultNow | |
+| Column           | Type                                                 | Notes                                                     |
+| ---------------- | ---------------------------------------------------- | --------------------------------------------------------- |
+| `id`             | uuid PK, defaultRandom                               |                                                           |
+| `project_id`     | uuid not null, FK -> `projects.id` ON DELETE CASCADE |                                                           |
+| `editor_id`      | text not null, FK -> `user.id` ON DELETE RESTRICT    |                                                           |
+| `changed_fields` | `text[]` not null                                    | List of field names that actually changed in this update. |
+| `old_values`     | `jsonb` not null                                     | Map of `{field: oldValue}`, only the fields that changed. |
+| `new_values`     | `jsonb` not null                                     | Map of `{field: newValue}`, only the fields that changed. |
+| `created_at`     | timestamptz not null defaultNow                      |                                                           |
 
 Index: `project_edit_log_project_idx` on `(project_id, created_at desc)`.
 
@@ -155,18 +155,21 @@ type Status =
 type ActorRole = "owner" | "staff";
 
 const TRANSITIONS: Record<Status, Partial<Record<ActorRole, Status[]>>> = {
-  draft:             { owner: ["submitted"],            staff: ["submitted", "approved"] },
-  submitted:         { owner: ["draft"],                staff: ["draft", "approved", "changes_requested"] },
-  changes_requested: { owner: ["submitted"],            staff: ["submitted", "approved"] },
-  approved:          {                                  staff: ["published", "changes_requested"] },
-  published:         {                                  staff: ["archived"] },
-  archived:          {                                  staff: ["published"] },
+  draft: { owner: ["submitted"], staff: ["submitted", "approved"] },
+  submitted: {
+    owner: ["draft"],
+    staff: ["draft", "approved", "changes_requested"],
+  },
+  changes_requested: { owner: ["submitted"], staff: ["submitted", "approved"] },
+  approved: { staff: ["published", "changes_requested"] },
+  published: { staff: ["archived"] },
+  archived: { staff: ["published"] },
 };
 
 export function canTransition(
   from: Status,
   to: Status,
-  role: ActorRole,
+  role: ActorRole
 ): boolean {
   return (TRANSITIONS[from][role] ?? []).includes(to);
 }
@@ -174,7 +177,7 @@ export function canTransition(
 export function assertTransitionAllowed(
   from: Status,
   to: Status,
-  role: ActorRole,
+  role: ActorRole
 ): void {
   if (!canTransition(from, to, role)) {
     throw new Error(`Transition ${from} -> ${to} not allowed for ${role}`);
@@ -186,11 +189,11 @@ export function assertTransitionAllowed(
 
 These are orthogonal to the status field and have their own gates.
 
-| Action | Allowed when | Allowed actors | Effect |
-| --- | --- | --- | --- |
-| Hard delete | `status = 'draft' AND deleted_at IS NULL` | owner or staff | `DELETE FROM projects WHERE id = ?` |
-| Soft delete | `status != 'draft' AND deleted_at IS NULL` | staff | Sets `deleted_at = now()`. Status unchanged. |
-| Restore from soft delete | `deleted_at IS NOT NULL` | staff | Sets `deleted_at = NULL`. Status unchanged. |
+| Action                   | Allowed when                               | Allowed actors | Effect                                       |
+| ------------------------ | ------------------------------------------ | -------------- | -------------------------------------------- |
+| Hard delete              | `status = 'draft' AND deleted_at IS NULL`  | owner or staff | `DELETE FROM projects WHERE id = ?`          |
+| Soft delete              | `status != 'draft' AND deleted_at IS NULL` | staff          | Sets `deleted_at = now()`. Status unchanged. |
+| Restore from soft delete | `deleted_at IS NOT NULL`                   | staff          | Sets `deleted_at = NULL`. Status unchanged.  |
 
 A soft-deleted project is hidden from every query except `listAdminProjects(includeSoftDeleted=true)` and the staff detail view.
 
@@ -198,12 +201,12 @@ A soft-deleted project is hidden from every query except `listAdminProjects(incl
 
 `src/lib/project-visibility.ts`, pure.
 
-| Viewer | Can see project | Sees `notes` | Sees internal comments | Can edit |
-| --- | --- | --- | --- | --- |
-| Anonymous | `status = 'published' AND deleted_at IS NULL` only | No | No | No |
-| Authenticated non-owner non-staff | Above; plus own bids/assignments (post-MVP) | No | No | No |
-| Owner | All statuses of own; soft-deleted hidden | Own only | No | Own only, except when `archived` or soft-deleted |
-| Staff | Everything including soft-deleted, all statuses | Yes | Yes | Yes |
+| Viewer                            | Can see project                                    | Sees `notes` | Sees internal comments | Can edit                                         |
+| --------------------------------- | -------------------------------------------------- | ------------ | ---------------------- | ------------------------------------------------ |
+| Anonymous                         | `status = 'published' AND deleted_at IS NULL` only | No           | No                     | No                                               |
+| Authenticated non-owner non-staff | Above; plus own bids/assignments (post-MVP)        | No           | No                     | No                                               |
+| Owner                             | All statuses of own; soft-deleted hidden           | Own only     | No                     | Own only, except when `archived` or soft-deleted |
+| Staff                             | Everything including soft-deleted, all statuses    | Yes          | Yes                    | Yes                                              |
 
 Rules of thumb:
 
@@ -228,11 +231,11 @@ Rules of thumb:
 
 ### 8.2 Visibility
 
-| Viewer | Sees non-internal | Sees internal |
-| --- | --- | --- |
-| Anonymous | Yes (on published projects only) | No |
-| Owner | Yes | No |
-| Staff | Yes | Yes |
+| Viewer    | Sees non-internal                | Sees internal |
+| --------- | -------------------------------- | ------------- |
+| Anonymous | Yes (on published projects only) | No            |
+| Owner     | Yes                              | No            |
+| Staff     | Yes                              | Yes           |
 
 `listComments` returns the filtered list. Internal comments are stripped server-side, not hidden client-side.
 
@@ -246,12 +249,12 @@ One. Strictly enforced server-side. The UI does not render a "reply" button unde
 
 All happen inside the same DB transaction as the originating write.
 
-| Event | Recipient(s) | Title | Link |
-| --- | --- | --- | --- |
-| Status change | Project proposer, unless they are the actor. | `Your project '{title}' is now {status}` | `/projects/{id}` |
-| Non-internal comment | Project proposer (if not the comment author). For replies: also the parent comment author (if different from both the proposer and the actor). | `New comment on '{title}'` | `/projects/{id}#comment-{id}` |
-| Internal comment | No notification. Intentional, to keep noise down. | | |
-| Soft delete / restore / hard delete | Project proposer (if not the actor). | `Your project '{title}' was {action} by staff` | `/projects/{id}` (404 if hard-deleted, which is fine) |
+| Event                               | Recipient(s)                                                                                                                                   | Title                                          | Link                                                  |
+| ----------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------- | ----------------------------------------------------- |
+| Status change                       | Project proposer, unless they are the actor.                                                                                                   | `Your project '{title}' is now {status}`       | `/projects/{id}`                                      |
+| Non-internal comment                | Project proposer (if not the comment author). For replies: also the parent comment author (if different from both the proposer and the actor). | `New comment on '{title}'`                     | `/projects/{id}#comment-{id}`                         |
+| Internal comment                    | No notification. Intentional, to keep noise down.                                                                                              |                                                |                                                       |
+| Soft delete / restore / hard delete | Project proposer (if not the actor).                                                                                                           | `Your project '{title}' was {action} by staff` | `/projects/{id}` (404 if hard-deleted, which is fine) |
 
 ### 9.2 UI
 
@@ -295,7 +298,10 @@ This keeps the codebase from acquiring TanStack Form boilerplate around one-line
 import type { FormApi } from "@tanstack/react-form";
 import { ZodError } from "zod";
 
-export function applyServerErrors(form: FormApi<unknown, unknown>, err: unknown) {
+export function applyServerErrors(
+  form: FormApi<unknown, unknown>,
+  err: unknown
+) {
   if (err instanceof ZodError) {
     for (const issue of err.issues) {
       const field = issue.path.join(".");
@@ -314,33 +320,33 @@ Submit handler calls `applyServerErrors(form, err)` and falls back to a generic 
 
 ## 11. Routes
 
-| Path | Layout | Component | Notes |
-| --- | --- | --- | --- |
-| `/projects` | Public | `projects/index.tsx` | Paginated published list. |
-| `/projects/$projectId` | Public | `projects/$projectId.tsx` | Canonical project detail. Staff sections (notes, internal comments, edit log, transition action buttons) render conditionally when the viewer is staff. One URL per project regardless of viewer role. |
-| `/projects/new` | `_authed` | `_authed/projects/new.tsx` | Create form. |
-| `/projects/$projectId/edit` | `_authed` | `_authed/projects/$projectId/edit.tsx` | Edit form. Loader rejects if not `canEditProject`. Staff see additional fields (`notes`). |
-| `/my/projects` | `_authed` | `_authed/my/projects.tsx` | Own projects list with status sub-filter. |
-| `/admin/projects` | `_authed/admin` | `_authed/admin/projects/index.tsx` | Admin list view of all projects: status filter, include-soft-deleted toggle, links to canonical `/projects/$id`. |
+| Path                        | Layout          | Component                              | Notes                                                                                                                                                                                                  |
+| --------------------------- | --------------- | -------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `/projects`                 | Public          | `projects/index.tsx`                   | Paginated published list.                                                                                                                                                                              |
+| `/projects/$projectId`      | Public          | `projects/$projectId.tsx`              | Canonical project detail. Staff sections (notes, internal comments, edit log, transition action buttons) render conditionally when the viewer is staff. One URL per project regardless of viewer role. |
+| `/projects/new`             | `_authed`       | `_authed/projects/new.tsx`             | Create form.                                                                                                                                                                                           |
+| `/projects/$projectId/edit` | `_authed`       | `_authed/projects/$projectId/edit.tsx` | Edit form. Loader rejects if not `canEditProject`. Staff see additional fields (`notes`).                                                                                                              |
+| `/my/projects`              | `_authed`       | `_authed/my/projects.tsx`              | Own projects list with status sub-filter.                                                                                                                                                              |
+| `/admin/projects`           | `_authed/admin` | `_authed/admin/projects/index.tsx`     | Admin list view of all projects: status filter, include-soft-deleted toggle, links to canonical `/projects/$id`.                                                                                       |
 
 Notes on the routing model:
 
 - Single canonical URL per project (`/projects/$id`). Avoids two diverging templates and lets staff share project URLs with non-staff users; each viewer just sees the slice they are allowed to see.
-- `/admin/projects` exists only as a *list* URL because the admin list is a fundamentally different query (all statuses, soft-deleted, filters). Detail navigation from the admin list links back to `/projects/$id`.
+- `/admin/projects` exists only as a _list_ URL because the admin list is a fundamentally different query (all statuses, soft-deleted, filters). Detail navigation from the admin list links back to `/projects/$id`.
 - The existing `_authed/admin/index.tsx` stub from Spec 1 stays as the admin landing page and gets a small links list pointing at `/admin/projects` (and at the future Spec 3 admin pages).
 - `/projects/new` and `/projects/$projectId/edit` live under the `_authed` layout so they inherit the session guard.
 
 ## 12. Testing
 
-| Layer | What we cover | Tooling |
-| --- | --- | --- |
-| Unit (pure) | `project-workflow.ts`: every cell of the transition table, owner attempts to staff-only transitions, staff attempts on archived/published, the two `assert*` throw shape. | Vitest, no mocks. |
-| Unit (pure) | `project-visibility.ts`: visibility matrix per viewer kind; `stripStaffOnlyFields` actually strips; `filterCommentsForViewer` actually filters internal. | Vitest, no mocks. |
-| Integration | Full workflow happy path: create -> submit -> request changes -> resubmit -> approve -> publish -> archive. After each step, query history, query notifications for the proposer, assert expected counts and titles. | Vitest against docker-compose Postgres, same harness as Spec 1. |
-| Integration | Negative workflow paths: owner cannot publish; owner cannot delete a submitted project; staff cannot transition from draft to published in one step; soft-deleted projects do not appear in `listPublishedProjects` or `listMyProjects`. | Same harness. |
-| Integration | Comments: staff posts review comment; owner replies (status=changes_requested); owner cannot post when status=draft; staff posts internal; owner's `listComments` excludes the internal one. | Same harness. |
-| Integration | Notifications: status change writes a row for the proposer; proposer commenting on own project does NOT write a self-notification; staff internal comment writes NO notification. | Same harness. |
-| Integration | Edit log: updating a single field writes one log row with that field's old + new value only; updating nothing writes no row. | Same harness. |
+| Layer       | What we cover                                                                                                                                                                                                                            | Tooling                                                         |
+| ----------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------- |
+| Unit (pure) | `project-workflow.ts`: every cell of the transition table, owner attempts to staff-only transitions, staff attempts on archived/published, the two `assert*` throw shape.                                                                | Vitest, no mocks.                                               |
+| Unit (pure) | `project-visibility.ts`: visibility matrix per viewer kind; `stripStaffOnlyFields` actually strips; `filterCommentsForViewer` actually filters internal.                                                                                 | Vitest, no mocks.                                               |
+| Integration | Full workflow happy path: create -> submit -> request changes -> resubmit -> approve -> publish -> archive. After each step, query history, query notifications for the proposer, assert expected counts and titles.                     | Vitest against docker-compose Postgres, same harness as Spec 1. |
+| Integration | Negative workflow paths: owner cannot publish; owner cannot delete a submitted project; staff cannot transition from draft to published in one step; soft-deleted projects do not appear in `listPublishedProjects` or `listMyProjects`. | Same harness.                                                   |
+| Integration | Comments: staff posts review comment; owner replies (status=changes_requested); owner cannot post when status=draft; staff posts internal; owner's `listComments` excludes the internal one.                                             | Same harness.                                                   |
+| Integration | Notifications: status change writes a row for the proposer; proposer commenting on own project does NOT write a self-notification; staff internal comment writes NO notification.                                                        | Same harness.                                                   |
+| Integration | Edit log: updating a single field writes one log row with that field's old + new value only; updating nothing writes no row.                                                                                                             | Same harness.                                                   |
 
 **No browser/E2E tests in Spec 2.** The spec ships a manual smoke checklist (Section 14) instead.
 

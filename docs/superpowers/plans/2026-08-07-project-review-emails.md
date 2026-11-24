@@ -26,20 +26,20 @@
 
 ## File Structure
 
-| File | Responsibility |
-|---|---|
-| `src/lib/email/templates.ts` (new) | All email content as pure functions. Owns `escapeHtml`, `RenderedEmail`. |
-| `src/lib/email/__tests__/templates.test.ts` (new) | Unit tests for content and escaping. |
-| `src/lib/email/sender.ts` (modify) | `EmailSender` collapses to `send(to, email)`. Factory unchanged. |
-| `src/lib/email/ses-sender.ts` (modify) | Dumb transport. Content constants deleted. |
-| `src/lib/email/console-sender.ts` (modify) | Dumb transport. Prints subject and text. |
-| `src/lib/auth.ts` (modify) | Renders templates, calls `send`. Behavior unchanged. |
-| `src/server/_internal/project-emails.ts` (new) | Recipient resolution, link building, failure swallowing. |
-| `src/server/_internal/projects.ts` (modify) | Options object on both transition functions; calls the notifier after commit. |
-| `src/server/projects.ts` (modify) | `sendEmail` on the wire schema, threaded through the wrappers. |
-| `src/components/staff-project-panel.tsx` (modify) | Recipient hint and opt-out checkbox in the transition dialog. Reads the address from the existing `getProposerForEdit`. |
-| `infra/variables.tf`, `infra/ecs.tf`, `.env.example` (modify) | `EMAIL_REVIEW_INBOX`. |
-| `README.md`, `DEPLOYMENT.md`, `docs/QUIRKS.md` (modify) | Four emails, not two. |
+| File                                                          | Responsibility                                                                                                          |
+| ------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------- |
+| `src/lib/email/templates.ts` (new)                            | All email content as pure functions. Owns `escapeHtml`, `RenderedEmail`.                                                |
+| `src/lib/email/__tests__/templates.test.ts` (new)             | Unit tests for content and escaping.                                                                                    |
+| `src/lib/email/sender.ts` (modify)                            | `EmailSender` collapses to `send(to, email)`. Factory unchanged.                                                        |
+| `src/lib/email/ses-sender.ts` (modify)                        | Dumb transport. Content constants deleted.                                                                              |
+| `src/lib/email/console-sender.ts` (modify)                    | Dumb transport. Prints subject and text.                                                                                |
+| `src/lib/auth.ts` (modify)                                    | Renders templates, calls `send`. Behavior unchanged.                                                                    |
+| `src/server/_internal/project-emails.ts` (new)                | Recipient resolution, link building, failure swallowing.                                                                |
+| `src/server/_internal/projects.ts` (modify)                   | Options object on both transition functions; calls the notifier after commit.                                           |
+| `src/server/projects.ts` (modify)                             | `sendEmail` on the wire schema, threaded through the wrappers.                                                          |
+| `src/components/staff-project-panel.tsx` (modify)             | Recipient hint and opt-out checkbox in the transition dialog. Reads the address from the existing `getProposerForEdit`. |
+| `infra/variables.tf`, `infra/ecs.tf`, `.env.example` (modify) | `EMAIL_REVIEW_INBOX`.                                                                                                   |
+| `README.md`, `DEPLOYMENT.md`, `docs/QUIRKS.md` (modify)       | Four emails, not two.                                                                                                   |
 
 ---
 
@@ -48,10 +48,12 @@
 Pure functions with no I/O. Nothing else in the plan can be written until the shapes here exist.
 
 **Files:**
+
 - Create: `src/lib/email/templates.ts`
 - Test: `src/lib/email/__tests__/templates.test.ts`
 
 **Interfaces:**
+
 - Consumes: nothing.
 - Produces:
   - `interface RenderedEmail { html: string; subject: string; text: string }`
@@ -264,10 +266,7 @@ function summarize(description: string | null): string {
 ${TRUNCATION_NOTE}`;
 }
 
-function describeProposer(
-  name: string | null,
-  email: string | null
-): string {
+function describeProposer(name: string | null, email: string | null): string {
   if (name && email) {
     return `${name} (${email})`;
   }
@@ -284,9 +283,7 @@ function layout(
   cta: { label: string; url: string }
 ): { html: string; text: string } {
   const text = `${paragraphs.join("\n\n")}\n\n${cta.label}: ${cta.url}\n`;
-  const body = paragraphs
-    .map((p) => `<p>${escapeHtml(p)}</p>`)
-    .join("");
+  const body = paragraphs.map((p) => `<p>${escapeHtml(p)}</p>`).join("");
   const link = `<p><a href="${escapeHtml(cta.url)}">${escapeHtml(cta.label)}</a></p>`;
   return { html: `${body}${link}`, text };
 }
@@ -394,6 +391,7 @@ git commit -m "feat(email): add template module with html escaping"
 ### Task 2: Collapse the transports onto a single send
 
 **Files:**
+
 - Modify: `src/lib/email/sender.ts`
 - Modify: `src/lib/email/ses-sender.ts`
 - Modify: `src/lib/email/console-sender.ts`
@@ -401,6 +399,7 @@ git commit -m "feat(email): add template module with html escaping"
 - Test: `src/lib/email/__tests__/ses-sender.test.ts`, `src/lib/email/__tests__/console-sender.test.ts`
 
 **Interfaces:**
+
 - Consumes: `RenderedEmail`, `verificationEmail`, `passwordResetEmail` from Task 1.
 - Produces: `interface EmailSender { send(to: string, email: RenderedEmail): Promise<void> }`. `getEmailSender(): EmailSender` keeps its name and factory behavior. `createSesEmailSender(): SesEmailSender` unchanged in signature.
 
@@ -643,11 +642,13 @@ git commit -m "refactor(email): collapse EmailSender onto a single send"
 ### Task 3: The project email notifier and its configuration
 
 **Files:**
+
 - Create: `src/server/_internal/project-emails.ts`
 - Test: `src/server/_internal/__tests__/project-emails.test.ts`
 - Modify: `.env.example`, `infra/variables.tf`, `infra/ecs.tf`
 
 **Interfaces:**
+
 - Consumes: `RenderedEmail` and the three project templates from Task 1; `getEmailSender` from Task 2; `Status` from `#/lib/project-workflow`.
 - Produces:
   - `type SendEmailFn = (to: string, email: RenderedEmail) => Promise<void>`
@@ -815,10 +816,7 @@ import {
 } from "#/lib/email/templates";
 import type { Status } from "#/lib/project-workflow";
 
-export type SendEmailFn = (
-  to: string,
-  email: RenderedEmail
-) => Promise<void>;
+export type SendEmailFn = (to: string, email: RenderedEmail) => Promise<void>;
 
 export interface TransitionEmailProject {
   description: string | null;
@@ -1007,12 +1005,14 @@ git commit -m "feat(email): add the project review notifier and EMAIL_REVIEW_INB
 ### Task 4: Wire the notifier into both transitions
 
 **Files:**
+
 - Modify: `src/server/_internal/projects.ts:215-268` and `:344-402` and `:414-430`
 - Modify: `src/server/projects.ts:52-55` and the four transition handlers
 - Modify: `src/server/__tests__/project-embeddings.integration.test.ts:141-159`
 - Test: `src/server/__tests__/projects.integration.test.ts`
 
 **Interfaces:**
+
 - Consumes: `notifyTransitionByEmail`, `SendEmailFn`, `TransitionEmailProject` from Task 3.
 - Produces:
   - `interface TransitionOptions { embed?: EmbedFn; sendEmail?: boolean }`
@@ -1057,7 +1057,9 @@ describe("review emails", () => {
     expect(send).toHaveBeenCalledTimes(2);
     expect(send.mock.calls[0]?.[0]).toBe("review@oregonstate.edu");
     expect(send.mock.calls[1]?.[0]).toBe("owner-mail@x.edu");
-    expect(send.mock.calls[1]?.[1].text).toContain("will not receive another email");
+    expect(send.mock.calls[1]?.[1].text).toContain(
+      "will not receive another email"
+    );
   });
 
   it("emails the proposer the staff note when changes are requested", async () => {
@@ -1069,9 +1071,15 @@ describe("review emails", () => {
 
     await performTransitionAs(owner, id, "submitted", undefined, { send });
     send.mockClear();
-    await performTransitionAs(admin, id, "changes_requested", "Add objectives.", {
-      send,
-    });
+    await performTransitionAs(
+      admin,
+      id,
+      "changes_requested",
+      "Add objectives.",
+      {
+        send,
+      }
+    );
 
     expect(send).toHaveBeenCalledOnce();
     expect(send.mock.calls[0]?.[0]).toBe("owner-cr@x.edu");
@@ -1167,10 +1175,7 @@ the call counts are zero.
 In `src/server/_internal/projects.ts`, add the import and the options type:
 
 ```ts
-import {
-  notifyTransitionByEmail,
-  type SendEmailFn,
-} from "./project-emails";
+import { notifyTransitionByEmail, type SendEmailFn } from "./project-emails";
 ```
 
 ```ts
@@ -1334,9 +1339,11 @@ git commit -m "feat(projects): send review emails after each transition commits"
 ### Task 5: The staff hint and opt-out control
 
 **Files:**
+
 - Modify: `src/components/staff-project-panel.tsx`
 
 **Interfaces:**
+
 - Consumes: the `sendEmail` field on `statusTransitionSchema` from Task 4, and the existing `getProposerForEdit` server function.
 - Produces: no prop changes. `$projectId.tsx` is not touched.
 
@@ -1359,21 +1366,21 @@ import {
 Add state and a fetch beside the existing `editLog` effect:
 
 ```ts
-  const [proposerAddress, setProposerAddress] = useState<string | null>(null);
+const [proposerAddress, setProposerAddress] = useState<string | null>(null);
 
-  useEffect(() => {
-    void (async () => {
-      try {
-        const email = await getProposerForEdit({
-          data: { projectId: project.id },
-        });
-        setProposerAddress(email || null);
-      } catch {
-        // Staff-only endpoint; on failure the dialog degrades to "no address
-        // on file" and sends nothing, which is the safe direction.
-      }
-    })();
-  }, [project.id]);
+useEffect(() => {
+  void (async () => {
+    try {
+      const email = await getProposerForEdit({
+        data: { projectId: project.id },
+      });
+      setProposerAddress(email || null);
+    } catch {
+      // Staff-only endpoint; on failure the dialog degrades to "no address
+      // on file" and sends nothing, which is the safe direction.
+    }
+  })();
+}, [project.id]);
 ```
 
 Confirm the exported server function's name and its argument key in
@@ -1398,21 +1405,21 @@ Reset it in `openTransition` so each dialog starts from the default, exactly as
 `comment` is reset:
 
 ```ts
-  function openTransition(target: Status, force: boolean) {
-    setError(null);
-    setComment("");
-    setSendEmail(true);
-    setPending({ target, force });
-  }
+function openTransition(target: Status, force: boolean) {
+  setError(null);
+  setComment("");
+  setSendEmail(true);
+  setPending({ target, force });
+}
 ```
 
 Derive the one remaining fact, beside `isChangesRequested`:
 
 ```ts
-  // Only these two transitions email anyone. Publishing is deliberately silent,
-  // which is what the approval email promises.
-  const emailsProposer =
-    pending?.target === "approved" || pending?.target === "changes_requested";
+// Only these two transitions email anyone. Publishing is deliberately silent,
+// which is what the approval email promises.
+const emailsProposer =
+  pending?.target === "approved" || pending?.target === "changes_requested";
 ```
 
 `proposerAddress` is already in scope from Step 1.
@@ -1423,25 +1430,27 @@ Insert directly after the closing `</div>` of the comment block and before the
 `{error && ...}` line:
 
 ```tsx
-          {emailsProposer && (
-            <div className="space-y-1">
-              <Label className="font-normal">
-                <Checkbox
-                  checked={sendEmail && proposerAddress !== null}
-                  disabled={proposerAddress === null}
-                  onCheckedChange={(checked) => setSendEmail(checked === true)}
-                />
-                {proposerAddress
-                  ? `Email the proposer (${proposerAddress})`
-                  : "No address on file, no email will be sent"}
-              </Label>
-              {proposerAddress && (
-                <p className="text-muted-foreground text-xs">
-                  Uncheck to change the status silently.
-                </p>
-              )}
-            </div>
-          )}
+{
+  emailsProposer && (
+    <div className="space-y-1">
+      <Label className="font-normal">
+        <Checkbox
+          checked={sendEmail && proposerAddress !== null}
+          disabled={proposerAddress === null}
+          onCheckedChange={(checked) => setSendEmail(checked === true)}
+        />
+        {proposerAddress
+          ? `Email the proposer (${proposerAddress})`
+          : "No address on file, no email will be sent"}
+      </Label>
+      {proposerAddress && (
+        <p className="text-muted-foreground text-xs">
+          Uncheck to change the status silently.
+        </p>
+      )}
+    </div>
+  );
+}
 ```
 
 - [ ] **Step 4: Send the flag**
@@ -1450,12 +1459,12 @@ In `confirmTransition`, include it in the payload. Send `false` when there is no
 address, so the server agrees with what the dialog showed:
 
 ```ts
-      const data = {
-        id: project.id,
-        status: pending.target,
-        comment,
-        sendEmail: sendEmail && proposerAddress !== null,
-      };
+const data = {
+  id: project.id,
+  status: pending.target,
+  comment,
+  sendEmail: sendEmail && proposerAddress !== null,
+};
 ```
 
 - [ ] **Step 5: Verify in the browser**
@@ -1488,6 +1497,7 @@ git commit -m "feat(projects): show and allow skipping the review email"
 The README currently tells a reader the app sends two emails. It sends four.
 
 **Files:**
+
 - Modify: `README.md` (email transport section)
 - Modify: `DEPLOYMENT.md` (section 9)
 - Modify: `docs/QUIRKS.md` (console email transport section)
@@ -1499,12 +1509,12 @@ After the paragraph describing `EMAIL_TRANSPORT`, add:
 ```markdown
 The app sends four emails, all through `src/lib/email/templates.ts`:
 
-| Email | Trigger | Recipient |
-|---|---|---|
-| Verify your email | Sign-up | The new account |
-| Reset your password | Forgot-password form | The account |
-| New project submitted | A project moves to `submitted` | `EMAIL_REVIEW_INBOX` |
-| Approved / Changes requested | Staff review a project | The proposer |
+| Email                        | Trigger                        | Recipient            |
+| ---------------------------- | ------------------------------ | -------------------- |
+| Verify your email            | Sign-up                        | The new account      |
+| Reset your password          | Forgot-password form           | The account          |
+| New project submitted        | A project moves to `submitted` | `EMAIL_REVIEW_INBOX` |
+| Approved / Changes requested | Staff review a project         | The proposer         |
 
 Everything else the app notifies about is in-app only, a row in `notifications`
 rendered by the bell, and never reaches an inbox. Staff can skip either review

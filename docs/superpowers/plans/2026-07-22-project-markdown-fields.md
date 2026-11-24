@@ -27,6 +27,7 @@ Source spec: `docs/superpowers/specs/2026-07-22-project-markdown-fields-design.m
 ## File Structure
 
 **Created:**
+
 - `src/lib/strip-markdown.ts`: pure markdown-to-plain-text reducer for summaries.
 - `src/lib/__tests__/strip-markdown.test.ts`
 - `src/lib/markdown-toolbar.ts`: pure editor-edit calculator, no DOM.
@@ -37,6 +38,7 @@ Source spec: `docs/superpowers/specs/2026-07-22-project-markdown-fields-design.m
 - `src/test/markdown-field.test.tsx`
 
 **Modified:**
+
 - `src/components/project-card.tsx:63-65` and `src/components/project-row.tsx:31-35`: strip summaries.
 - `src/routes/projects/$projectId.tsx:232-242`: render the detail sections as markdown.
 - `src/components/project-form.tsx`: `Field` gains a `markdown` mode; six call sites switch to it.
@@ -47,12 +49,14 @@ Source spec: `docs/superpowers/specs/2026-07-22-project-markdown-fields-design.m
 ## Task 1: `stripMarkdown` and plain-text summaries
 
 **Files:**
+
 - Create: `src/lib/strip-markdown.ts`
 - Create: `src/lib/__tests__/strip-markdown.test.ts`
 - Modify: `src/components/project-card.tsx:62-66`
 - Modify: `src/components/project-row.tsx:31-35`
 
 **Interfaces:**
+
 - Consumes: nothing.
 - Produces: `export function stripMarkdown(input: string | null | undefined): string`. No later task depends on it, but the card and row both call it in this task.
 
@@ -64,7 +68,7 @@ This task ships first because it is fully independent: it protects the listings 
 
 Create `src/lib/__tests__/strip-markdown.test.ts`:
 
-```ts
+````ts
 import { describe, expect, it } from "vitest";
 import { stripMarkdown } from "#/lib/strip-markdown";
 
@@ -133,7 +137,7 @@ describe("stripMarkdown", () => {
     expect(stripMarkdown("a\n\n\nb   c")).toBe("a b c");
   });
 });
-```
+````
 
 - [ ] **Step 2: Run the test to verify it fails**
 
@@ -144,7 +148,7 @@ Expected: FAIL, cannot resolve `#/lib/strip-markdown`.
 
 Create `src/lib/strip-markdown.ts`:
 
-```ts
+````ts
 /**
  * Reduces markdown source to plain text for clamped summaries (cards, rows).
  *
@@ -183,7 +187,7 @@ export function stripMarkdown(input: string | null | undefined): string {
     .replace(WHITESPACE, " ")
     .trim();
 }
-```
+````
 
 Order matters. `HORIZONTAL_RULE` runs before `LIST_MARKER` so that `- - -` is dropped as a rule rather than half-eaten as a bullet. `IMAGE` runs before `LINK` because an image is a link with a leading `!`. The underscore rule uses `(?<!\w)` / `(?!\w)` so `snake_case_name` survives, matching GFM's own intra-word rule.
 
@@ -203,21 +207,25 @@ import { stripMarkdown } from "#/lib/strip-markdown";
 and replace:
 
 ```tsx
-        {project.description && (
-          <p className="mt-2 line-clamp-3 text-muted-foreground text-sm">
-            {project.description}
-          </p>
-        )}
+{
+  project.description && (
+    <p className="mt-2 line-clamp-3 text-muted-foreground text-sm">
+      {project.description}
+    </p>
+  );
+}
 ```
 
 with:
 
 ```tsx
-        {project.description && (
-          <p className="mt-2 line-clamp-3 text-muted-foreground text-sm">
-            {stripMarkdown(project.description)}
-          </p>
-        )}
+{
+  project.description && (
+    <p className="mt-2 line-clamp-3 text-muted-foreground text-sm">
+      {stripMarkdown(project.description)}
+    </p>
+  );
+}
 ```
 
 - [ ] **Step 6: Use it in the row**
@@ -225,21 +233,25 @@ with:
 In `src/components/project-row.tsx`, add the same import and replace:
 
 ```tsx
-        {project.description && (
-          <p className="mt-1 line-clamp-3 text-muted-foreground text-sm">
-            {project.description}
-          </p>
-        )}
+{
+  project.description && (
+    <p className="mt-1 line-clamp-3 text-muted-foreground text-sm">
+      {project.description}
+    </p>
+  );
+}
 ```
 
 with:
 
 ```tsx
-        {project.description && (
-          <p className="mt-1 line-clamp-3 text-muted-foreground text-sm">
-            {stripMarkdown(project.description)}
-          </p>
-        )}
+{
+  project.description && (
+    <p className="mt-1 line-clamp-3 text-muted-foreground text-sm">
+      {stripMarkdown(project.description)}
+    </p>
+  );
+}
 ```
 
 - [ ] **Step 7: Run the component suite**
@@ -260,11 +272,13 @@ git commit -m "feat: strip markdown from clamped project summaries"
 ## Task 2: The `Markdown` render component
 
 **Files:**
+
 - Create: `src/components/markdown.tsx`
 - Create: `src/test/markdown.test.tsx`
 - Modify: `package.json` (two new dependencies)
 
 **Interfaces:**
+
 - Consumes: nothing from earlier tasks.
 - Produces: `export function Markdown({ children }: { children: string | null | undefined }): JSX.Element | null`. Tasks 3 and 4 both render this exact component.
 
@@ -325,9 +339,7 @@ describe("Markdown", () => {
   });
 
   it("clamps every heading level to h4", () => {
-    const { container } = render(
-      <Markdown>{"# Top\n\n### Third"}</Markdown>
-    );
+    const { container } = render(<Markdown>{"# Top\n\n### Third"}</Markdown>);
     expect(container.querySelector("h1")).toBeNull();
     expect(container.querySelector("h3")).toBeNull();
     expect(container.querySelectorAll("h4").length).toBe(2);
@@ -335,7 +347,7 @@ describe("Markdown", () => {
 
   it("does not execute or emit raw HTML", () => {
     const { container } = render(
-      <Markdown>{'<script>alert(1)</script><b>raw</b>'}</Markdown>
+      <Markdown>{"<script>alert(1)</script><b>raw</b>"}</Markdown>
     );
     expect(container.querySelector("script")).toBeNull();
     expect(container.querySelector("b")).toBeNull();
@@ -415,13 +427,7 @@ function Heading({ children }: { children?: ReactNode }) {
   return <h4 className="font-medium text-base">{children}</h4>;
 }
 
-function Anchor({
-  href,
-  children,
-}: {
-  children?: ReactNode;
-  href?: string;
-}) {
+function Anchor({ href, children }: { children?: ReactNode; href?: string }) {
   return (
     <a href={href} rel="noopener noreferrer" target="_blank">
       {children}
@@ -439,7 +445,11 @@ const COMPONENTS = {
   h6: Heading,
 };
 
-export function Markdown({ children }: { children: string | null | undefined }) {
+export function Markdown({
+  children,
+}: {
+  children: string | null | undefined;
+}) {
   if (!children?.trim()) {
     return null;
   }
@@ -478,9 +488,11 @@ git commit -m "feat: add a Markdown render component with a safe element allowli
 ## Task 3: Render the project detail sections as markdown
 
 **Files:**
+
 - Modify: `src/routes/projects/$projectId.tsx:232-242`
 
 **Interfaces:**
+
 - Consumes: `Markdown` from Task 2.
 - Produces: nothing new.
 
@@ -540,6 +552,7 @@ Expected: no errors.
 - [ ] **Step 3: Manual verification**
 
 Run `npm run dev` and open a published project that has a description. Confirm:
+
 - Existing plain text still renders and reads correctly.
 - A field manually edited to contain `- one\n- two` renders as a real bullet list.
 - A field containing `# Title` renders it at `h4` size, and the page's `h1` is still the project title.
@@ -562,12 +575,15 @@ git commit -m "feat: render project detail sections as markdown"
 ## Task 4: The toolbar edit calculator
 
 **Files:**
+
 - Create: `src/lib/markdown-toolbar.ts`
 - Create: `src/lib/__tests__/markdown-toolbar.test.ts`
 
 **Interfaces:**
+
 - Consumes: nothing.
 - Produces:
+
   ```ts
   export type ToolbarAction = "bold" | "italic" | "bulletList" | "numberedList" | "link";
 
@@ -588,6 +604,7 @@ git commit -m "feat: render project detail sections as markdown"
   export function buildToolbarEdit(state: EditorState, action: ToolbarAction): ToolbarEdit;
   export function applyEdit(value: string, edit: ToolbarEdit): string;
   ```
+
   Task 5 calls `buildToolbarEdit` and `applyEdit` with exactly these shapes.
 
 **Context:** This is deliberately a **range replacement**, not a whole-new-value calculation. The component feeds `replacement` to `document.execCommand("insertText")` over `[rangeStart, rangeEnd]`, which is what preserves the browser's native undo stack. A whole-value swap would clear undo history on every toolbar click.
@@ -622,7 +639,9 @@ describe("buildToolbarEdit: bold", () => {
     const edit = buildToolbarEdit(state("", 0), "bold");
     const next = applyEdit("", edit);
     expect(next).toBe("**bold text**");
-    expect(next.slice(edit.selectionStart, edit.selectionEnd)).toBe("bold text");
+    expect(next.slice(edit.selectionStart, edit.selectionEnd)).toBe(
+      "bold text"
+    );
   });
 });
 
@@ -647,7 +666,9 @@ describe("buildToolbarEdit: link", () => {
     const edit = buildToolbarEdit(state("", 0), "link");
     const next = applyEdit("", edit);
     expect(next).toBe("[link text](https://)");
-    expect(next.slice(edit.selectionStart, edit.selectionEnd)).toBe("link text");
+    expect(next.slice(edit.selectionStart, edit.selectionEnd)).toBe(
+      "link text"
+    );
   });
 });
 
@@ -817,13 +838,16 @@ git commit -m "feat: add pure toolbar edit calculator for the markdown editor"
 ## Task 5: The `MarkdownField` editor and its form wiring
 
 **Files:**
+
 - Create: `src/components/markdown-field.tsx`
 - Create: `src/test/markdown-field.test.tsx`
 - Modify: `src/components/project-form.tsx`
 
 **Interfaces:**
+
 - Consumes: `buildToolbarEdit`, `applyEdit`, `ToolbarAction`, `EditorState` (Task 4); `Markdown` (Task 2).
 - Produces:
+
   ```ts
   export function MarkdownField(props: {
     id: string;
@@ -1074,40 +1098,42 @@ import { MarkdownField } from "./markdown-field";
 Then replace the ternary inside `Field`:
 
 ```tsx
-          {textarea ? (
-            <Textarea
-              className="mt-1"
-              id={field.name}
-              name={field.name}
-              onBlur={field.handleBlur}
-              onChange={(e) => field.handleChange(e.target.value)}
-              placeholder={placeholder}
-              rows={rows}
-              value={field.state.value as string}
-            />
-          ) : (
-            <Input
-              className="mt-1"
-              id={field.name}
-              name={field.name}
-              onBlur={field.handleBlur}
-              onChange={(e) => field.handleChange(e.target.value)}
-              placeholder={placeholder}
-              value={field.state.value as string}
-            />
-          )}
+{
+  textarea ? (
+    <Textarea
+      className="mt-1"
+      id={field.name}
+      name={field.name}
+      onBlur={field.handleBlur}
+      onChange={(e) => field.handleChange(e.target.value)}
+      placeholder={placeholder}
+      rows={rows}
+      value={field.state.value as string}
+    />
+  ) : (
+    <Input
+      className="mt-1"
+      id={field.name}
+      name={field.name}
+      onBlur={field.handleBlur}
+      onChange={(e) => field.handleChange(e.target.value)}
+      placeholder={placeholder}
+      value={field.state.value as string}
+    />
+  );
+}
 ```
 
 with a single call:
 
 ```tsx
-          <FieldControl
-            field={field}
-            markdown={markdown}
-            placeholder={placeholder}
-            rows={rows}
-            textarea={textarea}
-          />
+<FieldControl
+  field={field}
+  markdown={markdown}
+  placeholder={placeholder}
+  rows={rows}
+  textarea={textarea}
+/>;
 ```
 
 and add this component above `Field` in the same file:
@@ -1176,15 +1202,15 @@ In the same file, change the `textarea` prop to `markdown` on exactly these six 
 For example, `description` becomes:
 
 ```tsx
-      <Field
-        form={form}
-        label="Description"
-        markdown
-        name="description"
-        onApply={() => applyField("description")}
-        rows={4}
-        suggestion={suggestions.description}
-      />
+<Field
+  form={form}
+  label="Description"
+  markdown
+  name="description"
+  onApply={() => applyField("description")}
+  rows={4}
+  suggestion={suggestions.description}
+/>;
 ```
 
 **Leave `notes` (line 371-379) on `textarea`.** Internal staff notes are explicitly out of scope, and it is the one remaining `textarea` consumer.
@@ -1197,6 +1223,7 @@ Expected: PASS. `src/test/project-form-ai-review.test.tsx` exercises this form; 
 - [ ] **Step 8: Manual verification**
 
 Run `npm run dev` and open `/projects/new`:
+
 - Select a word in Description and click Bold. The word is wrapped and stays selected.
 - Click Bold with no selection. `**bold text**` is inserted with the placeholder selected.
 - Select two lines and click Bullet list. Both lines get `- `.
@@ -1217,10 +1244,12 @@ git commit -m "feat: add a markdown editor with toolbar and preview to project f
 ## Task 6: Teach the AI reviewer that fields are markdown
 
 **Files:**
+
 - Modify: `src/server/_internal/project-review-core.ts:57` (the `SYSTEM_PROMPT` rule list)
 - Modify: `src/server/__tests__/project-review-core.test.ts`
 
 **Interfaces:**
+
 - Consumes: nothing from earlier tasks.
 - Produces: nothing. This is the last task.
 
@@ -1286,25 +1315,25 @@ git commit -m "feat: tell the AI reviewer that project fields are markdown"
 
 **Spec coverage:**
 
-| Spec section | Task |
-| --- | --- |
-| Markdown source stored in existing columns, no migration | Implicit throughout; no task touches `src/db` |
-| `react-markdown` + `remark-gfm`, no `dangerouslySetInnerHTML` | Task 2 |
-| No `remark-breaks`; reflow accepted | Task 2 (absent from plugin list), Task 3 Step 1 note |
-| Headings clamped to `h4` | Task 2, Steps 2 and 4 |
-| Links get `rel="noopener noreferrer"` | Task 2, Steps 2 and 4 |
-| Raw HTML inert, no images | Task 2, Step 2 |
-| Six fields in scope, `title` and `notes` excluded | Task 5, Step 6 |
-| `MarkdownField`: toolbar, preview tab, undo-preserving insertion | Tasks 4 and 5 |
-| `stripMarkdown` for card and row summaries | Task 1 |
-| Detail page `Section` renders markdown | Task 3 |
-| AI review prompt updated | Task 6 |
-| `search_vector` untouched | No task modifies `src/db/schema.ts` |
-| Testing: toolbar helper over empty/single/multi-line selection | Task 4, Step 1 |
-| Testing: `stripMarkdown` over all syntax forms | Task 1, Step 1 |
-| Testing: renderer safe subset, no script or img | Task 2, Step 2 |
-| Testing: `#` renders as `h4` | Task 2, Step 2 |
-| Accessibility: heading order preserved | Task 3, Step 4 |
+| Spec section                                                     | Task                                                 |
+| ---------------------------------------------------------------- | ---------------------------------------------------- |
+| Markdown source stored in existing columns, no migration         | Implicit throughout; no task touches `src/db`        |
+| `react-markdown` + `remark-gfm`, no `dangerouslySetInnerHTML`    | Task 2                                               |
+| No `remark-breaks`; reflow accepted                              | Task 2 (absent from plugin list), Task 3 Step 1 note |
+| Headings clamped to `h4`                                         | Task 2, Steps 2 and 4                                |
+| Links get `rel="noopener noreferrer"`                            | Task 2, Steps 2 and 4                                |
+| Raw HTML inert, no images                                        | Task 2, Step 2                                       |
+| Six fields in scope, `title` and `notes` excluded                | Task 5, Step 6                                       |
+| `MarkdownField`: toolbar, preview tab, undo-preserving insertion | Tasks 4 and 5                                        |
+| `stripMarkdown` for card and row summaries                       | Task 1                                               |
+| Detail page `Section` renders markdown                           | Task 3                                               |
+| AI review prompt updated                                         | Task 6                                               |
+| `search_vector` untouched                                        | No task modifies `src/db/schema.ts`                  |
+| Testing: toolbar helper over empty/single/multi-line selection   | Task 4, Step 1                                       |
+| Testing: `stripMarkdown` over all syntax forms                   | Task 1, Step 1                                       |
+| Testing: renderer safe subset, no script or img                  | Task 2, Step 2                                       |
+| Testing: `#` renders as `h4`                                     | Task 2, Step 2                                       |
+| Accessibility: heading order preserved                           | Task 3, Step 4                                       |
 
 **Type consistency:** `stripMarkdown(input: string | null | undefined): string` is defined in Task 1 and called in Task 1 only. `Markdown({ children })` is defined in Task 2 and consumed in Task 3 and Task 5 with a `string` child. `buildToolbarEdit(state, action)` and `applyEdit(value, edit)` are defined in Task 4 and called in Task 5 with `EditorState` built from live textarea properties. `MarkdownField`'s `onChange: (value: string) => void` differs from `Textarea`'s event-based `onChange`, which is why `FieldControl` adapts it with `(value: string) => field.handleChange(value)` in Task 5, Step 5.
 

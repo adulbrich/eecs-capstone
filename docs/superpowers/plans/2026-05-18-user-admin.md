@@ -2,7 +2,6 @@
 
 > **Status (verified 2026-06-07):** ✅ **Implemented and shipped.** Verified against the codebase; all deliverables exist. The `- [ ]` checkboxes below were never ticked during execution; they are stale, not a sign of incomplete work.
 
-
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking. Read `docs/QUIRKS.md` before starting; it documents every framework gotcha this codebase has hit.
 
 **Spec:** `docs/superpowers/specs/2026-05-18-user-admin-design.md`
@@ -44,19 +43,10 @@ Spec 4 needs no migration. All required columns (`user.role`, `user.banned`, `us
 ```ts
 import { and, asc, desc, eq, ilike, isNull, or, sql } from "drizzle-orm";
 import { db } from "#/db";
-import {
-  projectBookmarks,
-  projects,
-  session,
-  user,
-} from "#/db/schema";
+import { projectBookmarks, projects, session, user } from "#/db/schema";
 import { requireUser } from "#/lib/_internal/auth-guards";
 import { isStaff } from "#/lib/project-visibility";
-import type {
-  BanUserInput,
-  ListUsersInput,
-  SetUserRoleInput,
-} from "../users";
+import type { BanUserInput, ListUsersInput, SetUserRoleInput } from "../users";
 
 type AuthUser = { id: string; role?: string | null | undefined };
 
@@ -74,7 +64,7 @@ export async function listUsersImpl(data: ListUsersInput) {
   const conditions = [];
   if (data.q) {
     conditions.push(
-      or(ilike(user.email, `%${data.q}%`), ilike(user.name, `%${data.q}%`)),
+      or(ilike(user.email, `%${data.q}%`), ilike(user.name, `%${data.q}%`))
     );
   }
   if (data.role) {
@@ -157,10 +147,7 @@ export async function getUserForCurrentUser(data: { id: string }) {
   return getUserImpl(data);
 }
 
-export async function setUserRoleAs(
-  viewer: AuthUser,
-  data: SetUserRoleInput,
-) {
+export async function setUserRoleAs(viewer: AuthUser, data: SetUserRoleInput) {
   assertAdmin(viewer);
   assertNotSelf(viewer, data.userId, "change the role of");
   await db
@@ -198,10 +185,7 @@ export async function banUserForCurrentUser(data: BanUserInput) {
   return banUserAs(viewer, data);
 }
 
-export async function unbanUserAs(
-  viewer: AuthUser,
-  data: { userId: string },
-) {
+export async function unbanUserAs(viewer: AuthUser, data: { userId: string }) {
   assertAdmin(viewer);
   await db
     .update(user)
@@ -450,8 +434,7 @@ export function BanForm({
     setBusy(true);
     setError(null);
     try {
-      const expires =
-        expiresAt.length > 0 ? new Date(expiresAt) : null;
+      const expires = expiresAt.length > 0 ? new Date(expiresAt) : null;
       await banUser({
         data: { userId, reason, expiresAt: expires },
       });
@@ -685,7 +668,9 @@ function UsersAdmin() {
               void navigate({
                 search: (prev) => ({
                   ...prev,
-                  role: (e.target.value || null) as (typeof ROLES)[number] | null,
+                  role: (e.target.value || null) as
+                    | (typeof ROLES)[number]
+                    | null,
                   page: 1,
                 }),
               })
@@ -760,7 +745,9 @@ function UsersAdmin() {
         <Link
           to="/admin/users"
           search={(prev) => ({ ...prev, page: Math.min(totalPages, page + 1) })}
-          className={page >= totalPages ? "text-neutral-300" : "hover:underline"}
+          className={
+            page >= totalPages ? "text-neutral-300" : "hover:underline"
+          }
         >
           Next
         </Link>
@@ -977,7 +964,7 @@ EOF
 Find the line:
 
 ```tsx
-<li className="text-neutral-400">Users (coming in Spec 4)</li>
+<li className="text-neutral-400">Users (coming in Spec 4)</li>;
 ```
 
 Replace with:
@@ -987,7 +974,7 @@ Replace with:
   <Link to="/admin/users" className="text-blue-700 hover:underline">
     Users
   </Link>
-</li>
+</li>;
 ```
 
 The `Link` import already exists.
@@ -1112,14 +1099,17 @@ describe("setUserRoleAs", () => {
     const target = await makeUser(`u-${Date.now()}@x.com`, "user");
 
     await setUserRoleAs(admin, { userId: target.id, role: "instructor" });
-    const [updated] = await db.select().from(user).where(eq(user.id, target.id));
+    const [updated] = await db
+      .select()
+      .from(user)
+      .where(eq(user.id, target.id));
     expect(updated.role).toBe("instructor");
   });
 
   it("refuses self-action", async () => {
     const admin = await makeUser(`a2-${Date.now()}@x.com`, "admin");
     await expect(
-      setUserRoleAs(admin, { userId: admin.id, role: "user" }),
+      setUserRoleAs(admin, { userId: admin.id, role: "user" })
     ).rejects.toThrow(/yourself/);
   });
 
@@ -1127,7 +1117,7 @@ describe("setUserRoleAs", () => {
     const instructor = await makeUser(`i-${Date.now()}@x.com`, "instructor");
     const target = await makeUser(`u-${Date.now()}@x.com`, "user");
     await expect(
-      setUserRoleAs(instructor, { userId: target.id, role: "admin" }),
+      setUserRoleAs(instructor, { userId: target.id, role: "admin" })
     ).rejects.toThrow();
   });
 });
@@ -1138,10 +1128,15 @@ describe("banUserAs / unbanUserAs", () => {
     const target = await makeUser(`t-${Date.now()}@x.com`, "user");
 
     // Create a session row for the target by signing them in via Better Auth.
-    const { headers } = await auth.api.signInEmail({
-      body: { email: `${target.id}` /* not used; we already have id */, password: "Password1!" },
-      asResponse: true,
-    }).catch(() => ({ headers: new Headers() }));
+    const { headers } = await auth.api
+      .signInEmail({
+        body: {
+          email: `${target.id}` /* not used; we already have id */,
+          password: "Password1!",
+        },
+        asResponse: true,
+      })
+      .catch(() => ({ headers: new Headers() }));
     void headers;
 
     // Insert a synthetic session row to verify revoke.
@@ -1158,7 +1153,10 @@ describe("banUserAs / unbanUserAs", () => {
       expiresAt: null,
     });
 
-    const [updated] = await db.select().from(user).where(eq(user.id, target.id));
+    const [updated] = await db
+      .select()
+      .from(user)
+      .where(eq(user.id, target.id));
     expect(updated.banned).toBe(true);
     expect(updated.banReason).toBe("test ban");
     expect(updated.banExpires).toBeNull();
@@ -1177,7 +1175,7 @@ describe("banUserAs / unbanUserAs", () => {
         userId: admin.id,
         reason: "x",
         expiresAt: null,
-      }),
+      })
     ).rejects.toThrow(/yourself/);
   });
 
@@ -1191,7 +1189,10 @@ describe("banUserAs / unbanUserAs", () => {
     });
     await unbanUserAs(admin, { userId: target.id });
 
-    const [updated] = await db.select().from(user).where(eq(user.id, target.id));
+    const [updated] = await db
+      .select()
+      .from(user)
+      .where(eq(user.id, target.id));
     expect(updated.banned).toBe(false);
     expect(updated.banReason).toBeNull();
     expect(updated.banExpires).toBeNull();

@@ -15,21 +15,21 @@ The governing principle, which every decision below follows from:
 
 Filtering (search text, status, program, proposer, soft-deleted, category)
 stays server-side, in the URL, and in `loaderDeps`. Sorting and column
-visibility are client-side, in the URL, and deliberately *not* in `loaderDeps`.
+visibility are client-side, in the URL, and deliberately _not_ in `loaderDeps`.
 
 ---
 
 ## Current behavior
 
-| | `/admin/inventory` | `/admin/projects` | `/admin/mentors` |
-| --- | --- | --- | --- |
-| Rows fetched | server-paginated, 20/page | all matching | all |
-| Presentation | `AdminTable` | `ProjectRow` cards | `AdminTable` |
-| Order | fixed `updatedAt desc` | fixed `updatedAt desc` | fixed `name asc` |
-| Search | server, name + tsvector | server, title + tsvector | none |
-| Other filters | status | status, program, proposer, soft-deleted | none |
-| Column choice | none | none | none |
-| Container | `max-w-4xl` | `max-w-4xl` | `max-w-4xl` |
+|               | `/admin/inventory`        | `/admin/projects`                       | `/admin/mentors` |
+| ------------- | ------------------------- | --------------------------------------- | ---------------- |
+| Rows fetched  | server-paginated, 20/page | all matching                            | all              |
+| Presentation  | `AdminTable`              | `ProjectRow` cards                      | `AdminTable`     |
+| Order         | fixed `updatedAt desc`    | fixed `updatedAt desc`                  | fixed `name asc` |
+| Search        | server, name + tsvector   | server, title + tsvector                | none             |
+| Other filters | status                    | status, program, proposer, soft-deleted | none             |
+| Column choice | none                      | none                                    | none             |
+| Container     | `max-w-4xl`               | `max-w-4xl`                             | `max-w-4xl`      |
 
 Three facts about the existing code shape the design:
 
@@ -105,14 +105,14 @@ the URL/localStorage sync. Props:
 
 ```ts
 interface AdminDataTableProps<T> {
-  caption: string;          // rendered in <TableCaption>, for screen readers
+  caption: string; // rendered in <TableCaption>, for screen readers
   columns: ColumnDef<T>[];
   data: T[];
   defaultSort: { id: string; desc: boolean };
   emptyMessage: string;
   getRowId: (row: T) => string;
-  storageKey: string;       // localStorage suffix, e.g. "inventory"
-  toolbar?: ReactNode;      // the page's own filter controls
+  storageKey: string; // localStorage suffix, e.g. "inventory"
+  toolbar?: ReactNode; // the page's own filter controls
 }
 ```
 
@@ -279,19 +279,19 @@ all three are already accounted for in the `table.tsx` edits:
 
 ### `/admin/inventory`
 
-| Column | Default | Notes |
-| --- | --- | --- |
-| Name | visible, not hideable | thumbnail + link to `/inventory/$itemId` |
-| Status | visible | `InventoryStatusBadge`, workflow sort order |
-| Holder | visible | name, falling back to label, then "(user)" |
-| Location | visible | |
-| Category | visible | |
-| Label | hidden | |
-| Serial | hidden | |
-| Due | hidden | `dueAt`, date sort |
-| Updated | hidden | |
-| Created | hidden | |
-| Actions | visible, not hideable | Edit link |
+| Column   | Default               | Notes                                       |
+| -------- | --------------------- | ------------------------------------------- |
+| Name     | visible, not hideable | thumbnail + link to `/inventory/$itemId`    |
+| Status   | visible               | `InventoryStatusBadge`, workflow sort order |
+| Holder   | visible               | name, falling back to label, then "(user)"  |
+| Location | visible               |                                             |
+| Category | visible               |                                             |
+| Label    | hidden                |                                             |
+| Serial   | hidden                |                                             |
+| Due      | hidden                | `dueAt`, date sort                          |
+| Updated  | hidden                |                                             |
+| Created  | hidden                |                                             |
+| Actions  | visible, not hideable | Edit link                                   |
 
 Filters: search, status, and the newly wired category select. Server pagination
 and the Previous/Next control are removed; the full filtered set renders in one
@@ -299,18 +299,18 @@ scrollable table.
 
 ### `/admin/projects`
 
-| Column | Default | Notes |
-| --- | --- | --- |
-| Title | visible, not hideable | thumbnail + link; carries a "Deleted" badge when `deletedAt` is set |
-| Status | visible | badge, workflow sort order |
-| Proposer | visible | name over email; sorts by name, nulls last |
-| Program | visible | `courseId courseName` |
-| Updated | visible | |
-| Contact | hidden | `contactName` over `contactEmail` |
-| Teams | hidden | `teamsSupported`, numeric sort |
-| Created | hidden | |
-| Published | hidden | |
-| Actions | visible, not hideable | Edit link |
+| Column    | Default               | Notes                                                               |
+| --------- | --------------------- | ------------------------------------------------------------------- |
+| Title     | visible, not hideable | thumbnail + link; carries a "Deleted" badge when `deletedAt` is set |
+| Status    | visible               | badge, workflow sort order                                          |
+| Proposer  | visible               | name over email; sorts by name, nulls last                          |
+| Program   | visible               | `courseId courseName`                                               |
+| Updated   | visible               |                                                                     |
+| Contact   | hidden                | `contactName` over `contactEmail`                                   |
+| Teams     | hidden                | `teamsSupported`, numeric sort                                      |
+| Created   | hidden                |                                                                     |
+| Published | hidden                |                                                                     |
+| Actions   | visible, not hideable | Edit link                                                           |
 
 Filters unchanged: search, status, program, proposer, show soft-deleted. The
 page stops importing `ProjectRow`.
@@ -321,13 +321,13 @@ open a project to learn who proposed it.
 
 ### `/admin/mentors`
 
-| Column | Default | Notes |
-| --- | --- | --- |
-| Name | visible, not hideable | |
-| Affiliation | visible | |
-| Email | visible | |
-| Teams | visible | the existing number input, live state |
-| Actions | visible, not hideable | Save / Remove |
+| Column      | Default               | Notes                                 |
+| ----------- | --------------------- | ------------------------------------- |
+| Name        | visible, not hideable |                                       |
+| Affiliation | visible               |                                       |
+| Email       | visible               |                                       |
+| Teams       | visible               | the existing number input, live state |
+| Actions     | visible, not hideable | Save / Remove                         |
 
 Gains a search box, backed by the new server-side `q`. Nothing is hidden by
 default; with five columns a picker that starts by hiding things would only
@@ -478,8 +478,8 @@ announcement all keep working exactly as they do on the other five pages.
 `cols`) join that route's `loaderDeps` for the same reason.
 
 **The component contract is not what this document describes.** The `Props`
-sketch above is for an *uncontrolled* `AdminDataTable` that owns its own URL
-and localStorage sync internally. What shipped is fully *controlled*: `hidden`
+sketch above is for an _uncontrolled_ `AdminDataTable` that owns its own URL
+and localStorage sync internally. What shipped is fully _controlled_: `hidden`
 / `onHiddenChange` and `sort` / `onSortChange` are props, and the caller is
 responsible for the URL round-trip. The sync logic itself lives in
 `useAdminTableState`, a router-agnostic hook in `src/lib/table-state.ts` that

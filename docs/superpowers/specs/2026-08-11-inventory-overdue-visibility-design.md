@@ -56,10 +56,10 @@ stops and nobody finds out.
 An Active tab entry is a union, and the deadline pair lives in different
 columns per arm:
 
-| Entry | status | pickupBy | dueAt | recency |
-| --- | --- | --- | --- | --- |
-| hold | `item.status` | `item.currentPickupBy` | `item.currentDueAt` | `item.updatedAt` |
-| request | `item.status` | `line.pickupBy` | `line.dueAt` | `line.createdAt` |
+| Entry   | status        | pickupBy               | dueAt               | recency          |
+| ------- | ------------- | ---------------------- | ------------------- | ---------------- |
+| hold    | `item.status` | `item.currentPickupBy` | `item.currentDueAt` | `item.updatedAt` |
+| request | `item.status` | `line.pickupBy`        | `line.dueAt`        | `line.createdAt` |
 
 `deadlineOf` and `recencyOf` already normalize this for the server-side sort.
 The badge work would need the same normalization on the client, which is where
@@ -96,10 +96,10 @@ reader already looks for the item's state.
 
 Two labels, because they mean different things to the student:
 
-| Case | Label | Colour |
-| --- | --- | --- |
+| Case                       | Label            | Colour             |
+| -------------------------- | ---------------- | ------------------ |
 | `reserved` past `pickupBy` | `Pickup overdue` | `--status-warning` |
-| `checked_out` past `dueAt` | `Overdue` | `text-destructive` |
+| `checked_out` past `dueAt` | `Overdue`        | `text-destructive` |
 
 "Collect this" and "bring this back" are different asks, and a late return is
 the more serious of the two. The dates already on the row stay as they are.

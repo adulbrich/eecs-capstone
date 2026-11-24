@@ -8,7 +8,7 @@ pre-commit:
     # Biome, via ultracite, narrowed to the staged files. Same check CI runs
     # (`npm run check`); run `npm run format` to auto-fix what it reports.
     biome:
-      glob: "*.{js,jsx,mjs,ts,tsx,json,jsonc,css}"
+      glob: "*.{js,jsx,mjs,ts,tsx,json,jsonc,css,md}"
       run: npx ultracite check {staged_files}
     # No emdash, no emoji, in prose, comments and string literals alike.
     prose:

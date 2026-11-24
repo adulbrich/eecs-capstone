@@ -2,7 +2,6 @@
 
 > **Status (verified 2026-06-07):** ✅ **Implemented and shipped.** Verified against the codebase; all deliverables exist. The `- [ ]` checkboxes below were never ticked during execution; they are stale, not a sign of incomplete work.
 
-
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking. Read `docs/QUIRKS.md` before starting; it documents every framework gotcha this codebase has hit.
 
 **Spec:** `docs/superpowers/specs/2026-05-18-media-and-revised-listing-design.md`
@@ -174,7 +173,9 @@ import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { getPublicUrl } from "../storage";
 
 beforeAll(() => {
-  vi.stubGlobal("import.meta.env", { VITE_STORAGE_PUBLIC_BASE: "http://localhost:9000/cs-capstone" });
+  vi.stubGlobal("import.meta.env", {
+    VITE_STORAGE_PUBLIC_BASE: "http://localhost:9000/cs-capstone",
+  });
 });
 afterAll(() => {
   vi.unstubAllGlobals();
@@ -188,12 +189,18 @@ describe("getPublicUrl", () => {
   });
 
   it("returns the value unchanged for http/https URLs", () => {
-    expect(getPublicUrl("https://example.com/x.png")).toBe("https://example.com/x.png");
-    expect(getPublicUrl("http://example.com/x.png")).toBe("http://example.com/x.png");
+    expect(getPublicUrl("https://example.com/x.png")).toBe(
+      "https://example.com/x.png"
+    );
+    expect(getPublicUrl("http://example.com/x.png")).toBe(
+      "http://example.com/x.png"
+    );
   });
 
   it("prefixes the base for storage keys", () => {
-    expect(getPublicUrl("projects/abc/img.webp")).toMatch(/\/projects\/abc\/img\.webp$/);
+    expect(getPublicUrl("projects/abc/img.webp")).toMatch(
+      /\/projects\/abc\/img\.webp$/
+    );
   });
 });
 ```
@@ -228,9 +235,7 @@ const PUBLIC_BASE =
 
 export const STORAGE_PUBLIC_BASE = PUBLIC_BASE;
 
-export function getPublicUrl(
-  key: string | null | undefined,
-): string | null {
+export function getPublicUrl(key: string | null | undefined): string | null {
   if (!key) return null;
   if (key.startsWith("http://") || key.startsWith("https://")) return key;
   return `${PUBLIC_BASE}/${key.replace(/^\/+/, "")}`;
@@ -254,7 +259,7 @@ export interface ObjectStorage {
 class S3Storage implements ObjectStorage {
   constructor(
     private bucket: string,
-    private client: S3Client,
+    private client: S3Client
   ) {}
 
   async put(key: string, body: Buffer, contentType: string): Promise<void> {
@@ -264,13 +269,13 @@ class S3Storage implements ObjectStorage {
         Key: key,
         Body: body,
         ContentType: contentType,
-      }),
+      })
     );
   }
 
   async delete(key: string): Promise<void> {
     await this.client.send(
-      new DeleteObjectCommand({ Bucket: this.bucket, Key: key }),
+      new DeleteObjectCommand({ Bucket: this.bucket, Key: key })
     );
   }
 }
@@ -357,13 +362,14 @@ import path from "node:path";
 import { describe, expect, it } from "vitest";
 import { processImage } from "../_internal/image-processing";
 
-const fixture = readFileSync(
-  path.join(__dirname, "fixtures", "sample.jpg"),
-);
+const fixture = readFileSync(path.join(__dirname, "fixtures", "sample.jpg"));
 
 describe("processImage", () => {
   it("returns a webp buffer no larger than the max dimensions", async () => {
-    const result = await processImage(fixture, { maxWidth: 100, maxHeight: 100 });
+    const result = await processImage(fixture, {
+      maxWidth: 100,
+      maxHeight: 100,
+    });
     expect(result.contentType).toBe("image/webp");
     expect(result.buffer.length).toBeGreaterThan(0);
     expect(result.width).toBeLessThanOrEqual(100);
@@ -372,13 +378,19 @@ describe("processImage", () => {
 
   it("preserves the input aspect ratio (fit: inside)", async () => {
     // 200x200 fixture, maxWidth: 50, maxHeight: 100 -> output should be 50x50
-    const result = await processImage(fixture, { maxWidth: 50, maxHeight: 100 });
+    const result = await processImage(fixture, {
+      maxWidth: 50,
+      maxHeight: 100,
+    });
     expect(result.width).toBe(50);
     expect(result.height).toBe(50);
   });
 
   it("does not enlarge images smaller than the max", async () => {
-    const result = await processImage(fixture, { maxWidth: 5000, maxHeight: 5000 });
+    const result = await processImage(fixture, {
+      maxWidth: 5000,
+      maxHeight: 5000,
+    });
     expect(result.width).toBe(200);
     expect(result.height).toBe(200);
   });
@@ -414,7 +426,7 @@ export type ProcessedImage = {
 
 export async function processImage(
   input: Buffer,
-  opts: ProcessImageOptions,
+  opts: ProcessImageOptions
 ): Promise<ProcessedImage> {
   const buffer = await sharp(input)
     .rotate()
@@ -522,9 +534,7 @@ export async function uploadProjectImageForCurrentUser(form: FormData) {
     .from(projects)
     .where(eq(projects.id, projectId));
   if (!project) throw new Error("Project not found");
-  if (
-    !canEditProject(project, { id: viewer.id, role: viewer.role ?? null })
-  ) {
+  if (!canEditProject(project, { id: viewer.id, role: viewer.role ?? null })) {
     throw new Error("Forbidden");
   }
 
@@ -641,9 +651,7 @@ export const uploadProjectImage = createServerFn({ method: "POST" })
 export const uploadAvatar = createServerFn({ method: "POST" })
   .inputValidator((data: unknown) => expectFormData(data))
   .handler(async ({ data }) => {
-    const { uploadAvatarForCurrentUser } = await import(
-      "./_internal/uploads"
-    );
+    const { uploadAvatarForCurrentUser } = await import("./_internal/uploads");
     return uploadAvatarForCurrentUser(data);
   });
 
@@ -651,7 +659,7 @@ export const clearAvatar = createServerFn({ method: "POST" }).handler(
   async () => {
     const { clearAvatarForCurrentUser } = await import("./_internal/uploads");
     return clearAvatarForCurrentUser();
-  },
+  }
 );
 ```
 
@@ -716,7 +724,11 @@ At the top of `src/styles.css`, after the existing imports, add:
 ```tsx
 import { TrashIcon } from "@heroicons/react/24/outline";
 import { useRef, useState } from "react";
-import ReactCrop, { centerCrop, makeAspectCrop, type Crop } from "react-image-crop";
+import ReactCrop, {
+  centerCrop,
+  makeAspectCrop,
+  type Crop,
+} from "react-image-crop";
 import { getPublicUrl } from "#/lib/storage";
 
 type Props = {
@@ -765,15 +777,10 @@ export function ImageUploader({
     if (aspect) {
       setCrop(
         centerCrop(
-          makeAspectCrop(
-            { unit: "%", width: 80 },
-            aspect,
-            width,
-            height,
-          ),
+          makeAspectCrop({ unit: "%", width: 80 }, aspect, width, height),
           width,
-          height,
-        ),
+          height
+        )
       );
     } else {
       setCrop({
@@ -795,7 +802,7 @@ export function ImageUploader({
         imgRef.current,
         crop,
         maxWidth,
-        maxHeight,
+        maxHeight
       );
       const file = new File([blob], "upload.webp", { type: "image/webp" });
       const { key } = await upload(file);
@@ -915,7 +922,7 @@ async function renderCropToWebpBlob(
   img: HTMLImageElement,
   crop: Crop,
   maxWidth: number,
-  maxHeight: number,
+  maxHeight: number
 ): Promise<Blob> {
   const scaleX = img.naturalWidth / img.width;
   const scaleY = img.naturalHeight / img.height;
@@ -955,8 +962,8 @@ async function renderCropToWebpBlob(
     canvas.toBlob(
       (b) => (b ? resolve(b) : reject(new Error("toBlob failed"))),
       "image/webp",
-      0.85,
-    ),
+      0.85
+    )
   );
 }
 ```
@@ -1113,7 +1120,7 @@ Find the `createProjectAs` function. Replace the body's `.values({...})` to use 
 ```ts
 export async function createProjectAs(
   viewer: AuthUser,
-  data: ProjectInput,
+  data: ProjectInput
 ): Promise<{ id: string }> {
   const allowedNotes = isStaff(viewerToVisibility(viewer))
     ? (data.notes ?? null)
@@ -1213,7 +1220,7 @@ type Props = {
   submitLabel: string;
   onSubmit: (
     values: ProjectFormValues,
-    categoryIds: string[],
+    categoryIds: string[]
   ) => Promise<unknown>;
 };
 ```
@@ -1253,7 +1260,7 @@ export function ProjectForm({
       </p>
     </div>
   )}
-</form.Field>
+</form.Field>;
 ```
 
 **Step 2: Lint + tsc**
@@ -1497,7 +1504,7 @@ In the JSX, find the heading block (`<h1>Profile</h1>` and the email line). Afte
       onChanged={() => router.invalidate()}
     />
   </div>
-</div>
+</div>;
 ```
 
 The `user` variable already references the route context (`Route.useRouteContext().user`).
@@ -1598,7 +1605,10 @@ export function ProjectCard({ project }: { project: ProjectSummary }) {
       params={{ projectId: project.id }}
       className="block overflow-hidden border border-neutral-200 hover:bg-neutral-50 dark:border-neutral-800 dark:hover:bg-neutral-900"
     >
-      <ImageOrFallback src={src} className="aspect-[16/9] w-full object-cover" />
+      <ImageOrFallback
+        src={src}
+        className="aspect-[16/9] w-full object-cover"
+      />
       <div className="p-4">
         <div className="flex items-center justify-between gap-3">
           <h3 className="font-semibold">{project.title}</h3>
@@ -1639,7 +1649,10 @@ export function ProjectRow({ project }: { project: ProjectSummary }) {
       params={{ projectId: project.id }}
       className="flex items-stretch gap-3 border border-neutral-200 hover:bg-neutral-50 dark:border-neutral-800 dark:hover:bg-neutral-900"
     >
-      <ImageOrFallback src={src} className="h-20 w-28 flex-shrink-0 object-cover" />
+      <ImageOrFallback
+        src={src}
+        className="h-20 w-28 flex-shrink-0 object-cover"
+      />
       <div className="min-w-0 flex-1 p-3">
         <div className="flex items-center justify-between gap-3">
           <h3 className="truncate font-medium">{project.title}</h3>
@@ -1779,15 +1792,13 @@ Replace import: `import { ProjectCard } from "#/components/project-card";` becom
 Replace the loop body. Find:
 
 ```tsx
-rows.map((p) => <ProjectCard key={p.id} project={p} />)
+rows.map((p) => <ProjectCard key={p.id} project={p} />);
 ```
 
 Replace with:
 
 ```tsx
-rows.map((p) => (
-  <ProjectListItem key={p.id} project={p} mode={search.view} />
-))
+rows.map((p) => <ProjectListItem key={p.id} project={p} mode={search.view} />);
 ```
 
 Also wrap the grid based on view:
@@ -1801,15 +1812,13 @@ Also wrap the grid based on view:
   }
 >
   {rows.length === 0 ? (
-    <p className="text-sm text-neutral-500">
-      No projects matched your search.
-    </p>
+    <p className="text-sm text-neutral-500">No projects matched your search.</p>
   ) : (
     rows.map((p) => (
       <ProjectListItem key={p.id} project={p} mode={search.view} />
     ))
   )}
-</div>
+</div>;
 ```
 
 3. Pass `view` to the filter bar:
@@ -1822,7 +1831,7 @@ Find the `<ProjectsFilterBar q={...} categories={...} program={...} />` line. Up
   categories={search.categories}
   program={search.program}
   view={search.view}
-/>
+/>;
 ```
 
 **Step 2: Update `src/components/projects-filter-bar.tsx`**
@@ -1871,7 +1880,7 @@ with:
     className="flex-1 border p-2"
   />
   <ViewToggle current={view} />
-</div>
+</div>;
 ```
 
 **Step 3: Boot dev to regen, lint, commit**
@@ -1911,29 +1920,33 @@ EOF
 Read the current file. Find the block:
 
 ```tsx
-{project.imageUrl && (
-  <img
-    src={project.imageUrl as string}
-    alt=""
-    className="mt-4 max-h-72 w-full object-cover"
-  />
-)}
+{
+  project.imageUrl && (
+    <img
+      src={project.imageUrl as string}
+      alt=""
+      className="mt-4 max-h-72 w-full object-cover"
+    />
+  );
+}
 ```
 
 Replace with:
 
 ```tsx
-{(() => {
-  const heroUrl = getPublicUrl(project.imageUrl as string | null);
-  if (!heroUrl) return null;
-  return (
-    <img
-      src={heroUrl}
-      alt=""
-      className="mt-4 aspect-[16/9] w-full object-cover"
-    />
-  );
-})()}
+{
+  (() => {
+    const heroUrl = getPublicUrl(project.imageUrl as string | null);
+    if (!heroUrl) return null;
+    return (
+      <img
+        src={heroUrl}
+        alt=""
+        className="mt-4 aspect-[16/9] w-full object-cover"
+      />
+    );
+  })();
+}
 ```
 
 Add the import near the top: `import { getPublicUrl } from "#/lib/storage";`.
@@ -1973,7 +1986,11 @@ The integration test writes to a real RustFS bucket. Make sure `npm run storage:
 **Step 2: Write the test**
 
 ```ts
-import { GetObjectCommand, HeadObjectCommand, S3Client } from "@aws-sdk/client-s3";
+import {
+  GetObjectCommand,
+  HeadObjectCommand,
+  S3Client,
+} from "@aws-sdk/client-s3";
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import { eq } from "drizzle-orm";
@@ -1988,7 +2005,7 @@ import {
 } from "#/server/_internal/uploads";
 
 const fixture = readFileSync(
-  path.join(__dirname, "..", "..", "lib", "__tests__", "fixtures", "sample.jpg"),
+  path.join(__dirname, "..", "..", "lib", "__tests__", "fixtures", "sample.jpg")
 );
 
 function s3Client() {
@@ -2057,7 +2074,7 @@ describe("uploadProjectImageForCurrentUser", () => {
       new HeadObjectCommand({
         Bucket: process.env.S3_BUCKET ?? "cs-capstone",
         Key: result.key,
-      }),
+      })
     );
     expect(head.ContentType).toBe("image/webp");
     expect(head.ContentLength).toBeGreaterThan(0);
@@ -2143,7 +2160,7 @@ EOF
 
 After the "User admin (Spec 4)" section, add:
 
-```markdown
+````markdown
 ## Media + revised listing (Spec 5)
 
 Images are stored in an S3-compatible bucket (RustFS locally, AWS S3
@@ -2153,7 +2170,7 @@ client-side crop + canvas-resize pipeline so the network payload is
 already-small upload to strip EXIF and re-encode WebP at consistent
 quality.
 
-Storage rows hold *keys* (`projects/<id>/<uuid>.webp`,
+Storage rows hold _keys_ (`projects/<id>/<uuid>.webp`,
 `avatars/<userId>/<uuid>.webp`), not URLs. The `getPublicUrl(key)`
 helper builds the rendered URL with a pass-through for legacy
 `http(s)://` values so existing rows (DiceBear identicons, OAuth
@@ -2165,6 +2182,7 @@ Bucket setup (local):
 docker compose up -d rustfs
 npm run storage:init    # idempotent
 ```
+````
 
 The `/projects` listing has a `?view=card|row` URL toggle. Card mode
 (default) renders a 16:9 image at the top of each tile; row mode
@@ -2174,7 +2192,8 @@ search still apply identically in both modes.
 Production note: configure the bucket as public-read at the bucket
 policy level on AWS, or run with `S3_ENDPOINT` set to your CDN base.
 Set `VITE_STORAGE_PUBLIC_BASE` to the customer-facing URL prefix.
-```
+
+````
 
 **Step 2: QUIRKS update**
 
@@ -2228,7 +2247,7 @@ export const uploadProjectImage = createServerFn({ method: "POST" })
     return data;
   })
   .handler(async ({ data }) => { /* data is FormData */ });
-```
+````
 
 The client sends:
 
@@ -2255,7 +2274,8 @@ idempotent (catches `BucketAlreadyOwnedByYou` / `BucketAlreadyExists`).
 ImageUploader component never accesses these at the module top level;
 all DOM work happens inside event handlers or after the user picks a
 file. The component renders a button-only state during SSR.
-```
+
+````
 
 **Step 3: Final verification**
 
@@ -2266,7 +2286,7 @@ npm test
 docker compose up -d postgres rustfs
 npm run test:integration
 npm run db:seed:dev    # restore TRUNCATEd dev users
-```
+````
 
 All checks green, all tests pass.
 

@@ -219,7 +219,7 @@ swapped global would leak between cases.
 Three named behaviours, not "async":
 
 1. **The transaction commits first.** `refreshProjectEmbedding` is called
-   *after* the existing `db.transaction` block returns. Embedding is never part
+   _after_ the existing `db.transaction` block returns. Embedding is never part
    of that transaction and can never roll back a publish, a status history row,
    or a notification.
 2. **Failure is tolerated and logged, never surfaced as a request failure.**
@@ -235,7 +235,7 @@ Three named behaviours, not "async":
    serves three purposes: the initial backfill of already-published projects,
    recovery from transient failures, and re-embedding after a model change.
 
-Profile save differs on point 2: an interests embedding failure *is* surfaced,
+Profile save differs on point 2: an interests embedding failure _is_ surfaced,
 because the user explicitly asked for their recommendations to be built. The
 text saves regardless; the UI reports that recommendations could not be
 prepared and offers a retry.

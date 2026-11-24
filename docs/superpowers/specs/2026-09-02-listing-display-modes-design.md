@@ -97,24 +97,24 @@ routes already avoid the same way.
 returns to an anonymous viewer is what is public. Nothing here makes a new field
 public.
 
-| Column | id | Default | Sort | Notes |
-| --- | --- | --- | --- | --- |
-| Title | `title` | visible, not hideable | text | `cardHeader`. Thumbnail and bookmark control render inside this cell beside the link, as `/admin/projects` does for the thumbnail. Neither is its own column. |
-| Program | `program` | visible | text, empties last | `programLabel`, course id and name |
-| Categories | `categories` | visible | none | name-only chips from a correlated `json_agg` of `{ id, name, type }`, ordered by type then name; the type is the chip's `title`, because as chip text it made a five-category project a five-line row |
-| Teams supported | `teams` | visible | `basic` | |
-| NDA/IP required | `nda` | visible | `basic` | `Badge` reading "Required", or a dash |
-| Mentorship | `mentorship` | visible | seeking first, then student proposed, `basic` | added when #75 landed during this branch: the two public flags as `MentorshipBadges` plus the resolved mentor name, which the card omits and only this cell shows; never the address |
-| Contact name | `contactName` | visible | text, empties last | |
-| Contact email | `contactEmail` | hidden | text, empties last | `mailto:` link, as the detail page renders it |
-| Updated | `updatedAt` | visible | `datetime` | `LocalTime dateOnly` |
-| Description | `description` | hidden | none | prose |
-| Problem statement | `problemStatement` | hidden | none | prose |
-| Objectives | `objectives` | hidden | none | prose |
-| Min qualifications | `minQualifications` | hidden | none | prose |
-| Pref qualifications | `prefQualifications` | hidden | none | prose |
-| License restrictions | `licenseRestrictions` | hidden | none | prose |
-| URL | `url` | hidden | text, empties last | external link, `rel="noreferrer"` |
+| Column               | id                    | Default               | Sort                                          | Notes                                                                                                                                                                                                 |
+| -------------------- | --------------------- | --------------------- | --------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Title                | `title`               | visible, not hideable | text                                          | `cardHeader`. Thumbnail and bookmark control render inside this cell beside the link, as `/admin/projects` does for the thumbnail. Neither is its own column.                                         |
+| Program              | `program`             | visible               | text, empties last                            | `programLabel`, course id and name                                                                                                                                                                    |
+| Categories           | `categories`          | visible               | none                                          | name-only chips from a correlated `json_agg` of `{ id, name, type }`, ordered by type then name; the type is the chip's `title`, because as chip text it made a five-category project a five-line row |
+| Teams supported      | `teams`               | visible               | `basic`                                       |                                                                                                                                                                                                       |
+| NDA/IP required      | `nda`                 | visible               | `basic`                                       | `Badge` reading "Required", or a dash                                                                                                                                                                 |
+| Mentorship           | `mentorship`          | visible               | seeking first, then student proposed, `basic` | added when #75 landed during this branch: the two public flags as `MentorshipBadges` plus the resolved mentor name, which the card omits and only this cell shows; never the address                  |
+| Contact name         | `contactName`         | visible               | text, empties last                            |                                                                                                                                                                                                       |
+| Contact email        | `contactEmail`        | hidden                | text, empties last                            | `mailto:` link, as the detail page renders it                                                                                                                                                         |
+| Updated              | `updatedAt`           | visible               | `datetime`                                    | `LocalTime dateOnly`                                                                                                                                                                                  |
+| Description          | `description`         | hidden                | none                                          | prose                                                                                                                                                                                                 |
+| Problem statement    | `problemStatement`    | hidden                | none                                          | prose                                                                                                                                                                                                 |
+| Objectives           | `objectives`          | hidden                | none                                          | prose                                                                                                                                                                                                 |
+| Min qualifications   | `minQualifications`   | hidden                | none                                          | prose                                                                                                                                                                                                 |
+| Pref qualifications  | `prefQualifications`  | hidden                | none                                          | prose                                                                                                                                                                                                 |
+| License restrictions | `licenseRestrictions` | hidden                | none                                          | prose                                                                                                                                                                                                 |
+| URL                  | `url`                 | hidden                | text, empties last                            | external link, `rel="noreferrer"`                                                                                                                                                                     |
 
 Prose cells render `stripMarkdown(text)` inside `max-w-xs line-clamp-3`. Without
 the fixed width one long description sets the row height and the table stops
@@ -207,12 +207,12 @@ as the projects one.
 `publicItemView` (`src/lib/inventory-visibility.ts`) is the authority. Its
 column list was settled on #78 on 2026-09-02:
 
-| Column | id | Default | Sort | Notes |
-| --- | --- | --- | --- | --- |
-| Name | `name` | visible, not hideable | text | `cardHeader`. Thumbnail, link, and the add-to-cart control for a signed-in viewer when the item is available, all inside this cell. No Actions column |
-| Status | `status` | visible | lifecycle order, `basic` | badge; available first, as `/admin/inventory` sorts it |
-| Categories | `categories` | visible | none | chips, as the cards render them |
-| Description | `description` | hidden | none | plain text, `max-w-xs line-clamp-3` |
+| Column      | id            | Default               | Sort                     | Notes                                                                                                                                                 |
+| ----------- | ------------- | --------------------- | ------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Name        | `name`        | visible, not hideable | text                     | `cardHeader`. Thumbnail, link, and the add-to-cart control for a signed-in viewer when the item is available, all inside this cell. No Actions column |
+| Status      | `status`      | visible               | lifecycle order, `basic` | badge; available first, as `/admin/inventory` sorts it                                                                                                |
+| Categories  | `categories`  | visible               | none                     | chips, as the cards render them                                                                                                                       |
+| Description | `description` | hidden                | none                     | plain text, `max-w-xs line-clamp-3`                                                                                                                   |
 
 Not columns: `pickupBy` and `dueAt`. They are in `publicItemView` but nowhere
 on the public UI, and #193 removes them from it: a hold's dates belong to

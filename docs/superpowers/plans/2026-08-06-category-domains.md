@@ -26,31 +26,33 @@ Spec: [`docs/superpowers/specs/2026-08-06-category-domains-design.md`](../specs/
 
 ## File Structure
 
-| File | Responsibility |
-| --- | --- |
-| `drizzle/0010_category_domains.sql` (create) | The one clean migration. Replaces deleted `0010`/`0011`. |
-| `drizzle/meta/0010_snapshot.json` (create) | Its snapshot. `0010`/`0011` snapshots deleted. |
-| `src/db/schema.ts` (modify) | `categoryDomainEnum`, `categories.domain`, nullable `type`, `inventoryItemCategories`, no `categoryId` on items. |
-| `src/lib/category-types.ts` (**delete**) | Sentinel replaced by a real column. |
-| `src/server/_internal/categories.ts` (modify) | `domain` filtering, validation, `setInventoryItemCategoriesAs`. |
-| `src/server/categories.ts` (modify) | Discriminated-union zod schemas. |
-| `src/server/_internal/inventory.ts` (modify) | `categoryIds` on write, categories on read, all-match filter. |
-| `src/server/inventory.ts` (modify) | `categoryIds` payload, `categories` list param. |
-| `src/components/category-multi-select.tsx` (modify) | `domain` prop, creatable affordance, null-type grouping. |
-| `src/components/category-chip.tsx` (modify) | Render without a type. |
-| `src/routes/_authed/admin/categories/index.tsx` (modify) | Project/Inventory tabs. |
-| `src/components/inventory-form.tsx`, `inventory-filter-bar.tsx`, `inventory-card.tsx`, `inventory-row.tsx` (modify) | Multi-category UI. |
+| File                                                                                                                | Responsibility                                                                                                   |
+| ------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------- |
+| `drizzle/0010_category_domains.sql` (create)                                                                        | The one clean migration. Replaces deleted `0010`/`0011`.                                                         |
+| `drizzle/meta/0010_snapshot.json` (create)                                                                          | Its snapshot. `0010`/`0011` snapshots deleted.                                                                   |
+| `src/db/schema.ts` (modify)                                                                                         | `categoryDomainEnum`, `categories.domain`, nullable `type`, `inventoryItemCategories`, no `categoryId` on items. |
+| `src/lib/category-types.ts` (**delete**)                                                                            | Sentinel replaced by a real column.                                                                              |
+| `src/server/_internal/categories.ts` (modify)                                                                       | `domain` filtering, validation, `setInventoryItemCategoriesAs`.                                                  |
+| `src/server/categories.ts` (modify)                                                                                 | Discriminated-union zod schemas.                                                                                 |
+| `src/server/_internal/inventory.ts` (modify)                                                                        | `categoryIds` on write, categories on read, all-match filter.                                                    |
+| `src/server/inventory.ts` (modify)                                                                                  | `categoryIds` payload, `categories` list param.                                                                  |
+| `src/components/category-multi-select.tsx` (modify)                                                                 | `domain` prop, creatable affordance, null-type grouping.                                                         |
+| `src/components/category-chip.tsx` (modify)                                                                         | Render without a type.                                                                                           |
+| `src/routes/_authed/admin/categories/index.tsx` (modify)                                                            | Project/Inventory tabs.                                                                                          |
+| `src/components/inventory-form.tsx`, `inventory-filter-bar.tsx`, `inventory-card.tsx`, `inventory-row.tsx` (modify) | Multi-category UI.                                                                                               |
 
 ---
 
 ### Task 1: Schema, the replacement migration, and a clean database
 
 **Files:**
+
 - Delete: `drizzle/0010_inventory_category_fk.sql`, `drizzle/0011_talented_wallflower.sql`, `drizzle/meta/0010_snapshot.json`, `drizzle/meta/0011_snapshot.json`, `src/lib/category-types.ts`
 - Create: `drizzle/0010_category_domains.sql`, `drizzle/meta/0010_snapshot.json`
 - Modify: `src/db/schema.ts`, `drizzle/meta/_journal.json`
 
 **Interfaces:**
+
 - Consumes: nothing.
 - Produces: `categoryDomainEnum`, `categories.domain`, nullable `categories.type`, and the `inventoryItemCategories` table. Every later task depends on these.
 
@@ -58,14 +60,14 @@ This task deliberately leaves `npm run typecheck` **failing**, and it stays fail
 
 For reference, deleting `src/lib/category-types.ts` breaks these six production files, which later tasks own:
 
-| File | Owned by |
-| --- | --- |
-| `src/components/category-multi-select.tsx` | Task 2 (mechanical swap), Task 5 (rework) |
-| `src/components/projects-filter-bar.tsx` | Task 2 |
-| `src/routes/_authed/admin/categories/index.tsx` | Task 4 |
-| `src/routes/_authed/inventory/new.tsx` | Task 6 |
-| `src/routes/_authed/inventory/$itemId/edit.tsx` | Task 6 |
-| `src/test/categories-schema.test.ts` | Task 2 |
+| File                                            | Owned by                                  |
+| ----------------------------------------------- | ----------------------------------------- |
+| `src/components/category-multi-select.tsx`      | Task 2 (mechanical swap), Task 5 (rework) |
+| `src/components/projects-filter-bar.tsx`        | Task 2                                    |
+| `src/routes/_authed/admin/categories/index.tsx` | Task 4                                    |
+| `src/routes/_authed/inventory/new.tsx`          | Task 6                                    |
+| `src/routes/_authed/inventory/$itemId/edit.tsx` | Task 6                                    |
+| `src/test/categories-schema.test.ts`            | Task 2                                    |
 
 Plus `src/server/_internal/categories.ts` and `src/server/categories.ts` (Task 2), and `src/server/_internal/inventory.ts` and `src/server/inventory.ts` (Task 3).
 
@@ -260,10 +262,12 @@ the consumers are updated."
 ### Task 2: The categories server surface
 
 **Files:**
+
 - Modify: `src/server/_internal/categories.ts`, `src/server/categories.ts`
 - Test: `src/server/__tests__/categories.integration.test.ts`, `src/test/categories-schema.test.ts`
 
 **Interfaces:**
+
 - Consumes: `categoryDomainEnum`, `categories.domain` from Task 1.
 - Produces: `listCategoriesImpl({ domain?, type? })`, and `createCategoryAs`/`updateCategoryAs` accepting a discriminated `CategoryInput`. Tasks 4 and 5 call these.
 
@@ -385,7 +389,10 @@ Add validation used by both create and update:
  * Rejecting a supplied inventory type rather than discarding it is deliberate:
  * silent stripping is the failure class this redesign removes.
  */
-function assertDomainShape(data: { domain: CategoryDomain; type: string | null }) {
+function assertDomainShape(data: {
+  domain: CategoryDomain;
+  type: string | null;
+}) {
   if (data.domain === "project" && !data.type?.trim()) {
     throw new Error("A project category requires a type");
   }
@@ -480,10 +487,12 @@ silently stripped."
 ### Task 3: Inventory items take many categories
 
 **Files:**
+
 - Modify: `src/server/_internal/categories.ts` (add `setInventoryItemCategoriesAs`), `src/server/_internal/inventory.ts`, `src/server/inventory.ts`
 - Test: `src/server/__tests__/inventory.integration.test.ts`, `src/server/__tests__/admin-inventory.integration.test.ts`
 
 **Interfaces:**
+
 - Consumes: `inventoryItemCategories` from Task 1, `listCategoriesImpl` from Task 2.
 - Produces: item rows carrying `categories: { id, name }[]`; `createInventoryItemAs`/`updateInventoryItemAs` taking `categoryIds: string[]`. Tasks 5-7 consume these.
 
@@ -666,9 +675,7 @@ In `src/server/inventory.ts`, replace `categoryId` in `itemPayloadSchema` with:
 Replace the single-category join with an aggregate so each row carries an array. Use a correlated subquery rather than a join, which would multiply item rows:
 
 ```ts
-const categoriesForItem = sql<
-  { id: string; name: string }[]
->`coalesce((
+const categoriesForItem = sql<{ id: string; name: string }[]>`coalesce((
   SELECT json_agg(json_build_object('id', c.id, 'name', c.name) ORDER BY c.name)
   FROM inventory_item_categories iic
   JOIN categories c ON c.id = iic.category_id
@@ -728,9 +735,11 @@ The edit log records category names, not UUIDs."
 ### Task 4: Project and Inventory tabs on /admin/categories
 
 **Files:**
+
 - Modify: `src/routes/_authed/admin/categories/index.tsx`, `src/routes/_authed/admin/categories/$categoryId.tsx`
 
 **Interfaces:**
+
 - Consumes: `listCategoriesImpl({ domain })` and the discriminated `CategoryInput` from Task 2.
 - Produces: nothing.
 
@@ -769,6 +778,7 @@ Follow the tab markup in `src/routes/_authed/my/items.tsx:49-77`: a row of butto
 Define `PROJECT_COLUMNS` (Name, Type, Created, Actions) and `INVENTORY_COLUMNS` (Name, Created, Actions) as module constants, and pick between them on `tab`. The inventory set has **no Type column**.
 
 Give each tab its own create dialog:
+
 - Project: Name plus the existing `CategoryTypeCombobox`, submitting `{ domain: "project", name, type }`.
 - Inventory: Name only, submitting `{ domain: "inventory", name, type: null }`. Its description should say what it makes, for example "Add a category for inventory items."
 
@@ -808,10 +818,12 @@ is never a selectable value."
 ### Task 5: A creatable, domain-aware multi-select
 
 **Files:**
+
 - Modify: `src/components/category-multi-select.tsx`, `src/components/category-chip.tsx`
 - Test: `src/test/category-multi-select.test.tsx` (create)
 
 **Interfaces:**
+
 - Consumes: `listCategories({ data: { domain } })` and `createCategory` from Task 2.
 - Produces: `<CategoryMultiSelect domain={"project"|"inventory"} value={string[]} onChange={(ids) => void} />`. Tasks 6 and 7 use it.
 
@@ -878,9 +890,11 @@ that domain renders one flat list instead of grouped fieldsets."
 ### Task 6: The inventory item form and item displays
 
 **Files:**
+
 - Modify: `src/components/inventory-form.tsx`, `src/routes/_authed/inventory/new.tsx`, `src/routes/_authed/inventory/$itemId/edit.tsx`, `src/components/inventory-card.tsx`, `src/components/inventory-row.tsx`, `src/routes/inventory/$itemId.tsx`, `src/routes/_authed/admin/inventory/index.tsx`
 
 **Interfaces:**
+
 - Consumes: `CategoryMultiSelect` from Task 5; item rows carrying `categories` from Task 3.
 - Produces: nothing.
 
@@ -931,9 +945,11 @@ The item form no longer dead-ends when no categories exist."
 ### Task 7: The public filter, the accessibility sweep, and the docs
 
 **Files:**
+
 - Modify: `src/components/inventory-filter-bar.tsx`, `src/routes/inventory/index.tsx`, `README.md`, `docs/QUIRKS.md`
 
 **Interfaces:**
+
 - Consumes: the `categories: string[]` list param from Task 3.
 - Produces: nothing.
 

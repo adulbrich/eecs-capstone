@@ -37,10 +37,13 @@ Start's compiler strips a handler from the client bundle only when `createServer
 // Stripped on the client.
 export const submitProject = createServerFn({ method: "POST" })
   .validator((d: unknown) => schema.parse(d))
-  .handler(async ({ data }) => { /* server work */ });
+  .handler(async ({ data }) => {
+    /* server work */
+  });
 
 // Ships to the browser, server imports and all.
-const make = (s: Status) => createServerFn({ method: "POST" }).handler(/* ... */);
+const make = (s: Status) =>
+  createServerFn({ method: "POST" }).handler(/* ... */);
 ```
 
 ### Server-only modules must not match `**/*.server.*`
@@ -91,7 +94,9 @@ A pathless child of `_authed` resolves to `/` and collides with `src/routes/_pub
 
 ```ts
 export const Route = createFileRoute("/projects/")({
-  validateSearch: z.object({ page: z.number().int().min(1).catch(1).default(1) }),
+  validateSearch: z.object({
+    page: z.number().int().min(1).catch(1).default(1),
+  }),
   loaderDeps: ({ search }) => ({ page: search.page }),
   loader: ({ deps }) => listPublishedProjects({ data: { page: deps.page } }),
 });
@@ -292,9 +297,10 @@ Cascade rules live in the schema files, never in application code, and `account.
 In a `.select({...})` with no joins, Drizzle strips the table from every column interpolated at the top level of a `sql` template, so a hand-written correlated subquery compares two columns of its own table: an error when their types differ, a silently wrong answer when they match. `db.$count(table, where)` survives, because the strip does not descend into its nested `eq()`.
 
 ```ts
-const aiCallCount = sql<number>`${db.$count(aiReviewUsage, eq(aiReviewUsage.userId, user.id))}`
-  .mapWith(Number)
-  .as("aiCallCount");
+const aiCallCount =
+  sql<number>`${db.$count(aiReviewUsage, eq(aiReviewUsage.userId, user.id))}`
+    .mapWith(Number)
+    .as("aiCallCount");
 ```
 
 `.as` lets a sort read the alias instead of evaluating the subquery twice, and `.mapWith` restores the number node-postgres returns as a string. A projection that must work with and without a join uses `sql.raw('"projects"."id"')`, as `project-summary.ts` does.
@@ -365,7 +371,11 @@ The shared arbitrary and `isWellFormed` are in `src/test/shared/arbitraries.ts`;
 React's `act` returns a thenable that pops its scope once per `then`, and `waitNext` attaches two, so passing `act` itself logs "overlapping act() calls" on every release. Wrap it:
 
 ```ts
-fc.scheduler({ act: async (f) => { await act(f); } })
+fc.scheduler({
+  act: async (f) => {
+    await act(f);
+  },
+});
 ```
 
 A scheduled function that refuses attaches `.catch(() => undefined)` to its `Promise.reject(...)` before returning it. The scheduler observes the rejection only when it releases the call, and Node reports it unhandled first, which Vitest prints as an error under a green run. After a release, flush with a macrotask inside `act`, not a count of microtask turns; a component on TanStack Query needs two, since Query notifies observers on a timer of its own. `src/test/bookmark-button.test.tsx` has the pattern (#846).
@@ -438,7 +448,7 @@ A Columns menu tall enough to scroll fails axe's `scrollable-region-focusable` u
 
 `toBeVisible` passes at the first frame of a Radix enter animation, and axe can then measure contrast at partial opacity. Call `waitForSurfaceSettled` from `src/test/shared/playwright.ts` before scanning an open dialog, sheet or menu.
 
-### A Select item's `aria-selected` is selected *and* focused
+### A Select item's `aria-selected` is selected _and_ focused
 
 Radix sets it to `isSelected && isFocused`, and a stray pointer moves focus, so it flips while the value stays put. Read the trigger's text, or `data-state="checked"`. An open Select is modal and hides the rest of the page from role queries, so a helper that opens one closes it.
 
@@ -566,23 +576,23 @@ Radix fires `onOpenChange` only for closes it initiates (Escape, the overlay, `D
 
 ### Path-by-path convention summary
 
-| Path | What goes there |
-| --- | --- |
-| `src/lib/*.ts` | Pure, client-safe modules. |
-| `src/lib/_internal/*.ts` | Server-only helpers. |
-| `src/lib/placement/` | Placement (ADR-0056), browser and Node only; `plugins/` holds the source converters (ADR-0059). |
-| `src/nitro/*.ts` | Nitro plugins named in `vite.config.ts`; the only code that runs at boot. |
-| `src/server/*.ts` | `createServerFn` wrappers: Zod schema plus dynamic-import handler. Client-importable. |
-| `src/server/_internal/*.ts` | Impl, `*As(viewer, ...)` and `*ForCurrentUser(...)`. Server-only. |
-| `src/server/__tests__/` | Integration suites (`*.integration.test.ts`) and the structural unit tests (`seam-convention`, `access-contract`). |
-| `src/components/` | Components on shadcn/ui and Radix (`ui/`). |
-| `src/routes/` | File routes. `_authed` holds every signed-in page, `_public` the pages the traffic writer records. `routeTree.gen.ts` is generated. |
-| `src/db/` | `schema.ts` is hand-written; `auth-schema.ts` is generated by the Better Auth CLI. |
-| `drizzle/*.sql` | Generated migrations; tsvector and FK-rule changes are hand-authored. |
-| `scripts/` | Operational scripts, not Biome-checked, and seven checks tested from `src/test/`: `check-prose`, `check-commit-message`, `check-compression`, `check-asset-manifest`, `check-pr-screenshots`, `check-workspace`, `check-doc-size`. |
-| `.claude/` | Hooks (tested from `src/test/claude-hooks.test.ts`) and the repo-local review skills. |
-| `docs/agents/` | What the mattpocock skills read about this repo. |
-| `docs/superpowers/` | The specs and plans of features built before 2026-10, kept for reference. The issue is the spec for all new work. |
+| Path                        | What goes there                                                                                                                                                                                                                    |
+| --------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `src/lib/*.ts`              | Pure, client-safe modules.                                                                                                                                                                                                         |
+| `src/lib/_internal/*.ts`    | Server-only helpers.                                                                                                                                                                                                               |
+| `src/lib/placement/`        | Placement (ADR-0056), browser and Node only; `plugins/` holds the source converters (ADR-0059).                                                                                                                                    |
+| `src/nitro/*.ts`            | Nitro plugins named in `vite.config.ts`; the only code that runs at boot.                                                                                                                                                          |
+| `src/server/*.ts`           | `createServerFn` wrappers: Zod schema plus dynamic-import handler. Client-importable.                                                                                                                                              |
+| `src/server/_internal/*.ts` | Impl, `*As(viewer, ...)` and `*ForCurrentUser(...)`. Server-only.                                                                                                                                                                  |
+| `src/server/__tests__/`     | Integration suites (`*.integration.test.ts`) and the structural unit tests (`seam-convention`, `access-contract`).                                                                                                                 |
+| `src/components/`           | Components on shadcn/ui and Radix (`ui/`).                                                                                                                                                                                         |
+| `src/routes/`               | File routes. `_authed` holds every signed-in page, `_public` the pages the traffic writer records. `routeTree.gen.ts` is generated.                                                                                                |
+| `src/db/`                   | `schema.ts` is hand-written; `auth-schema.ts` is generated by the Better Auth CLI.                                                                                                                                                 |
+| `drizzle/*.sql`             | Generated migrations; tsvector and FK-rule changes are hand-authored.                                                                                                                                                              |
+| `scripts/`                  | Operational scripts, not Biome-checked, and seven checks tested from `src/test/`: `check-prose`, `check-commit-message`, `check-compression`, `check-asset-manifest`, `check-pr-screenshots`, `check-workspace`, `check-doc-size`. |
+| `.claude/`                  | Hooks (tested from `src/test/claude-hooks.test.ts`) and the repo-local review skills.                                                                                                                                              |
+| `docs/agents/`              | What the mattpocock skills read about this repo.                                                                                                                                                                                   |
+| `docs/superpowers/`         | The specs and plans of features built before 2026-10, kept for reference. The issue is the spec for all new work.                                                                                                                  |
 
 ### `/privacy` is a promise the deletion flow makes, so the two move together
 
@@ -626,7 +636,9 @@ A write may set `image_url` only to empty or to one filename directly under the 
 ```ts
 export const uploadProjectImage = createServerFn({ method: "POST" })
   .validator((data: unknown) => expectFormData(data))
-  .handler(async ({ data }) => { /* data is FormData */ });
+  .handler(async ({ data }) => {
+    /* data is FormData */
+  });
 ```
 
 ### RustFS local bucket bootstrap

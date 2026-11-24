@@ -25,10 +25,10 @@ comments explaining why the last two sit outside the transaction.
 
 Only the gates differ:
 
-| | `performTransitionAs` `:227-232` | `forceTransitionAs` `:372-378` |
-| --- | --- | --- |
-| Order | load, then authorize | authorize, then load |
-| Who may act | staff, or the proposer | staff only |
+|              | `performTransitionAs` `:227-232`          | `forceTransitionAs` `:372-378`       |
+| ------------ | ----------------------------------------- | ------------------------------------ |
+| Order        | load, then authorize                      | authorize, then load                 |
+| Who may act  | staff, or the proposer                    | staff only                           |
 | Which target | `assertTransitionAllowed(from, to, role)` | any, except the one it is already in |
 
 That ordering difference is observable and is preserved deliberately. A

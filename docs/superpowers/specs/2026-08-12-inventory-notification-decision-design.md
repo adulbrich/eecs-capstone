@@ -146,17 +146,17 @@ already, which is what the `*As` convention exists for.
 
 Nine states, using the three student accounts the seed already has:
 
-| Case | Who | State |
-| --- | --- | --- |
-| Overdue checkout | `user@example.com` | `checked_out`, due 9 days ago |
-| Overdue pickup | `user@example.com` | `reserved`, pickup 3 days ago |
-| Healthy hold | Jordan | `checked_out`, due in 10 days, no badge |
-| Pending request | Sam | line `pending`, sitting in the staff queue |
-| Approved request | Sam | line `approved`, item `reserved`, future pickup |
+| Case                        | Who                           | State                                           |
+| --------------------------- | ----------------------------- | ----------------------------------------------- |
+| Overdue checkout            | `user@example.com`            | `checked_out`, due 9 days ago                   |
+| Overdue pickup              | `user@example.com`            | `reserved`, pickup 3 days ago                   |
+| Healthy hold                | Jordan                        | `checked_out`, due in 10 days, no badge         |
+| Pending request             | Sam                           | line `pending`, sitting in the staff queue      |
+| Approved request            | Sam                           | line `approved`, item `reserved`, future pickup |
 | Requester is not the holder | Sam requests, Jordan collects | both see it, one as a request and one as a hold |
-| History: returned | `user@example.com` | closed line |
-| History: rejected | Sam | closed with a denial comment |
-| History: cancelled | Jordan | self-cancelled |
+| History: returned           | `user@example.com`            | closed line                                     |
+| History: rejected           | Sam                           | closed with a denial comment                    |
+| History: cancelled          | Jordan                        | self-cancelled                                  |
 
 **Dates are relative to seed time.** Overdue is derived against `Date.now()`, so
 fixed calendar dates would drift into being four hundred days overdue, which

@@ -21,15 +21,15 @@
 
 ## File Structure
 
-| File | Responsibility |
-| --- | --- |
-| `src/components/field-errors.tsx` | new; the coercer, one place |
-| `src/test/field-errors.test.tsx` | new; both error shapes |
-| `src/components/inventory-form.tsx` | schema loses defaults, validator becomes the schema, two render props gain errors |
-| `src/components/project-form.tsx` | same, four render props gain errors |
-| `src/test/inventory-form.test.tsx` | new; invalid submit shows the message |
-| `src/test/project-form-validation.test.tsx` | new; invalid `proposerEmail` shows the message |
-| `docs/QUIRKS.md` | the obsolete adapter entry rewritten |
+| File                                        | Responsibility                                                                    |
+| ------------------------------------------- | --------------------------------------------------------------------------------- |
+| `src/components/field-errors.tsx`           | new; the coercer, one place                                                       |
+| `src/test/field-errors.test.tsx`            | new; both error shapes                                                            |
+| `src/components/inventory-form.tsx`         | schema loses defaults, validator becomes the schema, two render props gain errors |
+| `src/components/project-form.tsx`           | same, four render props gain errors                                               |
+| `src/test/inventory-form.test.tsx`          | new; invalid submit shows the message                                             |
+| `src/test/project-form-validation.test.tsx` | new; invalid `proposerEmail` shows the message                                    |
+| `docs/QUIRKS.md`                            | the obsolete adapter entry rewritten                                              |
 
 ---
 
@@ -49,7 +49,9 @@ afterEach(cleanup);
 
 describe("FieldErrors", () => {
   it("renders a string entry", () => {
-    const { getByText } = render(<FieldErrors errors={["Title is required"]} />);
+    const { getByText } = render(
+      <FieldErrors errors={["Title is required"]} />
+    );
     expect(getByText("Title is required")).toBeTruthy();
   });
 
@@ -149,8 +151,14 @@ The spike already proved both halves of this on `inventory-form.tsx`. Redo it pr
 
 ```ts
 const _check: InventoryFormValues = {
-  name: "", description: "", categoryIds: [], serial: "",
-  label: "", location: "", notes: "", imageUrl: "",
+  name: "",
+  description: "",
+  categoryIds: [],
+  serial: "",
+  label: "",
+  location: "",
+  notes: "",
+  imageUrl: "",
 };
 ```
 
@@ -176,27 +184,27 @@ Behaviour change, own commit, own tests.
 - [ ] **Step 1: write the project regression test** at `src/test/project-form-validation.test.tsx`. Model the mocks on `src/test/project-form-ai-review.test.tsx`, which already renders `ProjectForm` and knows what to stub.
 
 ```tsx
-  it("shows the message when the proposer address is not an address", async () => {
-    // The bug this guards: onSubmit fails, canSubmit flips false, the Save
-    // button greys out, and nothing said why, because this field renders
-    // ProposerPicker with no error output of its own.
-    render(<ProjectForm onSubmit={vi.fn()} showProposer viewerIsStaff />);
+it("shows the message when the proposer address is not an address", async () => {
+  // The bug this guards: onSubmit fails, canSubmit flips false, the Save
+  // button greys out, and nothing said why, because this field renders
+  // ProposerPicker with no error output of its own.
+  render(<ProjectForm onSubmit={vi.fn()} showProposer viewerIsStaff />);
 
-    // Absent first, so a message that was always on the page cannot pass this.
-    expect(screen.queryByText(/Must be a valid email/)).toBeNull();
+  // Absent first, so a message that was always on the page cannot pass this.
+  expect(screen.queryByText(/Must be a valid email/)).toBeNull();
 
-    fireEvent.change(screen.getByLabelText(/title/i), {
-      target: { value: "A project" },
-    });
-    fireEvent.change(screen.getByLabelText(/proposer/i), {
-      target: { value: "notanemail" },
-    });
-    fireEvent.click(screen.getByRole("button", { name: /save|create/i }));
-
-    await waitFor(() =>
-      expect(screen.getByText(/Must be a valid email/)).toBeTruthy()
-    );
+  fireEvent.change(screen.getByLabelText(/title/i), {
+    target: { value: "A project" },
   });
+  fireEvent.change(screen.getByLabelText(/proposer/i), {
+    target: { value: "notanemail" },
+  });
+  fireEvent.click(screen.getByRole("button", { name: /save|create/i }));
+
+  await waitFor(() =>
+    expect(screen.getByText(/Must be a valid email/)).toBeTruthy()
+  );
+});
 ```
 
 Adjust the prop names and the label queries to what `ProjectForm` actually takes; the shape above is the intent, not a literal. If `ProposerPicker`'s input has no accessible label, query it the way `proposer-picker.test.tsx` already does rather than adding one here.
@@ -249,10 +257,10 @@ git commit -m "refactor(forms): drop the applyServerErrors cast"
 
 ## Risks
 
-| Risk | Mitigation |
-| --- | --- |
-| Dropping a default changes an inferred type | Phase 2 Step 4 asserts the output type explicitly before moving on |
-| A default was load-bearing for a consumer outside the file | Already checked: neither schema is referenced anywhere else. Re-grep if the diff surprises you |
-| The Phase 3 tests pass vacuously | Every one asserts the message is absent before the click, which is how the spike was validated |
-| The submit test cannot reach the proposer input | Phase 3 Step 1 says to query it the way `proposer-picker.test.tsx` already does rather than changing the component to suit the test |
-| `teamsSupported` errors now render where they never did | That is the point, but check the layout: it is a narrow `w-24` input and a long message may need the wrapper to allow wrapping |
+| Risk                                                       | Mitigation                                                                                                                          |
+| ---------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
+| Dropping a default changes an inferred type                | Phase 2 Step 4 asserts the output type explicitly before moving on                                                                  |
+| A default was load-bearing for a consumer outside the file | Already checked: neither schema is referenced anywhere else. Re-grep if the diff surprises you                                      |
+| The Phase 3 tests pass vacuously                           | Every one asserts the message is absent before the click, which is how the spike was validated                                      |
+| The submit test cannot reach the proposer input            | Phase 3 Step 1 says to query it the way `proposer-picker.test.tsx` already does rather than changing the component to suit the test |
+| `teamsSupported` errors now render where they never did    | That is the point, but check the layout: it is a narrow `w-24` input and a long message may need the wrapper to allow wrapping      |

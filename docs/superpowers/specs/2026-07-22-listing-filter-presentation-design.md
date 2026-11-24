@@ -103,8 +103,10 @@ New `src/components/filter-switch.tsx`, built on the existing
 ```tsx
 <div className="flex h-9 items-center gap-2">
   <Switch checked={checked} id={id} onCheckedChange={onCheckedChange} />
-  <Label className="font-normal" htmlFor={id}>{children}</Label>
-</div>
+  <Label className="font-normal" htmlFor={id}>
+    {children}
+  </Label>
+</div>;
 ```
 
 The `h-9` box is what does the alignment work. Where a switch sits beside a
@@ -159,12 +161,12 @@ Placement, matching the route's existing responsive split:
 
 - Mobile: the program select stacks under the status select in the existing
   `space-y-2` block, with the soft-delete switch below.
-**Amended during implementation: the status tab strip is now a dropdown.**
-Adding the program select pushed the desktop toolbar past its container. The
-row held a seven-item tab strip plus, newly, a 224px select and the
-soft-delete switch: roughly 960px of content in an 832px `max-w-4xl` column.
-It could not fit at any viewport, and `body { overflow-x: hidden }` meant the
-overflow was silently clipped rather than scrollable.
+  **Amended during implementation: the status tab strip is now a dropdown.**
+  Adding the program select pushed the desktop toolbar past its container. The
+  row held a seven-item tab strip plus, newly, a 224px select and the
+  soft-delete switch: roughly 960px of content in an 832px `max-w-4xl` column.
+  It could not fit at any viewport, and `body { overflow-x: hidden }` meant the
+  overflow was silently clipped rather than scrollable.
 
 Converting status to a dropdown fixes the cause rather than the symptom, and
 collapses a structural problem with it. The mobile and desktop blocks had

@@ -8,7 +8,7 @@
 
 **Tech Stack:** TanStack Start + TanStack Router, Nitro (nitro-nightly) on the node-server preset, Vite 8, React 19, Tailwind v4, Vitest + Testing Library, Terraform (CloudFront, ALB, Fargate), Node 24.
 
-**Design spec:** `docs/superpowers/specs/2026-08-01-first-paint-delivery-design.md`. Read it before starting; it explains *why* for most of what follows, including two rejected alternatives you might otherwise re-propose.
+**Design spec:** `docs/superpowers/specs/2026-08-01-first-paint-delivery-design.md`. Read it before starting; it explains _why_ for most of what follows, including two rejected alternatives you might otherwise re-propose.
 
 **Branch:** `perf/first-paint-delivery`, already created, spec already committed there.
 
@@ -32,32 +32,32 @@
 
 **Created**
 
-| File | Responsibility |
-| --- | --- |
-| `scripts/check-compression.mjs` | Build assertion: every `/assets` bundle at or above 1 KB has a `.br` sibling. The only guard against Task 1 silently regressing. |
-| `src/test/institution-logo.test.tsx` | Asserts the logo declares intrinsic dimensions matching the source viewBox ratio. |
-| `src/test/site-header.test.tsx` | **Conditional on Task 5's measurement.** Asserts the header session slot reserves identical width in pending, signed-out, and signed-in states. Not created if nothing moves. |
-| `svgo.config.mjs` | Keeps the logo minification reproducible for a future brand swap, and pins `removeViewBox: false`. |
-| `src/assets/logo-institution.svg` | The minified mark, moved out of `public/` so Vite hashes it. |
+| File                                 | Responsibility                                                                                                                                                                |
+| ------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `scripts/check-compression.mjs`      | Build assertion: every `/assets` bundle at or above 1 KB has a `.br` sibling. The only guard against Task 1 silently regressing.                                              |
+| `src/test/institution-logo.test.tsx` | Asserts the logo declares intrinsic dimensions matching the source viewBox ratio.                                                                                             |
+| `src/test/site-header.test.tsx`      | **Conditional on Task 5's measurement.** Asserts the header session slot reserves identical width in pending, signed-out, and signed-in states. Not created if nothing moves. |
+| `svgo.config.mjs`                    | Keeps the logo minification reproducible for a future brand swap, and pins `removeViewBox: false`.                                                                            |
+| `src/assets/logo-institution.svg`    | The minified mark, moved out of `public/` so Vite hashes it.                                                                                                                  |
 
 **Modified**
 
-| File | Change |
-| --- | --- |
-| `vite.config.ts` | Add `compressPublicAssets: true` to the existing `nitro()` call. |
-| `package.json` | Add the `check:compression` script. |
-| `.github/workflows/ci.yml` | Run the compression check after `npm run build`. |
-| `biome.json` | Re-enable `correctness.useImageSize` for `institution-logo.tsx` only. |
-| `src/components/institution-logo.tsx` | Declare `width`/`height` on both `<img>` elements. |
-| `src/lib/brand.ts` | `logoUrl` becomes a `?url` import instead of a literal path. |
-| `src/components/site-header.tsx` | **Conditional on Task 5's measurement.** Reserve a fixed width on whichever bar actually moves. |
-| `docs/superpowers/specs/2026-08-01-first-paint-delivery-design.md` | Record Task 5's and Task 6's measurements, whichever way they come out. |
-| `infra/cloudfront.tf` | Add the `/assets/*` `ordered_cache_behavior`. |
+| File                                                               | Change                                                                                          |
+| ------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------- |
+| `vite.config.ts`                                                   | Add `compressPublicAssets: true` to the existing `nitro()` call.                                |
+| `package.json`                                                     | Add the `check:compression` script.                                                             |
+| `.github/workflows/ci.yml`                                         | Run the compression check after `npm run build`.                                                |
+| `biome.json`                                                       | Re-enable `correctness.useImageSize` for `institution-logo.tsx` only.                           |
+| `src/components/institution-logo.tsx`                              | Declare `width`/`height` on both `<img>` elements.                                              |
+| `src/lib/brand.ts`                                                 | `logoUrl` becomes a `?url` import instead of a literal path.                                    |
+| `src/components/site-header.tsx`                                   | **Conditional on Task 5's measurement.** Reserve a fixed width on whichever bar actually moves. |
+| `docs/superpowers/specs/2026-08-01-first-paint-delivery-design.md` | Record Task 5's and Task 6's measurements, whichever way they come out.                         |
+| `infra/cloudfront.tf`                                              | Add the `/assets/*` `ordered_cache_behavior`.                                                   |
 
 **Deleted**
 
-| File | Reason |
-| --- | --- |
+| File                          | Reason                                                                                                                                                                                                                             |
+| ----------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `public/logo-institution.svg` | Moved to `src/assets/` in Task 4 so it lands in `/assets/` hashed. Nothing else references it; verified that `brand.logoUrl` is its only consumer, with no references from email templates, `public/manifest.json`, or any script. |
 
 **Untouched on purpose:** `src/styles.css` (Feature D ships nothing unless Task 6's measurement demands it), the other ten `<img>` elements in `src/` (see Task 2 Step 5), `public/favicon.ico`, `public/project-placeholder.webp`, `public/manifest.json`, `public/robots.txt` (unhashed, so a one-year edge TTL would be wrong, and small enough not to matter).
@@ -69,10 +69,12 @@
 The compression flag and the check that guards it ship together. The check is written first and must fail on the current build; that failure is the proof that the flag is what fixes it. Nothing downstream depends on this task, but the spec gates the whole design on it: if Step 4 does not pass, stop and read Step 4's fallback note before continuing.
 
 **Files:**
+
 - Create: `scripts/check-compression.mjs`
 - Modify: `vite.config.ts`, `package.json`, `.github/workflows/ci.yml`
 
 **Interfaces:**
+
 - Consumes: nothing.
 - Produces: `npm run check:compression`, a non-zero exit when any `/assets` bundle at or above 1024 bytes lacks a `.br` sibling. Later tasks do not import from this; Task 4 re-runs it after moving the logo.
 
@@ -197,9 +199,9 @@ In `package.json`, add to `"scripts"`, directly after the `"build"` entry:
 In `.github/workflows/ci.yml`, the final step is currently `- run: npm run build`. Add one line after it so the job becomes:
 
 ```yaml
-      - run: npm test
-      - run: npm run build
-      - run: npm run check:compression
+- run: npm test
+- run: npm run build
+- run: npm run check:compression
 ```
 
 - [ ] **Step 7: Verify the repo still passes its own gates**
@@ -232,10 +234,12 @@ scripts/check-compression.mjs fails the build if any bundle at or above Nitro's
 ## Task 2: Declare the logo's intrinsic dimensions
 
 **Files:**
+
 - Create: `src/test/institution-logo.test.tsx`
 - Modify: `src/components/institution-logo.tsx`, `biome.json`
 
 **Interfaces:**
+
 - Consumes: nothing.
 - Produces: an `InstitutionLogo` whose every `<img>` carries `width={101} height={32}`. Task 3 preserves the viewBox this depends on; Task 4 changes the `src` and must not break this test, which is why the test deliberately asserts nothing about `src`.
 
@@ -298,28 +302,28 @@ Expected: FAIL. Both cases fail, the first with `expected null to be "101"`.
 In `src/components/institution-logo.tsx`, the first `<img>` (line 15) becomes:
 
 ```tsx
-      <img
-        alt={brand.logoAlt}
-        className={[
-          "h-8 w-auto",
-          hasLightVariant ? "dark:hidden" : "dark:brightness-0 dark:invert",
-        ].join(" ")}
-        height={32}
-        src={brand.logoUrl}
-        width={101}
-      />
+<img
+  alt={brand.logoAlt}
+  className={[
+    "h-8 w-auto",
+    hasLightVariant ? "dark:hidden" : "dark:brightness-0 dark:invert",
+  ].join(" ")}
+  height={32}
+  src={brand.logoUrl}
+  width={101}
+/>;
 ```
 
 And the light variant (line 24) becomes:
 
 ```tsx
-        <img
-          alt={brand.logoAlt}
-          className="hidden h-8 w-auto dark:block"
-          height={32}
-          src={brand.logoUrlLight}
-          width={101}
-        />
+<img
+  alt={brand.logoAlt}
+  className="hidden h-8 w-auto dark:block"
+  height={32}
+  src={brand.logoUrlLight}
+  width={101}
+/>;
 ```
 
 Then update the component's header comment, adding this paragraph below the existing "Logo color strategy" block:
@@ -355,16 +359,16 @@ Expected: PASS, 2 tests.
 There are eleven `<img>` elements in `src/`, and re-enabling the rule globally would mean sizing all of them, which is outside this spec's scope. Instead scope it to the file this spec owns. Leave the global `"off"` in place and add an override to the `overrides` array in `biome.json`:
 
 ```json
-    {
-      "includes": ["**/src/components/institution-logo.tsx"],
-      "linter": {
-        "rules": {
-          "correctness": {
-            "useImageSize": "on"
-          }
-        }
+{
+  "includes": ["**/src/components/institution-logo.tsx"],
+  "linter": {
+    "rules": {
+      "correctness": {
+        "useImageSize": "on"
       }
     }
+  }
+}
 ```
 
 The other ten `<img>` elements stay unsized and stay out of scope. Note that as a follow-up in the commit body, not as work.
@@ -398,10 +402,12 @@ remain unsized and are a separate follow-up."
 ## Task 3: Minify the logo
 
 **Files:**
+
 - Create: `svgo.config.mjs`
 - Modify: `public/logo-institution.svg`
 
 **Interfaces:**
+
 - Consumes: Task 2's test, which must still pass afterwards.
 - Produces: the same mark at 29,320 bytes (down from 35,440, a 17 percent reduction) with its `viewBox` intact. That is well short of the roughly 3 KB to 5 KB originally expected: about 78 percent of the file is genuine path geometry from Inkscape rather than metadata, so there was much less to strip than assumed. Task 4 moves the resulting file.
 
@@ -503,11 +509,13 @@ width/height. The viewBox is what institution-logo.tsx derives 101x32 from."
 ## Task 4: Move the logo into the hashed asset pipeline
 
 **Files:**
+
 - Create: `src/assets/logo-institution.svg` (moved, via `git mv`)
 - Modify: `src/lib/brand.ts`
 - Delete: `public/logo-institution.svg`
 
 **Interfaces:**
+
 - Consumes: Task 3's minified file; Task 1's `check:compression`.
 - Produces: `brand.logoUrl` as a Vite-emitted hashed URL string rather than the literal `"/logo-institution.svg"`. The `Brand` interface is unchanged, since it already declares `logoUrl: string`.
 
@@ -543,9 +551,9 @@ to:
 Then update the comment above `colorPrimary` region if needed, and add this note directly above `logoUrl`:
 
 ```ts
-  // Imported rather than referenced by path so Vite hashes it into /assets/,
-  // where the CloudFront behavior added in infra/cloudfront.tf caches it.
-  // Files left in public/ are copied verbatim and ship with no cache-control.
+// Imported rather than referenced by path so Vite hashes it into /assets/,
+// where the CloudFront behavior added in infra/cloudfront.tf caches it.
+// Files left in public/ are copied verbatim and ship with no cache-control.
 ```
 
 `#/*` maps to `./src/*` in both `tsconfig.json` and Vite (`resolve: { tsconfigPaths: true }`), and `vite/client` is already in `tsconfig.json`'s `types`, which declares `*?url`. This combination was verified to typecheck before this plan was written.
@@ -628,11 +636,13 @@ contribution is approximately zero, and the correct outcome is to change no
 code and fix the spec. Build the reservation only if the measurement disagrees.
 
 **Files:**
+
 - Modify: `docs/superpowers/specs/2026-08-01-first-paint-delivery-design.md` (always)
 - Create: `src/test/site-header.test.tsx` (**only if** Step 2 shows real movement)
 - Modify: `src/components/site-header.tsx` (**only if** Step 2 shows real movement)
 
 **Interfaces:**
+
 - Consumes: nothing from earlier tasks.
 - Produces: either a spec correction, or a desktop session container carrying `data-testid="header-session-slot"` and a stable `min-w-*` class in every session state.
 
@@ -858,9 +868,11 @@ needs a human with Chrome. The same applies to Task 5, which needs a throttled
 browser to observe the swap at all.
 
 **Files:**
+
 - Modify: `src/styles.css`, **only if** Step 2's threshold is exceeded.
 
 **Interfaces:**
+
 - Consumes: Tasks 1 through 4 must be complete, or the measurement is contaminated by the delivery problem this whole plan fixes.
 
 - [ ] **Step 1: Build and serve production**
@@ -917,9 +929,11 @@ If a layer was trimmed, commit `src/styles.css` alongside and say which layer an
 ## Task 7: Add the CloudFront `/assets/*` cache behavior
 
 **Files:**
+
 - Modify: `infra/cloudfront.tf`
 
 **Interfaces:**
+
 - Consumes: Task 1 must be deployed first, or the edge caches uncompressed objects for up to 24 hours. This is the origin-first ordering the spec's Feature A argues for; it is not optional sequencing.
 
 `terraform apply` is a human action outside this plan. This task produces a reviewed, validated change and stops.

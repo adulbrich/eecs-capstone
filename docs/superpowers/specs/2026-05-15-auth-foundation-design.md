@@ -37,30 +37,30 @@ Spec 2 will build project management features on top of this foundation.
 
 ### 4.1 Server modules
 
-| Path | Responsibility |
-| --- | --- |
-| `src/lib/auth.ts` | Better Auth instance. Wires the Drizzle adapter, the `tanstackStartCookies()` plugin, the `admin({ defaultRole: 'user' })` plugin, the `additionalFields` (`role`, `affiliation`, `linkedin`), and binds `sendVerificationEmail` / `sendResetPassword` to the email sender. |
-| `src/lib/auth-guards.ts` | `requireUser(request)` and `requireRole(request, roles[])` helpers. Used by both `beforeLoad` and every server function (defense in depth). |
-| `src/lib/email/sender.ts` | `EmailSender` interface (`sendVerification`, `sendPasswordReset`) and the factory that picks an implementation based on `EMAIL_TRANSPORT`. |
-| `src/lib/email/console-sender.ts` | v1 implementation. Writes a human-readable block to stderr with the recipient, subject, and link. |
-| `src/db/schema.ts` | Combined Drizzle schema. Better Auth's generated tables live here next to the app's tables. |
-| `src/db/index.ts` | Existing `drizzle(DATABASE_URL)` shortcut. The same `db` is passed to Better Auth's adapter (no second pool). |
-| `src/routes/api/auth/$.ts` | Existing catch-all. Forwards GET/POST to `auth.handler`. No change. |
-| `scripts/seed-admin.ts` | Idempotent script that ensures a user with email `SEED_ADMIN_EMAIL` exists with `role='admin'` (creates via Better Auth's server API if missing). |
+| Path                              | Responsibility                                                                                                                                                                                                                                                              |
+| --------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `src/lib/auth.ts`                 | Better Auth instance. Wires the Drizzle adapter, the `tanstackStartCookies()` plugin, the `admin({ defaultRole: 'user' })` plugin, the `additionalFields` (`role`, `affiliation`, `linkedin`), and binds `sendVerificationEmail` / `sendResetPassword` to the email sender. |
+| `src/lib/auth-guards.ts`          | `requireUser(request)` and `requireRole(request, roles[])` helpers. Used by both `beforeLoad` and every server function (defense in depth).                                                                                                                                 |
+| `src/lib/email/sender.ts`         | `EmailSender` interface (`sendVerification`, `sendPasswordReset`) and the factory that picks an implementation based on `EMAIL_TRANSPORT`.                                                                                                                                  |
+| `src/lib/email/console-sender.ts` | v1 implementation. Writes a human-readable block to stderr with the recipient, subject, and link.                                                                                                                                                                           |
+| `src/db/schema.ts`                | Combined Drizzle schema. Better Auth's generated tables live here next to the app's tables.                                                                                                                                                                                 |
+| `src/db/index.ts`                 | Existing `drizzle(DATABASE_URL)` shortcut. The same `db` is passed to Better Auth's adapter (no second pool).                                                                                                                                                               |
+| `src/routes/api/auth/$.ts`        | Existing catch-all. Forwards GET/POST to `auth.handler`. No change.                                                                                                                                                                                                         |
+| `scripts/seed-admin.ts`           | Idempotent script that ensures a user with email `SEED_ADMIN_EMAIL` exists with `role='admin'` (creates via Better Auth's server API if missing).                                                                                                                           |
 
 ### 4.2 Client modules
 
-| Path | Responsibility |
-| --- | --- |
-| `src/lib/auth-client.ts` | Adds the `adminClient()` plugin so role and ban APIs are accessible from the React side mirror of the server. |
-| `src/routes/(auth)/sign-in.tsx` | Email + password form; "Continue with GitHub" button. |
-| `src/routes/(auth)/sign-up.tsx` | Name, email, password. On submit, shows a "check your email" message. |
-| `src/routes/(auth)/forgot-password.tsx` | Email input; always shows a generic confirmation (no enumeration). |
-| `src/routes/(auth)/reset-password.tsx` | New-password form gated by token from URL. |
-| `src/routes/(auth)/verify-email.tsx` | Reads token from URL, calls Better Auth, then redirects to `/`. |
-| `src/routes/_authed/_layout.tsx` | `beforeLoad` calls `requireUser`. On miss, throws `redirect({ to: '/sign-in', search: { redirect: location.pathname } })`. |
-| `src/routes/_authed/_admin/_layout.tsx` | Nested layout. `beforeLoad` calls `requireRole(['admin','instructor'])`. |
-| `src/routes/_authed/profile.tsx` | Edit name, affiliation, linkedin; change password; sign out. |
+| Path                                    | Responsibility                                                                                                             |
+| --------------------------------------- | -------------------------------------------------------------------------------------------------------------------------- |
+| `src/lib/auth-client.ts`                | Adds the `adminClient()` plugin so role and ban APIs are accessible from the React side mirror of the server.              |
+| `src/routes/(auth)/sign-in.tsx`         | Email + password form; "Continue with GitHub" button.                                                                      |
+| `src/routes/(auth)/sign-up.tsx`         | Name, email, password. On submit, shows a "check your email" message.                                                      |
+| `src/routes/(auth)/forgot-password.tsx` | Email input; always shows a generic confirmation (no enumeration).                                                         |
+| `src/routes/(auth)/reset-password.tsx`  | New-password form gated by token from URL.                                                                                 |
+| `src/routes/(auth)/verify-email.tsx`    | Reads token from URL, calls Better Auth, then redirects to `/`.                                                            |
+| `src/routes/_authed/_layout.tsx`        | `beforeLoad` calls `requireUser`. On miss, throws `redirect({ to: '/sign-in', search: { redirect: location.pathname } })`. |
+| `src/routes/_authed/_admin/_layout.tsx` | Nested layout. `beforeLoad` calls `requireRole(['admin','instructor'])`.                                                   |
+| `src/routes/_authed/profile.tsx`        | Edit name, affiliation, linkedin; change password; sign out.                                                               |
 
 ### 4.3 Why these boundaries
 
@@ -238,8 +238,9 @@ This pass cleans up only tables touched by the user repointing. Project-internal
 The role string lives on `user.role` (admin plugin). Comparisons in code use a tiny helper:
 
 ```ts
-export const isAdmin = (u: User) => u.role === 'admin'
-export const isStaff = (u: User) => u.role === 'admin' || u.role === 'instructor'
+export const isAdmin = (u: User) => u.role === "admin";
+export const isStaff = (u: User) =>
+  u.role === "admin" || u.role === "instructor";
 ```
 
 ### 7.2 Guards
@@ -248,23 +249,23 @@ export const isStaff = (u: User) => u.role === 'admin' || u.role === 'instructor
 
 ```ts
 // _authed/_layout.tsx
-export const Route = createFileRoute('/_authed')({
+export const Route = createFileRoute("/_authed")({
   beforeLoad: async ({ location }) => {
-    const user = await requireUser()
-    return { user }
+    const user = await requireUser();
+    return { user };
   },
-})
+});
 ```
 
 **Server function layer** (every mutating server function):
 
 ```ts
-const updateProfile = createServerFn({ method: 'POST' })
+const updateProfile = createServerFn({ method: "POST" })
   .validator(profileSchema)
   .handler(async ({ data, signal }) => {
-    const user = await requireUser()
+    const user = await requireUser();
     // ... update
-  })
+  });
 ```
 
 This duplication is intentional. Server functions are reachable directly via fetch and must not assume a route guard ran.
@@ -317,12 +318,12 @@ Run after every fresh deploy: `tsx scripts/seed-admin.ts`.
 
 ## 10. Testing
 
-| Layer | What we cover | Tooling |
-| --- | --- | --- |
-| Unit | `requireUser` and `requireRole`: returns user on valid session, throws on missing/wrong role. | Vitest + mocked `auth.api.getSession`. |
+| Layer       | What we cover                                                                                                        | Tooling                                                                         |
+| ----------- | -------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------- |
+| Unit        | `requireUser` and `requireRole`: returns user on valid session, throws on missing/wrong role.                        | Vitest + mocked `auth.api.getSession`.                                          |
 | Integration | Sign up -> verify (intercept console output to get token) -> sign in -> update profile -> sign out -> sign in again. | Vitest against the live docker-compose Postgres + the real Better Auth handler. |
-| Integration | Admin role gate: a `user`-role session is rejected by `requireRole(['admin'])`. | Same harness. |
-| Smoke | `npm run check` (Biome lint + format) passes. | CI. |
+| Integration | Admin role gate: a `user`-role session is rejected by `requireRole(['admin'])`.                                      | Same harness.                                                                   |
+| Smoke       | `npm run check` (Biome lint + format) passes.                                                                        | CI.                                                                             |
 
 The integration suite resets the DB between runs via a `TRUNCATE` helper. No production data; trivially safe.
 

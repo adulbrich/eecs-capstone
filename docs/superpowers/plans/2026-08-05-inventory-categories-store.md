@@ -24,32 +24,34 @@ Spec: [`docs/superpowers/specs/2026-08-05-admin-export-inventory-categories-hold
 
 ## File Structure
 
-| File | Responsibility |
-| --- | --- |
-| `src/lib/category-types.ts` (create) | `INVENTORY_CATEGORY_TYPE` constant. Pure, no imports. |
-| `drizzle/XXXX_*.sql` (create) | The migration. Hand-written, not generated. |
-| `src/db/schema.ts` (modify) | `categoryId` replaces `category`; new `searchVector` expression; index list. |
-| `src/server/_internal/categories.ts` (modify) | `excludeTypes` support in `listCategoriesImpl`. |
-| `src/server/categories.ts` (modify) | `excludeTypes` in the list schema. |
-| `src/components/category-multi-select.tsx` (modify) | Exclude inventory categories. |
-| `src/components/projects-filter-bar.tsx` (modify) | Exclude inventory categories. |
-| `src/routes/_authed/admin/categories/index.tsx` (modify) | Offer `inventory` in the type combobox union. |
-| `src/components/inventory-form.tsx` (modify) | Category text input becomes a Select. |
-| `src/routes/_authed/inventory/new.tsx`, `.../$itemId/edit.tsx` (modify) | Load and pass the category list. |
-| `src/server/_internal/inventory.ts` (modify) | Join for the category name; rewrite `listInventoryCategoriesImpl`. |
-| `src/routes/inventory/index.tsx`, `src/components/inventory-filter-bar.tsx` (modify) | `?category=` carries a UUID. |
-| `scripts/seed-dev.ts` (modify) | Seed inventory categories. |
+| File                                                                                 | Responsibility                                                               |
+| ------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------- |
+| `src/lib/category-types.ts` (create)                                                 | `INVENTORY_CATEGORY_TYPE` constant. Pure, no imports.                        |
+| `drizzle/XXXX_*.sql` (create)                                                        | The migration. Hand-written, not generated.                                  |
+| `src/db/schema.ts` (modify)                                                          | `categoryId` replaces `category`; new `searchVector` expression; index list. |
+| `src/server/_internal/categories.ts` (modify)                                        | `excludeTypes` support in `listCategoriesImpl`.                              |
+| `src/server/categories.ts` (modify)                                                  | `excludeTypes` in the list schema.                                           |
+| `src/components/category-multi-select.tsx` (modify)                                  | Exclude inventory categories.                                                |
+| `src/components/projects-filter-bar.tsx` (modify)                                    | Exclude inventory categories.                                                |
+| `src/routes/_authed/admin/categories/index.tsx` (modify)                             | Offer `inventory` in the type combobox union.                                |
+| `src/components/inventory-form.tsx` (modify)                                         | Category text input becomes a Select.                                        |
+| `src/routes/_authed/inventory/new.tsx`, `.../$itemId/edit.tsx` (modify)              | Load and pass the category list.                                             |
+| `src/server/_internal/inventory.ts` (modify)                                         | Join for the category name; rewrite `listInventoryCategoriesImpl`.           |
+| `src/routes/inventory/index.tsx`, `src/components/inventory-filter-bar.tsx` (modify) | `?category=` carries a UUID.                                                 |
+| `scripts/seed-dev.ts` (modify)                                                       | Seed inventory categories.                                                   |
 
 ---
 
 ### Task 1: The constant and the migration
 
 **Files:**
+
 - Create: `src/lib/category-types.ts`
 - Create: `drizzle/XXXX_inventory_category_fk.sql`
 - Modify: `src/db/schema.ts:309-356`
 
 **Interfaces:**
+
 - Consumes: nothing.
 - Produces: `INVENTORY_CATEGORY_TYPE` (the literal `"inventory"`), and `inventoryItems.categoryId` on the Drizzle schema. Every later task depends on both.
 
@@ -184,6 +186,7 @@ Typecheck fails after this commit until the consumers are updated."
 ### Task 2: Keep inventory categories out of the project pickers
 
 **Files:**
+
 - Modify: `src/server/_internal/categories.ts:27-39`
 - Modify: `src/server/categories.ts` (the `listSchema`, near line 19)
 - Modify: `src/components/category-multi-select.tsx:23`
@@ -192,6 +195,7 @@ Typecheck fails after this commit until the consumers are updated."
 - Test: `src/server/__tests__/categories.integration.test.ts` (extend)
 
 **Interfaces:**
+
 - Consumes: `INVENTORY_CATEGORY_TYPE` from Task 1.
 - Produces: `listCategoriesImpl({ type?, excludeTypes? })`. Task 3 calls it with `{ type: INVENTORY_CATEGORY_TYPE }`.
 
@@ -275,9 +279,9 @@ Expected: PASS.
 In `src/components/category-multi-select.tsx`, change the fetch to:
 
 ```tsx
-        const { rows } = await listCategories({
-          data: { excludeTypes: [INVENTORY_CATEGORY_TYPE] },
-        });
+const { rows } = await listCategories({
+  data: { excludeTypes: [INVENTORY_CATEGORY_TYPE] },
+});
 ```
 
 In `src/components/projects-filter-bar.tsx`, change the `listCategories({ data: {} })` call the same way. Import `INVENTORY_CATEGORY_TYPE` from `#/lib/category-types` in both.
@@ -291,12 +295,12 @@ Leave `/admin/categories` calling it unfiltered. That page manages every type, w
 In `src/routes/_authed/admin/categories/index.tsx`, inside the component, replace the bare `types` passed to `CategoryTypeCombobox` with a union:
 
 ```tsx
-  // The inventory type must be offerable even before the first inventory
-  // category exists, since listCategoryTypes only knows types already in use.
-  const offeredTypes = useMemo(
-    () => [...new Set([...types, INVENTORY_CATEGORY_TYPE])].sort(),
-    [types]
-  );
+// The inventory type must be offerable even before the first inventory
+// category exists, since listCategoryTypes only knows types already in use.
+const offeredTypes = useMemo(
+  () => [...new Set([...types, INVENTORY_CATEGORY_TYPE])].sort(),
+  [types]
+);
 ```
 
 Pass `types={offeredTypes}` to the combobox. Import `useMemo` from React and `INVENTORY_CATEGORY_TYPE` from `#/lib/category-types`.
@@ -304,6 +308,7 @@ Pass `types={offeredTypes}` to the combobox. Import `useMemo` from React and `IN
 - [ ] **Step 7: Verify in the running app**
 
 Run: `npm run dev`
+
 - On `/admin/categories`, open New category: the Type combobox offers `inventory` even on a database with none.
 - Create an inventory category, then open `/projects/new`: it must **not** appear in the project category picker.
 - On the public `/projects` listing, it must not appear in the category filter.
@@ -325,11 +330,13 @@ category exists, since listCategoryTypes only knows types already in use."
 ### Task 3: The inventory form picks from the store
 
 **Files:**
+
 - Modify: `src/components/inventory-form.tsx:25,59,88,146`
 - Modify: `src/routes/_authed/inventory/new.tsx`
 - Modify: `src/routes/_authed/inventory/$itemId/edit.tsx:14,65`
 
 **Interfaces:**
+
 - Consumes: `INVENTORY_CATEGORY_TYPE`, `listCategoriesImpl` with a `type` filter.
 - Produces: `InventoryForm` gains a required `categories: { id: string; name: string }[]` prop; `inventoryFormSchema.categoryId` is `string | null`.
 
@@ -361,8 +368,12 @@ The `|| null` coercion is gone on purpose: the value is already `string | null`,
 Add to `interface Props`:
 
 ```ts
-  /** Inventory categories from /admin/categories, for the picker. */
-  categories: { id: string; name: string }[];
+/** Inventory categories from /admin/categories, for the picker. */
+categories: {
+  id: string;
+  name: string;
+}
+[];
 ```
 
 Destructure `categories` in the component signature. Replace the
@@ -371,31 +382,31 @@ bound to the form field, following the file's existing `Field` pattern for
 label and error wiring:
 
 ```tsx
-      <form.Field name="categoryId">
-        {(field) => (
-          <div className="flex flex-col gap-2">
-            <Label htmlFor="item-category">Category</Label>
-            <Select
-              onValueChange={(value) =>
-                field.handleChange(value === NO_CATEGORY ? null : value)
-              }
-              value={field.state.value ?? NO_CATEGORY}
-            >
-              <SelectTrigger className="w-full" id="item-category">
-                <SelectValue placeholder="No category" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value={NO_CATEGORY}>No category</SelectItem>
-                {categories.map((category) => (
-                  <SelectItem key={category.id} value={category.id}>
-                    {category.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-        )}
-      </form.Field>
+<form.Field name="categoryId">
+  {(field) => (
+    <div className="flex flex-col gap-2">
+      <Label htmlFor="item-category">Category</Label>
+      <Select
+        onValueChange={(value) =>
+          field.handleChange(value === NO_CATEGORY ? null : value)
+        }
+        value={field.state.value ?? NO_CATEGORY}
+      >
+        <SelectTrigger className="w-full" id="item-category">
+          <SelectValue placeholder="No category" />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value={NO_CATEGORY}>No category</SelectItem>
+          {categories.map((category) => (
+            <SelectItem key={category.id} value={category.id}>
+              {category.name}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+    </div>
+  )}
+</form.Field>;
 ```
 
 Add above the component:
@@ -432,6 +443,7 @@ In `src/routes/_authed/inventory/$itemId/edit.tsx`, do the same, and change the 
 - [ ] **Step 4: Verify in the running app**
 
 Run: `npm run dev`
+
 - Create an inventory item: the Category field is a dropdown listing the categories created in Task 2, plus "No category".
 - Save, reopen the edit form: the saved category is preselected.
 - Save with "No category": the item persists with a null category.
@@ -452,12 +464,14 @@ Electronic coexist as three categories that nothing could rename together."
 ### Task 4: The public listing filters by category ID
 
 **Files:**
+
 - Modify: `src/server/_internal/inventory.ts` (`stripForPublic` near line 73, `fullForStaff` near line 90, the listing joins, and `listInventoryCategoriesImpl` near line 330)
 - Modify: `src/server/inventory.ts` (the `category` field in `listInventorySchema`, line 30)
 - Modify: `src/components/inventory-filter-bar.tsx:23,66-73`
 - Modify: `src/routes/inventory/index.tsx:32,48,91-93`
 
 **Interfaces:**
+
 - Consumes: the `categoryId` column from Task 1.
 - Produces: item rows carrying `categoryId` and a joined `categoryName`; `listInventoryCategoriesImpl` returning `{ categories: { id: string; name: string }[] }`.
 
@@ -529,7 +543,11 @@ export async function listInventoryCategoriesImpl() {
 In `src/components/inventory-filter-bar.tsx`, change the prop type:
 
 ```ts
-  categories: { id: string; name: string }[];
+categories: {
+  id: string;
+  name: string;
+}
+[];
 ```
 
 and render each option as `<SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>`.
@@ -541,6 +559,7 @@ Old `?category=Electronics` links now fail validation and fall back to the defau
 - [ ] **Step 5: Verify in the running app**
 
 Run: `npm run dev`
+
 - On `/inventory`, the Category dropdown lists categories by name and filtering works.
 - The URL now carries a UUID.
 - An item with no category still appears when no filter is set.
@@ -568,11 +587,13 @@ existing links break. Intended: pre-production, no back-compat aliases."
 ### Task 5: Admin table, seeds, and the full sweep
 
 **Files:**
+
 - Modify: `src/routes/_authed/admin/inventory/index.tsx`
 - Modify: `src/components/inventory-card.tsx`, `inventory-row.tsx`, `src/routes/inventory/$itemId.tsx` (wherever the compiler still flags `.category`)
 - Modify: `scripts/seed-dev.ts`
 
 **Interfaces:**
+
 - Consumes: `categoryName` on item rows from Task 4.
 - Produces: nothing new.
 

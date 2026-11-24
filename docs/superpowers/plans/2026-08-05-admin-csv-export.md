@@ -24,18 +24,18 @@ Spec: [`docs/superpowers/specs/2026-08-05-admin-export-inventory-categories-hold
 
 ## File Structure
 
-| File | Responsibility |
-| --- | --- |
-| `src/lib/csv.ts` (create) | Pure CSV serialization. No DOM, no React. |
-| `src/lib/__tests__/csv.test.ts` (create) | Unit tests for the above. |
-| `src/components/export-csv-button.tsx` (create) | Browser download, pending/error state, a11y announcements. |
-| `src/components/admin-data-table.tsx` (modify) | New `actions?: ReactNode` slot. |
-| `src/server/_internal/projects-queries.ts` (modify) | Extract `buildAdminProjectListConditions`; add `exportAdminProjectsAs`. |
-| `src/server/projects-queries.ts` (modify) | `exportAdminProjects` server fn wrapper. |
-| `src/server/_internal/users.ts` (modify) | Extract `buildUserConditions` and `buildMentorConditions`; add `exportUsersImpl` and `exportMentorsAs`. |
-| `src/server/users.ts` (modify) | `exportUsers` and `exportMentors` server fn wrappers. |
-| `src/server/__tests__/admin-exports.integration.test.ts` (create) | Filter parity and per-function gate tests. |
-| Six route files under `src/routes/_authed/admin/` (modify) | `EXPORT_COLUMNS` constant + `actions` prop. |
+| File                                                              | Responsibility                                                                                          |
+| ----------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------- |
+| `src/lib/csv.ts` (create)                                         | Pure CSV serialization. No DOM, no React.                                                               |
+| `src/lib/__tests__/csv.test.ts` (create)                          | Unit tests for the above.                                                                               |
+| `src/components/export-csv-button.tsx` (create)                   | Browser download, pending/error state, a11y announcements.                                              |
+| `src/components/admin-data-table.tsx` (modify)                    | New `actions?: ReactNode` slot.                                                                         |
+| `src/server/_internal/projects-queries.ts` (modify)               | Extract `buildAdminProjectListConditions`; add `exportAdminProjectsAs`.                                 |
+| `src/server/projects-queries.ts` (modify)                         | `exportAdminProjects` server fn wrapper.                                                                |
+| `src/server/_internal/users.ts` (modify)                          | Extract `buildUserConditions` and `buildMentorConditions`; add `exportUsersImpl` and `exportMentorsAs`. |
+| `src/server/users.ts` (modify)                                    | `exportUsers` and `exportMentors` server fn wrappers.                                                   |
+| `src/server/__tests__/admin-exports.integration.test.ts` (create) | Filter parity and per-function gate tests.                                                              |
+| Six route files under `src/routes/_authed/admin/` (modify)        | `EXPORT_COLUMNS` constant + `actions` prop.                                                             |
 
 Export column lists live in their route files beside the existing `COLUMNS` constant. The table and its export are one concern; a shared module would need each route's `Row` type and would invert the dependency.
 
@@ -44,10 +44,12 @@ Export column lists live in their route files beside the existing `COLUMNS` cons
 ### Task 1: The CSV serializer
 
 **Files:**
+
 - Create: `src/lib/csv.ts`
 - Test: `src/lib/__tests__/csv.test.ts`
 
 **Interfaces:**
+
 - Consumes: nothing.
 - Produces: `export interface CsvColumn<T> { header: string; value: (row: T) => unknown }` and `export function toCsv<T>(columns: CsvColumn<T>[], rows: T[]): string`. Every later task in this plan and both sibling plans depend on these exact names.
 
@@ -130,24 +132,27 @@ describe("toCsv", () => {
   it.each(["=", "+", "-", "@", "\t", "\r"])(
     "prefixes a formula-injection lead character (%j) with an apostrophe",
     (lead) => {
-      const csv = toCsv([{ header: "Name", value: (r: Row) => r.name }], [
-        row({ name: `${lead}HYPERLINK("http://evil")` }),
-      ]);
+      const csv = toCsv(
+        [{ header: "Name", value: (r: Row) => r.name }],
+        [row({ name: `${lead}HYPERLINK("http://evil")` })]
+      );
       expect(csv.split("\r\n")[1]).toContain(`'${lead}HYPERLINK`);
     }
   );
 
   it("puts the guard apostrophe inside the quotes when both apply", () => {
-    const csv = toCsv([{ header: "Name", value: (r: Row) => r.name }], [
-      row({ name: "=SUM(A1,A2)" }),
-    ]);
+    const csv = toCsv(
+      [{ header: "Name", value: (r: Row) => r.name }],
+      [row({ name: "=SUM(A1,A2)" })]
+    );
     expect(csv.split("\r\n")[1]).toBe(`"'=SUM(A1,A2)"`);
   });
 
   it("leaves a safe value untouched", () => {
-    const csv = toCsv([{ header: "Name", value: (r: Row) => r.name }], [
-      row({ name: "Widget" }),
-    ]);
+    const csv = toCsv(
+      [{ header: "Name", value: (r: Row) => r.name }],
+      [row({ name: "Widget" })]
+    );
     expect(csv.split("\r\n")[1]).toBe("Widget");
   });
 });
@@ -247,11 +252,13 @@ item names, project titles and user names are all user input."
 ### Task 2: The export button, the table slot, and the first working export
 
 **Files:**
+
 - Create: `src/components/export-csv-button.tsx`
 - Modify: `src/components/admin-data-table.tsx` (the control group around the Columns dropdown, near line 270)
 - Modify: `src/routes/_authed/admin/categories/index.tsx`
 
 **Interfaces:**
+
 - Consumes: `toCsv`, `CsvColumn` from Task 1.
 - Produces: `<ExportCsvButton filename={string} load={() => Promise<string>} />` and `AdminDataTableProps.actions?: ReactNode`. Tasks 3 through 6 use both.
 
@@ -415,10 +422,12 @@ button lands in the same place on every admin table."
 ### Task 3: The two remaining direct-serialization tables
 
 **Files:**
+
 - Modify: `src/routes/_authed/admin/programs/index.tsx`
 - Modify: `src/routes/_authed/admin/inventory/index.tsx`
 
 **Interfaces:**
+
 - Consumes: `ExportCsvButton`, `toCsv`, `CsvColumn`, and `AdminDataTableProps.actions` from Task 2.
 - Produces: nothing new.
 
@@ -506,12 +515,14 @@ server export function."
 ### Task 4: The projects export
 
 **Files:**
+
 - Modify: `src/server/_internal/projects-queries.ts` (`listAdminProjectsAs`, near lines 113-183)
 - Modify: `src/server/projects-queries.ts`
 - Modify: `src/routes/_authed/admin/projects/index.tsx`
 - Test: `src/server/__tests__/admin-exports.integration.test.ts` (create)
 
 **Interfaces:**
+
 - Consumes: `ExportCsvButton`, `toCsv`, `CsvColumn`.
 - Produces: `exportAdminProjectsAs(viewer: Viewer, data: AdminProjectsFilter)` returning `{ rows }`; `exportAdminProjectsImpl(data)`; the `exportAdminProjects` server fn. Task 6 follows the same shape.
 
@@ -768,7 +779,9 @@ export const exportAdminProjects = createServerFn({ method: "GET" })
 In `src/routes/_authed/admin/projects/index.tsx`, import `ExportCsvButton`, `toCsv`, `CsvColumn`, and `exportAdminProjects`. Add:
 
 ```tsx
-type ExportRow = Awaited<ReturnType<typeof exportAdminProjects>>["rows"][number];
+type ExportRow = Awaited<
+  ReturnType<typeof exportAdminProjects>
+>["rows"][number];
 
 const EXPORT_COLUMNS: CsvColumn<ExportRow>[] = [
   { header: "ID", value: (row) => row.id },
@@ -846,12 +859,14 @@ proposer dropdown is built from."
 ### Task 5: The users export
 
 **Files:**
+
 - Modify: `src/server/_internal/users.ts` (`listUsersImpl`, near lines 104-155)
 - Modify: `src/server/users.ts`
 - Modify: `src/routes/_authed/admin/users/index.tsx`
 - Test: `src/server/__tests__/admin-exports.integration.test.ts` (extend)
 
 **Interfaces:**
+
 - Consumes: `ExportCsvButton`, `toCsv`, `CsvColumn`, `ListUsersInput`.
 - Produces: `exportUsersImpl(data)` (ungated query), `exportUsersAs(viewer, data)` (gate + query, the test seam), `exportUsersForCurrentUser(data)`, and the `exportUsers` server fn.
 
@@ -1092,12 +1107,14 @@ a page the router can redirect."
 ### Task 6: The mentors export
 
 **Files:**
+
 - Modify: `src/server/_internal/users.ts` (`listMentorsAs`, near lines 266-298)
 - Modify: `src/server/users.ts`
 - Modify: `src/routes/_authed/admin/mentors/index.tsx`
 - Test: `src/server/__tests__/admin-exports.integration.test.ts` (extend)
 
 **Interfaces:**
+
 - Consumes: `ExportCsvButton`, `toCsv`, `CsvColumn`.
 - Produces: `exportMentorsAs(viewer, data)`, `exportMentorsForCurrentUser(data)`, and the `exportMentors` server fn.
 

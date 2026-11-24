@@ -82,14 +82,14 @@ whichever environment owns the default action.
 
 ## Decisions
 
-| Question | Decision |
-|---|---|
-| Isolation | Separate RDS instance, shared VPC and ALB. Not a separate stack. |
-| RDS size | `db.t4g.micro`, the smallest class RDS Postgres offers, with every surrounding knob at its minimum. |
-| Hostname | The preview CloudFront distribution's own `*.cloudfront.net` name. No ACM certificate, no OSU DNS ticket. |
-| Email safety | Rewrite every seeded address to `example.com`, and map `example.com` recipients to the SES mailbox simulator so nothing bounces. |
-| GitHub OAuth | A second GitHub OAuth app registered against the preview hostname. |
-| Per-PR previews | Phase 2. Specced to decision depth here, gated on one AWS behaviour that has to be verified first. |
+| Question        | Decision                                                                                                                         |
+| --------------- | -------------------------------------------------------------------------------------------------------------------------------- |
+| Isolation       | Separate RDS instance, shared VPC and ALB. Not a separate stack.                                                                 |
+| RDS size        | `db.t4g.micro`, the smallest class RDS Postgres offers, with every surrounding knob at its minimum.                              |
+| Hostname        | The preview CloudFront distribution's own `*.cloudfront.net` name. No ACM certificate, no OSU DNS ticket.                        |
+| Email safety    | Rewrite every seeded address to `example.com`, and map `example.com` recipients to the SES mailbox simulator so nothing bounces. |
+| GitHub OAuth    | A second GitHub OAuth app registered against the preview hostname.                                                               |
+| Per-PR previews | Phase 2. Specced to decision depth here, gated on one AWS behaviour that has to be verified first.                               |
 
 ## Architecture
 
@@ -253,14 +253,14 @@ Same as production except for these. `EMAIL_TRANSPORT` stays `ses` and
 identity is shared and DKIM aligns on the sending domain, not the app's
 hostname.
 
-| Variable | Value | Why |
-|---|---|---|
-| `BETTER_AUTH_URL` | the preview distribution's `https://d***.cloudfront.net` | Better Auth reads it before `x-forwarded-host`, so a mismatch fails every request with `INVALID_ORIGIN` (`infra/ecs.tf:86-90`). |
-| `EMAIL_SUBJECT_PREFIX` | `[PREVIEW]` | The label issue #25 asks for. |
-| `EMAIL_SIMULATOR_DOMAINS` | `example.com` | Recipients in these domains are rewritten to the SES mailbox simulator. |
-| `EMAIL_REVIEW_INBOX` | `review@example.com` | Must not be the live staff inbox. It is subject to the simulator rewrite like any other recipient; config is not exempt. |
-| `EMAIL_REPLY_TO` | empty | No human should reply to preview mail. |
-| `GITHUB_CLIENT_ID` | the preview OAuth app's id | A GitHub OAuth app accepts one callback URL, so production's cannot serve the preview hostname. |
+| Variable                  | Value                                                    | Why                                                                                                                             |
+| ------------------------- | -------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
+| `BETTER_AUTH_URL`         | the preview distribution's `https://d***.cloudfront.net` | Better Auth reads it before `x-forwarded-host`, so a mismatch fails every request with `INVALID_ORIGIN` (`infra/ecs.tf:86-90`). |
+| `EMAIL_SUBJECT_PREFIX`    | `[PREVIEW]`                                              | The label issue #25 asks for.                                                                                                   |
+| `EMAIL_SIMULATOR_DOMAINS` | `example.com`                                            | Recipients in these domains are rewritten to the SES mailbox simulator.                                                         |
+| `EMAIL_REVIEW_INBOX`      | `review@example.com`                                     | Must not be the live staff inbox. It is subject to the simulator rewrite like any other recipient; config is not exempt.        |
+| `EMAIL_REPLY_TO`          | empty                                                    | No human should reply to preview mail.                                                                                          |
+| `GITHUB_CLIENT_ID`        | the preview OAuth app's id                               | A GitHub OAuth app accepts one callback URL, so production's cannot serve the preview hostname.                                 |
 
 Build arg, not environment: `VITE_PREVIEW_BANNER=1`, alongside the preview
 `VITE_STORAGE_PUBLIC_BASE`.
@@ -426,8 +426,8 @@ Permissions, all narrower than production's:
 on:
   workflow_dispatch:
     inputs:
-      reset_db: { type: boolean, default: true }
-      stop:     { type: boolean, default: false }
+      reset_db: {type: boolean, default: true}
+      stop: {type: boolean, default: false}
 
 concurrency:
   group: deploy-preview
@@ -568,14 +568,14 @@ ships.
 
 ## Cost
 
-| Item | ~$/mo |
-|------|------|
-| Fargate (0.25 vCPU / 0.5 GB, 1 task) | 9 |
-| RDS `db.t4g.micro` compute | 12 |
-| 20 GB gp3 storage | 2 |
-| CloudFront, S3, ECR | 1 |
-| **Total, always on** | **~24** |
-| **Total, after a `stop` dispatch** | **~3** |
+| Item                                 | ~$/mo   |
+| ------------------------------------ | ------- |
+| Fargate (0.25 vCPU / 0.5 GB, 1 task) | 9       |
+| RDS `db.t4g.micro` compute           | 12      |
+| 20 GB gp3 storage                    | 2       |
+| CloudFront, S3, ECR                  | 1       |
+| **Total, always on**                 | **~24** |
+| **Total, after a `stop` dispatch**   | **~3**  |
 
 A stopped RDS instance bills storage only, and `backup_retention_period = 0`
 means no snapshot charges. There is no new ALB, which is what keeps this well

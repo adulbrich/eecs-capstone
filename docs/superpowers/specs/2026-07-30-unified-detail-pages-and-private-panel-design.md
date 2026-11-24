@@ -22,14 +22,14 @@ expressed by which panels render, not by which URL you are on.**
 
 Two routes render the same item with no link between them:
 
-| | `/inventory/$itemId` | `/admin/inventory/$itemId` |
-| --- | --- | --- |
-| Reached from | `inventory-card`, `inventory-row` | `/admin/inventory` table |
-| Image, name, status, category, description | yes | yes, re-implemented |
-| Add to cart | yes | no |
-| Serial, label, location, private notes | no | yes |
-| Lifecycle panel | no | yes |
-| Link to the other page | no | no |
+|                                            | `/inventory/$itemId`              | `/admin/inventory/$itemId` |
+| ------------------------------------------ | --------------------------------- | -------------------------- |
+| Reached from                               | `inventory-card`, `inventory-row` | `/admin/inventory` table   |
+| Image, name, status, category, description | yes                               | yes, re-implemented        |
+| Add to cart                                | yes                               | no                         |
+| Serial, label, location, private notes     | no                                | yes                        |
+| Lifecycle panel                            | no                                | yes                        |
+| Link to the other page                     | no                                | no                         |
 
 Three problems follow:
 
@@ -85,6 +85,7 @@ Fate of the two server fns this replaces, verified by grep rather than assumed:
 ### Routes
 
 `src/routes/inventory/$itemId.tsx`
+
 - Loader calls `getInventoryItemDetail`, `throw notFound()` on null.
 - Public block unchanged in content: image, name, status badge, category,
   description, Add to cart. Add-to-cart gating (`status === "available"` and
@@ -92,6 +93,7 @@ Fate of the two server fns this replaces, verified by grep rather than assumed:
 - Renders `<StaffInventoryPanel>` when `viewerIsStaff`.
 
 `src/routes/_authed/admin/inventory/$itemId.tsx`
+
 - **Deleted.** Not a redirect: the app has no production deployment, so there
   are no bookmarks or external links to preserve, and a redirect route would be
   a compatibility shim for a compatibility problem that does not exist. The
@@ -101,6 +103,7 @@ Fate of the two server fns this replaces, verified by grep rather than assumed:
 
 `src/routes/_authed/inventory/$itemId/edit.tsx` (**moved** from
 `src/routes/_authed/admin/inventory/$itemId_.edit.tsx`)
+
 - URL becomes `/inventory/$itemId/edit`, mirroring
   `/projects/$projectId/edit`.
 - **No trailing-underscore de-nesting needed**, unlike its current filename.
@@ -118,12 +121,14 @@ Fate of the two server fns this replaces, verified by grep rather than assumed:
 - Breadcrumb's item link becomes `/inventory/$itemId`.
 
 `src/routes/_authed/admin/inventory/index.tsx`
+
 - Row link target becomes `/inventory/$itemId`.
 - Edit link target becomes `/inventory/$itemId/edit`.
 - "+ New item" link target becomes `/inventory/new`.
 
 `src/routes/_authed/inventory/new.tsx` (**moved** from
 `src/routes/_authed/admin/inventory/new.tsx`)
+
 - URL becomes `/inventory/new`, mirroring `/projects/new`
   (`routes/_authed/projects/new.tsx`).
 - Post-create navigation target becomes `/inventory/$itemId`.

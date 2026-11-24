@@ -76,13 +76,13 @@ are legal.
 
 ### Request line, unchanged
 
-| From | To | Who | What else happens |
-| --- | --- | --- | --- |
-| (new) | `pending` | requester, by submitting a borrow list | item goes to `requested`, held by the requester |
-| `pending` | `approved` | staff | item goes to `reserved`, pickup deadline set |
-| `pending` | `rejected` | staff, reason required | item released, usually to `available` |
-| `pending` | `cancelled` | requester | item released |
-| `approved` | `returned` | staff, on a release from `checked_out` | item released |
+| From       | To          | Who                                            | What else happens                                     |
+| ---------- | ----------- | ---------------------------------------------- | ----------------------------------------------------- |
+| (new)      | `pending`   | requester, by submitting a borrow list         | item goes to `requested`, held by the requester       |
+| `pending`  | `approved`  | staff                                          | item goes to `reserved`, pickup deadline set          |
+| `pending`  | `rejected`  | staff, reason required                         | item released, usually to `available`                 |
+| `pending`  | `cancelled` | requester                                      | item released                                         |
+| `approved` | `returned`  | staff, on a release from `checked_out`         | item released                                         |
 | `approved` | `cancelled` | requester, or staff releasing without a return | item released; refused once the item is `checked_out` |
 
 Two live states, three endings. `returned` is the line's own ending, not the item's
@@ -97,14 +97,14 @@ word people use, and `completed` is vaguer rather than clearer.
 
 ### Custom line, new
 
-| From | To | Who | What else happens |
-| --- | --- | --- | --- |
-| (new) | `pending` | requester, by submitting the form | nothing else; no item exists |
-| `pending` | `sourcing` | staff | notification, no item, no dates |
-| `pending` | `fulfilled` | staff, linking items we already own | see below |
-| `sourcing` | `fulfilled` | staff, linking items that arrived | see below |
-| `pending` or `sourcing` | `rejected` | staff, reason required | notification carrying the reason |
-| `pending` or `sourcing` | `cancelled` | requester | nothing else |
+| From                    | To          | Who                                 | What else happens                |
+| ----------------------- | ----------- | ----------------------------------- | -------------------------------- |
+| (new)                   | `pending`   | requester, by submitting the form   | nothing else; no item exists     |
+| `pending`               | `sourcing`  | staff                               | notification, no item, no dates  |
+| `pending`               | `fulfilled` | staff, linking items we already own | see below                        |
+| `sourcing`              | `fulfilled` | staff, linking items that arrived   | see below                        |
+| `pending` or `sourcing` | `rejected`  | staff, reason required              | notification carrying the reason |
+| `pending` or `sourcing` | `cancelled` | requester                           | nothing else                     |
 
 Same five slots as a request line: undecided, decided yes and still live, succeeded,
 refused, withdrawn. Only the success word differs, because the two kinds succeed at
@@ -132,16 +132,16 @@ writer beside it.
 
 ### Item, unchanged
 
-| From | To | Who |
-| --- | --- | --- |
-| `available` | `requested` | requester, via `submitCartAs` under `self_request`; this is the only path to `requested` |
-| `available` | `reserved` or `checked_out` | staff, with no request line at all |
-| `requested` | `reserved` | staff, approving the line |
-| `requested` | `checked_out` | staff, checking out directly for a teammate |
-| `reserved` | `checked_out` | staff, on collection |
-| any of `requested`, `reserved`, `checked_out` | `available`, `maintenance` or `retired` | staff; this is a release |
-| `available` | `maintenance` and back | staff |
-| any | `retired` | staff; the archive, and the only removal for an item with request history |
+| From                                          | To                                      | Who                                                                                      |
+| --------------------------------------------- | --------------------------------------- | ---------------------------------------------------------------------------------------- |
+| `available`                                   | `requested`                             | requester, via `submitCartAs` under `self_request`; this is the only path to `requested` |
+| `available`                                   | `reserved` or `checked_out`             | staff, with no request line at all                                                       |
+| `requested`                                   | `reserved`                              | staff, approving the line                                                                |
+| `requested`                                   | `checked_out`                           | staff, checking out directly for a teammate                                              |
+| `reserved`                                    | `checked_out`                           | staff, on collection                                                                     |
+| any of `requested`, `reserved`, `checked_out` | `available`, `maintenance` or `retired` | staff; this is a release                                                                 |
+| `available`                                   | `maintenance` and back                  | staff                                                                                    |
+| any                                           | `retired`                               | staff; the archive, and the only removal for an item with request history                |
 
 A release closes whatever line the item was held for: `returned` off a `checked_out`,
 `cancelled` otherwise, unless the caller names a different outcome. `reserved` and
@@ -207,17 +207,17 @@ exists, and a tuple placed anywhere else is scanned by nothing and passes silent
 
 ### Fields and who sees them
 
-| Field | Visible to | Editable by |
-| --- | --- | --- |
-| `name`, `reason`, `quantity`, `link` | requester, staff | nobody after submit |
-| `status` | requester, staff | staff, plus the requester for `cancelled` |
-| `sourcing_note` | requester, staff | staff, while the line is `sourcing` |
-| `outcome_note` | requester, staff | staff on a close, requester on a cancel |
-| `reviewed_at`, `closed_at` | requester, staff | written by the transition; the timeline needs the dates |
-| `reviewed_by` | staff | staff, on the first decision only; never overwritten |
-| `closed_by` | staff | whichever transition closes the line, staff or requester |
-| `inventory_custom_line_items` rows | requester, staff | staff |
-| envelope `note` | requester, staff | requester at submit, nobody after |
+| Field                                | Visible to       | Editable by                                              |
+| ------------------------------------ | ---------------- | -------------------------------------------------------- |
+| `name`, `reason`, `quantity`, `link` | requester, staff | nobody after submit                                      |
+| `status`                             | requester, staff | staff, plus the requester for `cancelled`                |
+| `sourcing_note`                      | requester, staff | staff, while the line is `sourcing`                      |
+| `outcome_note`                       | requester, staff | staff on a close, requester on a cancel                  |
+| `reviewed_at`, `closed_at`           | requester, staff | written by the transition; the timeline needs the dates  |
+| `reviewed_by`                        | staff            | staff, on the first decision only; never overwritten     |
+| `closed_by`                          | staff            | whichever transition closes the line, staff or requester |
+| `inventory_custom_line_items` rows   | requester, staff | staff                                                    |
+| envelope `note`                      | requester, staff | requester at submit, nobody after                        |
 
 Nothing here is public. A signed-out visitor, and a signed-in user who is not the
 requester, sees no custom request at all.
@@ -236,10 +236,10 @@ intermediate, then one terminal, and the terminals are mutually exclusive. That 
 for both kinds, and it is what makes the columns a complete record rather than a
 lossy summary of something longer.
 
-| Kind | Longest path | Transitions that carry a comment |
-| --- | --- | --- |
-| Request line | `pending`, `approved`, `returned` or `cancelled` | one, at the close. Approving says nothing: `approveRequestItemAs` takes only a line id and a pickup date |
-| Custom line | `pending`, `sourcing`, `fulfilled` or `rejected` or `cancelled` | two: the sourcing note, and the closing note |
+| Kind         | Longest path                                                    | Transitions that carry a comment                                                                         |
+| ------------ | --------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------- |
+| Request line | `pending`, `approved`, `returned` or `cancelled`                | one, at the close. Approving says nothing: `approveRequestItemAs` takes only a line id and a pickup date |
+| Custom line  | `pending`, `sourcing`, `fulfilled` or `rejected` or `cancelled` | two: the sourcing note, and the closing note                                                             |
 
 So the delta between the two kinds is exactly **one comment**, because `sourcing` is a
 staff action with something to say and approving is not: approving hands over a
@@ -248,7 +248,7 @@ and nothing is ever overwritten by the next event.
 
 **Neither kind gets a history table.** A per-line log would be an audit trail for a
 lifecycle that cannot lose anything, and `inventory_item_status_history` cannot stand
-in for one either: its `new_status` is the *item's* status, so a release to
+in for one either: its `new_status` is the _item's_ status, so a release to
 `available` is written identically whether the line was returned, cancelled or
 rejected. It is read per line in exactly one place today,
 `src/server/_internal/inventory-holdings.ts`, and only to answer "who collected this",
@@ -278,12 +278,12 @@ rules**, which matters more than the names:
 
 What each transition writes:
 
-| Transition | `sourcing_note` | `outcome_note` | `reviewed_by`, `reviewed_at` | `closed_by`, `closed_at` |
-| --- | --- | --- | --- | --- |
-| `sourcing` | the note, optional | untouched | the staff member, now, if unset | unset |
-| `fulfilled` | untouched | the note, optional | the staff member, now, if unset | the staff member, now |
-| `rejected` | untouched | the reason, **required** | the staff member, now, if unset | the staff member, now |
-| `cancelled` | untouched | the note, optional | untouched | the requester, now |
+| Transition  | `sourcing_note`    | `outcome_note`           | `reviewed_by`, `reviewed_at`    | `closed_by`, `closed_at` |
+| ----------- | ------------------ | ------------------------ | ------------------------------- | ------------------------ |
+| `sourcing`  | the note, optional | untouched                | the staff member, now, if unset | unset                    |
+| `fulfilled` | untouched          | the note, optional       | the staff member, now, if unset | the staff member, now    |
+| `rejected`  | untouched          | the reason, **required** | the staff member, now, if unset | the staff member, now    |
+| `cancelled` | untouched          | the note, optional       | untouched                       | the requester, now       |
 
 **Staff may rewrite `sourcing_note` while the line is `sourcing`**, and doing so
 notifies the requester. An order slipping is the likeliest thing to happen to a
@@ -393,11 +393,11 @@ tested with no docker, like the five modules beside it.
 **What each audience sees, per kind**, because the projections do not currently carry
 enough for this and saying so is the point:
 
-| Event | Staff, request line | Requester, request line | Staff, custom line | Requester, custom line |
-| --- | --- | --- | --- | --- |
-| submitted | date | date | date | date |
-| decided | date, actor | date | date, actor, `sourcing_note` | date, `sourcing_note` |
-| closed | date, actor, `closed_reason` | date, `closed_reason` | date, actor, `outcome_note` | date, `outcome_note` |
+| Event     | Staff, request line          | Requester, request line | Staff, custom line           | Requester, custom line |
+| --------- | ---------------------------- | ----------------------- | ---------------------------- | ---------------------- |
+| submitted | date                         | date                    | date                         | date                   |
+| decided   | date, actor                  | date                    | date, actor, `sourcing_note` | date, `sourcing_note`  |
+| closed    | date, actor, `closed_reason` | date, `closed_reason`   | date, actor, `outcome_note`  | date, `outcome_note`   |
 
 **`reviewed_at` and `closed_at` join `MyRequestLineView`**, which today carries only
 `closedReason`, `createdAt`, `dueAt`, `id`, `pickupBy` and `status`. Two timestamps
@@ -513,16 +513,16 @@ integration suite's exact-key-set assertions are updated, not dropped.
 
 **Links to rewrite.** No redirect shim; the parameter is replaced everywhere.
 
-| File | What |
-| --- | --- |
-| `src/lib/inventory-notifications.ts` | four `?tab=` links |
-| `src/components/borrow-list-button.tsx` | `search={{ tab: "cart" }}` |
-| `src/components/user-menu.tsx` | `search={{ tab: "active" }}` |
-| `src/components/my-items-attention.tsx` | the attention link |
-| `src/lib/__tests__/inventory-notifications.test.ts` | asserted link |
-| `src/server/__tests__/inventory.integration.test.ts` | asserted link |
-| `src/test/my-items-attention.test.tsx` | asserted link |
-| `src/test/e2e/inventory.e2e.test.ts`, `inventory-requests.e2e.test.ts`, `inventory-overdue.e2e.test.ts` | `goto` calls |
+| File                                                                                                    | What                         |
+| ------------------------------------------------------------------------------------------------------- | ---------------------------- |
+| `src/lib/inventory-notifications.ts`                                                                    | four `?tab=` links           |
+| `src/components/borrow-list-button.tsx`                                                                 | `search={{ tab: "cart" }}`   |
+| `src/components/user-menu.tsx`                                                                          | `search={{ tab: "active" }}` |
+| `src/components/my-items-attention.tsx`                                                                 | the attention link           |
+| `src/lib/__tests__/inventory-notifications.test.ts`                                                     | asserted link                |
+| `src/server/__tests__/inventory.integration.test.ts`                                                    | asserted link                |
+| `src/test/my-items-attention.test.tsx`                                                                  | asserted link                |
+| `src/test/e2e/inventory.e2e.test.ts`, `inventory-requests.e2e.test.ts`, `inventory-overdue.e2e.test.ts` | `goto` calls                 |
 
 ## Entry points and server surface
 

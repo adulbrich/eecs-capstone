@@ -29,32 +29,32 @@
 
 ## File Structure
 
-| File | Responsibility |
-|---|---|
-| `.github/workflows/ci.yml` (modify) | New `accessibility` job. Third job, mirroring `integration`'s service setup. |
-| `src/components/ui/alert-dialog.tsx` (new) | Radix AlertDialog wrapper. Styled parts only, no app logic. |
-| `src/components/confirm-dialog.tsx` (new) | The app-level destructive confirmation. Owns the copy shape and the `asChild` trigger. |
-| `src/components/ui/sonner.tsx` (new) | Toaster wrapper. `theme="system"`, no `next-themes`. |
-| `src/routes/__root.tsx` (modify) | Mounts `<Toaster />` inside `BrandProvider`. |
-| `src/components/ui/tabs.tsx` (new) | Radix Tabs wrapper with the brand underline treatment. |
-| `src/components/ui/pagination.tsx` (new) | Pagination shell. Adapted for TanStack `Link` and real disabled semantics. |
-| `src/components/ui/badge.tsx` (new) | The badge box. Variant `status` accepts caller-supplied tokens. |
-| `src/components/ui/card.tsx` (new) | The repeated `rounded-lg border border-border bg-card` surface. |
-| `src/components/ui/field.tsx` (new) | `Field`, `FieldLabel`, `FieldError`. Replaces the `space-y-1.5` idiom and `FieldErrors`. |
-| `src/components/ui/slider.tsx` (delete) | Zero importers. |
-| `src/components/field-errors.tsx` (delete) | Superseded by `FieldError`. |
-| `src/components/owner-project-actions.tsx` (modify) | `confirm()` to `ConfirmDialog`. |
-| `src/components/staff-project-panel.tsx` (modify) | `confirm()` to `ConfirmDialog`. |
-| `src/routes/_authed/admin/programs/$programId.tsx` (modify) | `confirm()` to `ConfirmDialog`. |
-| `src/routes/_authed/admin/categories/$categoryId.tsx` (modify) | `confirm()` to `ConfirmDialog`. |
-| `src/routes/_authed/my/items.tsx` (modify) | `alert()` to toast; hand-rolled tabs to `Tabs`; unlabelled `Textarea`. |
-| `src/routes/_authed/admin/categories/index.tsx` (modify) | Hand-rolled tabs to `Tabs`. |
-| `src/routes/projects/index.tsx` (modify) | Link pagination to `Pagination`. |
-| `src/routes/_authed/admin/users/index.tsx` (modify) | Link pagination to `Pagination`. |
-| `src/routes/inventory/index.tsx` (modify) | Button pagination to `Pagination`. |
-| `src/test/a11y/user.a11y.test.ts` (modify) | First interaction-state assertions. |
-| `src/test/a11y/public.a11y.test.ts` (modify) | First interaction-state assertions. |
-| `docs/UI-CONVENTIONS.md` (modify) | The 9 deltas from the spec. |
+| File                                                           | Responsibility                                                                           |
+| -------------------------------------------------------------- | ---------------------------------------------------------------------------------------- |
+| `.github/workflows/ci.yml` (modify)                            | New `accessibility` job. Third job, mirroring `integration`'s service setup.             |
+| `src/components/ui/alert-dialog.tsx` (new)                     | Radix AlertDialog wrapper. Styled parts only, no app logic.                              |
+| `src/components/confirm-dialog.tsx` (new)                      | The app-level destructive confirmation. Owns the copy shape and the `asChild` trigger.   |
+| `src/components/ui/sonner.tsx` (new)                           | Toaster wrapper. `theme="system"`, no `next-themes`.                                     |
+| `src/routes/__root.tsx` (modify)                               | Mounts `<Toaster />` inside `BrandProvider`.                                             |
+| `src/components/ui/tabs.tsx` (new)                             | Radix Tabs wrapper with the brand underline treatment.                                   |
+| `src/components/ui/pagination.tsx` (new)                       | Pagination shell. Adapted for TanStack `Link` and real disabled semantics.               |
+| `src/components/ui/badge.tsx` (new)                            | The badge box. Variant `status` accepts caller-supplied tokens.                          |
+| `src/components/ui/card.tsx` (new)                             | The repeated `rounded-lg border border-border bg-card` surface.                          |
+| `src/components/ui/field.tsx` (new)                            | `Field`, `FieldLabel`, `FieldError`. Replaces the `space-y-1.5` idiom and `FieldErrors`. |
+| `src/components/ui/slider.tsx` (delete)                        | Zero importers.                                                                          |
+| `src/components/field-errors.tsx` (delete)                     | Superseded by `FieldError`.                                                              |
+| `src/components/owner-project-actions.tsx` (modify)            | `confirm()` to `ConfirmDialog`.                                                          |
+| `src/components/staff-project-panel.tsx` (modify)              | `confirm()` to `ConfirmDialog`.                                                          |
+| `src/routes/_authed/admin/programs/$programId.tsx` (modify)    | `confirm()` to `ConfirmDialog`.                                                          |
+| `src/routes/_authed/admin/categories/$categoryId.tsx` (modify) | `confirm()` to `ConfirmDialog`.                                                          |
+| `src/routes/_authed/my/items.tsx` (modify)                     | `alert()` to toast; hand-rolled tabs to `Tabs`; unlabelled `Textarea`.                   |
+| `src/routes/_authed/admin/categories/index.tsx` (modify)       | Hand-rolled tabs to `Tabs`.                                                              |
+| `src/routes/projects/index.tsx` (modify)                       | Link pagination to `Pagination`.                                                         |
+| `src/routes/_authed/admin/users/index.tsx` (modify)            | Link pagination to `Pagination`.                                                         |
+| `src/routes/inventory/index.tsx` (modify)                      | Button pagination to `Pagination`.                                                       |
+| `src/test/a11y/user.a11y.test.ts` (modify)                     | First interaction-state assertions.                                                      |
+| `src/test/a11y/public.a11y.test.ts` (modify)                   | First interaction-state assertions.                                                      |
+| `docs/UI-CONVENTIONS.md` (modify)                              | The 9 deltas from the spec.                                                              |
 
 ---
 
@@ -65,9 +65,11 @@ The spec called this "one job, no code change." That was optimistic and this pla
 ### Task 1: Add the accessibility job to CI
 
 **Files:**
+
 - Modify: `.github/workflows/ci.yml`
 
 **Interfaces:**
+
 - Consumes: nothing.
 - Produces: a CI job named `accessibility` that runs `npm run test:accessibility`. No code artifact other tasks import.
 
@@ -91,86 +93,86 @@ If this fails, **stop and report the failures rather than fixing them here**. A 
 Append to `.github/workflows/ci.yml`, after the `integration` job. The service block and the `.env.local` heredoc are copied from `integration` deliberately: the two jobs need the same stack, and a shared composite action is not worth the indirection for two call sites.
 
 ```yaml
-  # The a11y suite has existed since 2026-05-26 and has never run in CI, so an
-  # accessibility regression could reach main unnoticed. `npm test` excludes it
-  # on purpose to keep the unit run fast; this is the other half of that trade,
-  # which was never added. It needs the same stack as the integration job plus a
-  # dev seed, because global-setup.ts signs in as the seeded users to capture
-  # their storage state.
-  accessibility:
-    runs-on: ubuntu-latest
-    services:
-      postgres:
-        image: pgvector/pgvector:pg18
-        env:
-          POSTGRES_USER: postgres
-          POSTGRES_PASSWORD: postgres
-          POSTGRES_DB: eecs_capstone
-        ports:
-          - 5432:5432
-        options: >-
-          --health-cmd pg_isready
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 10
-      rustfs:
-        image: rustfs/rustfs:latest
-        env:
-          RUSTFS_ACCESS_KEY: rustfsadmin
-          RUSTFS_SECRET_KEY: rustfsadmin
-        ports:
-          - 9000:9000
-    steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-node@v7
-        with:
-          node-version: 24.16.0
-          cache: npm
-      - run: npm ci
+# The a11y suite has existed since 2026-05-26 and has never run in CI, so an
+# accessibility regression could reach main unnoticed. `npm test` excludes it
+# on purpose to keep the unit run fast; this is the other half of that trade,
+# which was never added. It needs the same stack as the integration job plus a
+# dev seed, because global-setup.ts signs in as the seeded users to capture
+# their storage state.
+accessibility:
+  runs-on: ubuntu-latest
+  services:
+    postgres:
+      image: pgvector/pgvector:pg18
+      env:
+        POSTGRES_USER: postgres
+        POSTGRES_PASSWORD: postgres
+        POSTGRES_DB: eecs_capstone
+      ports:
+        - 5432:5432
+      options: >-
+        --health-cmd pg_isready
+        --health-interval 10s
+        --health-timeout 5s
+        --health-retries 10
+    rustfs:
+      image: rustfs/rustfs:latest
+      env:
+        RUSTFS_ACCESS_KEY: rustfsadmin
+        RUSTFS_SECRET_KEY: rustfsadmin
+      ports:
+        - 9000:9000
+  steps:
+    - uses: actions/checkout@v7
+    - uses: actions/setup-node@v7
+      with:
+        node-version: 24.16.0
+        cache: npm
+    - run: npm ci
 
-      - name: Write .env.local
-        run: |
-          cat > .env.local <<'EOF'
-          DATABASE_URL=postgresql://postgres:postgres@localhost:5432/eecs_capstone
-          BETTER_AUTH_SECRET=ci-not-a-real-secret
-          BETTER_AUTH_URL=http://localhost:3000
-          S3_ENDPOINT=http://localhost:9000
-          S3_REGION=us-east-1
-          S3_BUCKET=cs-capstone
-          S3_ACCESS_KEY=rustfsadmin
-          S3_SECRET_KEY=rustfsadmin
-          VITE_STORAGE_PUBLIC_BASE=http://localhost:9000/cs-capstone
-          EOF
+    - name: Write .env.local
+      run: |
+        cat > .env.local <<'EOF'
+        DATABASE_URL=postgresql://postgres:postgres@localhost:5432/eecs_capstone
+        BETTER_AUTH_SECRET=ci-not-a-real-secret
+        BETTER_AUTH_URL=http://localhost:3000
+        S3_ENDPOINT=http://localhost:9000
+        S3_REGION=us-east-1
+        S3_BUCKET=cs-capstone
+        S3_ACCESS_KEY=rustfsadmin
+        S3_SECRET_KEY=rustfsadmin
+        VITE_STORAGE_PUBLIC_BASE=http://localhost:9000/cs-capstone
+        EOF
 
-      - name: Wait for object storage
-        run: |
-          for i in $(seq 1 30); do
-            if curl -sf -o /dev/null http://localhost:9000 \
-              || [ "$(curl -s -o /dev/null -w '%{http_code}' http://localhost:9000)" != "000" ]; then
-              echo "storage responding"; exit 0
-            fi
-            sleep 2
-          done
-          echo "storage did not come up"; exit 1
+    - name: Wait for object storage
+      run: |
+        for i in $(seq 1 30); do
+          if curl -sf -o /dev/null http://localhost:9000 \
+            || [ "$(curl -s -o /dev/null -w '%{http_code}' http://localhost:9000)" != "000" ]; then
+            echo "storage responding"; exit 0
+          fi
+          sleep 2
+        done
+        echo "storage did not come up"; exit 1
 
-      - run: npm run db:migrate
-      - run: npm run storage:init
-      # global-setup.ts fails with an explicit "run npm run db:seed:dev" message
-      # if these users are missing, so the seed is a hard prerequisite.
-      - run: npm run db:seed:dev
+    - run: npm run db:migrate
+    - run: npm run storage:init
+    # global-setup.ts fails with an explicit "run npm run db:seed:dev" message
+    # if these users are missing, so the seed is a hard prerequisite.
+    - run: npm run db:seed:dev
 
-      # Only chromium: playwright.a11y.config.ts defines chromium-light and
-      # chromium-dark and no other browser.
-      - run: npx playwright install --with-deps chromium
+    # Only chromium: playwright.a11y.config.ts defines chromium-light and
+    # chromium-dark and no other browser.
+    - run: npx playwright install --with-deps chromium
 
-      - run: npm run test:accessibility
+    - run: npm run test:accessibility
 
-      - if: failure()
-        uses: actions/upload-artifact@v4
-        with:
-          name: a11y-report
-          path: playwright-report/a11y
-          retention-days: 7
+    - if: failure()
+      uses: actions/upload-artifact@v4
+      with:
+        name: a11y-report
+        path: playwright-report/a11y
+        retention-days: 7
 ```
 
 - [ ] **Step 3: Verify the workflow parses**
@@ -201,15 +203,18 @@ Four `confirm()` calls and one `alert()`. Highest user-visible risk in the audit
 Two files in one task because neither is testable without the other: the primitive is unstyled plumbing and the wrapper is what the app actually calls.
 
 **Files:**
+
 - Create: `src/components/ui/alert-dialog.tsx`
 - Create: `src/components/confirm-dialog.tsx`
 - Test: `src/test/confirm-dialog.test.tsx`
 
 **Interfaces:**
+
 - Consumes: `radix-ui`'s `AlertDialog` export (already installed at 1.4.3), `Button` and `buttonVariants` from `#/components/ui/button.tsx`, `cn` from `#/lib/utils.ts`.
 - Produces:
   - From `ui/alert-dialog.tsx`: `AlertDialog`, `AlertDialogTrigger`, `AlertDialogContent`, `AlertDialogHeader`, `AlertDialogFooter`, `AlertDialogTitle`, `AlertDialogDescription`, `AlertDialogAction`, `AlertDialogCancel`.
   - From `confirm-dialog.tsx`:
+
     ```ts
     function ConfirmDialog(props: {
       children: React.ReactNode;   // the trigger, rendered via asChild
@@ -246,7 +251,13 @@ Create `src/test/confirm-dialog.test.tsx`:
 ```tsx
 // @vitest-environment jsdom
 import "@testing-library/jest-dom/vitest";
-import { cleanup, render, screen, waitFor, within } from "@testing-library/react";
+import {
+  cleanup,
+  render,
+  screen,
+  waitFor,
+  within,
+} from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { ConfirmDialog } from "#/components/confirm-dialog";
@@ -295,9 +306,7 @@ describe("ConfirmDialog", () => {
     await userEvent.click(
       within(dialog).getByRole("button", { name: "Cancel" })
     );
-    await waitFor(() =>
-      expect(screen.queryByRole("alertdialog")).toBeNull()
-    );
+    await waitFor(() => expect(screen.queryByRole("alertdialog")).toBeNull());
     expect(onConfirm).not.toHaveBeenCalled();
   });
 
@@ -569,6 +578,7 @@ git commit -m "feat(ui): add AlertDialog and the ConfirmDialog that wraps it"
 ### Task 3: Replace all four native confirm() calls
 
 **Files:**
+
 - Modify: `src/components/owner-project-actions.tsx:37`
 - Modify: `src/components/staff-project-panel.tsx:172`
 - Modify: `src/routes/_authed/admin/programs/$programId.tsx:68`
@@ -576,6 +586,7 @@ git commit -m "feat(ui): add AlertDialog and the ConfirmDialog that wraps it"
 - Test: `src/test/no-native-confirm.test.ts`
 
 **Interfaces:**
+
 - Consumes: `ConfirmDialog` from Task 2.
 - Produces: nothing importable. Removes every `confirm(` call from `src/`.
 
@@ -607,7 +618,11 @@ describe("native browser modals", () => {
       // Skip both test locations. `src/lib/email/__tests__/templates.test.ts`
       // asserts on the XSS fixture string `onerror=alert(1)`, which any regex
       // looking for a native modal will match forever.
-      if (file.includes("src/test/") || file.includes("__tests__") || file.includes(".test.")) {
+      if (
+        file.includes("src/test/") ||
+        file.includes("__tests__") ||
+        file.includes(".test.")
+      ) {
         continue;
       }
       const source = readFileSync(file, "utf8");
@@ -650,33 +665,33 @@ The delete button is currently produced by a `buttons` array driven through `run
 Remove the `delete` branch from `run`:
 
 ```tsx
-      switch (action) {
-        case "submit":
-          await submitProject({ data: { id: project.id } });
-          break;
-        case "withdraw":
-          await returnToDraft({ data: { id: project.id } });
-          break;
-        default:
-          break;
-      }
-      onChanged();
+switch (action) {
+  case "submit":
+    await submitProject({ data: { id: project.id } });
+    break;
+  case "withdraw":
+    await returnToDraft({ data: { id: project.id } });
+    break;
+  default:
+    break;
+}
+onChanged();
 ```
 
 Narrow the `action` parameter and the `buttons` entry ids from `"submit" | "withdraw" | "delete"` to `"submit" | "withdraw"`, drop the `delete` entry from the `buttons` array, and add a dedicated handler:
 
 ```tsx
-  async function runDelete() {
-    setError(null);
-    setBusy(true);
-    try {
-      await hardDeleteProject({ data: { id: project.id } });
-      window.location.href = "/my/projects";
-    } catch (err) {
-      setError((err as Error).message);
-      setBusy(false);
-    }
+async function runDelete() {
+  setError(null);
+  setBusy(true);
+  try {
+    await hardDeleteProject({ data: { id: project.id } });
+    window.location.href = "/my/projects";
+  } catch (err) {
+    setError((err as Error).message);
+    setBusy(false);
   }
+}
 ```
 
 `setBusy(false)` sits only in the catch: the success path navigates away, and clearing it there would flash the button back to enabled during the redirect.
@@ -684,15 +699,15 @@ Narrow the `action` parameter and the `buttons` entry ids from `"submit" | "with
 Render the trigger next to the array's buttons, guarded by the same `show` condition the deleted array entry carried (read it off the entry you removed and keep it identical):
 
 ```tsx
-      <ConfirmDialog
-        description="This cannot be undone."
-        onConfirm={runDelete}
-        title="Permanently delete this draft?"
-      >
-        <Button disabled={busy} variant="destructive">
-          Delete draft
-        </Button>
-      </ConfirmDialog>
+<ConfirmDialog
+  description="This cannot be undone."
+  onConfirm={runDelete}
+  title="Permanently delete this draft?"
+>
+  <Button disabled={busy} variant="destructive">
+    Delete draft
+  </Button>
+</ConfirmDialog>;
 ```
 
 Add the import:
@@ -706,43 +721,43 @@ import { ConfirmDialog } from "./confirm-dialog";
 `runDelete` currently branches three ways and only `hardDelete` prompts. Split the prompting branch out so the other two keep their direct path:
 
 ```tsx
-  async function runDelete(action: "softDelete" | "restore") {
-    setError(null);
-    try {
-      if (action === "softDelete") {
-        await softDeleteProject({ data: { id: project.id } });
-      } else {
-        await restoreProject({ data: { id: project.id } });
-      }
-      onChanged();
-    } catch (err) {
-      setError((err as Error).message);
+async function runDelete(action: "softDelete" | "restore") {
+  setError(null);
+  try {
+    if (action === "softDelete") {
+      await softDeleteProject({ data: { id: project.id } });
+    } else {
+      await restoreProject({ data: { id: project.id } });
     }
+    onChanged();
+  } catch (err) {
+    setError((err as Error).message);
   }
+}
 
-  async function runHardDelete() {
-    setError(null);
-    try {
-      await hardDeleteProject({ data: { id: project.id } });
-      window.location.href = "/admin/projects";
-    } catch (err) {
-      setError((err as Error).message);
-    }
+async function runHardDelete() {
+  setError(null);
+  try {
+    await hardDeleteProject({ data: { id: project.id } });
+    window.location.href = "/admin/projects";
+  } catch (err) {
+    setError((err as Error).message);
   }
+}
 ```
 
 Find the button that called `runDelete("hardDelete")` (it is in the "Danger zone" `PanelSection` near line 410) and wrap it:
 
 ```tsx
-        <ConfirmDialog
-          description="This cannot be undone."
-          onConfirm={runHardDelete}
-          title="Permanently delete this draft?"
-        >
-          <Button size="sm" variant="destructive">
-            Delete permanently
-          </Button>
-        </ConfirmDialog>
+<ConfirmDialog
+  description="This cannot be undone."
+  onConfirm={runHardDelete}
+  title="Permanently delete this draft?"
+>
+  <Button size="sm" variant="destructive">
+    Delete permanently
+  </Button>
+</ConfirmDialog>;
 ```
 
 Keep the trigger's existing label and size exactly as they are today. Only the wrapper and the handler name change.
@@ -752,36 +767,36 @@ Keep the trigger's existing label and size exactly as they are today. Only the w
 This one has conditional copy, which is why `ConfirmDialog` takes `description` as a prop rather than owning it. Delete the `confirm` guard from `onDelete`:
 
 ```tsx
-  async function onDelete() {
-    setError(null);
-    try {
-      await deleteProgram({ data: { id: program.id } });
-      navigate({ to: "/admin/programs" });
-    } catch (err) {
-      setError((err as Error).message);
-    }
+async function onDelete() {
+  setError(null);
+  try {
+    await deleteProgram({ data: { id: program.id } });
+    navigate({ to: "/admin/programs" });
+  } catch (err) {
+    setError((err as Error).message);
   }
+}
 ```
 
 Compute the description where the component renders, keeping the two-branch copy verbatim:
 
 ```tsx
-  const deleteDescription =
-    projectCount > 0
-      ? `${projectCount} project(s) will be unlinked but kept.`
-      : "This cannot be undone.";
+const deleteDescription =
+  projectCount > 0
+    ? `${projectCount} project(s) will be unlinked but kept.`
+    : "This cannot be undone.";
 ```
 
 Wrap the existing delete button:
 
 ```tsx
-      <ConfirmDialog
-        description={deleteDescription}
-        onConfirm={onDelete}
-        title={`Delete program "${program.courseName}"?`}
-      >
-        <Button variant="destructive">Delete</Button>
-      </ConfirmDialog>
+<ConfirmDialog
+  description={deleteDescription}
+  onConfirm={onDelete}
+  title={`Delete program "${program.courseName}"?`}
+>
+  <Button variant="destructive">Delete</Button>
+</ConfirmDialog>;
 ```
 
 The question moves from the body to the title, which is what gives the dialog its accessible name. Keep the trigger's existing size and label.
@@ -789,27 +804,27 @@ The question moves from the body to the title, which is what gives the dialog it
 - [ ] **Step 6: Replace the call in `categories/$categoryId.tsx`**
 
 ```tsx
-  async function onDelete() {
-    setError(null);
-    try {
-      await deleteCategory({ data: { id: category.id } });
-      navigate({ search: { tab: category.domain }, to: "/admin/categories" });
-    } catch (err) {
-      setError((err as Error).message);
-    }
+async function onDelete() {
+  setError(null);
+  try {
+    await deleteCategory({ data: { id: category.id } });
+    navigate({ search: { tab: category.domain }, to: "/admin/categories" });
+  } catch (err) {
+    setError((err as Error).message);
   }
+}
 ```
 
 Wrap the existing delete button, splitting the long single string into title and description:
 
 ```tsx
-      <ConfirmDialog
-        description="It will be removed from any projects and inventory items that use it. Those projects and items are unaffected otherwise."
-        onConfirm={onDelete}
-        title={`Delete category "${category.name}"?`}
-      >
-        <Button variant="destructive">Delete</Button>
-      </ConfirmDialog>
+<ConfirmDialog
+  description="It will be removed from any projects and inventory items that use it. Those projects and items are unaffected otherwise."
+  onConfirm={onDelete}
+  title={`Delete category "${category.name}"?`}
+>
+  <Button variant="destructive">Delete</Button>
+</ConfirmDialog>;
 ```
 
 Note the semicolon in the original copy became a period plus a new sentence. Do not reintroduce an emdash here.
@@ -834,12 +849,14 @@ git commit -m "feat(ui): confirm destructive actions in a dialog instead of the 
 ### Task 4: Toasts, and the last native alert
 
 **Files:**
+
 - Create: `src/components/ui/sonner.tsx`
 - Modify: `src/routes/__root.tsx`
 - Modify: `src/routes/_authed/my/items.tsx:121`
 - Modify: `package.json` (adds `sonner`)
 
 **Interfaces:**
+
 - Consumes: nothing from earlier tasks.
 - Produces: `Toaster` from `#/components/ui/sonner.tsx`, mounted once in the root document. Call sites import `toast` from `sonner` directly.
 
@@ -916,23 +933,23 @@ Match the relative-import style already used in that file for `BrandProvider`.
 The current code blocks on a native `alert` to report a partial result nobody needs to acknowledge, then navigates. Replace it:
 
 ```tsx
-              <Button
-                onClick={async () => {
-                  const result = await submitCart({
-                    data: { note: note || null },
-                  });
-                  setNote("");
-                  await refresh();
-                  if (result.skipped.length > 0) {
-                    toast.warning(
-                      `Submitted ${result.submitted.length}, skipped ${result.skipped.length} (no longer available).`
-                    );
-                  }
-                  navigate({ search: () => ({ tab: "active" }) });
-                }}
-              >
-                Submit request
-              </Button>
+<Button
+  onClick={async () => {
+    const result = await submitCart({
+      data: { note: note || null },
+    });
+    setNote("");
+    await refresh();
+    if (result.skipped.length > 0) {
+      toast.warning(
+        `Submitted ${result.submitted.length}, skipped ${result.skipped.length} (no longer available).`
+      );
+    }
+    navigate({ search: () => ({ tab: "active" }) });
+  }}
+>
+  Submit request
+</Button>;
 ```
 
 The semicolon in the original copy becomes a comma, because the sentence is short enough not to need it. Add the import:
@@ -987,12 +1004,14 @@ git commit -m "feat(ui): report background results with a toast instead of a bro
 ### Task 5: The Tabs primitive, and the two hand-rolled tab strips
 
 **Files:**
+
 - Create: `src/components/ui/tabs.tsx`
 - Modify: `src/routes/_authed/my/items.tsx:50-75`
 - Modify: `src/routes/_authed/admin/categories/index.tsx:323-341`
 - Test: `src/test/tabs.test.tsx`
 
 **Interfaces:**
+
 - Consumes: `radix-ui`'s `Tabs` export, `cn`.
 - Produces: `Tabs`, `TabsList`, `TabsTrigger`, `TabsContent` from `#/components/ui/tabs.tsx`.
 
@@ -1006,12 +1025,7 @@ import "@testing-library/jest-dom/vitest";
 import { cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it } from "vitest";
-import {
-  Tabs,
-  TabsContent,
-  TabsList,
-  TabsTrigger,
-} from "#/components/ui/tabs";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "#/components/ui/tabs";
 
 afterEach(cleanup);
 
@@ -1076,7 +1090,10 @@ import { Tabs as TabsPrimitive } from "radix-ui";
 import type * as React from "react";
 import { cn } from "#/lib/utils.ts";
 
-function Tabs({ className, ...props }: React.ComponentProps<typeof TabsPrimitive.Root>) {
+function Tabs({
+  className,
+  ...props
+}: React.ComponentProps<typeof TabsPrimitive.Root>) {
   return (
     <TabsPrimitive.Root
       className={cn("flex flex-col", className)}
@@ -1147,23 +1164,23 @@ The tab state is a URL search param, so `Tabs` is controlled: `value` plus `onVa
 Replace the `<div className="mt-4 flex gap-4 border-border border-b">` block and everything it wraps:
 
 ```tsx
-      <Tabs
-        onValueChange={(next) =>
-          navigate({
-            search: () => ({ tab: next as "active" | "cart" | "history" }),
-          })
-        }
-        value={tab}
-      >
-        <TabsList>
-          <TabsTrigger value="cart">Cart ({data.cart.length})</TabsTrigger>
-          <TabsTrigger value="active">Active ({data.active.length})</TabsTrigger>
-          <TabsTrigger value="history">History</TabsTrigger>
-        </TabsList>
-        <TabsContent value="cart">{/* existing cart markup */}</TabsContent>
-        <TabsContent value="active">{/* existing active markup */}</TabsContent>
-        <TabsContent value="history">{/* existing history markup */}</TabsContent>
-      </Tabs>
+<Tabs
+  onValueChange={(next) =>
+    navigate({
+      search: () => ({ tab: next as "active" | "cart" | "history" }),
+    })
+  }
+  value={tab}
+>
+  <TabsList>
+    <TabsTrigger value="cart">Cart ({data.cart.length})</TabsTrigger>
+    <TabsTrigger value="active">Active ({data.active.length})</TabsTrigger>
+    <TabsTrigger value="history">History</TabsTrigger>
+  </TabsList>
+  <TabsContent value="cart">{/* existing cart markup */}</TabsContent>
+  <TabsContent value="active">{/* existing active markup */}</TabsContent>
+  <TabsContent value="history">{/* existing history markup */}</TabsContent>
+</Tabs>;
 ```
 
 The three triggers are now written out rather than mapped, because the labels differ in shape (two carry counts, one does not) and the map needed an IIFE with three branches to express that. Move the existing per-tab bodies into the matching `TabsContent` unchanged. Whatever currently switches on `tab` to decide which body renders is deleted: `TabsContent` does that now, and leaving both would render nothing.
@@ -1171,12 +1188,7 @@ The three triggers are now written out rather than mapped, because the labels di
 Add the import:
 
 ```tsx
-import {
-  Tabs,
-  TabsContent,
-  TabsList,
-  TabsTrigger,
-} from "#/components/ui/tabs";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "#/components/ui/tabs";
 ```
 
 - [ ] **Step 6: Convert `admin/categories/index.tsx`**
@@ -1184,19 +1196,16 @@ import {
 This one maps over a `TABS` constant with `{ label, value }` entries, which survives the conversion:
 
 ```tsx
-      <Tabs
-        onValueChange={(next) => navigate({ search: { tab: next } })}
-        value={tab}
-      >
-        <TabsList>
-          {TABS.map((t) => (
-            <TabsTrigger key={t.value} value={t.value}>
-              {t.label}
-            </TabsTrigger>
-          ))}
-        </TabsList>
-        <TabsContent value={tab}>{/* existing body */}</TabsContent>
-      </Tabs>
+<Tabs onValueChange={(next) => navigate({ search: { tab: next } })} value={tab}>
+  <TabsList>
+    {TABS.map((t) => (
+      <TabsTrigger key={t.value} value={t.value}>
+        {t.label}
+      </TabsTrigger>
+    ))}
+  </TabsList>
+  <TabsContent value={tab}>{/* existing body */}</TabsContent>
+</Tabs>;
 ```
 
 `onValueChange` receives a `string`; if `navigate`'s search schema wants a narrower union, cast at that boundary the same way `my/items.tsx` does. The single `TabsContent value={tab}` is deliberate: this page renders one body driven by a server query rather than three static panels, so one panel that always matches the active tab is correct and keeps `aria-controls` valid.
@@ -1206,6 +1215,7 @@ This one maps over a `TABS` constant with `{ label, value }` entries, which surv
 Run: `npm run dev`. Visit `/my/items` and `/admin/categories`.
 
 Check all four, since they are the reason for the task:
+
 1. Tab, once. Focus lands on the tab strip and one tab only.
 2. Arrow right and left move between tabs and change the panel.
 3. The active tab still shows the orange underline, in light and dark.
@@ -1228,6 +1238,7 @@ git commit -m "feat(ui): make the status tab strips real tablists"
 The spec's finding 3 has a correction worth carrying into the code: the three sites are **two** implementations. `projects/index.tsx` and `admin/users/index.tsx` use a TanStack `<Link>` neutralized by `pointer-events-none`, which leaves it in the tab order, announced as a link, and activatable by Enter. `inventory/index.tsx` uses `<button disabled>`, which is correct. So this task fixes a real defect at two sites and a consistency problem at all three.
 
 **Files:**
+
 - Create: `src/components/ui/pagination.tsx`
 - Modify: `src/routes/projects/index.tsx:85-113`
 - Modify: `src/routes/_authed/admin/users/index.tsx:353-384`
@@ -1235,8 +1246,10 @@ The spec's finding 3 has a correction worth carrying into the code: the three si
 - Test: `src/test/pagination.test.tsx`
 
 **Interfaces:**
+
 - Consumes: `cn`, `buttonVariants`.
 - Produces: from `#/components/ui/pagination.tsx`:
+
   ```ts
   function Pagination(props: React.ComponentProps<"nav">): React.JSX.Element
   function PaginationStatus(props: { page: number; totalPages: number }): React.JSX.Element
@@ -1268,9 +1281,7 @@ describe("Pagination", () => {
         <PaginationStatus page={1} totalPages={3} />
       </Pagination>
     );
-    expect(
-      screen.getByRole("navigation", { name: "Pagination" })
-    ).toBeTruthy();
+    expect(screen.getByRole("navigation", { name: "Pagination" })).toBeTruthy();
   });
 
   it("takes a disabled link out of the tab order and marks it disabled", () => {
@@ -1367,7 +1378,8 @@ function PaginationStatus({
 
 const CONTROL_CLASS =
   "rounded-md px-2 py-1 hover:underline focus-visible:outline-2 focus-visible:outline-ring focus-visible:outline-offset-2";
-const DISABLED_CLASS = "cursor-default text-muted-foreground/40 no-underline hover:no-underline";
+const DISABLED_CLASS =
+  "cursor-default text-muted-foreground/40 no-underline hover:no-underline";
 
 function PaginationLink({
   children,
@@ -1420,35 +1432,35 @@ Expected: PASS, 4 tests.
 TanStack's `<Link>` renders an `<a>` and accepts `disabled`, but it does not drop `href`, so `PaginationLink` is used with `asChild`-style composition instead. The simplest correct form here is to render `PaginationLink` directly and let TanStack build the href through its `Link` only when enabled. Use the two-branch form:
 
 ```tsx
-      <Pagination className="mx-auto max-w-4xl">
-        {page <= 1 ? (
-          <PaginationLink disabled>Previous</PaginationLink>
-        ) : (
-          <PaginationLink asChild>
-            <Link
-              from="/projects/"
-              search={(prev) => ({ ...prev, page: page - 1 })}
-              to="/projects"
-            >
-              Previous
-            </Link>
-          </PaginationLink>
-        )}
-        <PaginationStatus page={page} totalPages={totalPages} />
-        {page >= totalPages ? (
-          <PaginationLink disabled>Next</PaginationLink>
-        ) : (
-          <PaginationLink asChild>
-            <Link
-              from="/projects/"
-              search={(prev) => ({ ...prev, page: page + 1 })}
-              to="/projects"
-            >
-              Next
-            </Link>
-          </PaginationLink>
-        )}
-      </Pagination>
+<Pagination className="mx-auto max-w-4xl">
+  {page <= 1 ? (
+    <PaginationLink disabled>Previous</PaginationLink>
+  ) : (
+    <PaginationLink asChild>
+      <Link
+        from="/projects/"
+        search={(prev) => ({ ...prev, page: page - 1 })}
+        to="/projects"
+      >
+        Previous
+      </Link>
+    </PaginationLink>
+  )}
+  <PaginationStatus page={page} totalPages={totalPages} />
+  {page >= totalPages ? (
+    <PaginationLink disabled>Next</PaginationLink>
+  ) : (
+    <PaginationLink asChild>
+      <Link
+        from="/projects/"
+        search={(prev) => ({ ...prev, page: page + 1 })}
+        to="/projects"
+      >
+        Next
+      </Link>
+    </PaginationLink>
+  )}
+</Pagination>;
 ```
 
 This needs `asChild` on `PaginationLink`, which the Step 3 code does not have. Add it using the same `Slot` import the `Button` component uses:
@@ -1489,17 +1501,17 @@ function PaginationLink({
 Since the Step 3 test does not cover `asChild`, add one more case to `src/test/pagination.test.tsx`:
 
 ```tsx
-  it("merges onto a child link when enabled", () => {
-    render(
-      <Pagination>
-        <PaginationLink asChild>
-          <a href="/projects?page=2">Next</a>
-        </PaginationLink>
-      </Pagination>
-    );
-    // One element, not an anchor inside an anchor.
-    expect(screen.getAllByRole("link", { name: "Next" })).toHaveLength(1);
-  });
+it("merges onto a child link when enabled", () => {
+  render(
+    <Pagination>
+      <PaginationLink asChild>
+        <a href="/projects?page=2">Next</a>
+      </PaginationLink>
+    </Pagination>
+  );
+  // One element, not an anchor inside an anchor.
+  expect(screen.getAllByRole("link", { name: "Next" })).toHaveLength(1);
+});
 ```
 
 Also drop the now-redundant `Math.max(1, ...)` and `Math.min(totalPages, ...)` clamps: the branch already guarantees the bound, and leaving them implies the guard is not trusted.
@@ -1509,35 +1521,35 @@ Also drop the now-redundant `Math.max(1, ...)` and `Math.min(totalPages, ...)` c
 The same shape on a different route. Repeated in full rather than referred back to, because you may be reading this task on its own. This pager has no `mx-auto max-w-4xl` wrapper today, so it passes no `className`:
 
 ```tsx
-      <Pagination>
-        {page <= 1 ? (
-          <PaginationLink disabled>Previous</PaginationLink>
-        ) : (
-          <PaginationLink asChild>
-            <Link
-              from="/admin/users/"
-              search={(prev) => ({ ...prev, page: page - 1 })}
-              to="/admin/users"
-            >
-              Previous
-            </Link>
-          </PaginationLink>
-        )}
-        <PaginationStatus page={page} totalPages={totalPages} />
-        {page >= totalPages ? (
-          <PaginationLink disabled>Next</PaginationLink>
-        ) : (
-          <PaginationLink asChild>
-            <Link
-              from="/admin/users/"
-              search={(prev) => ({ ...prev, page: page + 1 })}
-              to="/admin/users"
-            >
-              Next
-            </Link>
-          </PaginationLink>
-        )}
-      </Pagination>
+<Pagination>
+  {page <= 1 ? (
+    <PaginationLink disabled>Previous</PaginationLink>
+  ) : (
+    <PaginationLink asChild>
+      <Link
+        from="/admin/users/"
+        search={(prev) => ({ ...prev, page: page - 1 })}
+        to="/admin/users"
+      >
+        Previous
+      </Link>
+    </PaginationLink>
+  )}
+  <PaginationStatus page={page} totalPages={totalPages} />
+  {page >= totalPages ? (
+    <PaginationLink disabled>Next</PaginationLink>
+  ) : (
+    <PaginationLink asChild>
+      <Link
+        from="/admin/users/"
+        search={(prev) => ({ ...prev, page: page + 1 })}
+        to="/admin/users"
+      >
+        Next
+      </Link>
+    </PaginationLink>
+  )}
+</Pagination>;
 ```
 
 Add the import:
@@ -1557,25 +1569,21 @@ As on `/projects`, the `Math.max` and `Math.min` clamps come out: the branch alr
 This one is button-driven and already correct on the disabled semantics. It converts for consistency, and it keeps `PaginationButton` rather than `PaginationLink`:
 
 ```tsx
-      <Pagination className="mx-auto max-w-4xl">
-        <PaginationButton
-          disabled={data.page <= 1}
-          onClick={() =>
-            navigate({ search: (s) => ({ ...s, page: s.page - 1 }) })
-          }
-        >
-          Previous
-        </PaginationButton>
-        <PaginationStatus page={data.page} totalPages={totalPages} />
-        <PaginationButton
-          disabled={data.page >= totalPages}
-          onClick={() =>
-            navigate({ search: (s) => ({ ...s, page: s.page + 1 }) })
-          }
-        >
-          Next
-        </PaginationButton>
-      </Pagination>
+<Pagination className="mx-auto max-w-4xl">
+  <PaginationButton
+    disabled={data.page <= 1}
+    onClick={() => navigate({ search: (s) => ({ ...s, page: s.page - 1 }) })}
+  >
+    Previous
+  </PaginationButton>
+  <PaginationStatus page={data.page} totalPages={totalPages} />
+  <PaginationButton
+    disabled={data.page >= totalPages}
+    onClick={() => navigate({ search: (s) => ({ ...s, page: s.page + 1 }) })}
+  >
+    Next
+  </PaginationButton>
+</Pagination>;
 ```
 
 The `pointer-events-none` class is gone: `disabled` already does that job on a button, and keeping both was what made this pager look like the broken ones.
@@ -1608,10 +1616,12 @@ git commit -m "fix(ui): stop disabled pagination controls staying keyboard-reach
 `admin.a11y.test.ts` fires 33 interactions before scanning. `public.a11y.test.ts` and `user.a11y.test.ts` fire zero, so every page they cover is scanned only in its initial load state. Groups 1 and 2 just added three interactive components to exactly those pages.
 
 **Files:**
+
 - Modify: `src/test/a11y/user.a11y.test.ts`
 - Modify: `src/test/a11y/public.a11y.test.ts`
 
 **Interfaces:**
+
 - Consumes: `checkA11y` and `waitForHydration` from `./helpers`, `ConfirmDialog` / `Tabs` / `Pagination` as rendered by Tasks 3, 5, and 6.
 - Produces: nothing importable.
 
@@ -1648,7 +1658,10 @@ test("delete confirmation dialog", async ({ page }) => {
   await page.goto(`/projects/${draftProjectId}`);
   await waitForHydration(page);
 
-  await page.getByRole("button", { name: /Delete/ }).first().click();
+  await page
+    .getByRole("button", { name: /Delete/ })
+    .first()
+    .click();
   const dialog = page.getByRole("alertdialog");
   await expect(dialog).toBeVisible();
 
@@ -1710,6 +1723,7 @@ Cosmetic and mechanical, and the safest to defer. Nothing here changes behavior.
 Four components render the same box, with two accidental divergences: `status-badge.tsx` uses `inline-block` where its siblings use `inline-flex`, and `category-chip.tsx` drops `font-medium`. Upstream `badge` has four fixed variants and no way to express a status-token mapping, so this adopts the box and keeps the maps.
 
 **Files:**
+
 - Create: `src/components/ui/badge.tsx`
 - Modify: `src/components/status-badge.tsx`
 - Modify: `src/components/inventory-status-badge.tsx`
@@ -1718,8 +1732,10 @@ Four components render the same box, with two accidental divergences: `status-ba
 - Test: `src/test/badge.test.tsx`
 
 **Interfaces:**
+
 - Consumes: `cn`, `class-variance-authority` (already a dependency).
 - Produces:
+
   ```ts
   function Badge(props: React.ComponentProps<"span"> & {
     variant?: "default" | "outline" | "secondary" | "status";
@@ -1902,11 +1918,13 @@ git commit -m "refactor(ui): render every badge through one Badge component"
 `rounded-lg border border-border bg-card` is written inline in eight components. `panel.tsx`, `.island-shell`, and `.feature-card` are separate deliberate surfaces and are **not** touched.
 
 **Files:**
+
 - Create: `src/components/ui/card.tsx`
 - Modify: `src/components/project-card.tsx`, `src/components/inventory-card.tsx`, `src/components/project-row.tsx`, `src/components/inventory-row.tsx`, `src/components/owner-project-actions.tsx`, `src/components/projects-filter-bar.tsx`, `src/components/inventory-filter-bar.tsx`, `src/routes/_authed/admin/index.tsx`
 - Test: `src/test/card.test.tsx`
 
 **Interfaces:**
+
 - Consumes: `cn`.
 - Produces: `Card`, `CardHeader`, `CardTitle`, `CardContent`, `CardFooter` from `#/components/ui/card.tsx`. `Card` accepts `interactive?: boolean` for the hover-border treatment the list items share.
 
@@ -1931,9 +1949,13 @@ describe("Card", () => {
 
   it("adds the hover treatment only when interactive", () => {
     const { rerender } = render(<Card>plain</Card>);
-    expect(screen.getByText("plain").className).not.toContain("hover:border-primary");
+    expect(screen.getByText("plain").className).not.toContain(
+      "hover:border-primary"
+    );
     rerender(<Card interactive>linked</Card>);
-    expect(screen.getByText("linked").className).toContain("hover:border-primary");
+    expect(screen.getByText("linked").className).toContain(
+      "hover:border-primary"
+    );
   });
 });
 ```
@@ -1977,7 +1999,11 @@ function Card({
 
 function CardHeader({ className, ...props }: React.ComponentProps<"div">) {
   return (
-    <div className={cn("p-4 pb-0", className)} data-slot="card-header" {...props} />
+    <div
+      className={cn("p-4 pb-0", className)}
+      data-slot="card-header"
+      {...props}
+    />
   );
 }
 
@@ -1992,7 +2018,9 @@ function CardTitle({ className, ...props }: React.ComponentProps<"h3">) {
 }
 
 function CardContent({ className, ...props }: React.ComponentProps<"div">) {
-  return <div className={cn("p-4", className)} data-slot="card-content" {...props} />;
+  return (
+    <div className={cn("p-4", className)} data-slot="card-content" {...props} />
+  );
 }
 
 function CardFooter({ className, ...props }: React.ComponentProps<"div">) {
@@ -2013,7 +2041,7 @@ export { Card, CardContent, CardFooter, CardHeader, CardTitle };
 Start with `project-card.tsx`. Its root is:
 
 ```tsx
-"flex flex-col overflow-hidden rounded-lg border border-border bg-card transition-colors hover:border-primary"
+"flex flex-col overflow-hidden rounded-lg border border-border bg-card transition-colors hover:border-primary";
 ```
 
 becomes:
@@ -2054,6 +2082,7 @@ git commit -m "refactor(ui): route the repeated card surface through one Card co
 `field` is the one form primitive this project can adopt: zero npm dependencies, no react-hook-form. It replaces both the documented `space-y-1.5` wrapper and `field-errors.tsx`.
 
 **Files:**
+
 - Create: `src/components/ui/field.tsx`
 - Delete: `src/components/field-errors.tsx`
 - Modify: every importer of `FieldErrors`
@@ -2061,8 +2090,10 @@ git commit -m "refactor(ui): route the repeated card surface through one Card co
 - Test: `src/test/field.test.tsx`, and update `src/test/field-errors.test.tsx`
 
 **Interfaces:**
+
 - Consumes: `Label` from `#/components/ui/label.tsx`, `cn`.
 - Produces:
+
   ```ts
   function Field(props: React.ComponentProps<"div">): React.JSX.Element
   function FieldLabel(props: React.ComponentProps<typeof Label>): React.JSX.Element
@@ -2145,7 +2176,11 @@ import { cn } from "#/lib/utils.ts";
  */
 function Field({ className, ...props }: React.ComponentProps<"div">) {
   return (
-    <div className={cn("space-y-1.5", className)} data-slot="field" {...props} />
+    <div
+      className={cn("space-y-1.5", className)}
+      data-slot="field"
+      {...props}
+    />
   );
 }
 
@@ -2193,7 +2228,7 @@ import { FieldError } from "#/components/ui/field";
 ```
 
 ```tsx
-<FieldError errors={field.state.meta.errors} />
+<FieldError errors={field.state.meta.errors} />;
 ```
 
 Then:
@@ -2240,7 +2275,9 @@ describe("every Input and Textarea", () => {
         continue;
       }
       const source = readFileSync(file, "utf8");
-      for (const match of source.matchAll(/<(Input|Textarea)\b([\s\S]*?)\/?>/g)) {
+      for (const match of source.matchAll(
+        /<(Input|Textarea)\b([\s\S]*?)\/?>/g
+      )) {
         if (!(/\bid=/.test(match[2]) || /aria-label/.test(match[2]))) {
           offenders.push(`${file}: <${match[1]}>`);
         }
@@ -2282,10 +2319,12 @@ The `git rm` in Step 5 already staged the two deletions.
 ### Task 11: Delete the dead slider, and sweep the palette and emdash tails
 
 **Files:**
+
 - Delete: `src/components/ui/slider.tsx`
 - Modify: the files holding raw palette classes and emdashes
 
 **Interfaces:**
+
 - Consumes: nothing.
 - Produces: nothing.
 
@@ -2310,14 +2349,14 @@ Run: `grep -rn 'text-neutral-\|border-neutral-\|bg-neutral-\|bg-white\|text-red-
 
 Expected: 23 hits. Apply the mapping from `docs/UI-CONVENTIONS.md`:
 
-| Raw | Token |
-| --- | --- |
-| `text-neutral-500` | `text-muted-foreground` |
-| `border-neutral-200`, `border-neutral-300` | `border-border` |
-| `bg-neutral-50`, `bg-neutral-100` | `bg-secondary` |
-| `bg-white` | `bg-card` |
-| `text-red-600`, `text-red-700` | `text-destructive` |
-| `text-blue-700` on a link | drop it, the global `a` style handles link color |
+| Raw                                        | Token                                            |
+| ------------------------------------------ | ------------------------------------------------ |
+| `text-neutral-500`                         | `text-muted-foreground`                          |
+| `border-neutral-200`, `border-neutral-300` | `border-border`                                  |
+| `bg-neutral-50`, `bg-neutral-100`          | `bg-secondary`                                   |
+| `bg-white`                                 | `bg-card`                                        |
+| `text-red-600`, `text-red-700`             | `text-destructive`                               |
+| `text-blue-700` on a link                  | drop it, the global `a` style handles link color |
 
 Read each site before replacing: a `text-red-` inside a status map may want `var(--status-error)` rather than `text-destructive`.
 
@@ -2360,9 +2399,11 @@ The emdash set is 11 files: `src/components/panel.tsx`, `src/components/staff-pr
 The doc currently teaches two hand-rolled patterns that no longer exist. This is the task the issue's last line asks for: "updated where the audit settles something new."
 
 **Files:**
+
 - Modify: `docs/UI-CONVENTIONS.md`
 
 **Interfaces:**
+
 - Consumes: everything above.
 - Produces: nothing importable.
 
@@ -2487,13 +2528,13 @@ that family and has no npm dependencies at all. Do not re-propose `form`.
 
 In "Page wrapper padding", replace the claim that `max-w-4xl` is the standard:
 
-````markdown
+```markdown
 Page width is chosen by content, not fixed. Counting route roots: `max-w-2xl` on
 form and detail pages (7), `max-w-4xl` on list pages that hold a grid (3),
 `max-w-3xl` on the one long-form page, and `max-w-md` / `max-w-sm` on the auth
 cards. Pick the narrowest that fits the content; a form at `max-w-4xl` has an
 uncomfortably long measure.
-````
+```
 
 In "Mobile-first layout", sanction the card grid:
 
@@ -2513,7 +2554,7 @@ Everything else stays two-tier.
 
 Under "Component patterns":
 
-````markdown
+```markdown
 ### Badges
 
 Every badge renders through `<Badge>` from `#/components/ui/badge`. A badge that
@@ -2531,7 +2572,7 @@ deliberately separate and must not be folded into it:
 - `panel.tsx` for the audience-gated panels, which carry their own tone variants
 - `.island-shell` for the auth cards
 - `.feature-card` for the landing page tiles
-````
+```
 
 - [ ] **Step 7: Update the table of contents**
 
@@ -2557,19 +2598,19 @@ git commit -m "docs(ui): teach the primitives instead of the hand-rolled pattern
 
 **Spec coverage.** Every finding maps to a task:
 
-| Spec finding | Task |
-|---|---|
-| 1. Destructive confirmation has no component | 2, 3, 4 |
-| 2. Hand-rolled tabs are not a tablist | 5 |
-| 3. Pagination keyboard-reachable, two implementations | 6 |
-| 4. Suite ungated; zero interaction assertions | 1, 7 |
-| 5. Four badge components, two divergences | 8 |
-| 6. Four card idioms | 9 |
-| 7. `field` yes, `form` never | 10, and 12 records the reason |
-| 8. Dead `slider.tsx` | 11 |
-| 9. Two stale doc conventions | 12 |
-| 10. Raw `<button>` inventory | Partly. See the gap below. |
-| Proposed doc deltas, all 9 | 12 |
+| Spec finding                                          | Task                          |
+| ----------------------------------------------------- | ----------------------------- |
+| 1. Destructive confirmation has no component          | 2, 3, 4                       |
+| 2. Hand-rolled tabs are not a tablist                 | 5                             |
+| 3. Pagination keyboard-reachable, two implementations | 6                             |
+| 4. Suite ungated; zero interaction assertions         | 1, 7                          |
+| 5. Four badge components, two divergences             | 8                             |
+| 6. Four card idioms                                   | 9                             |
+| 7. `field` yes, `form` never                          | 10, and 12 records the reason |
+| 8. Dead `slider.tsx`                                  | 11                            |
+| 9. Two stale doc conventions                          | 12                            |
+| 10. Raw `<button>` inventory                          | Partly. See the gap below.    |
+| Proposed doc deltas, all 9                            | 12                            |
 
 **Known gap, stated rather than hidden.** Spec finding 10 lists eight raw `<button>` sites that are neither the tabs nor the pagination: `notification-bell.tsx` (2), `staff-project-panel.tsx:260`, `projects-filter-bar.tsx:248`, `image-uploader.tsx` (4), and `integrations/better-auth/header-user.tsx:24`. The spec called these "not a single architectural decision," and that holds: each needs a judgment call against the `Button` variant table, and batching eight unrelated judgment calls into one task would produce a task no reviewer could meaningfully reject in part. They are left for a follow-up issue. `ViewToggle` is deliberately excluded too, per the spec's keep verdict.
 

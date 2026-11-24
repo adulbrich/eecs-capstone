@@ -46,11 +46,11 @@ Blast radius is the viewer's own held or requested items, not anyone else's.
 That makes this a contradiction between the docs and the code rather than a
 cross-account exposure, and it is still the whole reason the seam was built.
 
-| Source | Fields on the payload that no consumer reads |
-| --- | --- |
-| `inventory_items` | `serial`, `notes`, `label`, `location` (all `staffItemView`-only), the five `currentHolder*` columns, `currentRequestItemId`, `description`, `imageUrl`, `createdAt`, `searchVector` |
-| `inventory_request_items` | `reviewedBy`, `reviewedAt`, `reviewComment`, `closedBy`, `closedAt`, `requestId`, `itemId`, `updatedAt` |
-| `inventory_requests` | the entire row, on every entry, in both halves |
+| Source                    | Fields on the payload that no consumer reads                                                                                                                                         |
+| ------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `inventory_items`         | `serial`, `notes`, `label`, `location` (all `staffItemView`-only), the five `currentHolder*` columns, `currentRequestItemId`, `description`, `imageUrl`, `createdAt`, `searchVector` |
+| `inventory_request_items` | `reviewedBy`, `reviewedAt`, `reviewComment`, `closedBy`, `closedAt`, `requestId`, `itemId`, `updatedAt`                                                                              |
+| `inventory_requests`      | the entire row, on every entry, in both halves                                                                                                                                       |
 
 `searchVector` rides the payload too, which was checked rather than assumed:
 being `generatedAlwaysAs` does not exclude it, and `db.select({ item:
@@ -82,11 +82,19 @@ line, plus the item's name and status:
 ```ts
 type ActiveEntry =
   | { kind: "hold"; item: HoldItemView }
-  | { kind: "request"; itemName: string; itemStatus: ItemStatus;
-      line: MyRequestLineView; collectedBy: CollectedBy | null };
+  | {
+      kind: "request";
+      itemName: string;
+      itemStatus: ItemStatus;
+      line: MyRequestLineView;
+      collectedBy: CollectedBy | null;
+    };
 
-type HistoryEntry =
-  { itemName: string; line: MyRequestLineView; collectedBy: CollectedBy | null };
+type HistoryEntry = {
+  itemName: string;
+  line: MyRequestLineView;
+  collectedBy: CollectedBy | null;
+};
 ```
 
 ### The decisions behind that, and why
@@ -105,12 +113,12 @@ type HistoryEntry =
   `deadlinePairOf` (`src/lib/inventory-deadlines.ts:90-96`) and the fixture
   builders in `src/lib/__tests__/inventory-deadlines.test.ts` and
   `src/test/overdue-badge.test.tsx`. `deadlinePairOf` itself survives: it exists
-  because it knows *which object* carries the pair, and a hold's living on the
+  because it knows _which object_ carries the pair, and a hold's living on the
   item while a request's lives on the line stays true after any rename.
 
 - **The request arm carries `itemName` and `itemStatus`, not an item view.**
   This is what makes the rename above safe. Had the request arm kept a full item
-  view, one entry would carry `item.pickupBy` (the item's *current* hold
+  view, one entry would carry `item.pickupBy` (the item's _current_ hold
   deadline) beside `line.pickupBy` (that request line's deadline): the same name
   on two columns with different meanings, where today the different names are
   what stop you reading the wrong one. The arm never needed the item's dates
@@ -145,7 +153,7 @@ type HistoryEntry =
 
 - **History carries `itemName`, not an item view.** It renders exactly one item
   field (`items.tsx:234`). It also renders the outcome from `line.status`, which
-  stays. Shipping the item's *current* status and dates on a *closed* line
+  stays. Shipping the item's _current_ status and dates on a _closed_ line
   describes the present, not the record: a returned item reads `available`, or
   `checked_out` if someone else has it now. Flattening to a name makes that
   unrepresentable rather than merely unlikely, and it is the same shape the

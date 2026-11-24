@@ -41,24 +41,24 @@ Spec 4 will add user admin (list, role change, ban/unban). Spec 5 will add media
 
 Same pattern as Spec 2: client-importable wrapper file + server-only `_internal/` impl. Wrappers contain ONLY Zod + `createServerFn` and one dynamic import per handler. Impls hold the DB work.
 
-| Path | Responsibility |
-| --- | --- |
-| `src/server/search.ts` + `src/server/_internal/search.ts` | Single `searchProjects({query, categoryIds, programId, page, pageSize})` server fn. Public (no auth required), but returns only `status='published' AND deleted_at IS NULL`. |
-| `src/server/categories.ts` + `_internal/categories.ts` | `listCategories` (public, used by filter + admin), `createCategory`, `updateCategory`, `deleteCategory`, `listCategoryTypes` (distinct values for the admin autocomplete), `setProjectCategories(projectId, categoryIds[])`. All mutations are staff-only. |
-| `src/server/programs.ts` + `_internal/programs.ts` | `listPrograms` (public, used by filter + dropdown), `getProgram`, `createProgram`, `updateProgram`, `deleteProgram` (returns `{ unlinkedProjectCount }` after the cascade), `addProgramInstructor(programId, userId)`, `removeProgramInstructor(programId, userId)`, `listProgramInstructors(programId)`, `listEligibleInstructors()` (users with role `admin` or `instructor`, for the picker). All mutations staff-only. |
-| `src/server/bookmarks.ts` + `_internal/bookmarks.ts` | `addBookmark(projectId)`, `removeBookmark(projectId)`, `listMyBookmarks()`, `isBookmarked(projectId)`. All authed. Add / remove are idempotent. |
+| Path                                                      | Responsibility                                                                                                                                                                                                                                                                                                                                                                                                             |
+| --------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `src/server/search.ts` + `src/server/_internal/search.ts` | Single `searchProjects({query, categoryIds, programId, page, pageSize})` server fn. Public (no auth required), but returns only `status='published' AND deleted_at IS NULL`.                                                                                                                                                                                                                                               |
+| `src/server/categories.ts` + `_internal/categories.ts`    | `listCategories` (public, used by filter + admin), `createCategory`, `updateCategory`, `deleteCategory`, `listCategoryTypes` (distinct values for the admin autocomplete), `setProjectCategories(projectId, categoryIds[])`. All mutations are staff-only.                                                                                                                                                                 |
+| `src/server/programs.ts` + `_internal/programs.ts`        | `listPrograms` (public, used by filter + dropdown), `getProgram`, `createProgram`, `updateProgram`, `deleteProgram` (returns `{ unlinkedProjectCount }` after the cascade), `addProgramInstructor(programId, userId)`, `removeProgramInstructor(programId, userId)`, `listProgramInstructors(programId)`, `listEligibleInstructors()` (users with role `admin` or `instructor`, for the picker). All mutations staff-only. |
+| `src/server/bookmarks.ts` + `_internal/bookmarks.ts`      | `addBookmark(projectId)`, `removeBookmark(projectId)`, `listMyBookmarks()`, `isBookmarked(projectId)`. All authed. Add / remove are idempotent.                                                                                                                                                                                                                                                                            |
 
 ### 4.2 Client modules
 
-| Path | Responsibility |
-| --- | --- |
-| `src/components/projects-filter-bar.tsx` | Search input (debounced 300ms), category multi-select, program select. Reads / writes via `Route.useSearch()` and `Route.useNavigate({ search: ... })`. Always resets `page` to 1 on filter change. |
-| `src/components/category-chip.tsx` | Small pill rendering the category `name`, with optional `type` tag in muted text. Used on project detail and admin tables. |
-| `src/components/category-multi-select.tsx` | TanStack Form-friendly multi-select (checkboxes inside a popover or simple stacked checkboxes). Only mounted by `project-form.tsx` when `showCategories` is true. |
-| `src/components/bookmark-button.tsx` | Toggle button on project detail. Uses TanStack Query for optimistic update. |
-| `src/components/program-select.tsx` | Plain `<select>` populated from `listPrograms()`. Used in `project-form.tsx` and (single-select variant) the filter bar. |
-| `src/components/admin-table.tsx` | Tiny shared `<table>` shell used by the categories and programs admin lists. Keeps both pages consistent without dragging in a table library. |
-| `src/components/instructor-manager.tsx` | The per-program "Instructors" section on the program edit page: lists current instructors with a remove button, plus an "Add instructor" picker fed by `listEligibleInstructors`. |
+| Path                                       | Responsibility                                                                                                                                                                                      |
+| ------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `src/components/projects-filter-bar.tsx`   | Search input (debounced 300ms), category multi-select, program select. Reads / writes via `Route.useSearch()` and `Route.useNavigate({ search: ... })`. Always resets `page` to 1 on filter change. |
+| `src/components/category-chip.tsx`         | Small pill rendering the category `name`, with optional `type` tag in muted text. Used on project detail and admin tables.                                                                          |
+| `src/components/category-multi-select.tsx` | TanStack Form-friendly multi-select (checkboxes inside a popover or simple stacked checkboxes). Only mounted by `project-form.tsx` when `showCategories` is true.                                   |
+| `src/components/bookmark-button.tsx`       | Toggle button on project detail. Uses TanStack Query for optimistic update.                                                                                                                         |
+| `src/components/program-select.tsx`        | Plain `<select>` populated from `listPrograms()`. Used in `project-form.tsx` and (single-select variant) the filter bar.                                                                            |
+| `src/components/admin-table.tsx`           | Tiny shared `<table>` shell used by the categories and programs admin lists. Keeps both pages consistent without dragging in a table library.                                                       |
+| `src/components/instructor-manager.tsx`    | The per-program "Instructors" section on the program edit page: lists current instructors with a remove button, plus an "Add instructor" picker fed by `listEligibleInstructors`.                   |
 
 ### 4.3 Existing files changed
 
@@ -209,14 +209,14 @@ No DB enforcement on `type`. The admin form's autocomplete is fed by `listCatego
 
 ### 7.2 Server functions
 
-| Name | Auth | Description |
-| --- | --- | --- |
-| `listCategories({ type? })` | Public | All categories, optionally filtered by type. Used by the filter bar AND the admin table. |
-| `listCategoryTypes()` | Public | Distinct existing types, for the admin form autocomplete. |
-| `getCategory(id)` | Public | Single category. |
-| `createCategory({ name, type })` | Staff | `name` and `type` both required, max 100 chars each, trimmed, non-empty. |
-| `updateCategory({ id, name, type })` | Staff | Same validation. |
-| `deleteCategory(id)` | Staff | Cascades `project_categories` (already configured `ON DELETE CASCADE` in Spec 1). |
+| Name                                                 | Auth                                                                              | Description                                                                                                           |
+| ---------------------------------------------------- | --------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------- |
+| `listCategories({ type? })`                          | Public                                                                            | All categories, optionally filtered by type. Used by the filter bar AND the admin table.                              |
+| `listCategoryTypes()`                                | Public                                                                            | Distinct existing types, for the admin form autocomplete.                                                             |
+| `getCategory(id)`                                    | Public                                                                            | Single category.                                                                                                      |
+| `createCategory({ name, type })`                     | Staff                                                                             | `name` and `type` both required, max 100 chars each, trimmed, non-empty.                                              |
+| `updateCategory({ id, name, type })`                 | Staff                                                                             | Same validation.                                                                                                      |
+| `deleteCategory(id)`                                 | Staff                                                                             | Cascades `project_categories` (already configured `ON DELETE CASCADE` in Spec 1).                                     |
 | `setProjectCategories({ projectId, categoryIds[] })` | Staff (and viewer must be allowed to see the project; same `canSeeProject` check) | Replaces the join rows for that project in a transaction (`DELETE ... WHERE projectId = ?` then `INSERT ... VALUES`). |
 
 ### 7.3 Admin UI
@@ -233,17 +233,17 @@ No DB enforcement on `type`. The admin form's autocomplete is fed by `listCatego
 
 ### 8.1 Server functions
 
-| Name | Auth | Description |
-| --- | --- | --- |
-| `listPrograms()` | Public | All programs, ordered by `courseId asc`. Used by program dropdown + admin table. |
-| `getProgram(id)` | Public | Single program with its instructor list. |
-| `createProgram({ courseId, courseName, description? })` | Staff | All three trimmed; `courseId` and `courseName` required. |
-| `updateProgram({ id, courseId, courseName, description? })` | Staff | Same validation. |
-| `deleteProgram(id)` | Staff | Returns `{ unlinkedProjectCount }`. Programs.projectId FK is now `SET NULL` so deletion succeeds even when projects reference it. |
-| `addProgramInstructor({ programId, userId })` | Staff | Refuses if user role is not `admin` or `instructor`. |
-| `removeProgramInstructor({ programId, userId })` | Staff | Idempotent. |
-| `listProgramInstructors(programId)` | Public | Used to render the instructor list on the program edit page and (later) on the program detail page. |
-| `listEligibleInstructors()` | Staff | Users with role `admin` or `instructor`, for the add-instructor picker. |
+| Name                                                        | Auth   | Description                                                                                                                       |
+| ----------------------------------------------------------- | ------ | --------------------------------------------------------------------------------------------------------------------------------- |
+| `listPrograms()`                                            | Public | All programs, ordered by `courseId asc`. Used by program dropdown + admin table.                                                  |
+| `getProgram(id)`                                            | Public | Single program with its instructor list.                                                                                          |
+| `createProgram({ courseId, courseName, description? })`     | Staff  | All three trimmed; `courseId` and `courseName` required.                                                                          |
+| `updateProgram({ id, courseId, courseName, description? })` | Staff  | Same validation.                                                                                                                  |
+| `deleteProgram(id)`                                         | Staff  | Returns `{ unlinkedProjectCount }`. Programs.projectId FK is now `SET NULL` so deletion succeeds even when projects reference it. |
+| `addProgramInstructor({ programId, userId })`               | Staff  | Refuses if user role is not `admin` or `instructor`.                                                                              |
+| `removeProgramInstructor({ programId, userId })`            | Staff  | Idempotent.                                                                                                                       |
+| `listProgramInstructors(programId)`                         | Public | Used to render the instructor list on the program edit page and (later) on the program detail page.                               |
+| `listEligibleInstructors()`                                 | Staff  | Users with role `admin` or `instructor`, for the add-instructor picker.                                                           |
 
 ### 8.2 Admin UI
 
@@ -259,12 +259,12 @@ No DB enforcement on `type`. The admin form's autocomplete is fed by `listCatego
 
 ### 9.1 Server functions
 
-| Name | Auth | Description |
-| --- | --- | --- |
-| `addBookmark({ projectId })` | Authed | Inserts `(userId, projectId)`; `ON CONFLICT DO NOTHING` for idempotency. Viewer must be able to see the project. |
-| `removeBookmark({ projectId })` | Authed | Deletes the row; no-op if absent. |
-| `isBookmarked({ projectId })` | Authed | Returns `{ bookmarked: boolean }`. |
-| `listMyBookmarks()` | Authed | Joins `project_bookmarks` with `projects`, filtered to projects the viewer can still see (excludes soft-deleted, excludes drafts that aren't theirs). Ordered by `bookmarked_at desc`. |
+| Name                            | Auth   | Description                                                                                                                                                                            |
+| ------------------------------- | ------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `addBookmark({ projectId })`    | Authed | Inserts `(userId, projectId)`; `ON CONFLICT DO NOTHING` for idempotency. Viewer must be able to see the project.                                                                       |
+| `removeBookmark({ projectId })` | Authed | Deletes the row; no-op if absent.                                                                                                                                                      |
+| `isBookmarked({ projectId })`   | Authed | Returns `{ bookmarked: boolean }`.                                                                                                                                                     |
+| `listMyBookmarks()`             | Authed | Joins `project_bookmarks` with `projects`, filtered to projects the viewer can still see (excludes soft-deleted, excludes drafts that aren't theirs). Ordered by `bookmarked_at desc`. |
 
 ### 9.2 UI
 
@@ -282,28 +282,28 @@ Admin landing page (`/admin`):
 
 ## 11. Routes
 
-| Path | Layout | Component | Notes |
-| --- | --- | --- | --- |
-| `/projects` | Public | `projects/index.tsx` (modified) | Replaces `listPublishedProjects` with `searchProjects`. Mounts filter bar. |
-| `/projects/$projectId` | Public | `projects/$projectId.tsx` (modified) | Adds category chips row and bookmark button. |
-| `/projects/new` and `/projects/$id/edit` | `_authed` | (modified) | Pass `showCategories={isStaff}` and program dropdown. |
-| `/my/bookmarks` | `_authed` | `_authed/my/bookmarks.tsx` (new) | List of bookmarked projects. |
-| `/admin/categories` | `_authed/admin` | `_authed/admin/categories/index.tsx` (new) | List + inline create. |
-| `/admin/categories/$id` | `_authed/admin` | `_authed/admin/categories/$id.tsx` (new) | Edit + delete. |
-| `/admin/programs` | `_authed/admin` | `_authed/admin/programs/index.tsx` (new) | List + inline create. |
-| `/admin/programs/$id` | `_authed/admin` | `_authed/admin/programs/$id.tsx` (new) | Edit + delete + instructor manager. |
+| Path                                     | Layout          | Component                                  | Notes                                                                      |
+| ---------------------------------------- | --------------- | ------------------------------------------ | -------------------------------------------------------------------------- |
+| `/projects`                              | Public          | `projects/index.tsx` (modified)            | Replaces `listPublishedProjects` with `searchProjects`. Mounts filter bar. |
+| `/projects/$projectId`                   | Public          | `projects/$projectId.tsx` (modified)       | Adds category chips row and bookmark button.                               |
+| `/projects/new` and `/projects/$id/edit` | `_authed`       | (modified)                                 | Pass `showCategories={isStaff}` and program dropdown.                      |
+| `/my/bookmarks`                          | `_authed`       | `_authed/my/bookmarks.tsx` (new)           | List of bookmarked projects.                                               |
+| `/admin/categories`                      | `_authed/admin` | `_authed/admin/categories/index.tsx` (new) | List + inline create.                                                      |
+| `/admin/categories/$id`                  | `_authed/admin` | `_authed/admin/categories/$id.tsx` (new)   | Edit + delete.                                                             |
+| `/admin/programs`                        | `_authed/admin` | `_authed/admin/programs/index.tsx` (new)   | List + inline create.                                                      |
+| `/admin/programs/$id`                    | `_authed/admin` | `_authed/admin/programs/$id.tsx` (new)     | Edit + delete + instructor manager.                                        |
 
 All admin routes use the existing admin `beforeLoad` guard (admin OR instructor; the per-action gate inside server functions further restricts to staff for mutations, which is the same set in Spec 2's role model).
 
 ## 12. Testing
 
-| Layer | What we cover | Tooling |
-| --- | --- | --- |
-| Integration (search) | Title hit outranks qualifications hit for the same query. Program filter intersects with query. Two-category AND requires both. Soft-deleted / non-published never appear. Empty query falls back to recency. Phrase queries (`"some thing"`) work. Punctuation-only input returns the recency list. | Vitest against docker Postgres, same harness as Spec 1 / 2. |
-| Integration (categories) | Create / update / delete round-trip. `deleteCategory` removes the row AND the join rows. `setProjectCategories` is staff-gated; running it as owner throws. `setProjectCategories` is transactional (atomic replace). | Same harness. |
-| Integration (programs) | Create / update round-trip. `deleteProgram` unlinks projects (`SET NULL` cascade) and reports the count. Instructor add refuses for a user role. Instructor remove is idempotent. | Same harness. |
-| Integration (bookmarks) | Add is idempotent. Remove is idempotent. `listMyBookmarks` excludes soft-deleted projects. Viewer can only see their own bookmarks. | Same harness. |
-| Pure (none new) | No new pure modules; the workflow and visibility modules from Spec 2 are unchanged. | N/A |
+| Layer                    | What we cover                                                                                                                                                                                                                                                                                        | Tooling                                                     |
+| ------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------- |
+| Integration (search)     | Title hit outranks qualifications hit for the same query. Program filter intersects with query. Two-category AND requires both. Soft-deleted / non-published never appear. Empty query falls back to recency. Phrase queries (`"some thing"`) work. Punctuation-only input returns the recency list. | Vitest against docker Postgres, same harness as Spec 1 / 2. |
+| Integration (categories) | Create / update / delete round-trip. `deleteCategory` removes the row AND the join rows. `setProjectCategories` is staff-gated; running it as owner throws. `setProjectCategories` is transactional (atomic replace).                                                                                | Same harness.                                               |
+| Integration (programs)   | Create / update round-trip. `deleteProgram` unlinks projects (`SET NULL` cascade) and reports the count. Instructor add refuses for a user role. Instructor remove is idempotent.                                                                                                                    | Same harness.                                               |
+| Integration (bookmarks)  | Add is idempotent. Remove is idempotent. `listMyBookmarks` excludes soft-deleted projects. Viewer can only see their own bookmarks.                                                                                                                                                                  | Same harness.                                               |
+| Pure (none new)          | No new pure modules; the workflow and visibility modules from Spec 2 are unchanged.                                                                                                                                                                                                                  | N/A                                                         |
 
 No new browser / E2E tests. Manual smoke checklist in Section 14.
 

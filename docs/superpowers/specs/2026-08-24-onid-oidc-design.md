@@ -13,14 +13,14 @@ resolve: this is the `genericOAuth` branch, not the SAML branch, and the
 
 What they sent:
 
-| Value | |
-|---|---|
+| Value         |                                                                                                                |
+| ------------- | -------------------------------------------------------------------------------------------------------------- |
 | Discovery URL | `https://login.microsoftonline.com/ce6d05e1-3c5e-4d62-87a8-4c4a2713c113/v2.0/.well-known/openid-configuration` |
-| Tenant ID | `ce6d05e1-3c5e-4d62-87a8-4c4a2713c113` |
-| Client ID | `d551d87a-b608-46a6-9fc3-a8b6bd56a5df` |
-| Client secret | In `kv-engr-coe-vault-caps`, which we cannot currently read |
-| Claims | `username`, `email`, `given_name`, `family_name`, in the ID token |
-| Audience | Holders of an active College of Engineering account |
+| Tenant ID     | `ce6d05e1-3c5e-4d62-87a8-4c4a2713c113`                                                                         |
+| Client ID     | `d551d87a-b608-46a6-9fc3-a8b6bd56a5df`                                                                         |
+| Client secret | In `kv-engr-coe-vault-caps`, which we cannot currently read                                                    |
+| Claims        | `username`, `email`, `given_name`, `family_name`, in the ID token                                              |
+| Audience      | Holders of an active College of Engineering account                                                            |
 
 Three of their answers change the design rather than just filling in blanks.
 
@@ -213,16 +213,18 @@ inherit a real student's account. We are not turning that off.
 
 ```ts
 genericOAuth({
-  config: [{
-    providerId: "onid",
-    discoveryUrl: process.env.ONID_DISCOVERY_URL ?? "",
-    clientId: process.env.ONID_CLIENT_ID ?? "",
-    clientSecret: process.env.ONID_CLIENT_SECRET ?? "",
-    scopes: ["openid", "profile", "email"],
-    pkce: true,
-    getUserInfo: onidUserInfo,
-  }],
-})
+  config: [
+    {
+      providerId: "onid",
+      discoveryUrl: process.env.ONID_DISCOVERY_URL ?? "",
+      clientId: process.env.ONID_CLIENT_ID ?? "",
+      clientSecret: process.env.ONID_CLIENT_SECRET ?? "",
+      scopes: ["openid", "profile", "email"],
+      pkce: true,
+      getUserInfo: onidUserInfo,
+    },
+  ],
+});
 ```
 
 `offline_access` is deliberately absent. It buys a refresh token, and a refresh

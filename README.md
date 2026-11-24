@@ -41,7 +41,7 @@ docker compose down
 
 The stack publishes Postgres on 5432 and RustFS on 9000/9001. If another
 project already holds those host ports, the containers still start but silently
-publish nothing, and the app talks to the *other* project's services instead:
+publish nothing, and the app talks to the _other_ project's services instead:
 Postgres fails with `password authentication failed`, while S3 may quietly
 accept writes, because the default `rustfsadmin` credentials are the same.
 
@@ -180,21 +180,21 @@ version, this file could return to CLI generation; until then, edit it directly.
 Every email renders through `src/lib/email/templates.ts`. Every one is mandatory
 for its recipient; there are no notification preferences (ADR-0019).
 
-| Email | Trigger | Recipient |
-|---|---|---|
-| Your sign-in code | Somebody asks for a code at `/sign-in` | The address typed |
-| New project submitted | A project moves to `submitted` | `EMAIL_STAFF_INBOX` |
-| Approved / Changes requested / Returned to draft | Staff review a project | The proposer |
-| New comment on your project | Staff comment, not internal | The proposer |
-| Comment from the proposer | The proposer comments | `EMAIL_STAFF_INBOX` |
-| Proposer edited a project | The proposer stops saving edits to an approved or published project for 30 minutes, or 3 hours pass (ADR-0071) | `EMAIL_STAFF_INBOX` |
-| A project was assigned to you | Staff reassign the proposer | The new proposer |
-| You were named as a mentor | Staff set a mentor address | The mentor |
-| Your draft was deleted | Staff hard-delete a draft | The proposer |
-| Borrow list / Custom request submitted | A student submits | `EMAIL_STAFF_INBOX` |
-| Reserved / Request denied / Checked out | Staff decide a request line | The requester or holder, an address-only walk-in included |
-| Fulfilled / Request denied (custom line) | Staff close a custom line | The requester |
-| Your role is now ... / Your account was suspended | An admin changes a role or bans | The account |
+| Email                                             | Trigger                                                                                                        | Recipient                                                 |
+| ------------------------------------------------- | -------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------- |
+| Your sign-in code                                 | Somebody asks for a code at `/sign-in`                                                                         | The address typed                                         |
+| New project submitted                             | A project moves to `submitted`                                                                                 | `EMAIL_STAFF_INBOX`                                       |
+| Approved / Changes requested / Returned to draft  | Staff review a project                                                                                         | The proposer                                              |
+| New comment on your project                       | Staff comment, not internal                                                                                    | The proposer                                              |
+| Comment from the proposer                         | The proposer comments                                                                                          | `EMAIL_STAFF_INBOX`                                       |
+| Proposer edited a project                         | The proposer stops saving edits to an approved or published project for 30 minutes, or 3 hours pass (ADR-0071) | `EMAIL_STAFF_INBOX`                                       |
+| A project was assigned to you                     | Staff reassign the proposer                                                                                    | The new proposer                                          |
+| You were named as a mentor                        | Staff set a mentor address                                                                                     | The mentor                                                |
+| Your draft was deleted                            | Staff hard-delete a draft                                                                                      | The proposer                                              |
+| Borrow list / Custom request submitted            | A student submits                                                                                              | `EMAIL_STAFF_INBOX`                                       |
+| Reserved / Request denied / Checked out           | Staff decide a request line                                                                                    | The requester or holder, an address-only walk-in included |
+| Fulfilled / Request denied (custom line)          | Staff close a custom line                                                                                      | The requester                                             |
+| Your role is now ... / Your account was suspended | An admin changes a role or bans                                                                                | The account                                               |
 
 The full channel table, in-app beside email, is PRD section 13. Everything not in
 it is in-app only or silent. Staff can skip the proposer email per action from

@@ -53,14 +53,14 @@ forbids it on an `asChild` one (the child is a link), so `npm run typecheck` fai
 `Button` that does not say. It has no default, because a default of `"button"` would
 turn an implicit form submit into a no-op just as silently.
 
-| Variant | Use when |
-| --- | --- |
-| `default` | Primary CTA (Submit, Save, Create, Sign in) |
-| `outline` | Secondary actions (Cancel, Edit, Sign out, Withdraw) |
-| `ghost` | Tertiary / low-emphasis (Reply, Remove in lists) |
-| `destructive` | Irreversible danger (Delete, Ban) |
-| `secondary` | Muted fill, when `outline` reads too light against the surface |
-| `link` | Inline text that behaves as a button |
+| Variant       | Use when                                                       |
+| ------------- | -------------------------------------------------------------- |
+| `default`     | Primary CTA (Submit, Save, Create, Sign in)                    |
+| `outline`     | Secondary actions (Cancel, Edit, Sign out, Withdraw)           |
+| `ghost`       | Tertiary / low-emphasis (Reply, Remove in lists)               |
+| `destructive` | Irreversible danger (Delete, Ban)                              |
+| `secondary`   | Muted fill, when `outline` reads too light against the surface |
+| `link`        | Inline text that behaves as a button                           |
 
 ### Sizes and icons
 
@@ -87,18 +87,18 @@ activation.
 ```tsx
 <Button asChild size="sm">
   <Link to="/projects/new">New project</Link>
-</Button>
+</Button>;
 ```
 
 ### One kind of action is one button everywhere
 
 The eye reads a different button as a different action, so these four are fixed:
 
-| Action | Button |
-| --- | --- |
-| Cancel | `outline` |
-| Remove | `ghost` |
-| Save | `default` |
+| Action    | Button                                                          |
+| --------- | --------------------------------------------------------------- |
+| Cancel    | `outline`                                                       |
+| Remove    | `ghost`                                                         |
+| Save      | `default`                                                       |
 | Clear all | `<ClearFiltersButton>` from `#/components/clear-filters-button` |
 
 Size is the row's to decide, not the action's: Cancel takes the size of the button
@@ -226,7 +226,7 @@ every input an `id` that the `Label`'s `htmlFor` matches, and render errors with
   <Label htmlFor="email">Email</Label>
   <Input id="email" name="email" type="email" required />
   <FieldError errors={field.state.meta.errors} />
-</div>
+</div>;
 ```
 
 `FieldError` takes `errors: readonly unknown[]` because a validation error can
@@ -339,17 +339,17 @@ family and declares no dependencies at all. Do not re-propose `form`.
 
 Semantic aliases adapt to dark mode; raw palette classes do not.
 
-| Instead of | Use |
-| --- | --- |
-| `text-neutral-500` | `text-muted-foreground` |
-| `border-neutral-200`, `border-neutral-300` | `border-border` |
-| `bg-neutral-50`, `bg-neutral-100` | `bg-secondary` |
-| `bg-white` | `bg-card` |
-| `text-red-600`, `text-red-700` | `text-destructive` |
-| `text-blue-700` on links | `text-brand-dark`; see the brand link rule below |
-| `bg-blue-50` for highlights | `bg-[var(--brand-primary-tint)]` |
-| `dark:bg-neutral-900` | `dark:bg-card` |
-| `dark:border-neutral-800` | `dark:border-border` |
+| Instead of                                 | Use                                              |
+| ------------------------------------------ | ------------------------------------------------ |
+| `text-neutral-500`                         | `text-muted-foreground`                          |
+| `border-neutral-200`, `border-neutral-300` | `border-border`                                  |
+| `bg-neutral-50`, `bg-neutral-100`          | `bg-secondary`                                   |
+| `bg-white`                                 | `bg-card`                                        |
+| `text-red-600`, `text-red-700`             | `text-destructive`                               |
+| `text-blue-700` on links                   | `text-brand-dark`; see the brand link rule below |
+| `bg-blue-50` for highlights                | `bg-[var(--brand-primary-tint)]`                 |
+| `dark:bg-neutral-900`                      | `dark:bg-card`                                   |
+| `dark:border-neutral-800`                  | `dark:border-border`                             |
 
 Biome's `noTailwindRawColors` fails every raw palette class in the table, but lets
 `bg-white` and `text-black` through by design, so those two stay review's job.
@@ -434,13 +434,13 @@ carries this padding signature, with `max-w-*` chosen per page:
 Page width is chosen by content. Pick the narrowest that fits; a form at
 `max-w-4xl` has an uncomfortably long measure.
 
-| Width | For | Example |
-| --- | --- | --- |
-| `max-w-md` | one narrow form or card | `profile.tsx` |
-| `max-w-2xl` | forms, dashboards, prose | `projects/new.tsx`, `privacy.tsx` |
-| `max-w-3xl` | the long-form project page | `SimilarProjectsLayout`, widening to `xl:max-w-6xl` for its aside |
+| Width       | For                                        | Example                                                                                                                             |
+| ----------- | ------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------- |
+| `max-w-md`  | one narrow form or card                    | `profile.tsx`                                                                                                                       |
+| `max-w-2xl` | forms, dashboards, prose                   | `projects/new.tsx`, `privacy.tsx`                                                                                                   |
+| `max-w-3xl` | the long-form project page                 | `SimilarProjectsLayout`, widening to `xl:max-w-6xl` for its aside                                                                   |
 | `max-w-4xl` | lists, two-column detail, grids of figures | `my/projects.tsx`, `inventory/$itemId.tsx`, `admin/analytics.tsx`; `admin/index.tsx` widening to `xl:max-w-7xl` for its four groups |
-| none | admin tables that run full width | `/admin/projects`, `my/bookmarks.tsx` below its bounded title |
+| none        | admin tables that run full width           | `/admin/projects`, `my/bookmarks.tsx` below its bounded title                                                                       |
 
 ### Interactive element height
 
@@ -485,11 +485,13 @@ belongs in the header, and a live count of a page's own collection does not.
 `SiteHeader` renders two sibling layouts and shows exactly one at a time:
 
 ```tsx
-{/* Desktop */}
-<div className="hidden h-14 md:flex ...">...</div>
+<>
+  {/* Desktop */}
+  <div className="hidden h-14 md:flex ...">...</div>
 
-{/* Mobile */}
-<div className="flex h-14 md:hidden ...">...</div>
+  {/* Mobile */}
+  <div className="flex h-14 md:hidden ...">...</div>
+</>;
 ```
 
 The mobile drawer is a shadcn `Sheet` with `side="left"`, opened by a hamburger
@@ -518,7 +520,7 @@ and escape-dismissible. Four rules keep it correct:
   <SheetContent className="w-72 p-0" side="left">
     ...
   </SheetContent>
-</Sheet>
+</Sheet>;
 ```
 
 ---
@@ -659,7 +661,7 @@ Absent means the flat table every other admin route renders.
     actions: (rows) => <ApproveAll rows={rows} />,
   }}
   {...tableProps}
-/>
+/>;
 ```
 
 Grouped-ness is derived from the sort, never stored: rows are grouped while the
@@ -778,11 +780,11 @@ Both fail quietly otherwise: the table renders and sorts, in the wrong order.
 every column without one to a locale-aware **string** comparator, so whatever the
 accessor returns is sorted through `String(value)`:
 
-| Column value | `sortFn` | What the default does instead |
-| --- | --- | --- |
-| `Date` | `"datetime"` | `String(date)` starts with the weekday name, so ascending reads Fri, Fri, Mon, Wed. |
-| number | `"basic"` | `"10"` sorts before `"2"`. |
-| boolean | `"basic"` | `"false" < "true"` happens to read right, until a nullable flag puts `"null"` between them. |
+| Column value | `sortFn`     | What the default does instead                                                               |
+| ------------ | ------------ | ------------------------------------------------------------------------------------------- |
+| `Date`       | `"datetime"` | `String(date)` starts with the weekday name, so ascending reads Fri, Fri, Mon, Wed.         |
+| number       | `"basic"`    | `"10"` sorts before `"2"`.                                                                  |
+| boolean      | `"basic"`    | `"false" < "true"` happens to read right, until a nullable flag puts `"null"` between them. |
 
 **An accessor returns `undefined` for a missing value, never `null`.**
 `sortUndefined: "last"` is the only knob TanStack offers for grouping empties and
@@ -865,7 +867,7 @@ that opens it, or the `onOpenChange` that handles the close.
   onOpenChange={setConfirmOpen}
   open={confirmOpen}
   title="Save the mentor?"
-/>
+/>;
 ```
 
 ### Detail page header
@@ -914,7 +916,7 @@ focus, and Enter or Space activates.
   </TabsList>
   <TabsContent value="active">{/* active panel */}</TabsContent>
   <TabsContent value="history">{/* history panel */}</TabsContent>
-</Tabs>
+</Tabs>;
 ```
 
 `onValueChange` hands back a plain `string`; cast it at the `navigate` boundary
@@ -961,7 +963,7 @@ when disabled, which is what actually removes it from the tab order.
     totalPages={totalPages}
   />
   ...
-</Pagination>
+</Pagination>;
 ```
 
 `PaginationStatus` is the one live region that counts rows, on every list:
@@ -1070,14 +1072,18 @@ forms inline in their routes.
   search={<ProjectsSearchBar {...top} />}
   tableControls={
     view === "table" ? (
-      <AdminTableControls filtered={filtered} rowCount={rows.length} {...controlsProps} />
+      <AdminTableControls
+        filtered={filtered}
+        rowCount={rows.length}
+        {...controlsProps}
+      />
     ) : undefined
   }
   title={<h1 className="font-semibold text-2xl">Projects</h1>}
 >
   {rows}
   <Pagination>...</Pagination>
-</ListingLayout>
+</ListingLayout>;
 ```
 
 `search` holds what does not narrow the list: the search input, its `SearchHint`
@@ -1128,11 +1134,11 @@ One panel floats, the project page's similar projects (`SimilarProjectsLayout`,
 [ADR-0054](./adr/0054-similar-projects-float-below-xl-and-sit-beside-from-it.md)),
 and it has one form per tier:
 
-| Width | Form | Starts |
-| --- | --- | --- |
-| below `md` | `icon-lg` outline Button, fixed bottom right, opening a bottom `Sheet` | collapsed |
+| Width        | Form                                                                                     | Starts                                               |
+| ------------ | ---------------------------------------------------------------------------------------- | ---------------------------------------------------- |
+| below `md`   | `icon-lg` outline Button, fixed bottom right, opening a bottom `Sheet`                   | collapsed                                            |
 | `md` to `xl` | `Card` fixed bottom right, collapsing to an outline Button with the heading as its label | open, or collapsed if the viewer collapsed it before |
-| `xl` and up | sticky aside in a second grid column, no collapse | open |
+| `xl` and up  | sticky aside in a second grid column, no collapse                                        | open                                                 |
 
 The collapse is remembered in `localStorage` under
 `cs-capstone:similar-projects-collapsed`, read and written in try/catch, and
@@ -1180,7 +1186,7 @@ else, such as Admin's `NavCard`; a plain `<Card>` would nest a `<div>` around th
 ```tsx
 <Card asChild className="flex flex-col overflow-hidden" interactive>
   <Link to="/admin/projects">...</Link>
-</Card>
+</Card>;
 ```
 
 A card that carries a control beside its link (`project-card.tsx` with its bookmark
@@ -1210,7 +1216,7 @@ Radix `SelectItem` rejects `value=""`, so an unset option needs a sentinel. Use
       </SelectItem>
     ))}
   </SelectContent>
-</Select>
+</Select>;
 ```
 
 ### Auth pages
@@ -1220,7 +1226,7 @@ Radix `SelectItem` rejects `value=""`, so an unset option needs a sentinel. Use
 ```tsx
 <div className="flex min-h-[calc(100vh-3.5rem)] items-start justify-center px-4 pt-12 pb-20">
   <div className="island-shell w-full max-w-sm rounded-xl p-8">...</div>
-</div>
+</div>;
 ```
 
 `3.5rem` is the `h-14` header, so the card centers in the space below it.
@@ -1243,7 +1249,7 @@ hard delete puts the email skip there, since that delete emails the proposer
   title="Permanently delete this draft?"
 >
   <Button variant="destructive">Delete draft</Button>
-</ConfirmDialog>
+</ConfirmDialog>;
 ```
 
 `ConfirmDialog` and both dialogs under "Typing the value to confirm" are built on

@@ -45,11 +45,11 @@ The seed creates one account per role, among others. None has a password: sign
 in with an emailed code, which the console transport prints, code included, to
 the terminal running `npm run dev`.
 
-| Address | Role |
-| --- | --- |
-| `user@example.com` | user |
+| Address                  | Role       |
+| ------------------------ | ---------- |
+| `user@example.com`       | user       |
 | `instructor@example.com` | instructor |
-| `admin@example.com` | admin |
+| `admin@example.com`      | admin      |
 
 ## Claude Code
 
@@ -72,13 +72,13 @@ installed by the prompt.
 which run inside your session and refuse the commands the rules forbid before they
 execute:
 
-| Hook | When | What it does |
-| --- | --- | --- |
-| `session-context.mjs` | session start | Prints the branch, working tree, Node against `.nvmrc`, and the running compose services. |
-| `guard-git.mjs` | before a `git` command | Refuses `add -A`, `commit -a`, a commit on `main`, a force push at `main`, `reset --hard`, `checkout .`, `restore .`, `clean -f`, `branch -D`, and a commit message that fails the commit check. |
-| `guard-gh.mjs` | before a `gh` command | Refuses PR or issue text with an emdash, an emoji, a session link, or a title that is not a Conventional Commits subject. Warns, without refusing, when a `gh pr create` or `gh pr edit` body has no screenshot for a branch that changes a UI path (#342). |
-| `guard-edits.mjs` | before an edit | Refuses edits to the generated and personal files: the route tree, the auth schema, `CLAUDE.md`, `.env` and `.env.local`. |
-| `after-edit.mjs` | after an edit | Reports Biome and the prose rule on the edited file. |
+| Hook                  | When                   | What it does                                                                                                                                                                                                                                                |
+| --------------------- | ---------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `session-context.mjs` | session start          | Prints the branch, working tree, Node against `.nvmrc`, and the running compose services.                                                                                                                                                                   |
+| `guard-git.mjs`       | before a `git` command | Refuses `add -A`, `commit -a`, a commit on `main`, a force push at `main`, `reset --hard`, `checkout .`, `restore .`, `clean -f`, `branch -D`, and a commit message that fails the commit check.                                                            |
+| `guard-gh.mjs`        | before a `gh` command  | Refuses PR or issue text with an emdash, an emoji, a session link, or a title that is not a Conventional Commits subject. Warns, without refusing, when a `gh pr create` or `gh pr edit` body has no screenshot for a branch that changes a UI path (#342). |
+| `guard-edits.mjs`     | before an edit         | Refuses edits to the generated and personal files: the route tree, the auth schema, `CLAUDE.md`, `.env` and `.env.local`.                                                                                                                                   |
+| `after-edit.mjs`      | after an edit          | Reports Biome and the prose rule on the edited file.                                                                                                                                                                                                        |
 
 A refusal from the git guard looks like this in the session, and the agent is
 expected to change what it was about to do rather than retry; the edit guard

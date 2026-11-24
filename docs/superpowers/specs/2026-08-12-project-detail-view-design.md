@@ -19,12 +19,12 @@ The governing principle:
 `db.select()` and returns the row through `stripPrivateFields`. `/projects/$id`
 is fully public, so this payload reaches anonymous viewers.
 
-| Column | Handling today |
-| --- | --- |
-| `notes` | conditionally nulled in `stripPrivateFields` (`project-visibility.ts:111-113`) |
-| `proposerEmail` | conditionally nulled there too (`:114-116`) |
-| `embedding`, `embeddingSourceHash`, `embeddingUpdatedAt` | nulled by the **caller**, inline at `projects-queries.ts:286-289` |
-| `proposerId`, `programManagerId`, `publishedAt`, `archivedAt`, `searchVector`, `createdAt`, `updatedAt` | **neither read nor stripped**: riding the payload |
+| Column                                                                                                  | Handling today                                                                 |
+| ------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------ |
+| `notes`                                                                                                 | conditionally nulled in `stripPrivateFields` (`project-visibility.ts:111-113`) |
+| `proposerEmail`                                                                                         | conditionally nulled there too (`:114-116`)                                    |
+| `embedding`, `embeddingSourceHash`, `embeddingUpdatedAt`                                                | nulled by the **caller**, inline at `projects-queries.ts:286-289`              |
+| `proposerId`, `programManagerId`, `publishedAt`, `archivedAt`, `searchVector`, `createdAt`, `updatedAt` | **neither read nor stripped**: riding the payload                              |
 
 The rule for what a viewer may read lives in two places, and the split is the
 tell: someone hit the embedding leak and patched the call site instead of the
@@ -36,7 +36,7 @@ module. `searchVector` is a tsvector on an anonymous page.
 `VisibleProject = {...} & Record<string, unknown>` widens every other field to
 `unknown`, so the routes cast to compensate and the deepening would buy type
 leverage. That is wrong. `stripPrivateFields<T extends VisibleProject>(project:
-T): T` returns the inferred Drizzle row; the intersection is a *constraint*, not
+T): T` returns the inferred Drizzle row; the intersection is a _constraint_, not
 a widening. All 37 casts (34 `as string`, 2 `as number`, 1 `as Date`) are
 vestigial and deletable today, independent of this change. They are removed here
 because the projection touches those exact lines, not because it enables it.
@@ -155,11 +155,11 @@ dialog's checkbox label (`:335-337`).
 
 A read-only `ProposerSummary` component renders the three states:
 
-| State | Shown |
-| --- | --- |
-| Linked | the account holder's name, the address, and an "Account linked" badge |
+| State               | Shown                                                                                                             |
+| ------------------- | ----------------------------------------------------------------------------------------------------------------- |
+| Linked              | the account holder's name, the address, and an "Account linked" badge                                             |
 | Address, no account | the address, a "No account yet" badge, and a hint that it links automatically when they sign up with that address |
-| Neither | "None on file" |
+| Neither             | "None on file"                                                                                                    |
 
 `user.name` is `notNull`, so a linked account always has one.
 

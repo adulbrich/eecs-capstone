@@ -26,12 +26,14 @@ Source spec: `docs/superpowers/specs/2026-07-22-listing-filter-presentation-desi
 ## File Structure
 
 **Created:**
+
 - `src/components/filter-switch.tsx`: the single boolean-filter control used by every filter bar.
 - `src/test/filter-switch.test.tsx`: unit tests for the above.
 - `src/test/project-row.test.tsx`: unit tests for the row thumbnail.
 - `src/server/__tests__/admin-projects-filter.integration.test.ts`: integration tests for the program filter.
 
 **Modified:**
+
 - `src/components/project-row.tsx`: fixed-ratio thumbnail.
 - `src/components/projects-filter-bar.tsx:152-160`: adopt `FilterSwitch`.
 - `src/routes/_authed/admin/users/index.tsx:145-159`: adopt `FilterSwitch`.
@@ -44,10 +46,12 @@ Source spec: `docs/superpowers/specs/2026-07-22-listing-filter-presentation-desi
 ## Task 1: Fixed-ratio list thumbnail
 
 **Files:**
+
 - Modify: `src/components/project-row.tsx:12-24`
 - Test: `src/test/project-row.test.tsx` (create)
 
 **Interfaces:**
+
 - Consumes: nothing from earlier tasks.
 - Produces: no new exports. `ProjectRow` keeps its existing signature `({ project }: { project: ProjectSummary })`.
 
@@ -186,12 +190,15 @@ git commit -m "fix: give the list-view thumbnail a fixed 3:2 aspect ratio"
 ## Task 2: The `FilterSwitch` component
 
 **Files:**
+
 - Create: `src/components/filter-switch.tsx`
 - Test: `src/test/filter-switch.test.tsx` (create)
 
 **Interfaces:**
+
 - Consumes: `Switch` from `#/components/ui/switch`, `Label` from `#/components/ui/label`.
 - Produces:
+
   ```ts
   export function FilterSwitch(props: {
     checked: boolean;
@@ -200,6 +207,7 @@ git commit -m "fix: give the list-view thumbnail a fixed 3:2 aspect ratio"
     onCheckedChange: (checked: boolean) => void;
   }): JSX.Element
   ```
+
   Tasks 3 and 5 import this exact signature.
 
 **Context:** The existing call sites nest `<Checkbox>` inside `<Label>` and rely on implicit labelling. Radix's `Switch` renders a `button`, and a `button` inside a `label` is **not** implicitly labelled, so this component requires an explicit `id` plus `htmlFor`. Getting this wrong ships an unlabelled control that screen readers announce as "switch" with no name.
@@ -247,7 +255,9 @@ describe("FilterSwitch", () => {
         }}
       />
     );
-    expect(screen.getByRole("switch").getAttribute("aria-checked")).toBe("true");
+    expect(screen.getByRole("switch").getAttribute("aria-checked")).toBe(
+      "true"
+    );
   });
 
   it("calls onCheckedChange with the next value when toggled", () => {
@@ -344,11 +354,13 @@ git commit -m "feat: add FilterSwitch, a shared boolean filter control"
 ## Task 3: Adopt `FilterSwitch` at all three call sites
 
 **Files:**
+
 - Modify: `src/components/projects-filter-bar.tsx:152-160`
 - Modify: `src/routes/_authed/admin/users/index.tsx:145-159`
 - Modify: `src/routes/_authed/admin/projects/index.tsx:76-87`
 
 **Interfaces:**
+
 - Consumes: `FilterSwitch` from Task 2, exact signature `{ checked, id, label, onCheckedChange }`.
 - Produces: nothing new. The admin projects `softDeleteToggle` variable keeps its name and its position in the JSX.
 
@@ -359,28 +371,28 @@ git commit -m "feat: add FilterSwitch, a shared boolean filter control"
 In `src/components/projects-filter-bar.tsx`, replace this block:
 
 ```tsx
-        <div className="flex items-end">
-          <Label className="font-normal">
-            <Checkbox
-              checked={archivedOnly}
-              onCheckedChange={(checked) => setArchivedOnly(checked === true)}
-            />
-            Show only archived projects
-          </Label>
-        </div>
+<div className="flex items-end">
+  <Label className="font-normal">
+    <Checkbox
+      checked={archivedOnly}
+      onCheckedChange={(checked) => setArchivedOnly(checked === true)}
+    />
+    Show only archived projects
+  </Label>
+</div>;
 ```
 
 with this:
 
 ```tsx
-        <div className="flex items-end">
-          <FilterSwitch
-            checked={archivedOnly}
-            id="filter-archived-only"
-            label="Show only archived projects"
-            onCheckedChange={setArchivedOnly}
-          />
-        </div>
+<div className="flex items-end">
+  <FilterSwitch
+    checked={archivedOnly}
+    id="filter-archived-only"
+    label="Show only archived projects"
+    onCheckedChange={setArchivedOnly}
+  />
+</div>;
 ```
 
 The outer `flex items-end` stays. That is what aligns the switch's `h-9` box with the `SelectTrigger` in the sibling grid cell.
@@ -398,36 +410,36 @@ Do **not** remove the `Checkbox` import: it is still used by the category filter
 In `src/routes/_authed/admin/users/index.tsx`, replace this block:
 
 ```tsx
-        <Label className="font-normal">
-          <Checkbox
-            checked={includeBanned}
-            onCheckedChange={(checked) =>
-              void navigate({
-                search: (prev) => ({
-                  ...prev,
-                  includeBanned: checked === true,
-                  page: 1,
-                }),
-              })
-            }
-          />
-          Include banned
-        </Label>
+<Label className="font-normal">
+  <Checkbox
+    checked={includeBanned}
+    onCheckedChange={(checked) =>
+      void navigate({
+        search: (prev) => ({
+          ...prev,
+          includeBanned: checked === true,
+          page: 1,
+        }),
+      })
+    }
+  />
+  Include banned
+</Label>;
 ```
 
 with this:
 
 ```tsx
-        <FilterSwitch
-          checked={includeBanned}
-          id="user-include-banned"
-          label="Include banned"
-          onCheckedChange={(checked) =>
-            void navigate({
-              search: (prev) => ({ ...prev, includeBanned: checked, page: 1 }),
-            })
-          }
-        />
+<FilterSwitch
+  checked={includeBanned}
+  id="user-include-banned"
+  label="Include banned"
+  onCheckedChange={(checked) =>
+    void navigate({
+      search: (prev) => ({ ...prev, includeBanned: checked, page: 1 }),
+    })
+  }
+/>;
 ```
 
 Note the simplification: `onCheckedChange` already hands you a `boolean`, so the `checked === true` narrowing that `Checkbox` needed (its callback can also emit `"indeterminate"`) is gone.
@@ -445,36 +457,36 @@ Then remove the now-unused `Checkbox` import from this file if nothing else in i
 In `src/routes/_authed/admin/projects/index.tsx`, replace this:
 
 ```tsx
-  const softDeleteToggle = (
-    <Link
-      className="text-muted-foreground text-xs hover:text-foreground"
-      search={{
-        status,
-        includeSoftDeleted: !includeSoftDeleted,
-      }}
-      to="/admin/projects"
-    >
-      {includeSoftDeleted ? "Hide soft-deleted" : "Show soft-deleted"}
-    </Link>
-  );
+const softDeleteToggle = (
+  <Link
+    className="text-muted-foreground text-xs hover:text-foreground"
+    search={{
+      status,
+      includeSoftDeleted: !includeSoftDeleted,
+    }}
+    to="/admin/projects"
+  >
+    {includeSoftDeleted ? "Hide soft-deleted" : "Show soft-deleted"}
+  </Link>
+);
 ```
 
 with this:
 
 ```tsx
-  const softDeleteToggle = (
-    <FilterSwitch
-      checked={includeSoftDeleted}
-      id="admin-include-soft-deleted"
-      label="Show soft-deleted"
-      onCheckedChange={(checked) =>
-        void navigate({
-          to: "/admin/projects",
-          search: (prev) => ({ ...prev, includeSoftDeleted: checked }),
-        })
-      }
-    />
-  );
+const softDeleteToggle = (
+  <FilterSwitch
+    checked={includeSoftDeleted}
+    id="admin-include-soft-deleted"
+    label="Show soft-deleted"
+    onCheckedChange={(checked) =>
+      void navigate({
+        to: "/admin/projects",
+        search: (prev) => ({ ...prev, includeSoftDeleted: checked }),
+      })
+    }
+  />
+);
 ```
 
 Two behavioural notes. The label is now static ("Show soft-deleted") because the switch's own state communicates on/off; the old link had to describe its action instead. And the `search` callback now spreads `prev`, where the old `Link` listed params explicitly, so the toggle will not clobber the program filter added in Task 5.
@@ -502,6 +514,7 @@ Expected: no findings, including no unused-import warnings.
 - [ ] **Step 6: Manual verification**
 
 Run `npm run dev`, then check:
+
 - `/projects`: the archived switch sits on the same horizontal centre line as the Program select.
 - `/admin/users`: the banned switch aligns with the search input and role select.
 - `/admin/projects`: the soft-delete switch reads as a control, toggles, and updates the URL.
@@ -519,13 +532,16 @@ git commit -m "refactor: use FilterSwitch for archived, banned, and soft-deleted
 ## Task 4: Program filter, server side
 
 **Files:**
+
 - Modify: `src/server/projects-queries.ts:18-21`
 - Modify: `src/server/_internal/projects-queries.ts:68-90`
 - Test: `src/server/__tests__/admin-projects-filter.integration.test.ts` (create)
 
 **Interfaces:**
+
 - Consumes: nothing from earlier tasks.
 - Produces:
+
   ```ts
   // src/server/_internal/projects-queries.ts
   export async function listAdminProjectsAs(
@@ -533,14 +549,15 @@ git commit -m "refactor: use FilterSwitch for archived, banned, and soft-deleted
     data: { status: StatusFilter; includeSoftDeleted: boolean; program: string | null }
   ): Promise<{ rows: ProjectSummaryRow[] }>
   ```
+
   Task 5 relies on `listAdminProjects` accepting `program: string | null` in its input.
 
 **Context:** `searchProjectsImpl:18-20` already does exactly this filter for the public listing:
 
 ```ts
-  if (data.programId) {
-    conditions.push(eq(projects.programId, data.programId));
-  }
+if (data.programId) {
+  conditions.push(eq(projects.programId, data.programId));
+}
 ```
 
 The admin query mirrors it. `listAdminProjectsImpl` already `leftJoin`s `programs`, so the label is available and the join does not change.
@@ -632,7 +649,10 @@ describe("admin projects program filter", () => {
       program: null,
     });
 
-    expect(rows.map((r) => r.title).sort()).toEqual(["In CS 461", "No program"]);
+    expect(rows.map((r) => r.title).sort()).toEqual([
+      "In CS 461",
+      "No program",
+    ]);
   });
 
   it("composes the program filter with the status filter", async () => {
@@ -804,9 +824,11 @@ git commit -m "feat: filter admin projects by program"
 ## Task 5: Program filter, route and UI
 
 **Files:**
+
 - Modify: `src/routes/_authed/admin/projects/index.tsx`
 
 **Interfaces:**
+
 - Consumes: `listAdminProjects` accepting `program: string | null` (Task 4); `FilterSwitch` (Task 2); `listPrograms` from `#/server/programs`, which returns `{ rows: { id: string; courseId: string; courseName: string }[] }`.
 - Produces: nothing consumed by later tasks. This is the last task in the plan.
 
@@ -879,33 +901,33 @@ import { listPrograms } from "#/server/programs";
 Inside `function AdminProjects()`, after the existing `useNavigate` call, add:
 
 ```tsx
-  const { program } = Route.useSearch();
-  const [allPrograms, setAllPrograms] = useState<
-    { courseId: string; courseName: string; id: string }[]
-  >([]);
+const { program } = Route.useSearch();
+const [allPrograms, setAllPrograms] = useState<
+  { courseId: string; courseName: string; id: string }[]
+>([]);
 
-  useEffect(() => {
-    void (async () => {
-      try {
-        const { rows: progs } = await listPrograms();
-        setAllPrograms(progs);
-      } catch {
-        // Filter degrades to "All programs" if the list cannot be loaded.
-      }
-    })();
-  }, []);
+useEffect(() => {
+  void (async () => {
+    try {
+      const { rows: progs } = await listPrograms();
+      setAllPrograms(progs);
+    } catch {
+      // Filter degrades to "All programs" if the list cannot be loaded.
+    }
+  })();
+}, []);
 ```
 
 Add `program` to the existing destructure instead of a second `Route.useSearch()` call if one already destructures `status` and `includeSoftDeleted`; the existing line is:
 
 ```tsx
-  const { status, includeSoftDeleted } = Route.useSearch();
+const { status, includeSoftDeleted } = Route.useSearch();
 ```
 
 so change it to:
 
 ```tsx
-  const { status, includeSoftDeleted, program } = Route.useSearch();
+const { status, includeSoftDeleted, program } = Route.useSearch();
 ```
 
 and do not add a separate `const { program } = Route.useSearch();`.
@@ -915,29 +937,29 @@ and do not add a separate `const { program } = Route.useSearch();`.
 Still inside `AdminProjects`, next to the existing `softDeleteToggle` definition, add:
 
 ```tsx
-  const programFilter = (
-    <Select
-      onValueChange={(v) =>
-        void navigate({
-          to: "/admin/projects",
-          search: (prev) => ({ ...prev, program: v === "_all_" ? null : v }),
-        })
-      }
-      value={program ?? "_all_"}
-    >
-      <SelectTrigger className="w-56" id="admin-filter-program">
-        <SelectValue placeholder="All programs" />
-      </SelectTrigger>
-      <SelectContent>
-        <SelectItem value="_all_">All programs</SelectItem>
-        {allPrograms.map((p) => (
-          <SelectItem key={p.id} value={p.id}>
-            {p.courseId} {p.courseName}
-          </SelectItem>
-        ))}
-      </SelectContent>
-    </Select>
-  );
+const programFilter = (
+  <Select
+    onValueChange={(v) =>
+      void navigate({
+        to: "/admin/projects",
+        search: (prev) => ({ ...prev, program: v === "_all_" ? null : v }),
+      })
+    }
+    value={program ?? "_all_"}
+  >
+    <SelectTrigger className="w-56" id="admin-filter-program">
+      <SelectValue placeholder="All programs" />
+    </SelectTrigger>
+    <SelectContent>
+      <SelectItem value="_all_">All programs</SelectItem>
+      {allPrograms.map((p) => (
+        <SelectItem key={p.id} value={p.id}>
+          {p.courseId} {p.courseName}
+        </SelectItem>
+      ))}
+    </SelectContent>
+  </Select>
+);
 ```
 
 `_all_` is a sentinel, not a value that reaches the server: it maps to `null` before navigation. An empty string cannot be used because Radix rejects it as a `SelectItem` value.
@@ -962,16 +984,16 @@ with:
 In the desktop block, replace:
 
 ```tsx
-        <div>{softDeleteToggle}</div>
+<div>{softDeleteToggle}</div>;
 ```
 
 (which Task 3 left after removing `mb-2`) with:
 
 ```tsx
-        <div className="flex items-end gap-3">
-          {programFilter}
-          {softDeleteToggle}
-        </div>
+<div className="flex items-end gap-3">
+  {programFilter}
+  {softDeleteToggle}
+</div>;
 ```
 
 The `items-end` here is what aligns the switch's `h-9` box with the select's trigger.
@@ -984,6 +1006,7 @@ Expected: no findings.
 - [ ] **Step 6: Manual verification**
 
 Run `npm run dev` and sign in as an admin, then confirm:
+
 - Selecting a program on `/admin/projects` narrows the list and writes `?program=<uuid>` to the URL.
 - Reloading that URL preserves the selection.
 - Changing the status tab keeps the program selection, and toggling soft-deleted keeps both.
@@ -1008,18 +1031,18 @@ git commit -m "feat: add a program filter to the admin projects page"
 
 **Spec coverage:**
 
-| Spec section | Task |
-| --- | --- |
-| Item 1: list-view thumbnail, fixed 3:2, centered | Task 1 |
-| Items 2 and 3: `FilterSwitch` component | Task 2 |
-| Items 2 and 3: three call sites converted | Task 3 |
-| Item 4: server chain (`adminListSchema`, `listAdminProjectsImpl`) | Task 4 |
-| Item 4: route `searchSchema`, `loaderDeps`, UI at both breakpoints | Task 5 |
-| Accessibility: explicit `id`/`htmlFor` on the switch | Task 2, Steps 1 and 3 |
-| Testing: `ProjectRow` aspect class, both branches | Task 1, Step 1 |
-| Testing: `FilterSwitch` accessible name and toggle | Task 2, Step 1 |
-| Testing: program filter composition and staff gate | Task 4, Step 1 |
-| Manual smoke checklist | Task 3 Step 6, Task 5 Step 6 |
+| Spec section                                                       | Task                         |
+| ------------------------------------------------------------------ | ---------------------------- |
+| Item 1: list-view thumbnail, fixed 3:2, centered                   | Task 1                       |
+| Items 2 and 3: `FilterSwitch` component                            | Task 2                       |
+| Items 2 and 3: three call sites converted                          | Task 3                       |
+| Item 4: server chain (`adminListSchema`, `listAdminProjectsImpl`)  | Task 4                       |
+| Item 4: route `searchSchema`, `loaderDeps`, UI at both breakpoints | Task 5                       |
+| Accessibility: explicit `id`/`htmlFor` on the switch               | Task 2, Steps 1 and 3        |
+| Testing: `ProjectRow` aspect class, both branches                  | Task 1, Step 1               |
+| Testing: `FilterSwitch` accessible name and toggle                 | Task 2, Step 1               |
+| Testing: program filter composition and staff gate                 | Task 4, Step 1               |
+| Manual smoke checklist                                             | Task 3 Step 6, Task 5 Step 6 |
 
 The spec's Playwright axe checks are covered by the existing `npm run test:accessibility` suite, which runs against these pages unchanged; Task 3's manual step calls out the keyboard and labelling checks explicitly.
 

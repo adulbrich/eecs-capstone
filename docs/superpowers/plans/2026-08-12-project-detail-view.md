@@ -22,18 +22,18 @@
 
 ## File Structure
 
-| File | Responsibility |
-| --- | --- |
-| `src/lib/project-visibility.ts` | gains `ProjectRow`, `ProjectDetailView`, `projectDetailView`; loses `stripPrivateFields` |
-| `src/lib/__tests__/project-visibility.test.ts` | six `stripPrivateFields` cases replaced by `projectDetailView` cases |
-| `src/server/_internal/projects-queries.ts` | `getProjectAs` returns the projection; the inline embedding patch goes |
-| `src/routes/projects/$projectId.tsx` | 22 casts removed |
-| `src/routes/_authed/projects/$projectId/edit.tsx` | 15 casts removed |
-| `src/server/__tests__/projects.integration.test.ts` | key-set guards; the `proposerEmail` test inverted |
-| `src/components/proposer-summary.tsx` | new, read-only, three states |
-| `src/components/staff-project-panel.tsx` | keeps the whole `ProposerForEdit`, renders the block |
-| `src/components/project-form.tsx` | renders the block above `ProposerPicker` |
-| `docs/QUIRKS.md` | the `stripPrivateFields` entry replaced |
+| File                                                | Responsibility                                                                           |
+| --------------------------------------------------- | ---------------------------------------------------------------------------------------- |
+| `src/lib/project-visibility.ts`                     | gains `ProjectRow`, `ProjectDetailView`, `projectDetailView`; loses `stripPrivateFields` |
+| `src/lib/__tests__/project-visibility.test.ts`      | six `stripPrivateFields` cases replaced by `projectDetailView` cases                     |
+| `src/server/_internal/projects-queries.ts`          | `getProjectAs` returns the projection; the inline embedding patch goes                   |
+| `src/routes/projects/$projectId.tsx`                | 22 casts removed                                                                         |
+| `src/routes/_authed/projects/$projectId/edit.tsx`   | 15 casts removed                                                                         |
+| `src/server/__tests__/projects.integration.test.ts` | key-set guards; the `proposerEmail` test inverted                                        |
+| `src/components/proposer-summary.tsx`               | new, read-only, three states                                                             |
+| `src/components/staff-project-panel.tsx`            | keeps the whole `ProposerForEdit`, renders the block                                     |
+| `src/components/project-form.tsx`                   | renders the block above `ProposerPicker`                                                 |
+| `docs/QUIRKS.md`                                    | the `stripPrivateFields` entry replaced                                                  |
 
 ---
 
@@ -204,7 +204,7 @@ export function projectDetailView(
 - [ ] **Step 1: rewrite `getProjectAs`'s return path** in `src/server/_internal/projects-queries.ts`. Swap the `stripPrivateFields` import for `projectDetailView`. Replace the `stripped` block (`:284-289`) and the `project: stripped` key:
 
 ```ts
-  const project = projectDetailView(row, viewer);
+const project = projectDetailView(row, viewer);
 ```
 
 The three inline `embedding*: null` patches go with it: the projection never names those columns, so there is nothing to null.
@@ -216,15 +216,15 @@ Rename the loaded row variable if it collides. **Do not touch the `canEdit` bloc
 - [ ] **Step 3: invert the `proposerEmail` integration test.** `src/server/__tests__/projects.integration.test.ts:479`, "keeps proposerEmail staff-only", asserts it IS `owner.email` for an admin. Rewrite it to assert the address never reaches the payload for any viewer:
 
 ```ts
-  it("never returns proposerEmail to anyone, staff included", async () => {
-    // It is the private link key. It used to ride the payload for every viewer
-    // and be nulled for the wrong ones; now it is not on the wire at all. The
-    // staff panel reads it through getProposerForEditAs, which is staff-gated.
-    const { project: forAdmin } = await getProjectAs(admin, { id });
-    const { project: forAnon } = await getProjectAs(null, { id });
-    expect(forAdmin).not.toHaveProperty("proposerEmail");
-    expect(forAnon).not.toHaveProperty("proposerEmail");
-  });
+it("never returns proposerEmail to anyone, staff included", async () => {
+  // It is the private link key. It used to ride the payload for every viewer
+  // and be nulled for the wrong ones; now it is not on the wire at all. The
+  // staff panel reads it through getProposerForEditAs, which is staff-gated.
+  const { project: forAdmin } = await getProjectAs(admin, { id });
+  const { project: forAnon } = await getProjectAs(null, { id });
+  expect(forAdmin).not.toHaveProperty("proposerEmail");
+  expect(forAnon).not.toHaveProperty("proposerEmail");
+});
 ```
 
 Keep the surrounding setup; only the assertions change.
@@ -232,37 +232,37 @@ Keep the surrounding setup; only the assertions change.
 - [ ] **Step 4: add the key-set guards** in the same file, near the existing `getProjectAs` describe:
 
 ```ts
-  it("names every field it returns, for an anonymous reader and for staff", async () => {
-    // /projects/$id is public. The projection cannot widen on its own; what
-    // this catches is a future caller reintroducing a whole-row select above it.
-    const PUBLIC_KEYS = [
-      "contactEmail",
-      "contactName",
-      "deletedAt",
-      "description",
-      "id",
-      "imageUrl",
-      "licenseRestrictions",
-      "minQualifications",
-      "notes",
-      "objectives",
-      "prefQualifications",
-      "problemStatement",
-      "programId",
-      "status",
-      "teamsSupported",
-      "title",
-      "url",
-    ];
+it("names every field it returns, for an anonymous reader and for staff", async () => {
+  // /projects/$id is public. The projection cannot widen on its own; what
+  // this catches is a future caller reintroducing a whole-row select above it.
+  const PUBLIC_KEYS = [
+    "contactEmail",
+    "contactName",
+    "deletedAt",
+    "description",
+    "id",
+    "imageUrl",
+    "licenseRestrictions",
+    "minQualifications",
+    "notes",
+    "objectives",
+    "prefQualifications",
+    "problemStatement",
+    "programId",
+    "status",
+    "teamsSupported",
+    "title",
+    "url",
+  ];
 
-    const { project: forAnon } = await getProjectAs(null, { id });
-    expect(Object.keys(forAnon ?? {}).sort()).toEqual(PUBLIC_KEYS);
-    expect(forAnon?.notes).toBeNull();
+  const { project: forAnon } = await getProjectAs(null, { id });
+  expect(Object.keys(forAnon ?? {}).sort()).toEqual(PUBLIC_KEYS);
+  expect(forAnon?.notes).toBeNull();
 
-    const { project: forAdmin } = await getProjectAs(admin, { id });
-    expect(Object.keys(forAdmin ?? {}).sort()).toEqual(PUBLIC_KEYS);
-    expect(forAdmin?.notes).not.toBeNull();
-  });
+  const { project: forAdmin } = await getProjectAs(admin, { id });
+  expect(Object.keys(forAdmin ?? {}).sort()).toEqual(PUBLIC_KEYS);
+  expect(forAdmin?.notes).not.toBeNull();
+});
 ```
 
 The key set is identical for both; only `notes`'s value differs. That is the design, and asserting both makes it explicit.
@@ -403,10 +403,10 @@ git commit -m "docs(quirks): replace the stripPrivateFields entry"
 
 ## Risks
 
-| Risk | Mitigation |
-| --- | --- |
-| A field the audit missed is dropped | Phase 2 Step 2: it is a typecheck error, not a silent 500. Add it to the projection and the key-set test |
-| A cast in Phase 3 was load-bearing | Typecheck catches it. Put it back and say which in the commit body |
-| The key-set guard passes vacuously | Phase 2 Step 5 makes it fail on purpose first |
-| `staff-project-panel.test.tsx`'s mock returns a shape the new code cannot read | Phase 4 Step 5 checks all four `mockResolvedValue` sites |
-| The `canEdit` divergence gets "fixed" by accident while rewriting around it | The plan says do not touch `:310-314`, and the constraint is repeated in Global Constraints |
+| Risk                                                                           | Mitigation                                                                                               |
+| ------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------- |
+| A field the audit missed is dropped                                            | Phase 2 Step 2: it is a typecheck error, not a silent 500. Add it to the projection and the key-set test |
+| A cast in Phase 3 was load-bearing                                             | Typecheck catches it. Put it back and say which in the commit body                                       |
+| The key-set guard passes vacuously                                             | Phase 2 Step 5 makes it fail on purpose first                                                            |
+| `staff-project-panel.test.tsx`'s mock returns a shape the new code cannot read | Phase 4 Step 5 checks all four `mockResolvedValue` sites                                                 |
+| The `canEdit` divergence gets "fixed" by accident while rewriting around it    | The plan says do not touch `:310-314`, and the constraint is repeated in Global Constraints              |

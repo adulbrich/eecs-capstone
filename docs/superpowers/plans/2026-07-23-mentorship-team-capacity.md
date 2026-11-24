@@ -27,12 +27,14 @@ Source spec: `docs/superpowers/specs/2026-07-23-mentorship-team-capacity-design.
 ## File Structure
 
 **Created:**
+
 - `drizzle/00NN_*.sql`: generated migration (mentor columns + `teams_supported`).
 - `src/routes/_authed/admin/mentors/index.tsx`: the mentors admin page.
 - `src/server/__tests__/mentors.integration.test.ts`: mentor server function tests.
 - `src/test/profile-schema.test.ts`: profile schema unit tests.
 
 **Modified:**
+
 - `src/lib/auth.ts`: add the two `additionalFields`.
 - `src/db/auth-schema.ts`: regenerated (reviewed for defaults).
 - `src/db/schema.ts`: `projects.teamsSupported`.
@@ -50,12 +52,14 @@ Source spec: `docs/superpowers/specs/2026-07-23-mentorship-team-capacity-design.
 ## Task 1: Schema and migration
 
 **Files:**
+
 - Modify: `src/lib/auth.ts:41-44`
 - Regenerate: `src/db/auth-schema.ts`
 - Modify: `src/db/schema.ts` (projects table, near `licenseRestrictions`)
 - Create: `drizzle/00NN_*.sql` (generated, then reviewed)
 
 **Interfaces:**
+
 - Produces: `user.wantsToMentor` (boolean), `user.mentorTeamCount` (integer), `projects.teamsSupported` (integer). Every later task reads these exact names.
 
 **Context:** Better Auth owns the `user` table; the only safe way to add columns there is `additionalFields`, which the CLI regenerates into `auth-schema.ts` (README documents this). `integer` is already imported in `schema.ts`. Better Auth's `defaultValue` is applied at row creation in app code; the CLI may not emit a DB-level default, so the generated columns must be reviewed and given DB defaults so existing rows are not null.
@@ -133,19 +137,23 @@ git commit -m "feat: add mentor user fields and project teams-supported column"
 ## Task 2: Profile server (mentor fields, affiliation refine, persist)
 
 **Files:**
+
 - Modify: `src/server/profile.ts:4-10`
 - Modify: `src/server/_internal/profile.ts`
 - Test: `src/test/profile-schema.test.ts` (create)
 - Test: `src/server/__tests__/profile.integration.test.ts` (create if absent, else extend)
 
 **Interfaces:**
+
 - Consumes: the `user` columns from Task 1.
 - Produces:
+
   ```ts
   // profileSchema output type (ProfileInput)
   { name: string; affiliation?: string | null; linkedin?: string | null;
     wantsToMentor: boolean; mentorTeamCount: number }
   ```
+
   Task 3 (profile UI) sends exactly this shape to `updateProfile`.
 
 **Context:** `profileSchema` (`src/server/profile.ts`) currently validates `name`, `affiliation`, `linkedin`. `updateProfileForCurrentUser` writes them with `db.update(user).set({...})`. The affiliation-required-when-mentor rule is a `.refine` so it is enforced server-side regardless of the client.
@@ -195,12 +203,18 @@ describe("profileSchema mentor rules", () => {
 
   it("rejects a team count outside 1 to 5", () => {
     expect(
-      profileSchema.safeParse({ ...base, wantsToMentor: true, mentorTeamCount: 6 })
-        .success
+      profileSchema.safeParse({
+        ...base,
+        wantsToMentor: true,
+        mentorTeamCount: 6,
+      }).success
     ).toBe(false);
     expect(
-      profileSchema.safeParse({ ...base, wantsToMentor: true, mentorTeamCount: 0 })
-        .success
+      profileSchema.safeParse({
+        ...base,
+        wantsToMentor: true,
+        mentorTeamCount: 0,
+      }).success
     ).toBe(false);
   });
 
@@ -297,10 +311,12 @@ git commit -m "feat: validate and persist mentor opt-in on the profile"
 ## Task 3: Profile UI (mentorship section)
 
 **Files:**
+
 - Modify: `src/routes/_authed/profile.tsx`
 - Test: `src/test/profile-mentor.test.tsx` (create)
 
 **Interfaces:**
+
 - Consumes: `updateProfile` accepting `{ name, affiliation, linkedin, wantsToMentor, mentorTeamCount }` (Task 2); the route context `user` now carries `wantsToMentor` / `mentorTeamCount`.
 - Produces: nothing consumed later.
 
@@ -333,22 +349,39 @@ afterEach(cleanup);
 
 describe("MentorFields", () => {
   it("labels the switch and shows the audience note", () => {
-    render(<MentorFields count={1} onCountChange={() => {}} onToggle={() => {}} wants={false} />);
+    render(
+      <MentorFields
+        count={1}
+        onCountChange={() => {}}
+        onToggle={() => {}}
+        wants={false}
+      />
+    );
     expect(
       screen.getByRole("switch", { name: /want to mentor/i })
     ).toBeTruthy();
-    expect(
-      document.body.textContent
-    ).toContain("For professionals and faculty, not students");
+    expect(document.body.textContent).toContain(
+      "For professionals and faculty, not students"
+    );
   });
 
   it("reveals the team-count field only when opted in", () => {
     const { rerender } = render(
-      <MentorFields count={1} onCountChange={() => {}} onToggle={() => {}} wants={false} />
+      <MentorFields
+        count={1}
+        onCountChange={() => {}}
+        onToggle={() => {}}
+        wants={false}
+      />
     );
     expect(screen.queryByLabelText(/how many teams/i)).toBeNull();
     rerender(
-      <MentorFields count={2} onCountChange={() => {}} onToggle={() => {}} wants />
+      <MentorFields
+        count={2}
+        onCountChange={() => {}}
+        onToggle={() => {}}
+        wants
+      />
     );
     expect(screen.getByLabelText(/how many teams/i)).toBeTruthy();
   });
@@ -405,7 +438,11 @@ export function MentorFields({
   return (
     <div className="space-y-2">
       <div className="flex items-center gap-2">
-        <Switch checked={wants} id="wants-to-mentor" onCheckedChange={onToggle} />
+        <Switch
+          checked={wants}
+          id="wants-to-mentor"
+          onCheckedChange={onToggle}
+        />
         <Label className="font-normal" htmlFor="wants-to-mentor">
           I want to mentor a team
         </Label>
@@ -415,7 +452,9 @@ export function MentorFields({
       </p>
       {wants && (
         <div className="space-y-1.5">
-          <Label htmlFor="mentor-team-count">How many teams can you mentor?</Label>
+          <Label htmlFor="mentor-team-count">
+            How many teams can you mentor?
+          </Label>
           <Input
             className="w-24"
             id="mentor-team-count"
@@ -435,37 +474,35 @@ export function MentorFields({
 In `Profile`, add state seeded from the user and render the section inside the profile form, and include the fields in the submit. Add near the other `useState` calls:
 
 ```tsx
-  const [wantsToMentor, setWantsToMentor] = useState(
-    Boolean(user.wantsToMentor)
-  );
-  const [mentorTeamCount, setMentorTeamCount] = useState(
-    user.mentorTeamCount ?? 1
-  );
+const [wantsToMentor, setWantsToMentor] = useState(Boolean(user.wantsToMentor));
+const [mentorTeamCount, setMentorTeamCount] = useState(
+  user.mentorTeamCount ?? 1
+);
 ```
 
 In `onSaveProfile`, extend the `updateProfile` data:
 
 ```tsx
-      await updateProfile({
-        data: {
-          name: String(form.get("name") ?? ""),
-          affiliation: String(form.get("affiliation") ?? "") || null,
-          linkedin: String(form.get("linkedin") ?? "") || null,
-          wantsToMentor,
-          mentorTeamCount,
-        },
-      });
+await updateProfile({
+  data: {
+    name: String(form.get("name") ?? ""),
+    affiliation: String(form.get("affiliation") ?? "") || null,
+    linkedin: String(form.get("linkedin") ?? "") || null,
+    wantsToMentor,
+    mentorTeamCount,
+  },
+});
 ```
 
 Render `MentorFields` inside the profile `<form>`, after the LinkedIn field and before the submit button:
 
 ```tsx
-        <MentorFields
-          count={mentorTeamCount}
-          onCountChange={setMentorTeamCount}
-          onToggle={setWantsToMentor}
-          wants={wantsToMentor}
-        />
+<MentorFields
+  count={mentorTeamCount}
+  onCountChange={setMentorTeamCount}
+  onToggle={setWantsToMentor}
+  wants={wantsToMentor}
+/>;
 ```
 
 The server refine rejects an opt-in with a blank affiliation; that rejection surfaces through the existing `catch` into `setError`, and the affiliation input is in the same form.
@@ -494,12 +531,14 @@ git commit -m "feat: add a mentorship opt-in section to the profile"
 ## Task 4: Project teams-supported (form, persistence, staff display)
 
 **Files:**
+
 - Modify: `src/components/project-form.tsx` (schema + field)
 - Modify: `src/server/_internal/projects.ts` (editable fields + value maps)
 - Modify: `src/components/staff-project-panel.tsx` (display)
 - Test: `src/server/__tests__/projects.integration.test.ts` (extend)
 
 **Interfaces:**
+
 - Consumes: `projects.teamsSupported` (Task 1).
 - Produces: `teamsSupported` on the project create/update input and on the loaded project row.
 
@@ -548,22 +587,22 @@ In `src/server/_internal/projects.ts`, add `"teamsSupported"` to `PROJECT_EDITAB
 In `src/components/project-form.tsx`, render a control near the program field:
 
 ```tsx
-      <form.Field name="teamsSupported">
-        {(field: AnyForm) => (
-          <div>
-            <Label htmlFor="teamsSupported">Teams this project can support</Label>
-            <Input
-              className="mt-1 w-24"
-              id="teamsSupported"
-              max={5}
-              min={1}
-              onChange={(e) => field.handleChange(Number(e.target.value))}
-              type="number"
-              value={field.state.value as number}
-            />
-          </div>
-        )}
-      </form.Field>
+<form.Field name="teamsSupported">
+  {(field: AnyForm) => (
+    <div>
+      <Label htmlFor="teamsSupported">Teams this project can support</Label>
+      <Input
+        className="mt-1 w-24"
+        id="teamsSupported"
+        max={5}
+        min={1}
+        onChange={(e) => field.handleChange(Number(e.target.value))}
+        type="number"
+        value={field.state.value as number}
+      />
+    </div>
+  )}
+</form.Field>;
 ```
 
 - [ ] **Step 6: Display it staff-only**
@@ -571,10 +610,10 @@ In `src/components/project-form.tsx`, render a control near the program field:
 In `src/components/staff-project-panel.tsx`, inside the staff-only `section` (around line 204), add:
 
 ```tsx
-        <p className="text-sm">
-          <span className="text-muted-foreground">Teams supported: </span>
-          {project.teamsSupported ?? 1}
-        </p>
+<p className="text-sm">
+  <span className="text-muted-foreground">Teams supported: </span>
+  {project.teamsSupported ?? 1}
+</p>;
 ```
 
 Confirm the `project` prop type carries `teamsSupported`; widen it if needed. Do NOT add this to the public `Section` blocks in `src/routes/projects/$projectId.tsx`.
@@ -601,13 +640,16 @@ git commit -m "feat: record how many teams a project supports (staff-visible)"
 ## Task 5: Mentor server functions (listMentors, setUserMentorStatus)
 
 **Files:**
+
 - Modify: `src/server/users.ts`
 - Modify: `src/server/_internal/users.ts`
 - Test: `src/server/__tests__/mentors.integration.test.ts` (create)
 
 **Interfaces:**
+
 - Consumes: the `user` mentor columns (Task 1); `isStaff` from `#/lib/project-visibility`.
 - Produces:
+
   ```ts
   // src/server/_internal/users.ts
   export async function listMentorsAs(viewer: { id: string; role: string | null }):
@@ -617,6 +659,7 @@ git commit -m "feat: record how many teams a project supports (staff-visible)"
     viewer, data: { userId: string; wantsToMentor: boolean; mentorTeamCount: number }
   ): Promise<{ ok: true }>;
   ```
+
   Task 6 (the page) calls the `listMentors` / `setUserMentorStatus` server functions.
 
 **Context:** These mirror the existing `*As(viewer, ...)` + `*ForCurrentUser` split (`_internal/users.ts` already has `getUserImpl`, `getUserForCurrentUser`, etc.). `assertAdmin` exists; add an `assertStaff` (or reuse `isStaff`) so instructors are allowed.
@@ -631,10 +674,7 @@ import { describe, expect, it } from "vitest";
 import { db } from "#/db";
 import { user } from "#/db/schema";
 import { auth } from "#/lib/auth";
-import {
-  listMentorsAs,
-  setUserMentorStatusAs,
-} from "#/server/_internal/users";
+import { listMentorsAs, setUserMentorStatusAs } from "#/server/_internal/users";
 
 async function makeUser(email: string, role: "user" | "instructor" | "admin") {
   await auth.api.signUpEmail({
@@ -764,10 +804,12 @@ export async function setUserMentorStatusForCurrentUser(data: {
 In `src/server/users.ts`, add:
 
 ```ts
-export const listMentors = createServerFn({ method: "GET" }).handler(async () => {
-  const { listMentorsForCurrentUser } = await import("./_internal/users");
-  return listMentorsForCurrentUser();
-});
+export const listMentors = createServerFn({ method: "GET" }).handler(
+  async () => {
+    const { listMentorsForCurrentUser } = await import("./_internal/users");
+    return listMentorsForCurrentUser();
+  }
+);
 
 export const setUserMentorStatus = createServerFn({ method: "POST" })
   .inputValidator((data: unknown) =>
@@ -805,11 +847,13 @@ git commit -m "feat: add staff server functions to list and edit mentors"
 ## Task 6: Admin mentors page, overview link, and user-detail indicator
 
 **Files:**
+
 - Create: `src/routes/_authed/admin/mentors/index.tsx`
 - Modify: `src/routes/_authed/admin/index.tsx` (Mentors NavCard)
 - Modify: `src/routes/_authed/admin/users/$userId.tsx` (mentor line)
 
 **Interfaces:**
+
 - Consumes: `listMentors`, `setUserMentorStatus` (Task 5); `AdminTable`, `EmptyState`, `Input`, `Button`.
 - Produces: nothing consumed later. Final task.
 
@@ -820,7 +864,12 @@ git commit -m "feat: add staff server functions to list and edit mentors"
 Create `src/routes/_authed/admin/mentors/index.tsx`:
 
 ```tsx
-import { createFileRoute, Link, redirect, useRouter } from "@tanstack/react-router";
+import {
+  createFileRoute,
+  Link,
+  redirect,
+  useRouter,
+} from "@tanstack/react-router";
 import { useState } from "react";
 import { AdminTable } from "#/components/admin-table";
 import { EmptyState } from "#/components/empty-state";
@@ -853,13 +902,17 @@ export const Route = createFileRoute("/_authed/admin/mentors/")({
   component: MentorsAdmin,
 });
 
-function MentorRow({ mentor }: { mentor: {
-  affiliation: string | null;
-  email: string;
-  id: string;
-  mentorTeamCount: number;
-  name: string | null;
-} }) {
+function MentorRow({
+  mentor,
+}: {
+  mentor: {
+    affiliation: string | null;
+    email: string;
+    id: string;
+    mentorTeamCount: number;
+    name: string | null;
+  };
+}) {
   const router = useRouter();
   const [count, setCount] = useState(mentor.mentorTeamCount);
 
@@ -952,12 +1005,12 @@ Confirm `AdminTable`'s prop name for headers matches (`columns`); adjust to its 
 In `src/routes/_authed/admin/index.tsx`, add `Handshake` to the `lucide-react` import and a NavCard in the "Manage" grid (visible to all staff, not gated by `isAdmin`):
 
 ```tsx
-          <NavCard
-            description="See who volunteered to mentor and set capacity"
-            icon={Handshake}
-            label="Mentors"
-            to="/admin/mentors"
-          />
+<NavCard
+  description="See who volunteered to mentor and set capacity"
+  icon={Handshake}
+  label="Mentors"
+  to="/admin/mentors"
+/>;
 ```
 
 - [ ] **Step 3: Add the mentor line to the user detail page**
@@ -965,12 +1018,14 @@ In `src/routes/_authed/admin/index.tsx`, add `Handshake` to the `lucide-react` i
 In `src/routes/_authed/admin/users/$userId.tsx`, destructure the fields (they are on `user`) and, near the affiliation/joined lines, add:
 
 ```tsx
-      {user.wantsToMentor && (
-        <p className="text-sm">
-          <span className="text-muted-foreground">Mentor: </span>
-          yes ({user.mentorTeamCount ?? 1} teams)
-        </p>
-      )}
+{
+  user.wantsToMentor && (
+    <p className="text-sm">
+      <span className="text-muted-foreground">Mentor: </span>
+      yes ({user.mentorTeamCount ?? 1} teams)
+    </p>
+  );
+}
 ```
 
 - [ ] **Step 4: Typecheck, lint**
@@ -1001,18 +1056,18 @@ git commit -m "feat: add the /admin/mentors page, overview link, and user-detail
 
 **Spec coverage:**
 
-| Spec section | Task |
-| --- | --- |
-| Schema: mentor `additionalFields`, `teamsSupported`, migration | Task 1 |
-| Profile: mentor fields, affiliation-required refine, persist | Task 2 |
-| Profile UI: switch with audience copy, conditional count | Task 3 |
-| Project: `teamsSupported` form field, persistence, staff-only display | Task 4 |
-| Server: `listMentors`, `setUserMentorStatus` (staff-gated) | Task 5 |
-| `/admin/mentors` page, overview NavCard, user-detail indicator | Task 6 |
-| Bounds 1 to 5 on both counts | Tasks 2, 4, 5 (schemas) |
-| Staff gating (admin + instructor) vs admin-only users page | Tasks 5, 6 |
-| Purely informational (no access change) | No task adds authorization from the mentor flag |
-| Testing: schema refine, persistence, staff gate, a11y | Tasks 2, 4, 5, 6 |
+| Spec section                                                          | Task                                            |
+| --------------------------------------------------------------------- | ----------------------------------------------- |
+| Schema: mentor `additionalFields`, `teamsSupported`, migration        | Task 1                                          |
+| Profile: mentor fields, affiliation-required refine, persist          | Task 2                                          |
+| Profile UI: switch with audience copy, conditional count              | Task 3                                          |
+| Project: `teamsSupported` form field, persistence, staff-only display | Task 4                                          |
+| Server: `listMentors`, `setUserMentorStatus` (staff-gated)            | Task 5                                          |
+| `/admin/mentors` page, overview NavCard, user-detail indicator        | Task 6                                          |
+| Bounds 1 to 5 on both counts                                          | Tasks 2, 4, 5 (schemas)                         |
+| Staff gating (admin + instructor) vs admin-only users page            | Tasks 5, 6                                      |
+| Purely informational (no access change)                               | No task adds authorization from the mentor flag |
+| Testing: schema refine, persistence, staff gate, a11y                 | Tasks 2, 4, 5, 6                                |
 
 **Type consistency:** `wantsToMentor` (boolean) and `mentorTeamCount` (number, 1 to 5) are the names used in Task 1 (columns), Task 2 (`profileSchema`, persist), Task 3 (UI state and `updateProfile` payload), Task 5 (`listMentorsAs`, `setUserMentorStatusAs`), and Task 6 (page). `teamsSupported` (number, 1 to 5) is used in Task 1 (column), Task 4 (form schema, value maps, staff display). The `*As(viewer, ...)` seam names (`listMentorsAs`, `setUserMentorStatusAs`, `updateProfileAs`) are introduced in their tasks and consumed only by their tests and server-function wrappers.
 

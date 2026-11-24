@@ -126,11 +126,11 @@ primitive.
 Also codified, under "Component patterns > Disabled pagination". Three sites, and
 reading them shows the doc describes a pattern the code applies two different ways.
 
-| Site | Element | Disabled how | Keyboard-reachable when disabled |
-| --- | --- | --- | --- |
-| `src/routes/projects/index.tsx:89` | `<Link>` | `pointer-events-none` only | **Yes** |
-| `src/routes/_authed/admin/users/index.tsx:357` | `<Link>` | `pointer-events-none` only | **Yes** |
-| `src/routes/inventory/index.tsx:143` | `<button>` | `disabled` + `pointer-events-none` | No |
+| Site                                           | Element    | Disabled how                       | Keyboard-reachable when disabled |
+| ---------------------------------------------- | ---------- | ---------------------------------- | -------------------------------- |
+| `src/routes/projects/index.tsx:89`             | `<Link>`   | `pointer-events-none` only         | **Yes**                          |
+| `src/routes/_authed/admin/users/index.tsx:357` | `<Link>`   | `pointer-events-none` only         | **Yes**                          |
+| `src/routes/inventory/index.tsx:143`           | `<button>` | `disabled` + `pointer-events-none` | No                               |
 
 The two `<Link>` sites carry the defect. `pointer-events: none` suppresses mouse
 events only: the anchor stays in the tab order, is still announced as a link, and
@@ -168,11 +168,11 @@ Route coverage within it is genuinely broad: 21 routes plus 6 fixture-backed det
 pages across `public`, `user`, and `admin` suites. The gap is not which pages are
 visited, it is which **states** are.
 
-| Suite | Interactions before `checkA11y` |
-| --- | --- |
-| `admin.a11y.test.ts` | 33 |
-| `public.a11y.test.ts` | 0 |
-| `user.a11y.test.ts` | 0 |
+| Suite                 | Interactions before `checkA11y` |
+| --------------------- | ------------------------------- |
+| `admin.a11y.test.ts`  | 33                              |
+| `public.a11y.test.ts` | 0                               |
+| `user.a11y.test.ts`   | 0                               |
 
 Every interactive assertion in the suite exercises `AdminDataTable`'s column menu and
 sort headers. The entire interactive budget went to the one component that was
@@ -247,10 +247,10 @@ candidates for consolidation, so the next audit does not re-open this.
 These resolve opposite ways and the difference is worth pinning down, because a future
 audit will otherwise keep proposing `form`.
 
-| Primitive | npm dependencies | Verdict |
-| --- | --- | --- |
-| `form` | `react-hook-form`, `@hookform/resolvers`, `zod` | **Never adopt.** This project uses TanStack Form. Installing it would put a second form library in the tree. |
-| `field` | none. Registry deps `label`, `separator` only | **Adopt.** Form-library agnostic. |
+| Primitive | npm dependencies                                | Verdict                                                                                                      |
+| --------- | ----------------------------------------------- | ------------------------------------------------------------------------------------------------------------ |
+| `form`    | `react-hook-form`, `@hookform/resolvers`, `zod` | **Never adopt.** This project uses TanStack Form. Installing it would put a second form library in the tree. |
+| `field`   | none. Registry deps `label`, `separator` only   | **Adopt.** Form-library agnostic.                                                                            |
 
 `field` is the natural home for the documented `space-y-1.5` label/input wrapper and
 for `FieldErrors`, and it would have prevented finding 4's unlabelled inputs by making
@@ -307,21 +307,21 @@ against the `Button` variant table; it is not a single architectural decision.
 
 ## Verdict summary
 
-| Hand-rolled | Primitive | Verdict |
-| --- | --- | --- |
-| `confirm()` x4 | `alert-dialog` | Adopt |
-| `alert()` x1 | `sonner` | Adopt, dropping the `next-themes` import for `theme="system"` |
-| Status tabs x2 | `tabs` | Adopt |
-| Pagination x3 (2 buggy, 2 implementations) | `pagination` | Adopt |
-| 4 badge components | `badge` | Adopt as shape layer; keep status-token maps |
-| Inline card idiom x8 | `card` | Adopt |
-| `space-y-1.5` wrapper, `FieldErrors` | `field` | Adopt |
-| TanStack Form usage | `form` | **Never adopt.** Would add react-hook-form |
-| `AdminDataTable` | `table` | Keep. Deliberate deep module |
-| `panel.tsx` | `card` | Keep. Distinct surface with tone variants |
-| `.island-shell`, `.feature-card` | `card` | Keep. Distinct surfaces |
-| `ViewToggle` | `toggle-group` | Keep. ARIA is already correct; adopting buys consistency, not correctness. Judgment call |
-| `slider.tsx` | n/a | Delete. Zero importers |
+| Hand-rolled                                | Primitive      | Verdict                                                                                  |
+| ------------------------------------------ | -------------- | ---------------------------------------------------------------------------------------- |
+| `confirm()` x4                             | `alert-dialog` | Adopt                                                                                    |
+| `alert()` x1                               | `sonner`       | Adopt, dropping the `next-themes` import for `theme="system"`                            |
+| Status tabs x2                             | `tabs`         | Adopt                                                                                    |
+| Pagination x3 (2 buggy, 2 implementations) | `pagination`   | Adopt                                                                                    |
+| 4 badge components                         | `badge`        | Adopt as shape layer; keep status-token maps                                             |
+| Inline card idiom x8                       | `card`         | Adopt                                                                                    |
+| `space-y-1.5` wrapper, `FieldErrors`       | `field`        | Adopt                                                                                    |
+| TanStack Form usage                        | `form`         | **Never adopt.** Would add react-hook-form                                               |
+| `AdminDataTable`                           | `table`        | Keep. Deliberate deep module                                                             |
+| `panel.tsx`                                | `card`         | Keep. Distinct surface with tone variants                                                |
+| `.island-shell`, `.feature-card`           | `card`         | Keep. Distinct surfaces                                                                  |
+| `ViewToggle`                               | `toggle-group` | Keep. ARIA is already correct; adopting buys consistency, not correctness. Judgment call |
+| `slider.tsx`                               | n/a            | Delete. Zero importers                                                                   |
 
 ## Proposed `docs/UI-CONVENTIONS.md` deltas
 

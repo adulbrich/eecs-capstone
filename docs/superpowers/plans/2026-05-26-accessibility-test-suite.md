@@ -2,7 +2,6 @@
 
 > **Status (verified 2026-06-07):** ✅ **Implemented and shipped.** Verified against the codebase; all deliverables exist. The `- [ ]` checkboxes below were never ticked during execution; they are stale, not a sign of incomplete work.
 
-
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Add a Playwright + axe-core accessibility test suite that scans every page in both light and dark color schemes against WCAG 2.1 AA rules, with a `test:accessibility` npm script.
@@ -17,22 +16,23 @@
 
 ## File Map
 
-| Action | Path | Responsibility |
-|--------|------|----------------|
-| Create | `playwright.a11y.config.ts` | Playwright config: 2 projects, webServer, globalSetup |
-| Create | `src/test/a11y/global-setup.ts` | Seed DB fixtures, save auth storage state |
-| Create | `src/test/a11y/helpers.ts` | `checkA11y()` axe wrapper |
-| Create | `src/test/a11y/public.a11y.test.ts` | 10 public pages (no auth) |
-| Create | `src/test/a11y/user.a11y.test.ts` | 6 user-authenticated pages |
-| Create | `src/test/a11y/admin.a11y.test.ts` | 13 admin-authenticated pages |
-| Modify | `package.json` | Add `test:accessibility`, update `test` exclude |
-| Modify | `.gitignore` | Ignore generated auth/fixture files and Playwright output |
+| Action | Path                                | Responsibility                                            |
+| ------ | ----------------------------------- | --------------------------------------------------------- |
+| Create | `playwright.a11y.config.ts`         | Playwright config: 2 projects, webServer, globalSetup     |
+| Create | `src/test/a11y/global-setup.ts`     | Seed DB fixtures, save auth storage state                 |
+| Create | `src/test/a11y/helpers.ts`          | `checkA11y()` axe wrapper                                 |
+| Create | `src/test/a11y/public.a11y.test.ts` | 10 public pages (no auth)                                 |
+| Create | `src/test/a11y/user.a11y.test.ts`   | 6 user-authenticated pages                                |
+| Create | `src/test/a11y/admin.a11y.test.ts`  | 13 admin-authenticated pages                              |
+| Modify | `package.json`                      | Add `test:accessibility`, update `test` exclude           |
+| Modify | `.gitignore`                        | Ignore generated auth/fixture files and Playwright output |
 
 ---
 
 ## Task 1: Install Dependencies and Update .gitignore
 
 **Files:**
+
 - Modify: `.gitignore`
 
 - [ ] **Step 1: Install Playwright and axe**
@@ -75,6 +75,7 @@ git commit -m "chore: install playwright and axe-core for accessibility testing"
 ## Task 2: Create `playwright.a11y.config.ts`
 
 **Files:**
+
 - Create: `playwright.a11y.config.ts`
 
 - [ ] **Step 1: Write the config**
@@ -82,33 +83,33 @@ git commit -m "chore: install playwright and axe-core for accessibility testing"
 Create `playwright.a11y.config.ts` at the project root:
 
 ```ts
-import { defineConfig, devices } from '@playwright/test';
+import { defineConfig, devices } from "@playwright/test";
 
 export default defineConfig({
-  testDir: './src/test/a11y',
-  testMatch: '**/*.a11y.test.ts',
-  globalSetup: './src/test/a11y/global-setup.ts',
+  testDir: "./src/test/a11y",
+  testMatch: "**/*.a11y.test.ts",
+  globalSetup: "./src/test/a11y/global-setup.ts",
   reporter: [
-    ['list'],
-    ['html', { outputFolder: 'playwright-report/a11y', open: 'never' }],
+    ["list"],
+    ["html", { outputFolder: "playwright-report/a11y", open: "never" }],
   ],
   use: {
-    baseURL: 'http://localhost:3000',
-    trace: 'retain-on-failure',
+    baseURL: "http://localhost:3000",
+    trace: "retain-on-failure",
   },
   projects: [
     {
-      name: 'chromium-light',
-      use: { ...devices['Desktop Chrome'], colorScheme: 'light' },
+      name: "chromium-light",
+      use: { ...devices["Desktop Chrome"], colorScheme: "light" },
     },
     {
-      name: 'chromium-dark',
-      use: { ...devices['Desktop Chrome'], colorScheme: 'dark' },
+      name: "chromium-dark",
+      use: { ...devices["Desktop Chrome"], colorScheme: "dark" },
     },
   ],
   webServer: {
-    command: 'npm run dev',
-    url: 'http://localhost:3000',
+    command: "npm run dev",
+    url: "http://localhost:3000",
     reuseExistingServer: !process.env.CI,
     timeout: 120_000,
   },
@@ -135,6 +136,7 @@ git commit -m "chore: add playwright accessibility config"
 ## Task 3: Create `src/test/a11y/global-setup.ts`
 
 **Files:**
+
 - Create: `src/test/a11y/global-setup.ts`
 
 This file runs once before any tests. It seeds content fixtures (project, inventory item, category, program) and saves Playwright storage state for two users. It accesses the database directly using the same `drizzle-orm/node-postgres` driver the app uses, but opens its own connection to avoid importing from `#/db` (which has a path-alias that Playwright's transpiler does not resolve).
@@ -142,23 +144,23 @@ This file runs once before any tests. It seeds content fixtures (project, invent
 - [ ] **Step 1: Write global-setup.ts**
 
 ```ts
-import { config as loadDotenv } from 'dotenv';
-import { Pool } from 'pg';
-import { drizzle } from 'drizzle-orm/node-postgres';
-import type { NodePgDatabase } from 'drizzle-orm/node-postgres';
-import { eq } from 'drizzle-orm';
-import { chromium } from '@playwright/test';
-import { writeFileSync } from 'node:fs';
-import { join, dirname } from 'node:path';
-import { fileURLToPath } from 'node:url';
-import * as schema from '../../db/schema';
+import { config as loadDotenv } from "dotenv";
+import { Pool } from "pg";
+import { drizzle } from "drizzle-orm/node-postgres";
+import type { NodePgDatabase } from "drizzle-orm/node-postgres";
+import { eq } from "drizzle-orm";
+import { chromium } from "@playwright/test";
+import { writeFileSync } from "node:fs";
+import { join, dirname } from "node:path";
+import { fileURLToPath } from "node:url";
+import * as schema from "../../db/schema";
 
 const __dir = dirname(fileURLToPath(import.meta.url));
-const BASE_URL = 'http://localhost:3000';
-const PASSWORD = 'password';
+const BASE_URL = "http://localhost:3000";
+const PASSWORD = "password";
 
 export default async function globalSetup() {
-  loadDotenv({ path: ['.env.local', '.env'] });
+  loadDotenv({ path: [".env.local", ".env"] });
 
   const pool = new Pool({ connectionString: process.env.DATABASE_URL });
   const db = drizzle(pool, { schema });
@@ -169,28 +171,28 @@ export default async function globalSetup() {
     await pool.end();
   }
 
-  await saveStorageState('user@example.com', join(__dir, '.user-auth.json'));
-  await saveStorageState('admin@example.com', join(__dir, '.admin-auth.json'));
+  await saveStorageState("user@example.com", join(__dir, ".user-auth.json"));
+  await saveStorageState("admin@example.com", join(__dir, ".admin-auth.json"));
 }
 
 async function createFixtures(db: NodePgDatabase<typeof schema>) {
   const [owner] = await db
     .select()
     .from(schema.user)
-    .where(eq(schema.user.email, 'user@example.com'));
+    .where(eq(schema.user.email, "user@example.com"));
   if (!owner) {
     throw new Error(
-      'user@example.com not found in database. Run: npm run db:seed:dev',
+      "user@example.com not found in database. Run: npm run db:seed:dev"
     );
   }
 
   const [instructor] = await db
     .select()
     .from(schema.user)
-    .where(eq(schema.user.email, 'instructor@example.com'));
+    .where(eq(schema.user.email, "instructor@example.com"));
   if (!instructor) {
     throw new Error(
-      'instructor@example.com not found in database. Run: npm run db:seed:dev',
+      "instructor@example.com not found in database. Run: npm run db:seed:dev"
     );
   }
 
@@ -198,11 +200,11 @@ async function createFixtures(db: NodePgDatabase<typeof schema>) {
   let [category] = await db
     .select()
     .from(schema.categories)
-    .where(eq(schema.categories.name, 'a11y-test-category'));
+    .where(eq(schema.categories.name, "a11y-test-category"));
   if (!category) {
     [category] = await db
       .insert(schema.categories)
-      .values({ name: 'a11y-test-category', type: 'technology' })
+      .values({ name: "a11y-test-category", type: "technology" })
       .returning();
   }
 
@@ -210,11 +212,14 @@ async function createFixtures(db: NodePgDatabase<typeof schema>) {
   let [program] = await db
     .select()
     .from(schema.programs)
-    .where(eq(schema.programs.courseId, 'A11Y-101'));
+    .where(eq(schema.programs.courseId, "A11Y-101"));
   if (!program) {
     [program] = await db
       .insert(schema.programs)
-      .values({ courseId: 'A11Y-101', courseName: 'Accessibility Test Program' })
+      .values({
+        courseId: "A11Y-101",
+        courseName: "Accessibility Test Program",
+      })
       .returning();
   }
 
@@ -228,14 +233,14 @@ async function createFixtures(db: NodePgDatabase<typeof schema>) {
   let [project] = await db
     .select()
     .from(schema.projects)
-    .where(eq(schema.projects.title, 'A11Y Test Project'));
+    .where(eq(schema.projects.title, "A11Y Test Project"));
   if (!project) {
     [project] = await db
       .insert(schema.projects)
       .values({
-        title: 'A11Y Test Project',
-        description: 'A project created for accessibility testing.',
-        status: 'published',
+        title: "A11Y Test Project",
+        description: "A project created for accessibility testing.",
+        status: "published",
         proposerId: owner.id,
       })
       .returning();
@@ -245,19 +250,19 @@ async function createFixtures(db: NodePgDatabase<typeof schema>) {
   let [item] = await db
     .select()
     .from(schema.inventoryItems)
-    .where(eq(schema.inventoryItems.name, 'A11Y Test Item'));
+    .where(eq(schema.inventoryItems.name, "A11Y Test Item"));
   if (!item) {
     [item] = await db
       .insert(schema.inventoryItems)
       .values({
-        name: 'A11Y Test Item',
-        description: 'An item for accessibility testing.',
+        name: "A11Y Test Item",
+        description: "An item for accessibility testing.",
       })
       .returning();
   }
 
   writeFileSync(
-    join(__dir, '.fixtures.json'),
+    join(__dir, ".fixtures.json"),
     JSON.stringify(
       {
         projectId: project.id,
@@ -267,8 +272,8 @@ async function createFixtures(db: NodePgDatabase<typeof schema>) {
         userId: owner.id,
       },
       null,
-      2,
-    ),
+      2
+    )
   );
 }
 
@@ -281,7 +286,7 @@ async function saveStorageState(email: string, outputPath: string) {
   await page.fill('input[name="email"]', email);
   await page.fill('input[name="password"]', PASSWORD);
   await page.click('button[type="submit"]');
-  await page.waitForURL((url) => !url.pathname.startsWith('/sign-in'), {
+  await page.waitForURL((url) => !url.pathname.startsWith("/sign-in"), {
     timeout: 15_000,
   });
 
@@ -319,19 +324,20 @@ git commit -m "test(a11y): add global setup for fixture seeding and auth storage
 ## Task 4: Create `src/test/a11y/helpers.ts`
 
 **Files:**
+
 - Create: `src/test/a11y/helpers.ts`
 
 - [ ] **Step 1: Write helpers.ts**
 
 ```ts
-import { expect } from '@playwright/test';
-import AxeBuilder from '@axe-core/playwright';
-import type { Page } from '@playwright/test';
+import { expect } from "@playwright/test";
+import AxeBuilder from "@axe-core/playwright";
+import type { Page } from "@playwright/test";
 
 export async function checkA11y(page: Page): Promise<void> {
-  await page.waitForLoadState('networkidle', { timeout: 15_000 });
+  await page.waitForLoadState("networkidle", { timeout: 15_000 });
   const results = await new AxeBuilder({ page })
-    .withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa'])
+    .withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"])
     .analyze();
   expect(results.violations).toEqual([]);
 }
@@ -349,6 +355,7 @@ git commit -m "test(a11y): add checkA11y helper"
 ## Task 5: Create `src/test/a11y/public.a11y.test.ts`
 
 **Files:**
+
 - Create: `src/test/a11y/public.a11y.test.ts`
 
 These tests run without any auth storage state. Dynamic routes (`/projects/:id` and `/inventory/:id`) read IDs from `.fixtures.json`.
@@ -356,65 +363,65 @@ These tests run without any auth storage state. Dynamic routes (`/projects/:id` 
 - [ ] **Step 1: Write public.a11y.test.ts**
 
 ```ts
-import { test } from '@playwright/test';
-import { readFileSync } from 'node:fs';
-import { join, dirname } from 'node:path';
-import { fileURLToPath } from 'node:url';
-import { checkA11y } from './helpers';
+import { test } from "@playwright/test";
+import { readFileSync } from "node:fs";
+import { join, dirname } from "node:path";
+import { fileURLToPath } from "node:url";
+import { checkA11y } from "./helpers";
 
 const { projectId, itemId } = JSON.parse(
   readFileSync(
-    join(dirname(fileURLToPath(import.meta.url)), '.fixtures.json'),
-    'utf-8',
-  ),
+    join(dirname(fileURLToPath(import.meta.url)), ".fixtures.json"),
+    "utf-8"
+  )
 ) as { projectId: string; itemId: string };
 
-test('home page', async ({ page }) => {
-  await page.goto('/');
+test("home page", async ({ page }) => {
+  await page.goto("/");
   await checkA11y(page);
 });
 
-test('sign-in page', async ({ page }) => {
-  await page.goto('/sign-in');
+test("sign-in page", async ({ page }) => {
+  await page.goto("/sign-in");
   await checkA11y(page);
 });
 
-test('sign-up page', async ({ page }) => {
-  await page.goto('/sign-up');
+test("sign-up page", async ({ page }) => {
+  await page.goto("/sign-up");
   await checkA11y(page);
 });
 
-test('verify-email page', async ({ page }) => {
-  await page.goto('/verify-email');
+test("verify-email page", async ({ page }) => {
+  await page.goto("/verify-email");
   await checkA11y(page);
 });
 
-test('forgot-password page', async ({ page }) => {
-  await page.goto('/forgot-password');
+test("forgot-password page", async ({ page }) => {
+  await page.goto("/forgot-password");
   await checkA11y(page);
 });
 
-test('reset-password page', async ({ page }) => {
-  await page.goto('/reset-password');
+test("reset-password page", async ({ page }) => {
+  await page.goto("/reset-password");
   await checkA11y(page);
 });
 
-test('projects list', async ({ page }) => {
-  await page.goto('/projects');
+test("projects list", async ({ page }) => {
+  await page.goto("/projects");
   await checkA11y(page);
 });
 
-test('project detail', async ({ page }) => {
+test("project detail", async ({ page }) => {
   await page.goto(`/projects/${projectId}`);
   await checkA11y(page);
 });
 
-test('inventory list', async ({ page }) => {
-  await page.goto('/inventory');
+test("inventory list", async ({ page }) => {
+  await page.goto("/inventory");
   await checkA11y(page);
 });
 
-test('inventory item detail', async ({ page }) => {
+test("inventory item detail", async ({ page }) => {
   await page.goto(`/inventory/${itemId}`);
   await checkA11y(page);
 });
@@ -440,6 +447,7 @@ git commit -m "test(a11y): add public page accessibility tests"
 ## Task 6: Create `src/test/a11y/user.a11y.test.ts`
 
 **Files:**
+
 - Create: `src/test/a11y/user.a11y.test.ts`
 
 These tests run as `user@example.com`. The fixture project is owned by this user, so `/projects/:id/edit` will render the edit form.
@@ -447,46 +455,46 @@ These tests run as `user@example.com`. The fixture project is owned by this user
 - [ ] **Step 1: Write user.a11y.test.ts**
 
 ```ts
-import { test } from '@playwright/test';
-import { readFileSync } from 'node:fs';
-import { join, dirname } from 'node:path';
-import { fileURLToPath } from 'node:url';
-import { checkA11y } from './helpers';
+import { test } from "@playwright/test";
+import { readFileSync } from "node:fs";
+import { join, dirname } from "node:path";
+import { fileURLToPath } from "node:url";
+import { checkA11y } from "./helpers";
 
 const __dir = dirname(fileURLToPath(import.meta.url));
 
 const { projectId } = JSON.parse(
-  readFileSync(join(__dir, '.fixtures.json'), 'utf-8'),
+  readFileSync(join(__dir, ".fixtures.json"), "utf-8")
 ) as { projectId: string };
 
-test.use({ storageState: join(__dir, '.user-auth.json') });
+test.use({ storageState: join(__dir, ".user-auth.json") });
 
-test('my projects', async ({ page }) => {
-  await page.goto('/my/projects');
+test("my projects", async ({ page }) => {
+  await page.goto("/my/projects");
   await checkA11y(page);
 });
 
-test('my bookmarks', async ({ page }) => {
-  await page.goto('/my/bookmarks');
+test("my bookmarks", async ({ page }) => {
+  await page.goto("/my/bookmarks");
   await checkA11y(page);
 });
 
-test('my items', async ({ page }) => {
-  await page.goto('/my/items');
+test("my items", async ({ page }) => {
+  await page.goto("/my/items");
   await checkA11y(page);
 });
 
-test('profile page', async ({ page }) => {
-  await page.goto('/profile');
+test("profile page", async ({ page }) => {
+  await page.goto("/profile");
   await checkA11y(page);
 });
 
-test('new project form', async ({ page }) => {
-  await page.goto('/projects/new');
+test("new project form", async ({ page }) => {
+  await page.goto("/projects/new");
   await checkA11y(page);
 });
 
-test('edit project form', async ({ page }) => {
+test("edit project form", async ({ page }) => {
   await page.goto(`/projects/${projectId}/edit`);
   await checkA11y(page);
 });
@@ -512,6 +520,7 @@ git commit -m "test(a11y): add user-authenticated page accessibility tests"
 ## Task 7: Create `src/test/a11y/admin.a11y.test.ts`
 
 **Files:**
+
 - Create: `src/test/a11y/admin.a11y.test.ts`
 
 These tests run as `admin@example.com`. All 13 admin routes are covered, including all dynamic ID routes using fixture IDs.
@@ -519,16 +528,16 @@ These tests run as `admin@example.com`. All 13 admin routes are covered, includi
 - [ ] **Step 1: Write admin.a11y.test.ts**
 
 ```ts
-import { test } from '@playwright/test';
-import { readFileSync } from 'node:fs';
-import { join, dirname } from 'node:path';
-import { fileURLToPath } from 'node:url';
-import { checkA11y } from './helpers';
+import { test } from "@playwright/test";
+import { readFileSync } from "node:fs";
+import { join, dirname } from "node:path";
+import { fileURLToPath } from "node:url";
+import { checkA11y } from "./helpers";
 
 const __dir = dirname(fileURLToPath(import.meta.url));
 
 const { itemId, categoryId, programId, userId } = JSON.parse(
-  readFileSync(join(__dir, '.fixtures.json'), 'utf-8'),
+  readFileSync(join(__dir, ".fixtures.json"), "utf-8")
 ) as {
   itemId: string;
   categoryId: string;
@@ -536,69 +545,69 @@ const { itemId, categoryId, programId, userId } = JSON.parse(
   userId: string;
 };
 
-test.use({ storageState: join(__dir, '.admin-auth.json') });
+test.use({ storageState: join(__dir, ".admin-auth.json") });
 
-test('admin dashboard', async ({ page }) => {
-  await page.goto('/admin');
+test("admin dashboard", async ({ page }) => {
+  await page.goto("/admin");
   await checkA11y(page);
 });
 
-test('admin inventory list', async ({ page }) => {
-  await page.goto('/admin/inventory');
+test("admin inventory list", async ({ page }) => {
+  await page.goto("/admin/inventory");
   await checkA11y(page);
 });
 
-test('admin inventory new', async ({ page }) => {
-  await page.goto('/admin/inventory/new');
+test("admin inventory new", async ({ page }) => {
+  await page.goto("/admin/inventory/new");
   await checkA11y(page);
 });
 
-test('admin inventory item detail', async ({ page }) => {
+test("admin inventory item detail", async ({ page }) => {
   await page.goto(`/admin/inventory/${itemId}`);
   await checkA11y(page);
 });
 
-test('admin inventory item edit', async ({ page }) => {
+test("admin inventory item edit", async ({ page }) => {
   await page.goto(`/admin/inventory/${itemId}/edit`);
   await checkA11y(page);
 });
 
-test('admin inventory requests', async ({ page }) => {
-  await page.goto('/admin/inventory/requests');
+test("admin inventory requests", async ({ page }) => {
+  await page.goto("/admin/inventory/requests");
   await checkA11y(page);
 });
 
-test('admin projects list', async ({ page }) => {
-  await page.goto('/admin/projects');
+test("admin projects list", async ({ page }) => {
+  await page.goto("/admin/projects");
   await checkA11y(page);
 });
 
-test('admin users list', async ({ page }) => {
-  await page.goto('/admin/users');
+test("admin users list", async ({ page }) => {
+  await page.goto("/admin/users");
   await checkA11y(page);
 });
 
-test('admin user detail', async ({ page }) => {
+test("admin user detail", async ({ page }) => {
   await page.goto(`/admin/users/${userId}`);
   await checkA11y(page);
 });
 
-test('admin categories list', async ({ page }) => {
-  await page.goto('/admin/categories');
+test("admin categories list", async ({ page }) => {
+  await page.goto("/admin/categories");
   await checkA11y(page);
 });
 
-test('admin category detail', async ({ page }) => {
+test("admin category detail", async ({ page }) => {
   await page.goto(`/admin/categories/${categoryId}`);
   await checkA11y(page);
 });
 
-test('admin programs list', async ({ page }) => {
-  await page.goto('/admin/programs');
+test("admin programs list", async ({ page }) => {
+  await page.goto("/admin/programs");
   await checkA11y(page);
 });
 
-test('admin program detail', async ({ page }) => {
+test("admin program detail", async ({ page }) => {
   await page.goto(`/admin/programs/${programId}`);
   await checkA11y(page);
 });
@@ -624,6 +633,7 @@ git commit -m "test(a11y): add admin page accessibility tests"
 ## Task 8: Update `package.json` and Run Full Suite
 
 **Files:**
+
 - Modify: `package.json`
 
 - [ ] **Step 1: Add `test:accessibility` and update `test` to exclude a11y files**
@@ -652,6 +662,7 @@ npm run test:accessibility
 ```
 
 Expected: 58 test runs (29 pages × 2 color schemes). The suite may report failures if there are real axe violations in the app — that is correct behavior; those violations are genuine accessibility issues to address separately. The infrastructure is working correctly if:
+
 - All 58 tests execute (none timeout or error on import/navigation)
 - Each test produces a clear pass or axe-violation failure message
 - The HTML report is generated at `playwright-report/a11y/index.html`
@@ -676,6 +687,7 @@ git commit -m "test(a11y): add test:accessibility script and exclude a11y from v
 ## Notes for Addressing Violations Found
 
 When axe reports violations, each failure includes:
+
 - `id`: the WCAG rule ID (e.g. `color-contrast`, `label`, `aria-required-attr`)
 - `impact`: `critical` | `serious` | `moderate` | `minor`
 - `nodes[].target`: the CSS selector for the failing element
@@ -685,12 +697,12 @@ Address violations by fixing the underlying component or page markup. To suppres
 
 ```ts
 // In the specific test only — never in helpers.ts
-test('some page', async ({ page }) => {
-  await page.goto('/some-path');
-  await page.waitForLoadState('networkidle', { timeout: 15_000 });
+test("some page", async ({ page }) => {
+  await page.goto("/some-path");
+  await page.waitForLoadState("networkidle", { timeout: 15_000 });
   const results = await new AxeBuilder({ page })
-    .withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa'])
-    .exclude('#known-false-positive-selector') // reason: <explain why>
+    .withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"])
+    .exclude("#known-false-positive-selector") // reason: <explain why>
     .analyze();
   expect(results.violations).toEqual([]);
 });

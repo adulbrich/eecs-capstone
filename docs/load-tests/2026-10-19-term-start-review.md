@@ -16,23 +16,23 @@ before fall 2027.
 
 ## Against what #522 assumed
 
-| Metric | #522 assumed | Observed |
-| --- | --- | --- |
-| ECS `CPUUtilization` | peak 23.9% at one task | 41% busiest task at the 09-25 peak (49 requests per second); target tracking never fired after 09-23, since its trigger is three minutes of 50% average and the task count never rose |
-| ECS `MemoryUtilization` | 44.7% of 512 MB | 30.4% of 1024 MB at most (09-27); 10% to 17% since 10-03 |
-| ECS task count | floor 2, ceiling 4 | 3 every day from 09-24; 4 only during the 09-23 k6 run |
-| RDS `DatabaseConnections` | 210 worst case of 220 | 41 at most (09-24, 09-25); 17 to 18 at rest |
-| RDS `CPUUtilization`, `CPUCreditBalance` | 6.6%, credits flat | 7.1% at most outside one five-minute bucket; credits at 576 every day |
-| ALB `TargetResponseTime` p99, busiest minute | 208 ms, 263 requests | 223 ms worst hour; 2,934 requests; no ELB 5XX |
+| Metric                                       | #522 assumed           | Observed                                                                                                                                                                              |
+| -------------------------------------------- | ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| ECS `CPUUtilization`                         | peak 23.9% at one task | 41% busiest task at the 09-25 peak (49 requests per second); target tracking never fired after 09-23, since its trigger is three minutes of 50% average and the task count never rose |
+| ECS `MemoryUtilization`                      | 44.7% of 512 MB        | 30.4% of 1024 MB at most (09-27); 10% to 17% since 10-03                                                                                                                              |
+| ECS task count                               | floor 2, ceiling 4     | 3 every day from 09-24; 4 only during the 09-23 k6 run                                                                                                                                |
+| RDS `DatabaseConnections`                    | 210 worst case of 220  | 41 at most (09-24, 09-25); 17 to 18 at rest                                                                                                                                           |
+| RDS `CPUUtilization`, `CPUCreditBalance`     | 6.6%, credits flat     | 7.1% at most outside one five-minute bucket; credits at 576 every day                                                                                                                 |
+| ALB `TargetResponseTime` p99, busiest minute | 208 ms, 263 requests   | 223 ms worst hour; 2,934 requests; no ELB 5XX                                                                                                                                         |
 
 `PoolWaiting` was 0 in every minute from 09-24 to 10-18.
 
 Memory, which #522 did not size but the move back to `db.t4g.micro` turns on:
 
-| Instance | Period | `FreeableMemory` daily minimum | `SwapUsage` daily maximum |
-| --- | --- | --- | --- |
-| `db.t4g.micro` | 09-07 to 09-20, before term, a handful of staff | 131 to 180 MiB | 31 to 39 MiB |
-| `db.t4g.small` | 09-22 to 10-18 | 889 to 1,018 MiB | not read |
+| Instance       | Period                                          | `FreeableMemory` daily minimum | `SwapUsage` daily maximum |
+| -------------- | ----------------------------------------------- | ------------------------------ | ------------------------- |
+| `db.t4g.micro` | 09-07 to 09-20, before term, a handful of staff | 131 to 180 MiB                 | 31 to 39 MiB              |
+| `db.t4g.small` | 09-22 to 10-18                                  | 889 to 1,018 MiB               | not read                  |
 
 The micro row is the risk ADR-0064 accepts: a smaller dataset than today's already
 swapped a little. `eecs-capstone-db-memory` alarms below 64 MiB for ten minutes.
@@ -42,11 +42,11 @@ named it the change least worth making, with the worst failure if wrong.
 
 ## After the peak
 
-| Days | Requests a day | Busiest five minutes | p99, worst hour | Busiest task CPU | Memory max | DB connections max |
-| --- | --- | --- | --- | --- | --- | --- |
-| 09-29 to 10-02 | 25,000 to 45,000 | 710 | 98 ms | 27% | 15% | 39 |
-| 10-03 to 10-09 | 6,300 to 12,300 | 617 | 166 ms | 72% | 17% | 18 |
-| 10-10 to 10-18 | 1,700 to 9,900 | 190 | 110 ms | 24% | 17% | 35 |
+| Days           | Requests a day   | Busiest five minutes | p99, worst hour | Busiest task CPU | Memory max | DB connections max |
+| -------------- | ---------------- | -------------------- | --------------- | ---------------- | ---------- | ------------------ |
+| 09-29 to 10-02 | 25,000 to 45,000 | 710                  | 98 ms           | 27%              | 15%        | 39                 |
+| 10-03 to 10-09 | 6,300 to 12,300  | 617                  | 166 ms          | 72%              | 17%        | 18                 |
+| 10-10 to 10-18 | 1,700 to 9,900   | 190                  | 110 ms          | 24%              | 17%        | 35                 |
 
 Two outliers, neither with an error or a slow response around it:
 
@@ -73,14 +73,14 @@ than 25 on three.
 
 October 1 to 18 cost $56.42, about $97 a month:
 
-| Item | ~$/mo |
-| --- | --- |
-| Fargate, 3 tasks (vCPU and memory) | 26 |
-| RDS `db.t4g.small` | 24 |
-| ALB | 17 |
-| CloudWatch metrics, almost all Container Insights | 11 |
-| Public IPv4, one per task | 11 |
-| RDS storage, Secrets Manager, GuardDuty, alarms and the rest | 8 |
+| Item                                                         | ~$/mo |
+| ------------------------------------------------------------ | ----- |
+| Fargate, 3 tasks (vCPU and memory)                           | 26    |
+| RDS `db.t4g.small`                                           | 24    |
+| ALB                                                          | 17    |
+| CloudWatch metrics, almost all Container Insights            | 11    |
+| Public IPv4, one per task                                    | 11    |
+| RDS storage, Secrets Manager, GuardDuty, alarms and the rest | 8     |
 
 ADR-0064 takes off a task and its address (about $12), Container Insights (about $11) and
 half the instance (about $12), for about $62 a month off season. The ALB and the task

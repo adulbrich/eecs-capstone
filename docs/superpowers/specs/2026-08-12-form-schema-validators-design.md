@@ -62,10 +62,10 @@ The coercer appears exactly once per file. Every field rendered through a raw
 `form.Field` render prop displays nothing. Six sites, five distinct fields,
 since `imageUrl` appears in both forms:
 
-| File | Fields with no error rendering |
-| --- | --- |
-| `project-form.tsx` | `imageUrl` (:331), `programId` (:362), `teamsSupported` (:374), `proposerEmail` (:429) |
-| `inventory-form.tsx` | `categoryIds` (:151), `imageUrl` (:163) |
+| File                 | Fields with no error rendering                                                         |
+| -------------------- | -------------------------------------------------------------------------------------- |
+| `project-form.tsx`   | `imageUrl` (:331), `programId` (:362), `teamsSupported` (:374), `proposerEmail` (:429) |
+| `inventory-form.tsx` | `categoryIds` (:151), `imageUrl` (:163)                                                |
 
 `proposerEmail` is reachable in practice. `optionalEmail` requires a valid
 address, and `ProposerPicker` lets staff type freely whenever no account is

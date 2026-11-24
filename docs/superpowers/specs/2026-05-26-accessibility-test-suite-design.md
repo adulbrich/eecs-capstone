@@ -34,10 +34,10 @@ src/test/a11y/
 
 The config defines two named projects sharing the same test files:
 
-| Project         | `colorScheme` | Storage state       |
-|-----------------|---------------|---------------------|
-| `chromium-light`| `light`       | per test file       |
-| `chromium-dark` | `dark`        | per test file       |
+| Project          | `colorScheme` | Storage state |
+| ---------------- | ------------- | ------------- |
+| `chromium-light` | `light`       | per test file |
+| `chromium-dark`  | `dark`        | per test file |
 
 Every test runs twice -- once per project -- with no duplication in test code.
 
@@ -53,11 +53,11 @@ Playwright starts `npm run dev` (port 3000) and waits for it to be ready. Locall
 
 Ensures the three dev seed accounts exist with verified emails:
 
-| Email                      | Password   | Role        |
-|----------------------------|------------|-------------|
-| `user@example.com`         | `password` | `user`      |
-| `instructor@example.com`   | `password` | `instructor`|
-| `admin@example.com`        | `password` | `admin`     |
+| Email                    | Password   | Role         |
+| ------------------------ | ---------- | ------------ |
+| `user@example.com`       | `password` | `user`       |
+| `instructor@example.com` | `password` | `instructor` |
+| `admin@example.com`      | `password` | `admin`      |
 
 Uses the DB directly (same `#/db` import pattern as integration tests). Idempotent -- safe to re-run.
 
@@ -85,47 +85,47 @@ Test files declare which storage state to use via `test.use({ storageState })`, 
 
 ### Public pages (`public.a11y.test.ts`, no auth)
 
-| URL                          | Notes                              |
-|------------------------------|------------------------------------|
-| `/`                          | Home / landing                     |
-| `/sign-in`                   | Auth form                          |
-| `/sign-up`                   | Auth form                          |
-| `/verify-email`              | Post-signup email gate             |
-| `/forgot-password`           | Password reset request form        |
-| `/reset-password`            | Password reset form                |
-| `/projects`                  | Public project list                |
-| `/projects/:projectId`       | Project detail (fixture ID)        |
-| `/inventory`                 | Public inventory list              |
-| `/inventory/:itemId`         | Inventory detail (fixture ID)      |
+| URL                    | Notes                         |
+| ---------------------- | ----------------------------- |
+| `/`                    | Home / landing                |
+| `/sign-in`             | Auth form                     |
+| `/sign-up`             | Auth form                     |
+| `/verify-email`        | Post-signup email gate        |
+| `/forgot-password`     | Password reset request form   |
+| `/reset-password`      | Password reset form           |
+| `/projects`            | Public project list           |
+| `/projects/:projectId` | Project detail (fixture ID)   |
+| `/inventory`           | Public inventory list         |
+| `/inventory/:itemId`   | Inventory detail (fixture ID) |
 
 ### User pages (`user.a11y.test.ts`, `user@example.com`)
 
-| URL                               | Notes                          |
-|-----------------------------------|--------------------------------|
-| `/my/projects`                    | My projects list               |
-| `/my/bookmarks`                   | Bookmarked projects            |
-| `/my/items`                       | My borrowed/requested items    |
-| `/profile`                        | Edit profile                   |
-| `/projects/new`                   | New project form               |
-| `/projects/:projectId/edit`       | Edit project (fixture ID)      |
+| URL                         | Notes                       |
+| --------------------------- | --------------------------- |
+| `/my/projects`              | My projects list            |
+| `/my/bookmarks`             | Bookmarked projects         |
+| `/my/items`                 | My borrowed/requested items |
+| `/profile`                  | Edit profile                |
+| `/projects/new`             | New project form            |
+| `/projects/:projectId/edit` | Edit project (fixture ID)   |
 
 ### Admin pages (`admin.a11y.test.ts`, `admin@example.com`)
 
-| URL                                    | Notes                         |
-|----------------------------------------|-------------------------------|
-| `/admin`                               | Admin dashboard               |
-| `/admin/inventory`                     | Inventory list                |
-| `/admin/inventory/new`                 | New inventory item form       |
-| `/admin/inventory/:itemId`             | Inventory item detail         |
-| `/admin/inventory/:itemId/edit`        | Edit inventory item form      |
-| `/admin/inventory/requests`            | Request queue                 |
-| `/admin/projects`                      | All projects list             |
-| `/admin/users`                         | User list                     |
-| `/admin/users/:userId`                 | User detail                   |
-| `/admin/categories`                    | Category list                 |
-| `/admin/categories/:categoryId`        | Category detail (fixture ID)  |
-| `/admin/programs`                      | Program list                  |
-| `/admin/programs/:programId`           | Program detail (fixture ID)   |
+| URL                             | Notes                        |
+| ------------------------------- | ---------------------------- |
+| `/admin`                        | Admin dashboard              |
+| `/admin/inventory`              | Inventory list               |
+| `/admin/inventory/new`          | New inventory item form      |
+| `/admin/inventory/:itemId`      | Inventory item detail        |
+| `/admin/inventory/:itemId/edit` | Edit inventory item form     |
+| `/admin/inventory/requests`     | Request queue                |
+| `/admin/projects`               | All projects list            |
+| `/admin/users`                  | User list                    |
+| `/admin/users/:userId`          | User detail                  |
+| `/admin/categories`             | Category list                |
+| `/admin/categories/:categoryId` | Category detail (fixture ID) |
+| `/admin/programs`               | Program list                 |
+| `/admin/programs/:programId`    | Program detail (fixture ID)  |
 
 **Total: 29 pages, each scanned twice = 58 axe runs per test invocation.**
 
@@ -135,9 +135,9 @@ Test files declare which storage state to use via `test.use({ storageState })`, 
 
 ```ts
 export async function checkA11y(page: Page) {
-  await page.waitForLoadState('networkidle');
+  await page.waitForLoadState("networkidle");
   const results = await new AxeBuilder({ page })
-    .withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa'])
+    .withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"])
     .analyze();
   expect(results.violations).toEqual([]);
 }
@@ -146,8 +146,8 @@ export async function checkA11y(page: Page) {
 ### Per-test pattern
 
 ```ts
-test('sign-in page', async ({ page }) => {
-  await page.goto('/sign-in');
+test("sign-in page", async ({ page }) => {
+  await page.goto("/sign-in");
   await checkA11y(page);
 });
 ```

@@ -21,11 +21,11 @@
 
 ## File Structure
 
-| File | Responsibility |
-| --- | --- |
-| `src/server/_internal/bookmarks.ts` | four `*As` functions, four two-line wrappers |
-| `src/server/_internal/uploads.ts` | `uploadAvatarAs`, `clearAvatarAs`, their wrappers, viewer gains `image` |
-| `src/server/__tests__/bookmarks.integration.test.ts` | rewritten to call the functions |
+| File                                                 | Responsibility                                                          |
+| ---------------------------------------------------- | ----------------------------------------------------------------------- |
+| `src/server/_internal/bookmarks.ts`                  | four `*As` functions, four two-line wrappers                            |
+| `src/server/_internal/uploads.ts`                    | `uploadAvatarAs`, `clearAvatarAs`, their wrappers, viewer gains `image` |
+| `src/server/__tests__/bookmarks.integration.test.ts` | rewritten to call the functions                                         |
 
 ---
 
@@ -64,8 +64,8 @@
 
 ## Risks
 
-| Risk | Mitigation |
-| --- | --- |
-| The move drops a check | Bodies move verbatim; Phase 2's tests then cover the check that had none |
+| Risk                                                | Mitigation                                                                                                                        |
+| --------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
+| The move drops a check                              | Bodies move verbatim; Phase 2's tests then cover the check that had none                                                          |
 | The existing tests give false confidence in Phase 1 | Stated openly: they do not call this code, so Phase 1 is verified by review and typecheck, and Phase 2 is what actually covers it |
-| The avatar viewer type change ripples | Only two functions read `image`, and the field is optional |
+| The avatar viewer type change ripples               | Only two functions read `image`, and the field is optional                                                                        |

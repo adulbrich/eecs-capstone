@@ -33,6 +33,7 @@ Spec: `docs/superpowers/specs/2026-06-07-proposer-account-linking-design.md`
 ## Task 1: Schema change and migration
 
 **Files:**
+
 - Modify: `src/db/schema.ts`
 - Generate: `drizzle/` migration
 
@@ -82,6 +83,7 @@ git commit -m "make project proposer nullable and add proposer email link key"
 ## Task 2: Null-safe notifications
 
 **Files:**
+
 - Modify: `src/server/_internal/notify.ts`
 - Modify: `src/lib/project-visibility.ts`
 - Test: `src/server/__tests__/projects.integration.test.ts`
@@ -147,9 +149,9 @@ In `recordStatusChangeNotifications` and `recordSoftDeleteNotification`, broaden
 In `recordCommentNotifications`, guard the proposer before adding it to the recipient set:
 
 ```ts
-  if (project.proposerId && comment.authorId !== project.proposerId) {
-    recipients.add(project.proposerId);
-  }
+if (project.proposerId && comment.authorId !== project.proposerId) {
+  recipients.add(project.proposerId);
+}
 ```
 
 - [ ] **Step 4: Relax the visibility type and strip the email for non-staff**
@@ -157,7 +159,7 @@ In `recordCommentNotifications`, guard the proposer before adding it to the reci
 In `src/lib/project-visibility.ts`, change `VisibleProject` so `proposerId` is nullable:
 
 ```ts
-  proposerId: string | null;
+proposerId: string | null;
 ```
 
 `isOwner` already compares with `===`, so a null proposer simply never matches a viewer.
@@ -187,6 +189,7 @@ git commit -m "skip proposer notifications when a project has no linked account"
 ## Task 3: Staff user-search server function
 
 **Files:**
+
 - Modify: `src/server/users.ts`
 - Modify: `src/server/_internal/users.ts`
 - Test: `src/server/__tests__/users-search.integration.test.ts`
@@ -297,7 +300,9 @@ export async function searchUsersForCurrentUser(data: { q: string }) {
 In `src/server/users.ts`, add a schema and a `searchUsers` GET server function:
 
 ```ts
-const searchUsersSchema = z.object({ q: z.string().trim().max(200).default("") });
+const searchUsersSchema = z.object({
+  q: z.string().trim().max(200).default(""),
+});
 
 export const searchUsers = createServerFn({ method: "GET" })
   .inputValidator((data: unknown) => searchUsersSchema.parse(data ?? {}))
@@ -324,6 +329,7 @@ git commit -m "add staff-gated searchUsers server function"
 ## Task 4: Resolve proposer by email on create and update
 
 **Files:**
+
 - Modify: `src/server/projects.ts`
 - Modify: `src/server/_internal/projects.ts`
 - Modify: `src/server/projects-queries.ts`
@@ -403,7 +409,12 @@ In `src/server/projects.ts`, add to `projectInputSchema`:
 In `src/server/_internal/projects.ts`, import `user` and `eq` is already imported; add `user` to the schema import:
 
 ```ts
-import { projectEditLog, projectStatusHistory, projects, user } from "#/db/schema";
+import {
+  projectEditLog,
+  projectStatusHistory,
+  projects,
+  user,
+} from "#/db/schema";
 ```
 
 Add the resolver helper (after `loadProjectOr404`):
@@ -426,11 +437,11 @@ async function resolveProposerId(
 In `createProjectAs`, replace the hardcoded `proposerId: viewer.id` with staff-aware resolution. Before the insert:
 
 ```ts
-  const staff = isStaff(viewerToVisibility(viewer));
-  const proposerEmail = staff ? data.proposerEmail || null : null;
-  const proposerId = proposerEmail
-    ? await resolveProposerId(proposerEmail)
-    : viewer.id;
+const staff = isStaff(viewerToVisibility(viewer));
+const proposerEmail = staff ? data.proposerEmail || null : null;
+const proposerId = proposerEmail
+  ? await resolveProposerId(proposerEmail)
+  : viewer.id;
 ```
 
 and in the `.values({ ... })` object set:
@@ -445,14 +456,14 @@ and in the `.values({ ... })` object set:
 In `updateProjectAs`, the proposer is staff-only. Add `proposerEmail` to the `PROJECT_EDITABLE_FIELDS` list so changes are diffed and logged, then in the staff branch resolve and stage both columns. After the existing `if (staff) { newValues.notes = data.notes ?? null; }` block, extend it:
 
 ```ts
-  if (staff) {
-    newValues.notes = data.notes ?? null;
-    const proposerEmail = data.proposerEmail || null;
-    newValues.proposerEmail = proposerEmail;
-    newValues.proposerId = proposerEmail
-      ? await resolveProposerId(proposerEmail)
-      : null;
-  }
+if (staff) {
+  newValues.notes = data.notes ?? null;
+  const proposerEmail = data.proposerEmail || null;
+  newValues.proposerEmail = proposerEmail;
+  newValues.proposerId = proposerEmail
+    ? await resolveProposerId(proposerEmail)
+    : null;
+}
 ```
 
 Add `"proposerEmail"` and `"proposerId"` to `PROJECT_EDITABLE_FIELDS`, and in the diff loop skip them for non-staff just as `notes` is skipped:
@@ -480,7 +491,10 @@ export async function getProposerEmailForEditImpl(data: {
     throw new Error("Forbidden");
   }
   const [project] = await db
-    .select({ proposerId: projects.proposerId, proposerEmail: projects.proposerEmail })
+    .select({
+      proposerId: projects.proposerId,
+      proposerEmail: projects.proposerEmail,
+    })
     .from(projects)
     .where(eq(projects.id, data.projectId));
   if (!project) {
@@ -536,6 +550,7 @@ git commit -m "resolve project proposer from email on staff create and update"
 ## Task 5: Proposer picker and public-visibility note
 
 **Files:**
+
 - Create: `src/components/proposer-picker.tsx`
 - Modify: `src/components/project-form.tsx`
 - Test: `src/test/proposer-picker.test.tsx`
@@ -587,7 +602,9 @@ describe("ProposerPicker", () => {
       target: { value: "pat" },
     });
     fireEvent.click(await findByText(/pat@example.edu/));
-    await waitFor(() => expect(onChange).toHaveBeenCalledWith("pat@example.edu"));
+    await waitFor(() =>
+      expect(onChange).toHaveBeenCalledWith("pat@example.edu")
+    );
   });
 
   it("selects a result by keyboard (ArrowDown then Enter)", async () => {
@@ -603,7 +620,9 @@ describe("ProposerPicker", () => {
     await findByText(/pat@example.edu/);
     fireEvent.keyDown(search, { key: "ArrowDown" });
     fireEvent.keyDown(search, { key: "Enter" });
-    await waitFor(() => expect(onChange).toHaveBeenCalledWith("pat@example.edu"));
+    await waitFor(() =>
+      expect(onChange).toHaveBeenCalledWith("pat@example.edu")
+    );
   });
 });
 ```
@@ -752,25 +771,27 @@ In `src/components/project-form.tsx`:
 - Render the picker at the top of the staff section. Place it just before the staff-only `notes` field, gated on `showProposer`, wired to the form field:
 
 ```tsx
-      {showProposer && (
-        <form.Field name="proposerEmail">
-          {(field: AnyForm) => (
-            <ProposerPicker
-              onChange={(email) => field.handleChange(email)}
-              value={field.state.value as string}
-            />
-          )}
-        </form.Field>
+{
+  showProposer && (
+    <form.Field name="proposerEmail">
+      {(field: AnyForm) => (
+        <ProposerPicker
+          onChange={(email) => field.handleChange(email)}
+          value={field.state.value as string}
+        />
       )}
+    </form.Field>
+  );
+}
 ```
 
 - Add the public-visibility note directly above the `Contact name` field:
 
 ```tsx
-      <p className="text-muted-foreground text-xs">
-        Contact details below are shown publicly on the project page. Leave them
-        blank to keep them private.
-      </p>
+<p className="text-muted-foreground text-xs">
+  Contact details below are shown publicly on the project page. Leave them blank
+  to keep them private.
+</p>;
 ```
 
 - [ ] **Step 5: Run the component tests**
@@ -790,6 +811,7 @@ git commit -m "add staff proposer picker and public contact note to the project 
 ## Task 6: Wire the edit and new routes
 
 **Files:**
+
 - Modify: `src/routes/_authed/projects/$projectId/edit.tsx`
 - Modify: `src/routes/_authed/projects/new.tsx`
 
@@ -819,8 +841,8 @@ import { getProject, getProposerEmailForEdit } from "#/server/projects-queries";
 - In the component, destructure it from the loader data in one read:
 
 ```tsx
-  const { project, viewerIsStaff, categoryIds, proposerEmail } =
-    Route.useLoaderData();
+const { project, viewerIsStaff, categoryIds, proposerEmail } =
+  Route.useLoaderData();
 ```
 
 - In the `initial` object, add `proposerEmail` directly (it is already the resolved string):
@@ -854,6 +876,7 @@ Expected: no Biome violations in the changed files.
 - [ ] **Step 4: Manual verification**
 
 With `docker compose up -d` and `npm run dev`, signed in as an admin or instructor:
+
 - Open New project: confirm the Proposer email field and Find account button appear; create a draft linking an existing account by search; confirm the project detail shows the contact info you entered and the project lists under that account in admin user detail.
 - Open an existing project's edit page: confirm the proposer email prefills to the current proposer's account email and that saving without touching it preserves the proposer.
 - Sign in as a normal user: confirm the Proposer field is not shown and creating a project still attributes it to you.

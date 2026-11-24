@@ -38,6 +38,7 @@ matches Projects.
 ## Components
 
 ### `src/components/image-or-fallback.tsx` (new, moved)
+
 Move `ImageOrFallback` out of `project-card.tsx` into its own module so
 both project and inventory components share it. Renders the `<img>` when a
 src exists, otherwise a gradient with a centered, muted `ImageIcon`
@@ -45,7 +46,9 @@ placeholder. `project-card.tsx` re-exports it for back-compat, or callers
 import from the new path (prefer updating imports).
 
 ### `ProjectCard` / `ProjectRow`
+
 Shared visual spec:
+
 - **Card:** `ImageOrFallback` (aspect 16/9) → title row (title +
   `StatusBadge` when `status !== "published"`) → 3-line description
   (`line-clamp-3`) → meta line `CS-462 Capstone · Jane Doe` → `Updated
@@ -63,6 +66,7 @@ only when their value is present, so callers that don't supply them degrade
 gracefully (none will after this change, but it keeps the type safe).
 
 ### `InventoryCard` / `InventoryRow`
+
 - **Card:** `ImageOrFallback` (aspect 16/9) → name → 3-line description →
   `InventoryStatusBadge` → embedded `Add to cart` (rendered when
   `signedIn && status === "available" && onAddToCart`). The whole card is
@@ -110,6 +114,7 @@ plus `contactName` and `updatedAt`:
 
 Introduce a shared select fragment + mapper in
 `src/server/_internal/project-summary.ts`:
+
 - `projectSummarySelect` — the column projection (project fields + program
   course id/name) used by the queries.
 - `mapProjectSummary(row)` — maps a joined row to the `ProjectSummary`

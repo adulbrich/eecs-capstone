@@ -31,11 +31,11 @@ order.
 `select()` over `categories` filtered by domain and type. It has three
 consumers:
 
-| Caller | Purpose | Gate |
-| --- | --- | --- |
-| `src/routes/_authed/admin/categories/index.tsx:77` | the admin table | staff, in `beforeLoad` |
-| `src/components/category-multi-select.tsx:41` | the category picker on project and item forms | none |
-| `src/components/projects-filter-bar.tsx:61` | the public project filter | none |
+| Caller                                             | Purpose                                       | Gate                   |
+| -------------------------------------------------- | --------------------------------------------- | ---------------------- |
+| `src/routes/_authed/admin/categories/index.tsx:77` | the admin table                               | staff, in `beforeLoad` |
+| `src/components/category-multi-select.tsx:41`      | the category picker on project and item forms | none                   |
+| `src/components/projects-filter-bar.tsx:61`        | the public project filter                     | none                   |
 
 Two of the three are dropdowns on hot paths, and neither is staff-gated.
 
@@ -125,7 +125,7 @@ composite primary key, which leads with `project_id`, so counting by
 Add to the `projectCategories` table definition in `src/db/schema.ts`:
 
 ```ts
-index("project_categories_category_idx").on(t.categoryId)
+index("project_categories_category_idx").on(t.categoryId);
 ```
 
 `npm run db:generate` picks this up; no hand-written SQL.
@@ -135,10 +135,10 @@ index("project_categories_category_idx").on(t.categoryId)
 One count column per tab, since the domain decides which junction table was
 counted:
 
-| Tab | Header | Position |
-| --- | --- | --- |
-| Project categories | `Projects` | after `Name`, before `Type` |
-| Inventory categories | `Items` | after `Name` |
+| Tab                  | Header     | Position                    |
+| -------------------- | ---------- | --------------------------- |
+| Project categories   | `Projects` | after `Name`, before `Type` |
+| Inventory categories | `Items`    | after `Name`                |
 
 Numeric sort, visible by default, hideable through the Columns menu.
 
@@ -278,9 +278,9 @@ Reads
 
 ### Migration
 
-| Table | Change |
-| --- | --- |
-| `inventory_items` | add `current_holder_name` text, `current_holder_program` text |
+| Table                           | Change                                                             |
+| ------------------------------- | ------------------------------------------------------------------ |
+| `inventory_items`               | add `current_holder_name` text, `current_holder_program` text      |
 | `inventory_item_status_history` | add `holder_email` text, `holder_name` text, `holder_program` text |
 
 `program` is free text, not a foreign key to `programs`. A walk-in with no
@@ -364,14 +364,20 @@ what the columns mean and what the dialog sends.
 ```ts
 // replaces isNull(inventoryItems.currentRequestItemId)
 notExists(
-  db.select({ one: sql`1` })
+  db
+    .select({ one: sql`1` })
     .from(inventoryRequestItems)
-    .innerJoin(inventoryRequests, eq(inventoryRequestItems.requestId, inventoryRequests.id))
-    .where(and(
-      eq(inventoryRequestItems.id, inventoryItems.currentRequestItemId),
-      eq(inventoryRequests.userId, viewer.id)
-    ))
-)
+    .innerJoin(
+      inventoryRequests,
+      eq(inventoryRequestItems.requestId, inventoryRequests.id)
+    )
+    .where(
+      and(
+        eq(inventoryRequestItems.id, inventoryItems.currentRequestItemId),
+        eq(inventoryRequests.userId, viewer.id)
+      )
+    )
+);
 ```
 
 - **`recordOverdueNotificationsAs`**: the hold scan drops the same `isNull`

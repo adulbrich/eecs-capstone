@@ -2,7 +2,6 @@
 
 > **Status (verified 2026-06-07):** ✅ **Implemented and shipped.** Verified against the codebase; all deliverables exist. The `- [ ]` checkboxes below were never ticked during execution; they are stale, not a sign of incomplete work.
 
-
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking. Read `docs/QUIRKS.md` BEFORE starting; it documents every framework gotcha this codebase has hit.
 
 **Spec:** `docs/superpowers/specs/2026-05-17-discovery-and-taxonomy-design.md`
@@ -201,8 +200,15 @@ function assertStaff(viewer: AuthUser) {
 
 export async function listCategoriesImpl(data: { type?: string | null }) {
   const rows = data.type
-    ? await db.select().from(categories).where(eq(categories.type, data.type)).orderBy(categories.name)
-    : await db.select().from(categories).orderBy(categories.type, categories.name);
+    ? await db
+        .select()
+        .from(categories)
+        .where(eq(categories.type, data.type))
+        .orderBy(categories.name)
+    : await db
+        .select()
+        .from(categories)
+        .orderBy(categories.type, categories.name);
   return { rows };
 }
 
@@ -216,7 +222,10 @@ export async function listCategoryTypesImpl() {
 }
 
 export async function getCategoryImpl(data: { id: string }) {
-  const [row] = await db.select().from(categories).where(eq(categories.id, data.id));
+  const [row] = await db
+    .select()
+    .from(categories)
+    .where(eq(categories.id, data.id));
   if (!row) throw new Error("Category not found");
   return { category: row };
 }
@@ -237,7 +246,7 @@ export async function createCategoryForCurrentUser(data: CategoryInput) {
 
 export async function updateCategoryAs(
   viewer: AuthUser,
-  data: CategoryUpdateInput,
+  data: CategoryUpdateInput
 ) {
   assertStaff(viewer);
   await db
@@ -265,10 +274,13 @@ export async function deleteCategoryForCurrentUser(id: string) {
 
 export async function setProjectCategoriesAs(
   viewer: AuthUser,
-  data: SetProjectCategoriesInput,
+  data: SetProjectCategoriesInput
 ) {
   assertStaff(viewer);
-  const [project] = await db.select().from(projects).where(eq(projects.id, data.projectId));
+  const [project] = await db
+    .select()
+    .from(projects)
+    .where(eq(projects.id, data.projectId));
   if (!project) throw new Error("Project not found");
   if (!canSeeProject(project, viewerToVisibility(viewer))) {
     throw new Error("Forbidden");
@@ -282,7 +294,7 @@ export async function setProjectCategoriesAs(
         data.categoryIds.map((cid) => ({
           projectId: data.projectId,
           categoryId: cid,
-        })),
+        }))
       );
     }
   });
@@ -290,7 +302,7 @@ export async function setProjectCategoriesAs(
 }
 
 export async function setProjectCategoriesForCurrentUser(
-  data: SetProjectCategoriesInput,
+  data: SetProjectCategoriesInput
 ) {
   const viewer = await requireUser();
   return setProjectCategoriesAs(viewer, data);
@@ -358,7 +370,7 @@ export const listCategoryTypes = createServerFn({ method: "GET" }).handler(
   async () => {
     const { listCategoryTypesImpl } = await import("./_internal/categories");
     return listCategoryTypesImpl();
-  },
+  }
 );
 
 export const getCategory = createServerFn({ method: "GET" })
@@ -405,7 +417,9 @@ export const setProjectCategories = createServerFn({ method: "POST" })
   });
 
 export const listProjectCategories = createServerFn({ method: "GET" })
-  .inputValidator((data: unknown) => z.object({ projectId: z.string().uuid() }).parse(data))
+  .inputValidator((data: unknown) =>
+    z.object({ projectId: z.string().uuid() }).parse(data)
+  )
   .handler(async ({ data }) => {
     const { listProjectCategoriesImpl } = await import(
       "./_internal/categories"
@@ -476,7 +490,10 @@ export async function listProgramsImpl() {
 }
 
 export async function getProgramImpl(data: { id: string }) {
-  const [program] = await db.select().from(programs).where(eq(programs.id, data.id));
+  const [program] = await db
+    .select()
+    .from(programs)
+    .where(eq(programs.id, data.id));
   if (!program) throw new Error("Program not found");
   const instructors = await db
     .select({
@@ -516,7 +533,7 @@ export async function createProgramForCurrentUser(data: ProgramInput) {
 
 export async function updateProgramAs(
   viewer: AuthUser,
-  data: ProgramUpdateInput,
+  data: ProgramUpdateInput
 ) {
   assertStaff(viewer);
   await db
@@ -553,13 +570,15 @@ export async function deleteProgramForCurrentUser(id: string) {
 
 export async function addProgramInstructorAs(
   viewer: AuthUser,
-  data: { programId: string; userId: string },
+  data: { programId: string; userId: string }
 ) {
   assertStaff(viewer);
   const [target] = await db.select().from(user).where(eq(user.id, data.userId));
   if (!target) throw new Error("User not found");
   if (target.role !== "admin" && target.role !== "instructor") {
-    throw new Error("Only users with role admin or instructor can be assigned as program instructors");
+    throw new Error(
+      "Only users with role admin or instructor can be assigned as program instructors"
+    );
   }
   await db
     .insert(programInstructors)
@@ -578,7 +597,7 @@ export async function addProgramInstructorForCurrentUser(data: {
 
 export async function removeProgramInstructorAs(
   viewer: AuthUser,
-  data: { programId: string; userId: string },
+  data: { programId: string; userId: string }
 ) {
   assertStaff(viewer);
   await db
@@ -586,8 +605,8 @@ export async function removeProgramInstructorAs(
     .where(
       and(
         eq(programInstructors.programId, data.programId),
-        eq(programInstructors.userId, data.userId),
-      ),
+        eq(programInstructors.userId, data.userId)
+      )
     );
   return { programId: data.programId, userId: data.userId };
 }
@@ -602,7 +621,12 @@ export async function removeProgramInstructorForCurrentUser(data: {
 
 export async function listEligibleInstructorsImpl() {
   const rows = await db
-    .select({ id: user.id, name: user.name, email: user.email, role: user.role })
+    .select({
+      id: user.id,
+      name: user.name,
+      email: user.email,
+      role: user.role,
+    })
     .from(user)
     .where(inArray(user.role, ["admin", "instructor"]))
     .orderBy(user.name);
@@ -641,7 +665,7 @@ export const listPrograms = createServerFn({ method: "GET" }).handler(
   async () => {
     const { listProgramsImpl } = await import("./_internal/programs");
     return listProgramsImpl();
-  },
+  }
 );
 
 export const getProgram = createServerFn({ method: "GET" })
@@ -696,14 +720,12 @@ export const removeProgramInstructor = createServerFn({ method: "POST" })
     return removeProgramInstructorForCurrentUser(data);
   });
 
-export const listEligibleInstructors = createServerFn({ method: "GET" }).handler(
-  async () => {
-    const { listEligibleInstructorsImpl } = await import(
-      "./_internal/programs"
-    );
-    return listEligibleInstructorsImpl();
-  },
-);
+export const listEligibleInstructors = createServerFn({
+  method: "GET",
+}).handler(async () => {
+  const { listEligibleInstructorsImpl } = await import("./_internal/programs");
+  return listEligibleInstructorsImpl();
+});
 ```
 
 **Step 3: Format + check + commit**
@@ -764,15 +786,17 @@ export async function addBookmarkForCurrentUser(data: { projectId: string }) {
   return { ok: true };
 }
 
-export async function removeBookmarkForCurrentUser(data: { projectId: string }) {
+export async function removeBookmarkForCurrentUser(data: {
+  projectId: string;
+}) {
   const viewer = await requireUser();
   await db
     .delete(projectBookmarks)
     .where(
       and(
         eq(projectBookmarks.userId, viewer.id),
-        eq(projectBookmarks.projectId, data.projectId),
-      ),
+        eq(projectBookmarks.projectId, data.projectId)
+      )
     );
   return { ok: true };
 }
@@ -785,8 +809,8 @@ export async function isBookmarkedForCurrentUser(data: { projectId: string }) {
     .where(
       and(
         eq(projectBookmarks.userId, viewer.id),
-        eq(projectBookmarks.projectId, data.projectId),
-      ),
+        eq(projectBookmarks.projectId, data.projectId)
+      )
     );
   return { bookmarked: !!row };
 }
@@ -806,10 +830,7 @@ export async function listMyBookmarksForCurrentUser() {
     .from(projectBookmarks)
     .innerJoin(projects, eq(projectBookmarks.projectId, projects.id))
     .where(
-      and(
-        eq(projectBookmarks.userId, viewer.id),
-        isNull(projects.deletedAt),
-      ),
+      and(eq(projectBookmarks.userId, viewer.id), isNull(projects.deletedAt))
     )
     .orderBy(desc(projectBookmarks.createdAt));
   return { rows };
@@ -827,9 +848,7 @@ const projectIdSchema = z.object({ projectId: z.string().uuid() });
 export const addBookmark = createServerFn({ method: "POST" })
   .inputValidator((data: unknown) => projectIdSchema.parse(data))
   .handler(async ({ data }) => {
-    const { addBookmarkForCurrentUser } = await import(
-      "./_internal/bookmarks"
-    );
+    const { addBookmarkForCurrentUser } = await import("./_internal/bookmarks");
     return addBookmarkForCurrentUser(data);
   });
 
@@ -857,7 +876,7 @@ export const listMyBookmarks = createServerFn({ method: "GET" }).handler(
       "./_internal/bookmarks"
     );
     return listMyBookmarksForCurrentUser();
-  },
+  }
 );
 ```
 
@@ -908,7 +927,7 @@ export async function searchProjectsImpl(data: SearchProjectsInput) {
   ];
   if (trimmed) {
     conditions.push(
-      sql`${projects.searchVector} @@ websearch_to_tsquery('english', ${trimmed})`,
+      sql`${projects.searchVector} @@ websearch_to_tsquery('english', ${trimmed})`
     );
   }
   if (data.programId) {
@@ -921,7 +940,7 @@ export async function searchProjectsImpl(data: SearchProjectsInput) {
         WHERE category_id = ANY(${data.categoryIds}::uuid[])
         GROUP BY project_id
         HAVING count(*) = ${data.categoryIds.length}
-      )`,
+      )`
     );
   }
 
@@ -1047,7 +1066,12 @@ type Props = {
   id?: string;
 };
 
-export function ProgramSelect({ value, onChange, allowEmpty = true, id }: Props) {
+export function ProgramSelect({
+  value,
+  onChange,
+  allowEmpty = true,
+  id,
+}: Props) {
   const [programs, setPrograms] = useState<Program[]>([]);
 
   useEffect(() => {
@@ -1201,7 +1225,9 @@ export function CategoryMultiSelect({ value, onChange }: Props) {
   }, []);
 
   function toggle(id: string) {
-    onChange(value.includes(id) ? value.filter((v) => v !== id) : [...value, id]);
+    onChange(
+      value.includes(id) ? value.filter((v) => v !== id) : [...value, id]
+    );
   }
 
   const grouped = new Map<string, Category[]>();
@@ -1231,10 +1257,7 @@ export function CategoryMultiSelect({ value, onChange }: Props) {
           </legend>
           <div className="flex flex-wrap gap-2">
             {items.map((c) => (
-              <label
-                key={c.id}
-                className="flex items-center gap-1 text-sm"
-              >
+              <label key={c.id} className="flex items-center gap-1 text-sm">
                 <input
                   type="checkbox"
                   checked={value.includes(c.id)}
@@ -1401,7 +1424,10 @@ export function ProjectsFilterBar({ q, categories, program }: Props) {
                 <p className="text-xs text-neutral-400">{type}</p>
                 <div className="mt-1 flex flex-wrap gap-2">
                   {items.map((c) => (
-                    <label key={c.id} className="flex items-center gap-1 text-sm">
+                    <label
+                      key={c.id}
+                      className="flex items-center gap-1 text-sm"
+                    >
                       <input
                         type="checkbox"
                         checked={categories.includes(c.id)}
@@ -1571,7 +1597,10 @@ export function InstructorManager({ programId, initial, onChanged }: Props) {
       ) : (
         <ul className="mt-2 space-y-1">
           {instructors.map((i) => (
-            <li key={i.userId} className="flex items-center justify-between border border-neutral-200 p-2 dark:border-neutral-800">
+            <li
+              key={i.userId}
+              className="flex items-center justify-between border border-neutral-200 p-2 dark:border-neutral-800"
+            >
               <span>
                 {i.name ?? i.email}{" "}
                 <span className="text-xs text-neutral-500">({i.role})</span>
@@ -1665,7 +1694,7 @@ type Props = {
   submitLabel: string;
   onSubmit: (
     values: ProjectFormValues,
-    categoryIds: string[],
+    categoryIds: string[]
   ) => Promise<unknown>;
 };
 ```
@@ -1688,23 +1717,22 @@ Replace the `<Field form={form} name="programId" ... />` line with:
       />
     </div>
   )}
-</form.Field>
+</form.Field>;
 ```
 
 After the `{showNotes && (...)}` block, add:
 
 ```tsx
-{showCategories && (
-  <div>
-    <p className="block font-medium text-sm">Categories</p>
-    <div className="mt-1">
-      <CategoryMultiSelect
-        value={categoryIds}
-        onChange={setCategoryIds}
-      />
+{
+  showCategories && (
+    <div>
+      <p className="block font-medium text-sm">Categories</p>
+      <div className="mt-1">
+        <CategoryMultiSelect value={categoryIds} onChange={setCategoryIds} />
+      </div>
     </div>
-  </div>
-)}
+  );
+}
 ```
 
 Update the form's onSubmit to pass both arguments:
@@ -1780,7 +1808,10 @@ Add a loader change so initial category ids are fetched. Replace the file conten
 ```tsx
 import { createFileRoute, redirect, useNavigate } from "@tanstack/react-router";
 import { ProjectForm } from "#/components/project-form";
-import { listProjectCategories, setProjectCategories } from "#/server/categories";
+import {
+  listProjectCategories,
+  setProjectCategories,
+} from "#/server/categories";
 import { updateProject } from "#/server/projects";
 import { getProject } from "#/server/projects-queries";
 
@@ -1959,7 +1990,9 @@ function ProjectsList() {
         <Link
           to="/projects"
           search={(prev) => ({ ...prev, page: Math.min(totalPages, page + 1) })}
-          className={page >= totalPages ? "text-neutral-300" : "hover:underline"}
+          className={
+            page >= totalPages ? "text-neutral-300" : "hover:underline"
+          }
         >
           Next
         </Link>
@@ -2035,19 +2068,21 @@ loader: async ({ params }) => {
 Below the `<StatusBadge />` block (right next to the Edit link), add:
 
 ```tsx
-<BookmarkButton projectId={project.id as string} />
+<BookmarkButton projectId={project.id as string} />;
 ```
 
 After the title block, before the description Section, add:
 
 ```tsx
-{projectCategories.length > 0 && (
-  <div className="mt-3 flex flex-wrap gap-2">
-    {projectCategories.map((c) => (
-      <CategoryChip key={c.id} category={c} />
-    ))}
-  </div>
-)}
+{
+  projectCategories.length > 0 && (
+    <div className="mt-3 flex flex-wrap gap-2">
+      {projectCategories.map((c) => (
+        <CategoryChip key={c.id} category={c} />
+      ))}
+    </div>
+  );
+}
 ```
 
 If there is a program assigned, show it. Add a `<Section />` call:
@@ -2060,7 +2095,7 @@ If there is a program assigned, show it. Add a `<Section />` call:
       ? `${(project as { programCourseId?: string }).programCourseId ?? "(program)"}`
       : null
   }
-/>
+/>;
 ```
 
 Note: `getProject` does not currently return program data inline. If you want the program name shown rather than just an indicator, fetch it inline OR simply omit this Section in this commit. For Spec 3 we will just check the URL state.
@@ -2070,8 +2105,14 @@ Actually skip the Program section to keep this commit small. The filter bar show
 **Step 4: Update the `Route.useLoaderData()` destructuring**
 
 ```tsx
-const { project, history, canEdit, viewerIsStaff, viewerIsOwner, projectCategories } =
-  Route.useLoaderData();
+const {
+  project,
+  history,
+  canEdit,
+  viewerIsStaff,
+  viewerIsOwner,
+  projectCategories,
+} = Route.useLoaderData();
 ```
 
 **Step 5: Boot dev, lint, commit**
@@ -2173,7 +2214,12 @@ EOF
 **Step 1: `src/routes/_authed/admin/categories/index.tsx`**
 
 ```tsx
-import { createFileRoute, Link, redirect, useRouter } from "@tanstack/react-router";
+import {
+  createFileRoute,
+  Link,
+  redirect,
+  useRouter,
+} from "@tanstack/react-router";
 import { useState } from "react";
 import { AdminTable } from "#/components/admin-table";
 import { getSession } from "#/lib/auth-guards";
@@ -2227,7 +2273,10 @@ function CategoriesAdmin() {
 
       <form onSubmit={onCreate} className="mt-6 flex flex-wrap items-end gap-2">
         <div>
-          <label htmlFor="cat-name" className="block text-xs font-medium text-neutral-500">
+          <label
+            htmlFor="cat-name"
+            className="block text-xs font-medium text-neutral-500"
+          >
             Name
           </label>
           <input
@@ -2239,7 +2288,10 @@ function CategoriesAdmin() {
           />
         </div>
         <div>
-          <label htmlFor="cat-type" className="block text-xs font-medium text-neutral-500">
+          <label
+            htmlFor="cat-type"
+            className="block text-xs font-medium text-neutral-500"
+          >
             Type
           </label>
           <input
@@ -2339,7 +2391,12 @@ function CategoryEdit() {
   }
 
   async function onDelete() {
-    if (!confirm(`Delete category "${category.name}"? Projects tagged with it will lose the tag.`)) return;
+    if (
+      !confirm(
+        `Delete category "${category.name}"? Projects tagged with it will lose the tag.`
+      )
+    )
+      return;
     setError(null);
     try {
       await deleteCategory({ data: { id: category.id } });
@@ -2354,7 +2411,10 @@ function CategoryEdit() {
       <h1 className="text-2xl font-semibold">Edit category</h1>
       <form onSubmit={onSave} className="mt-6 space-y-3">
         <div>
-          <label htmlFor="cat-name" className="block text-xs font-medium text-neutral-500">
+          <label
+            htmlFor="cat-name"
+            className="block text-xs font-medium text-neutral-500"
+          >
             Name
           </label>
           <input
@@ -2366,7 +2426,10 @@ function CategoryEdit() {
           />
         </div>
         <div>
-          <label htmlFor="cat-type" className="block text-xs font-medium text-neutral-500">
+          <label
+            htmlFor="cat-type"
+            className="block text-xs font-medium text-neutral-500"
+          >
             Type
           </label>
           <input
@@ -2384,7 +2447,10 @@ function CategoryEdit() {
           </datalist>
         </div>
         <div className="flex gap-2">
-          <button type="submit" className="bg-black px-3 py-2 text-sm text-white">
+          <button
+            type="submit"
+            className="bg-black px-3 py-2 text-sm text-white"
+          >
             Save
           </button>
           <button
@@ -2437,7 +2503,12 @@ EOF
 **Step 1: `src/routes/_authed/admin/programs/index.tsx`**
 
 ```tsx
-import { createFileRoute, Link, redirect, useRouter } from "@tanstack/react-router";
+import {
+  createFileRoute,
+  Link,
+  redirect,
+  useRouter,
+} from "@tanstack/react-router";
 import { useState } from "react";
 import { AdminTable } from "#/components/admin-table";
 import { getSession } from "#/lib/auth-guards";
@@ -2505,7 +2576,10 @@ function ProgramsAdmin() {
           className="border p-2"
         />
         <div className="md:col-span-3">
-          <button type="submit" className="bg-black px-3 py-2 text-sm text-white">
+          <button
+            type="submit"
+            className="bg-black px-3 py-2 text-sm text-white"
+          >
             Create program
           </button>
         </div>
@@ -2541,15 +2615,16 @@ function ProgramsAdmin() {
 **Step 2: `src/routes/_authed/admin/programs/$programId.tsx`**
 
 ```tsx
-import { createFileRoute, redirect, useNavigate, useRouter } from "@tanstack/react-router";
+import {
+  createFileRoute,
+  redirect,
+  useNavigate,
+  useRouter,
+} from "@tanstack/react-router";
 import { useState } from "react";
 import { InstructorManager } from "#/components/instructor-manager";
 import { getSession } from "#/lib/auth-guards";
-import {
-  deleteProgram,
-  getProgram,
-  updateProgram,
-} from "#/server/programs";
+import { deleteProgram, getProgram, updateProgram } from "#/server/programs";
 
 export const Route = createFileRoute("/_authed/admin/programs/$programId")({
   beforeLoad: async () => {
@@ -2559,8 +2634,7 @@ export const Route = createFileRoute("/_authed/admin/programs/$programId")({
       throw redirect({ to: "/" });
     }
   },
-  loader: async ({ params }) =>
-    getProgram({ data: { id: params.programId } }),
+  loader: async ({ params }) => getProgram({ data: { id: params.programId } }),
   component: ProgramEdit,
 });
 
@@ -2592,9 +2666,10 @@ function ProgramEdit() {
   }
 
   async function onDelete() {
-    const msg = projectCount > 0
-      ? `Delete program "${program.courseName}"? ${projectCount} project(s) will be unlinked but kept.`
-      : `Delete program "${program.courseName}"?`;
+    const msg =
+      projectCount > 0
+        ? `Delete program "${program.courseName}"? ${projectCount} project(s) will be unlinked but kept.`
+        : `Delete program "${program.courseName}"?`;
     if (!confirm(msg)) return;
     setError(null);
     try {
@@ -2614,7 +2689,10 @@ function ProgramEdit() {
 
       <form onSubmit={onSave} className="mt-6 space-y-3">
         <div>
-          <label htmlFor="course-id" className="block text-xs font-medium text-neutral-500">
+          <label
+            htmlFor="course-id"
+            className="block text-xs font-medium text-neutral-500"
+          >
             Course ID
           </label>
           <input
@@ -2626,7 +2704,10 @@ function ProgramEdit() {
           />
         </div>
         <div>
-          <label htmlFor="course-name" className="block text-xs font-medium text-neutral-500">
+          <label
+            htmlFor="course-name"
+            className="block text-xs font-medium text-neutral-500"
+          >
             Course name
           </label>
           <input
@@ -2638,7 +2719,10 @@ function ProgramEdit() {
           />
         </div>
         <div>
-          <label htmlFor="course-desc" className="block text-xs font-medium text-neutral-500">
+          <label
+            htmlFor="course-desc"
+            className="block text-xs font-medium text-neutral-500"
+          >
             Description
           </label>
           <textarea
@@ -2650,7 +2734,10 @@ function ProgramEdit() {
           />
         </div>
         <div className="flex gap-2">
-          <button type="submit" className="bg-black px-3 py-2 text-sm text-white">
+          <button
+            type="submit"
+            className="bg-black px-3 py-2 text-sm text-white"
+          >
             Save
           </button>
           <button
@@ -2712,7 +2799,7 @@ Inside the `nav` block, between "My projects" and "New project", add a "Bookmark
 ```tsx
 <Link to="/my/bookmarks" className="hover:underline">
   Bookmarks
-</Link>
+</Link>;
 ```
 
 **Step 2: Update `src/routes/_authed/admin/index.tsx`**
@@ -2737,7 +2824,10 @@ function AdminHome() {
           </Link>
         </li>
         <li>
-          <Link to="/admin/categories" className="text-blue-700 hover:underline">
+          <Link
+            to="/admin/categories"
+            className="text-blue-700 hover:underline"
+          >
             Categories
           </Link>
         </li>
@@ -2802,7 +2892,10 @@ async function makeAdmin(email: string) {
   await auth.api.signUpEmail({
     body: { email, password: "Password1!", name: email },
   });
-  await db.update(user).set({ emailVerified: true, role: "admin" }).where(eq(user.email, email));
+  await db
+    .update(user)
+    .set({ emailVerified: true, role: "admin" })
+    .where(eq(user.email, email));
   const [u] = await db.select().from(user).where(eq(user.email, email));
   return { id: u.id, role: u.role };
 }
@@ -2825,8 +2918,15 @@ function baseProject(title: string, description: string | null = null) {
   };
 }
 
-async function publish(admin: { id: string; role: string | null }, title: string, body: Partial<ReturnType<typeof baseProject>> = {}) {
-  const { id } = await createProjectAs(admin, { ...baseProject(title), ...body });
+async function publish(
+  admin: { id: string; role: string | null },
+  title: string,
+  body: Partial<ReturnType<typeof baseProject>> = {}
+) {
+  const { id } = await createProjectAs(admin, {
+    ...baseProject(title),
+    ...body,
+  });
   await performTransitionAs(admin, id, "submitted");
   await performTransitionAs(admin, id, "approved");
   await performTransitionAs(admin, id, "published");
@@ -2837,7 +2937,9 @@ describe("searchProjects", () => {
   it("ranks title hit above description hit for the same query", async () => {
     const admin = await makeAdmin(`a-${Date.now()}@x.com`);
     const titleId = await publish(admin, "React UI Library");
-    const descId = await publish(admin, "Random thing", { description: "uses react under the hood" });
+    const descId = await publish(admin, "Random thing", {
+      description: "uses react under the hood",
+    });
 
     const { rows } = await searchProjectsImpl({
       query: "react",
@@ -2969,39 +3071,69 @@ function baseProject() {
 describe("categories", () => {
   it("staff can create; deletion cascades project_categories", async () => {
     const admin = await makeUser(`a-${Date.now()}@x.com`, "admin");
-    const { id: catId } = await createCategoryAs(admin, { name: "react", type: "technology" });
+    const { id: catId } = await createCategoryAs(admin, {
+      name: "react",
+      type: "technology",
+    });
     const { id: projId } = await createProjectAs(admin, baseProject());
-    await setProjectCategoriesAs(admin, { projectId: projId, categoryIds: [catId] });
+    await setProjectCategoriesAs(admin, {
+      projectId: projId,
+      categoryIds: [catId],
+    });
 
-    const before = await db.select().from(projectCategories).where(eq(projectCategories.projectId, projId));
+    const before = await db
+      .select()
+      .from(projectCategories)
+      .where(eq(projectCategories.projectId, projId));
     expect(before.length).toBe(1);
 
     await deleteCategoryAs(admin, catId);
 
-    const after = await db.select().from(projectCategories).where(eq(projectCategories.projectId, projId));
+    const after = await db
+      .select()
+      .from(projectCategories)
+      .where(eq(projectCategories.projectId, projId));
     expect(after.length).toBe(0);
   });
 
   it("non-staff cannot create", async () => {
     const u = await makeUser(`u-${Date.now()}@x.com`, "user");
     await expect(
-      createCategoryAs(u, { name: "x", type: "technology" }),
+      createCategoryAs(u, { name: "x", type: "technology" })
     ).rejects.toThrow();
   });
 
   it("setProjectCategories replaces atomically", async () => {
     const admin = await makeUser(`a2-${Date.now()}@x.com`, "admin");
-    const { id: c1 } = await createCategoryAs(admin, { name: "a", type: "technology" });
-    const { id: c2 } = await createCategoryAs(admin, { name: "b", type: "technology" });
-    const { id: c3 } = await createCategoryAs(admin, { name: "c", type: "technology" });
+    const { id: c1 } = await createCategoryAs(admin, {
+      name: "a",
+      type: "technology",
+    });
+    const { id: c2 } = await createCategoryAs(admin, {
+      name: "b",
+      type: "technology",
+    });
+    const { id: c3 } = await createCategoryAs(admin, {
+      name: "c",
+      type: "technology",
+    });
     const { id: projId } = await createProjectAs(admin, baseProject());
 
-    await setProjectCategoriesAs(admin, { projectId: projId, categoryIds: [c1, c2] });
-    await setProjectCategoriesAs(admin, { projectId: projId, categoryIds: [c3] });
+    await setProjectCategoriesAs(admin, {
+      projectId: projId,
+      categoryIds: [c1, c2],
+    });
+    await setProjectCategoriesAs(admin, {
+      projectId: projId,
+      categoryIds: [c3],
+    });
 
     const after = await listCategoriesImpl({ type: null });
     void after;
-    const rows = await db.select().from(projectCategories).where(eq(projectCategories.projectId, projId));
+    const rows = await db
+      .select()
+      .from(projectCategories)
+      .where(eq(projectCategories.projectId, projId));
     expect(rows.map((r) => r.categoryId)).toEqual([c3]);
   });
 });
@@ -3021,7 +3153,10 @@ import {
   listMyBookmarksForCurrentUser,
   removeBookmarkForCurrentUser,
 } from "#/server/_internal/bookmarks";
-import { createProjectAs, performTransitionAs } from "#/server/_internal/projects";
+import {
+  createProjectAs,
+  performTransitionAs,
+} from "#/server/_internal/projects";
 
 async function makeUser(email: string, role: "user" | "admin") {
   await auth.api.signUpEmail({
@@ -3069,8 +3204,14 @@ describe("bookmarks (direct table-level)", () => {
     await performTransitionAs(admin, projId, "approved");
     await performTransitionAs(admin, projId, "published");
 
-    await db.insert(projectBookmarks).values({ userId: u.id, projectId: projId }).onConflictDoNothing();
-    await db.insert(projectBookmarks).values({ userId: u.id, projectId: projId }).onConflictDoNothing();
+    await db
+      .insert(projectBookmarks)
+      .values({ userId: u.id, projectId: projId })
+      .onConflictDoNothing();
+    await db
+      .insert(projectBookmarks)
+      .values({ userId: u.id, projectId: projId })
+      .onConflictDoNothing();
 
     const rows = await db
       .select()
@@ -3087,8 +3228,13 @@ describe("bookmarks (direct table-level)", () => {
     await performTransitionAs(admin, projId, "approved");
     await performTransitionAs(admin, projId, "published");
 
-    await db.insert(projectBookmarks).values({ userId: u.id, projectId: projId });
-    await db.update(projects).set({ deletedAt: new Date() }).where(eq(projects.id, projId));
+    await db
+      .insert(projectBookmarks)
+      .values({ userId: u.id, projectId: projId });
+    await db
+      .update(projects)
+      .set({ deletedAt: new Date() })
+      .where(eq(projects.id, projId));
 
     // Read directly via the same join the impl uses
     const rows = await db
@@ -3097,7 +3243,10 @@ describe("bookmarks (direct table-level)", () => {
       .innerJoin(projects, eq(projectBookmarks.projectId, projects.id))
       .where(eq(projectBookmarks.userId, u.id));
     void rows;
-    void addBookmarkForCurrentUser; void removeBookmarkForCurrentUser; void isBookmarkedForCurrentUser; void listMyBookmarksForCurrentUser;
+    void addBookmarkForCurrentUser;
+    void removeBookmarkForCurrentUser;
+    void isBookmarkedForCurrentUser;
+    void listMyBookmarksForCurrentUser;
     // We assert the soft-deleted row would be filtered out by the impl;
     // the impl is a thin wrapper, so this DB-level check is the truth.
   });
@@ -3196,7 +3345,10 @@ describe("programs", () => {
     const result = await deleteProgramAs(admin, programId);
     expect(result.unlinkedProjectCount).toBe(1);
 
-    const [project] = await db.select().from(projects).where(eq(projects.id, projId));
+    const [project] = await db
+      .select()
+      .from(projects)
+      .where(eq(projects.id, projId));
     expect(project.programId).toBeNull();
   });
 
@@ -3209,7 +3361,7 @@ describe("programs", () => {
       description: null,
     });
     await expect(
-      addProgramInstructorAs(admin, { programId, userId: plainUser.id }),
+      addProgramInstructorAs(admin, { programId, userId: plainUser.id })
     ).rejects.toThrow();
   });
 
@@ -3229,8 +3381,14 @@ describe("programs", () => {
       .where(eq(programInstructors.programId, programId));
     expect(rows.length).toBe(1);
 
-    await removeProgramInstructorAs(admin, { programId, userId: instructor.id });
-    await removeProgramInstructorAs(admin, { programId, userId: instructor.id });
+    await removeProgramInstructorAs(admin, {
+      programId,
+      userId: instructor.id,
+    });
+    await removeProgramInstructorAs(admin, {
+      programId,
+      userId: instructor.id,
+    });
     const after = await db
       .select()
       .from(programInstructors)
