@@ -515,7 +515,7 @@ function ReplyForm({
       {viewerIsStaff && (
         <div>
           <div className="flex flex-wrap gap-x-4 gap-y-2">
-            <Label className="text-xs font-normal">
+            <Label className="text-xs leading-4 font-normal">
               <Checkbox
                 checked={isInternal}
                 disabled={parentIsInternal || busy}
@@ -528,7 +528,7 @@ function ReplyForm({
             </Label>
             {/* Same shape as the new-comment form: disabled, not gone (#399). */}
             {offersSkip && (
-              <Label className="text-xs font-normal">
+              <Label className="text-xs leading-4 font-normal">
                 <Checkbox
                   checked={sendEmail && !isInternal}
                   disabled={busy || isInternal}

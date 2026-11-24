@@ -281,7 +281,7 @@ function Field({
     <form.Field name={name as never}>
       {(field: AnyForm) => (
         <div>
-          <Label className="text-base" htmlFor={field.name}>
+          <Label className="text-base leading-6" htmlFor={field.name}>
             {label}
           </Label>
           {description && (
