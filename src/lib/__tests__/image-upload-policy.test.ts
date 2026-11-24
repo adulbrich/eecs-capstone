@@ -79,6 +79,9 @@ describe("IMAGE_FILE_ACCEPT", () => {
     //
     // One type is not drift: `image/webp` alone is the output content type
     // Sharp and the canvas both name, which is why the threshold is two.
+    //
+    // If you touch this scan, mutate more than the form it was written for:
+    // every narrowing it needed was found by mutation, not by reading.
     const MIME = /image\/[a-z0-9.+-]+/gu;
     // Only reachable when the count did not fire, so this is about a picker
     // narrowed to a SINGLE type in a file that names no other. Anything
