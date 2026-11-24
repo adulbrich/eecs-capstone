@@ -7,11 +7,8 @@ import { Button } from "#/components/ui/button";
 import { Checkbox } from "#/components/ui/checkbox";
 import { Input } from "#/components/ui/input";
 import { Label } from "#/components/ui/label";
-import {
-  createCategory,
-  listCategories,
-  type listSchema,
-} from "#/server/categories";
+import type { listSchema } from "#/server/categories";
+import { createCategory, listCategories } from "#/server/categories";
 import { FieldError } from "./ui/field";
 
 interface Category {

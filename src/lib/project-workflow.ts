@@ -1,4 +1,5 @@
-import { PROJECT_STATUSES, type ProjectStatus } from "./vocabularies";
+import type { ProjectStatus } from "./vocabularies";
+import { PROJECT_STATUSES } from "./vocabularies";
 
 export type ActorRole = "owner" | "staff";
 

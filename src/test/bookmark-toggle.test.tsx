@@ -37,7 +37,8 @@ vi.mock("@tanstack/react-router", () => ({
 }));
 
 import { BookmarkSetProvider, BookmarkToggle } from "#/components/bookmark-set";
-import { ProjectCard, type ProjectSummary } from "#/components/project-card";
+import type { ProjectSummary } from "#/components/project-card";
+import { ProjectCard } from "#/components/project-card";
 
 beforeEach(() => {
   session.data = { user: { id: "u1" } };

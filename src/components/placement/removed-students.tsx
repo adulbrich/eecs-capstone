@@ -8,11 +8,8 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "#/components/ui/dropdown-menu";
-import {
-  type RemovedStudent,
-  removeStudents,
-  restoreStudent,
-} from "#/lib/placement/workspace";
+import type { RemovedStudent } from "#/lib/placement/workspace";
+import { removeStudents, restoreStudent } from "#/lib/placement/workspace";
 
 /**
  * Takes one student out of placement (#679), from the Bids tab's two views,

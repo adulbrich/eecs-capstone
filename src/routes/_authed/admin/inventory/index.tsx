@@ -7,10 +7,8 @@ import {
   AdminTableControls,
   defineAdminColumns,
 } from "#/components/admin-data-table";
-import {
-  CategoryCheckboxList,
-  type CategoryOption,
-} from "#/components/category-checkbox-list";
+import type { CategoryOption } from "#/components/category-checkbox-list";
+import { CategoryCheckboxList } from "#/components/category-checkbox-list";
 import { CategoryChip } from "#/components/category-chip";
 import { ClearFiltersButton } from "#/components/clear-filters-button";
 import { ExportCsvButton } from "#/components/export-csv-button";
@@ -43,16 +41,10 @@ import {
 import { requireStaff } from "#/lib/access-denied";
 import { defineCsvColumns, toCsv } from "#/lib/csv";
 import { formatHoldShort, holdFromStoredRow } from "#/lib/hold";
-import {
-  type DeadlineEntry,
-  deadlinePairOf,
-  isOverdue,
-} from "#/lib/inventory-deadlines";
-import {
-  ACTIVE_STATUSES,
-  type ActiveStatus,
-  statusRank,
-} from "#/lib/inventory-visibility";
+import type { DeadlineEntry } from "#/lib/inventory-deadlines";
+import { deadlinePairOf, isOverdue } from "#/lib/inventory-deadlines";
+import type { ActiveStatus } from "#/lib/inventory-visibility";
+import { ACTIVE_STATUSES, statusRank } from "#/lib/inventory-visibility";
 import { pageTitle } from "#/lib/page-title";
 import { searchParamQuerySchema } from "#/lib/search-query";
 import { getPublicUrl } from "#/lib/storage";

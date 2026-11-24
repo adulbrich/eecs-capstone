@@ -1,13 +1,5 @@
-import {
-  and,
-  eq,
-  ilike,
-  inArray,
-  isNull,
-  or,
-  type SQL,
-  sql,
-} from "drizzle-orm";
+import type { SQL } from "drizzle-orm";
+import { and, eq, ilike, inArray, isNull, or, sql } from "drizzle-orm";
 import { db } from "#/db";
 import { projectCategories, projects, userInterests } from "#/db/schema";
 import { readSession } from "#/lib/_internal/auth-guards";

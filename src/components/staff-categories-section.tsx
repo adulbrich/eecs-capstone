@@ -1,10 +1,8 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
 import { useId, useState } from "react";
-import {
-  type CategoryProposal,
-  PROPOSAL_NAME_MAX_LENGTH,
-} from "#/lib/categorize";
+import type { CategoryProposal } from "#/lib/categorize";
+import { PROPOSAL_NAME_MAX_LENGTH } from "#/lib/categorize";
 import {
   CATEGORY_DESCRIPTION_MAX_LENGTH,
   KIND_OF_WORK_TYPE,

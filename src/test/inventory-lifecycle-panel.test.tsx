@@ -8,7 +8,8 @@ import {
 } from "@testing-library/react";
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import { lastDeadlineDay, localDay } from "#/lib/day-range";
-import { INVENTORY_ITEM_STATUSES, type ItemStatus } from "#/lib/vocabularies";
+import type { ItemStatus } from "#/lib/vocabularies";
+import { INVENTORY_ITEM_STATUSES } from "#/lib/vocabularies";
 import { renderWithQueryClient } from "./shared/query-client";
 
 const { router, server } = vi.hoisted(() => ({
@@ -37,10 +38,8 @@ vi.mock("@tanstack/react-router", async (importOriginal) => ({
   useRouter: () => router,
 }));
 
-import {
-  type HistoryRow,
-  InventoryLifecyclePanel,
-} from "#/components/inventory-lifecycle-panel";
+import type { HistoryRow } from "#/components/inventory-lifecycle-panel";
+import { InventoryLifecyclePanel } from "#/components/inventory-lifecycle-panel";
 import {
   HARD_DELETE_HISTORY_REFUSAL,
   needsHolder,

@@ -1,11 +1,6 @@
 import { describe, expect, it } from "vitest";
-import {
-  assertAdmin,
-  assertStaff,
-  isAdmin,
-  isStaff,
-  type Viewer,
-} from "../viewer";
+import type { Viewer } from "../viewer";
+import { assertAdmin, assertStaff, isAdmin, isStaff } from "../viewer";
 
 const admin: Viewer = { id: "u-admin", role: "admin" };
 const instructor: Viewer = { id: "u-inst", role: "instructor" };

@@ -7,25 +7,26 @@ import {
   projects,
 } from "#/db/schema";
 import { requireUser } from "#/lib/_internal/auth-guards";
-import {
-  findToolCall,
-  type MantleResponse,
-  mantleResponses,
-  type ResponsesFn,
+import type {
+  MantleResponse,
+  ResponsesFn,
 } from "#/lib/_internal/bedrock-mantle";
+import { findToolCall, mantleResponses } from "#/lib/_internal/bedrock-mantle";
 import { redactQueryError } from "#/lib/_internal/redact-query-error";
 import { clearAllReferenceListCaches } from "#/lib/_internal/reference-list-cache";
 import type { ReviewOutcome } from "#/lib/ai-review-limits";
+import type {
+  CleanupApplyResult,
+  CleanupCategory,
+  CleanupChange,
+  CleanupEffect,
+  CleanupOperation,
+  CleanupProposal,
+  CleanupTool,
+} from "#/lib/category-cleanup";
 import {
   buildCleanupTool,
   CLEANUP_SAMPLE_TITLES,
-  type CleanupApplyResult,
-  type CleanupCategory,
-  type CleanupChange,
-  type CleanupEffect,
-  type CleanupOperation,
-  type CleanupProposal,
-  type CleanupTool,
   cleanupCategories,
 } from "#/lib/category-cleanup";
 import { KIND_OF_WORK_TYPE } from "#/lib/default-categories";

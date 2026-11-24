@@ -1,4 +1,5 @@
-import { type SQL, sql } from "drizzle-orm";
+import type { SQL } from "drizzle-orm";
+import { sql } from "drizzle-orm";
 import { projectEditLog, projects, user } from "#/db/schema";
 import {
   descriptionExcerpt,

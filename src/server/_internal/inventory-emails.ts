@@ -1,21 +1,14 @@
 import { redactQueryError } from "#/lib/_internal/redact-query-error";
-import {
-  buildNotificationConfig,
-  type NotificationConfig,
-} from "#/lib/email/config";
+import type { NotificationConfig } from "#/lib/email/config";
+import { buildNotificationConfig } from "#/lib/email/config";
 import {
   inventoryRequestSubmittedEmail,
   notificationEmail,
 } from "#/lib/email/templates";
-import {
-  EMAILED_INVENTORY_TYPES,
-  type InventoryNotice,
-} from "#/lib/inventory-notifications";
-import {
-  type EmailOptions,
-  emailDispatch,
-  type SendEmailFn,
-} from "./email-dispatch";
+import type { InventoryNotice } from "#/lib/inventory-notifications";
+import { EMAILED_INVENTORY_TYPES } from "#/lib/inventory-notifications";
+import type { EmailOptions, SendEmailFn } from "./email-dispatch";
+import { emailDispatch } from "./email-dispatch";
 
 /**
  * Sends the email an inventory notice owes, if it owes one. Never throws, for

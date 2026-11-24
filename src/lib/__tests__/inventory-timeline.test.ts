@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { lineTimeline, type TimelineInput } from "../inventory-timeline";
+import type { TimelineInput } from "../inventory-timeline";
+import { lineTimeline } from "../inventory-timeline";
 
 const submittedAt = new Date("2026-09-01T10:00:00.000Z");
 const reviewedAt = new Date("2026-09-02T10:00:00.000Z");

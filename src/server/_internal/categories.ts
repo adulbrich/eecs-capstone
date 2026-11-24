@@ -1,9 +1,10 @@
-import { and, eq, inArray, isNotNull, type SQL, sql } from "drizzle-orm";
+import type { SQL } from "drizzle-orm";
+import { and, eq, inArray, isNotNull, sql } from "drizzle-orm";
 import { db } from "#/db";
+import type { categoryDomainEnum } from "#/db/schema";
 import {
   CATEGORY_NAME_INDEX,
   categories,
-  type categoryDomainEnum,
   inventoryItemCategories,
   projectCategories,
   projects,
@@ -11,7 +12,8 @@ import {
 import { readSession, requireUser } from "#/lib/_internal/auth-guards";
 import { clearAllReferenceListCaches } from "#/lib/_internal/reference-list-cache";
 import { canSeeProject } from "#/lib/project-visibility";
-import { assertStaff, type Viewer } from "#/lib/viewer";
+import type { Viewer } from "#/lib/viewer";
+import { assertStaff } from "#/lib/viewer";
 import type {
   CategoryInput,
   CategoryUpdateInput,

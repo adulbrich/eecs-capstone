@@ -25,7 +25,8 @@
  */
 
 import { normalizeEmailAddress } from "./email-address";
-import { assertStaff, type Viewer } from "./viewer";
+import type { Viewer } from "./viewer";
+import { assertStaff } from "./viewer";
 import type {
   InventoryRequestItemStatus,
   ItemStatus,

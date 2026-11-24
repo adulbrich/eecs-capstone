@@ -2,16 +2,11 @@ import { eq } from "drizzle-orm";
 import { db } from "#/db";
 import { projectCategories, projects } from "#/db/schema";
 import { requireUser } from "#/lib/_internal/auth-guards";
-import {
-  mantleResponses,
-  type ResponsesFn,
-} from "#/lib/_internal/bedrock-mantle";
+import type { ResponsesFn } from "#/lib/_internal/bedrock-mantle";
+import { mantleResponses } from "#/lib/_internal/bedrock-mantle";
 import type { AiRefreshAttempt } from "#/lib/ai-refresh";
-import {
-  buildCategorizeSource,
-  buildCategorizeTool,
-  type CategoryProposal,
-} from "#/lib/categorize";
+import type { CategoryProposal } from "#/lib/categorize";
+import { buildCategorizeSource, buildCategorizeTool } from "#/lib/categorize";
 import { KIND_OF_WORK_TYPE } from "#/lib/default-categories";
 import { assertStaff } from "#/lib/viewer";
 import type {

@@ -1,7 +1,8 @@
 import { RemovedStudents } from "#/components/placement/removed-students";
 import { RosterSection } from "#/components/placement/roster-section";
 import type { PlacementWorkspace } from "#/components/placement/use-placement-workspace";
-import { setAsideRemoved, type Workspace } from "#/lib/placement/workspace";
+import type { Workspace } from "#/lib/placement/workspace";
+import { setAsideRemoved } from "#/lib/placement/workspace";
 
 /**
  * The class roster on its own tab (#717): who is in the class, what it

@@ -1,11 +1,6 @@
 import { ChevronLeft, ChevronRight } from "lucide-react";
-import {
-  type ReactNode,
-  useCallback,
-  useEffect,
-  useRef,
-  useState,
-} from "react";
+import type { ReactNode } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Button } from "#/components/ui/button";
 import { TabsList } from "#/components/ui/tabs";
 

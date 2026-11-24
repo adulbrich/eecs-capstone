@@ -1,7 +1,8 @@
 import { Download } from "lucide-react";
 import { Button } from "#/components/ui/button";
 import { downloadText } from "#/lib/placement/download";
-import { type CsvFormat, formatTemplate } from "#/lib/placement/formats";
+import type { CsvFormat } from "#/lib/placement/formats";
+import { formatTemplate } from "#/lib/placement/formats";
 
 /**
  * What a file must look like, beside the button that reads it: the header

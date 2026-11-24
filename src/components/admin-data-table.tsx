@@ -1,14 +1,16 @@
+import type {
+  ColumnDef,
+  ColumnSort,
+  ColumnVisibilityState,
+  Row,
+  RowData,
+  SortingState,
+} from "@tanstack/react-table";
 import {
-  type ColumnDef,
-  type ColumnSort,
-  type ColumnVisibilityState,
   columnVisibilityFeature,
   createSortedRowModel,
   flexRender,
-  type Row,
-  type RowData,
   rowSortingFeature,
-  type SortingState,
   sortFn_basic,
   sortFn_datetime,
   tableFeatures,
@@ -22,9 +24,9 @@ import {
   Columns3,
   Info,
 } from "lucide-react";
+import type { ReactNode } from "react";
 import {
   Fragment,
-  type ReactNode,
   useEffect,
   useId,
   useLayoutEffect,
@@ -57,9 +59,9 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "#/components/ui/tooltip";
+import type { SortState } from "#/lib/table-state";
 import {
   clearStoredHidden,
-  type SortState,
   serializeHidden,
   writeStoredHidden,
 } from "#/lib/table-state";

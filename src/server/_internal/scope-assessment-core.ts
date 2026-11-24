@@ -1,18 +1,17 @@
 import type { z } from "zod";
-import {
-  findToolCall,
-  type MantleResponse,
-  mantleResponses,
-  type ResponsesFn,
+import type {
+  MantleResponse,
+  ResponsesFn,
 } from "#/lib/_internal/bedrock-mantle";
+import { findToolCall, mantleResponses } from "#/lib/_internal/bedrock-mantle";
 import { redactQueryError } from "#/lib/_internal/redact-query-error";
 import type { ReviewOutcome } from "#/lib/ai-review-limits";
 import { errorMessage } from "#/lib/error-message";
 import { PROPOSAL_SCOPE_RULE, TERM_CALIBRATION } from "#/lib/proposal-guidance";
+import type { StoredScopeAssessment } from "#/lib/scope-assessment";
 import {
   SCOPE_RATIONALE_MAX_LENGTH,
   SCOPE_VERDICTS,
-  type StoredScopeAssessment,
   scopeAssessmentSchema,
 } from "#/lib/scope-assessment";
 

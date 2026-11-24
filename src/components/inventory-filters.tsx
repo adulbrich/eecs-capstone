@@ -1,12 +1,12 @@
 import { useId } from "react";
-import { ACTIVE_STATUSES, type ActiveStatus } from "#/lib/inventory-visibility";
+import type { ActiveStatus } from "#/lib/inventory-visibility";
+import { ACTIVE_STATUSES } from "#/lib/inventory-visibility";
 import { useSearchDraft } from "#/lib/use-search-draft";
 import type { ViewMode } from "#/lib/view-preference";
-import { INVENTORY_ORDERS, type InventoryOrder } from "#/server/inventory";
-import {
-  CategoryCheckboxList,
-  type CategoryOption,
-} from "./category-checkbox-list";
+import type { InventoryOrder } from "#/server/inventory";
+import { INVENTORY_ORDERS } from "#/server/inventory";
+import type { CategoryOption } from "./category-checkbox-list";
+import { CategoryCheckboxList } from "./category-checkbox-list";
 import { ClearFiltersButton } from "./clear-filters-button";
 import { SearchHint } from "./search-hint";
 import { Input } from "./ui/input";

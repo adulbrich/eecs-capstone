@@ -17,9 +17,12 @@
  * client.
  */
 
-import { type Hold, holdEmail, holdName } from "./hold";
-import { isStaff, type Viewer } from "./viewer";
-import { INVENTORY_ITEM_STATUSES, type ItemStatus } from "./vocabularies";
+import type { Hold } from "./hold";
+import { holdEmail, holdName } from "./hold";
+import type { Viewer } from "./viewer";
+import { isStaff } from "./viewer";
+import type { ItemStatus } from "./vocabularies";
+import { INVENTORY_ITEM_STATUSES } from "./vocabularies";
 
 /**
  * The archive. Named once, because both the type and the value below are

@@ -1,7 +1,7 @@
 import { Link } from "@tanstack/react-router";
+import type { DeadlineEntry } from "#/lib/inventory-deadlines";
 import {
   attentionSummary,
-  type DeadlineEntry,
   needsAttention,
   SOON_DAYS,
 } from "#/lib/inventory-deadlines";

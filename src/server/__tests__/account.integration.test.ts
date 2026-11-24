@@ -22,7 +22,8 @@ import {
   userInterests,
 } from "#/db/schema";
 import { auth } from "#/lib/auth";
-import { PROJECT_STATUSES, type UserRole } from "#/lib/vocabularies";
+import type { UserRole } from "#/lib/vocabularies";
+import { PROJECT_STATUSES } from "#/lib/vocabularies";
 import {
   CASCADE_TABLES,
   deleteAccountAs,

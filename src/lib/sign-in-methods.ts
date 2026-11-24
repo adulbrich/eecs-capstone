@@ -1,4 +1,5 @@
-import { type AddressHolder, addressProofRefused } from "./address-proof";
+import type { AddressHolder } from "./address-proof";
+import { addressProofRefused } from "./address-proof";
 
 const PROVIDER_LABELS: Record<string, string> = {
   github: "GitHub",

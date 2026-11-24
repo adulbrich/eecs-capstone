@@ -1,10 +1,7 @@
 import { fc, test } from "@fast-check/vitest";
 import { describe, expect, it } from "vitest";
-import {
-  buildCategorizeSource,
-  buildCategorizeTool,
-  type CategoryOption,
-} from "#/lib/categorize";
+import type { CategoryOption } from "#/lib/categorize";
+import { buildCategorizeSource, buildCategorizeTool } from "#/lib/categorize";
 import {
   strayBrackets,
   tagBreakingText,

@@ -16,13 +16,13 @@ import {
 } from "#/components/ui/select";
 import type { ImportIssue } from "#/lib/placement/csv";
 import { downloadText } from "#/lib/placement/download";
+import type { PlacementDataset } from "#/lib/placement/formats";
+import { CSV_EXTENSION, STANDARD_FORMATS } from "#/lib/placement/formats";
+import type {
+  ColumnMapping,
+  WideBids,
+} from "#/lib/placement/plugins/custom-mapping";
 import {
-  CSV_EXTENSION,
-  type PlacementDataset,
-  STANDARD_FORMATS,
-} from "#/lib/placement/formats";
-import {
-  type ColumnMapping,
   droppedColumns,
   fileHeaders,
   fitToDataset,
@@ -39,7 +39,6 @@ import {
   suggestMapping,
   unmappedRequired,
   versionedMapping,
-  type WideBids,
   wideProblems,
 } from "#/lib/placement/plugins/custom-mapping";
 import { QUALTRICS_SEPARATOR } from "#/lib/placement/plugins/header-title";

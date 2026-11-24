@@ -13,10 +13,8 @@ import {
   AdminTableControls,
   defineAdminColumns,
 } from "#/components/admin-data-table";
-import {
-  type BatchRow,
-  BatchTransitionDialog,
-} from "#/components/batch-transition-dialog";
+import type { BatchRow } from "#/components/batch-transition-dialog";
+import { BatchTransitionDialog } from "#/components/batch-transition-dialog";
 import { ClearFiltersButton } from "#/components/clear-filters-button";
 import { ExportCsvButton } from "#/components/export-csv-button";
 import { FilterSwitch } from "#/components/filter-switch";
@@ -24,16 +22,14 @@ import { ImageOrFallback } from "#/components/image-or-fallback";
 import { ListingLayout } from "#/components/listing-layout";
 import { LocalTime } from "#/components/local-time";
 import { programCourseIds } from "#/components/project-card";
+import type { FilterProgram } from "#/components/projects-filters";
 import {
-  type FilterProgram,
   PROJECT_SWITCH_HINT,
   PROJECT_SWITCH_LABEL,
   PROJECT_SWITCH_LEGEND,
 } from "#/components/projects-filters";
-import {
-  type FilterProposer,
-  ProposerFilterCombobox,
-} from "#/components/proposer-filter-combobox";
+import type { FilterProposer } from "#/components/proposer-filter-combobox";
+import { ProposerFilterCombobox } from "#/components/proposer-filter-combobox";
 import { SearchHint } from "#/components/search-hint";
 import { StatusBadge } from "#/components/status-badge";
 import {
@@ -63,10 +59,10 @@ import {
   SelectValue,
 } from "#/components/ui/select";
 import { requireStaff } from "#/lib/access-denied";
+import type { AdminDateField } from "#/lib/admin-project-filters";
 import {
   ADMIN_DATE_FIELD_LABEL,
   ADMIN_DATE_FIELDS,
-  type AdminDateField,
   DEFAULT_ADMIN_STATUSES,
   isDefaultStatusSelection,
   PROGRAM_FILTER_NONE,
@@ -85,7 +81,8 @@ import { searchParamQuerySchema } from "#/lib/search-query";
 import type { SortState } from "#/lib/table-state";
 import { useAdminTable } from "#/lib/use-admin-table";
 import { useSearchDraft } from "#/lib/use-search-draft";
-import { PROJECT_STATUSES, type ProjectStatus } from "#/lib/vocabularies";
+import type { ProjectStatus } from "#/lib/vocabularies";
+import { PROJECT_STATUSES } from "#/lib/vocabularies";
 import { listPrograms } from "#/server/programs";
 import {
   exportAdminProjects,

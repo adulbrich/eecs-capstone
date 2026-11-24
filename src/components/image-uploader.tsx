@@ -1,10 +1,7 @@
 import { Trash2 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
-import ReactCrop, {
-  type Crop,
-  centerCrop,
-  makeAspectCrop,
-} from "react-image-crop";
+import type { Crop } from "react-image-crop";
+import ReactCrop, { centerCrop, makeAspectCrop } from "react-image-crop";
 import { IMAGE_FILE_ACCEPT } from "#/lib/image-upload-policy";
 import { getPublicUrl } from "#/lib/storage";
 import { useAction } from "#/lib/use-action";

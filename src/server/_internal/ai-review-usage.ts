@@ -2,13 +2,15 @@ import { and, eq, gt, sql } from "drizzle-orm";
 import { db } from "#/db";
 import { aiReviewUsage } from "#/db/schema";
 import { redactQueryError } from "#/lib/_internal/redact-query-error";
+import type {
+  AiFeature,
+  ReviewOutcome,
+  ReviewWindowCounts,
+} from "#/lib/ai-review-limits";
 import {
   AI_FEATURE_NOUN,
-  type AiFeature,
   limitsFor,
   limitVerdict,
-  type ReviewOutcome,
-  type ReviewWindowCounts,
 } from "#/lib/ai-review-limits";
 
 export interface ReviewUsageRow {

@@ -1,12 +1,12 @@
 import { useRouter } from "@tanstack/react-router";
 import { Check, WandSparkles, X } from "lucide-react";
 import { useRef, useState } from "react";
-import {
-  type CleanupApplyResult,
-  type CleanupKind,
-  type CleanupProposal,
-  describeCleanup,
+import type {
+  CleanupApplyResult,
+  CleanupKind,
+  CleanupProposal,
 } from "#/lib/category-cleanup";
+import { describeCleanup } from "#/lib/category-cleanup";
 import { useAction } from "#/lib/use-action";
 import {
   applyCategoryCleanup,

@@ -8,10 +8,12 @@ import {
 } from "@testing-library/react";
 import { createContext, useContext, useState } from "react";
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
+import type {
+  AdminColumn,
+  AdminDataTableProps,
+} from "#/components/admin-data-table";
 import {
-  type AdminColumn,
   AdminDataTable,
-  type AdminDataTableProps,
   AdminTableControls,
 } from "#/components/admin-data-table";
 import { orderBySortedIds, toCsv } from "#/lib/csv";

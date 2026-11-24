@@ -1,9 +1,6 @@
 import { describe, expect, it } from "vitest";
-import {
-  applyEdit,
-  buildToolbarEdit,
-  type EditorState,
-} from "#/lib/markdown-toolbar";
+import type { EditorState } from "#/lib/markdown-toolbar";
+import { applyEdit, buildToolbarEdit } from "#/lib/markdown-toolbar";
 
 function state(value: string, start: number, end = start): EditorState {
   return { value, selectionStart: start, selectionEnd: end };

@@ -1,9 +1,9 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
+import type { SocialSummaryView } from "#/lib/social-summary";
 import {
   SOCIAL_SUMMARY_MAX_LENGTH,
   SOCIAL_SUMMARY_TOO_LONG_MESSAGE,
-  type SocialSummaryView,
   socialSummaryLength,
 } from "#/lib/social-summary";
 import {

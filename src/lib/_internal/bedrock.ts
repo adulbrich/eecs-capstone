@@ -1,7 +1,5 @@
-import {
-  BedrockRuntimeClient,
-  type BedrockRuntimeClientConfig,
-} from "@aws-sdk/client-bedrock-runtime";
+import type { BedrockRuntimeClientConfig } from "@aws-sdk/client-bedrock-runtime";
+import { BedrockRuntimeClient } from "@aws-sdk/client-bedrock-runtime";
 
 const DEFAULT_REGION = "us-east-1";
 

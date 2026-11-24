@@ -9,12 +9,14 @@ import {
   PRIVATE_NOTES_FIELD_LABEL,
   PRIVATE_NOTES_PROJECT_HINT,
 } from "#/lib/private-notes";
+import type {
+  FieldSuggestion,
+  ImprovableField,
+} from "#/lib/project-review-fields";
 import {
   FIELD_LABELS,
   FIELD_MAX_LENGTHS,
-  type FieldSuggestion,
   IMPROVABLE_FIELDS,
-  type ImprovableField,
 } from "#/lib/project-review-fields";
 import { projectUrlSchema } from "#/lib/project-url";
 import {
@@ -491,9 +493,8 @@ export function ProjectForm({
             </p>
             {/*
               Rendered from this field rather than a form.Subscribe: the
-              selector generics on Subscribe do not narrow to a single value
-              (see the useForm note in docs/QUIRKS.md), and the textarea only
-              ever depends on this one checkbox.
+              selector generics on Subscribe do not narrow to a single value,
+              and the textarea only ever depends on this one checkbox.
             */}
             {(field.state.value as boolean) && (
               <div className="mt-3">

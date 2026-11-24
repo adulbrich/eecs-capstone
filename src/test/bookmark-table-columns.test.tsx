@@ -44,10 +44,10 @@ vi.mock("@tanstack/react-router", () => ({
 
 import { AdminDataTable } from "#/components/admin-data-table";
 import { BookmarkSetProvider } from "#/components/bookmark-set";
+import type { BookmarkRow } from "#/components/bookmark-table-columns";
 import {
   BOOKMARK_TABLE_COLUMNS,
   BOOKMARK_TABLE_DEFAULT_SORT,
-  type BookmarkRow,
 } from "#/components/bookmark-table-columns";
 import type { SortState } from "#/lib/table-state";
 

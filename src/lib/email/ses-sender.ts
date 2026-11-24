@@ -1,9 +1,8 @@
-import {
-  SESv2Client,
-  SendEmailCommand,
-  type SendEmailCommandInput,
-  type SendEmailCommandOutput,
+import type {
+  SendEmailCommandInput,
+  SendEmailCommandOutput,
 } from "@aws-sdk/client-sesv2";
+import { SESv2Client, SendEmailCommand } from "@aws-sdk/client-sesv2";
 import type { SesSenderConfig } from "./config";
 import type { EmailSender } from "./sender";
 import type { RenderedEmail } from "./templates";

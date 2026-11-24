@@ -1,4 +1,5 @@
-import loadHighs, { type Highs } from "highs";
+import type { Highs } from "highs";
+import loadHighs from "highs";
 import { beforeAll, describe, expect, it } from "vitest";
 import {
   assertValidPlacement,

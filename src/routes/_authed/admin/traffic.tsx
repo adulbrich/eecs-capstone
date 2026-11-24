@@ -1,8 +1,8 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useState } from "react";
 import { z } from "zod";
+import type { AdminColumn } from "#/components/admin-data-table";
 import {
-  type AdminColumn,
   AdminDataTable,
   defineAdminColumns,
 } from "#/components/admin-data-table";

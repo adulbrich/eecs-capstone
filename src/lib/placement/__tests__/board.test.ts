@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { teamSizes } from "#/lib/placement/analytics";
+import type { BoardRow } from "#/lib/placement/board";
 import {
   applyPins,
-  type BoardRow,
   bidOptions,
   bidsWithPinsCsv,
   boardRows,
@@ -18,13 +18,12 @@ import {
   unsurveyedRows,
 } from "#/lib/placement/board";
 import { parseBidsCsv } from "#/lib/placement/csv";
+import type { StoredResult, Workspace } from "#/lib/placement/workspace";
 import {
   EMPTY_WORKSPACE,
   inputFingerprint,
   parseWorkspace,
-  type StoredResult,
   serializeWorkspace,
-  type Workspace,
 } from "#/lib/placement/workspace";
 
 // Invented data only (#649).

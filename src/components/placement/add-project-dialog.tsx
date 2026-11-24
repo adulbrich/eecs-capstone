@@ -16,11 +16,8 @@ import {
 import { FieldError } from "#/components/ui/field";
 import { Input } from "#/components/ui/input";
 import { Label } from "#/components/ui/label";
-import {
-  addProject,
-  PARAMETER_LIMITS,
-  type Workspace,
-} from "#/lib/placement/workspace";
+import type { Workspace } from "#/lib/placement/workspace";
+import { addProject, PARAMETER_LIMITS } from "#/lib/placement/workspace";
 
 const EMPTY = {
   title: "",

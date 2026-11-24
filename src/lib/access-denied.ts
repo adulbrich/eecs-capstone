@@ -1,4 +1,5 @@
-import { isAdmin, isStaff, type Viewer } from "./viewer";
+import type { Viewer } from "./viewer";
+import { isAdmin, isStaff } from "./viewer";
 
 /**
  * Refusing a signed-in viewer who lacks the role for a page, in place (#606).

@@ -1,5 +1,6 @@
 import { Download } from "lucide-react";
-import { type ReactNode, useId, useState } from "react";
+import type { ReactNode } from "react";
+import { useId, useState } from "react";
 import { ImportIssues } from "#/components/placement/import-issues";
 import {
   RuleDisclosure,

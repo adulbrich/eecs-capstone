@@ -13,10 +13,10 @@ import {
   InventoryFilters,
   InventorySearchBar,
 } from "#/components/inventory-filters";
+import type { InventoryListRow } from "#/components/inventory-table-columns";
 import {
   INVENTORY_TABLE_COLUMNS,
   INVENTORY_TABLE_DEFAULT_SORT,
-  type InventoryListRow,
 } from "#/components/inventory-table-columns";
 import { ListingLayout } from "#/components/listing-layout";
 import { Button } from "#/components/ui/button";
@@ -25,7 +25,8 @@ import {
   PaginationButton,
   PaginationStatus,
 } from "#/components/ui/pagination";
-import { ACTIVE_STATUSES, type ActiveStatus } from "#/lib/inventory-visibility";
+import type { ActiveStatus } from "#/lib/inventory-visibility";
+import { ACTIVE_STATUSES } from "#/lib/inventory-visibility";
 import { pageTitle } from "#/lib/page-title";
 import { PAGE_SIZE_DEFAULT } from "#/lib/pagination";
 import { searchParamQuerySchema } from "#/lib/search-query";
@@ -34,10 +35,10 @@ import { useAdminTable } from "#/lib/use-admin-table";
 import { useSeedViewFromStorage } from "#/lib/use-seed-view";
 import { useSignedIn } from "#/lib/use-signed-in";
 import type { ViewMode } from "#/lib/view-preference";
+import type { InventoryOrder } from "#/server/inventory";
 import {
   INVENTORY_ORDER_DEFAULT,
   INVENTORY_ORDERS,
-  type InventoryOrder,
   listInventory,
   listInventoryCategories,
 } from "#/server/inventory";

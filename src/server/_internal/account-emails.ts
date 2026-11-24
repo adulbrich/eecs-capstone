@@ -1,10 +1,9 @@
 import { redactQueryError } from "#/lib/_internal/redact-query-error";
-import {
-  buildNotificationConfig,
-  type NotificationConfig,
-} from "#/lib/email/config";
+import type { NotificationConfig } from "#/lib/email/config";
+import { buildNotificationConfig } from "#/lib/email/config";
 import { accountSuspendedEmail, roleChangedEmail } from "#/lib/email/templates";
-import { emailDispatch, type SendEmailFn } from "./email-dispatch";
+import type { SendEmailFn } from "./email-dispatch";
+import { emailDispatch } from "./email-dispatch";
 
 /**
  * The two account emails, both mandatory for their recipient and both sent

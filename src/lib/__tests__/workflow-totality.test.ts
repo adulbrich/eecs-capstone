@@ -1,16 +1,14 @@
 import { describe, expect, it } from "vitest";
-import {
-  assertTransitionAllowed,
-  type RequestLineOutcome,
-  type TransitionAuthority,
-  type TransitionInput,
+import type {
+  RequestLineOutcome,
+  TransitionAuthority,
+  TransitionInput,
 } from "../inventory-workflow";
-import { type ActorRole, canTransition } from "../project-workflow";
-import {
-  INVENTORY_ITEM_STATUSES,
-  PROJECT_STATUSES,
-  type ProjectStatus,
-} from "../vocabularies";
+import { assertTransitionAllowed } from "../inventory-workflow";
+import type { ActorRole } from "../project-workflow";
+import { canTransition } from "../project-workflow";
+import type { ProjectStatus } from "../vocabularies";
+import { INVENTORY_ITEM_STATUSES, PROJECT_STATUSES } from "../vocabularies";
 
 /**
  * Every workflow table answers every input its vocabulary can hand it.

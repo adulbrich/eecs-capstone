@@ -2,10 +2,9 @@ import { eq } from "drizzle-orm";
 import { db } from "#/db";
 import { user } from "#/db/schema";
 import { redactQueryError } from "#/lib/_internal/redact-query-error";
-import {
-  buildNotificationConfig,
-  type NotificationConfig,
-} from "#/lib/email/config";
+import type { NotificationConfig } from "#/lib/email/config";
+import { buildNotificationConfig } from "#/lib/email/config";
+import type { RenderedEmail } from "#/lib/email/templates";
 import {
   mentorNamedEmail,
   projectApprovedEmail,
@@ -16,10 +15,10 @@ import {
   projectReturnedToDraftEmail,
   projectSubmittedEmail,
   proposerCommentEmail,
-  type RenderedEmail,
 } from "#/lib/email/templates";
 import type { ProjectStatus } from "#/lib/vocabularies";
-import { emailDispatch, type SendEmailFn } from "./email-dispatch";
+import type { SendEmailFn } from "./email-dispatch";
+import { emailDispatch } from "./email-dispatch";
 
 /** The parts of a project every proposer-facing email reads. */
 export interface EmailProject {

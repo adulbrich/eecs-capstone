@@ -35,12 +35,14 @@ import {
   listInventoryItemEditLogAs,
   updateInventoryItemAs,
 } from "#/server/_internal/inventory-catalog";
+import type {
+  MyItemsRow,
+  QueueRow,
+} from "#/server/_internal/inventory-holdings";
 import {
   collectedByForRequestItems,
   listInventoryRequestsAs,
   listMyItemsAs,
-  type MyItemsRow,
-  type QueueRow,
 } from "#/server/_internal/inventory-holdings";
 import { recordOverdueNotificationsAs } from "#/server/_internal/inventory-overdue";
 import {

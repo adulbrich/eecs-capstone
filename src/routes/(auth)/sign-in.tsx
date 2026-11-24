@@ -6,7 +6,8 @@ import {
 } from "@tanstack/react-router";
 import { useState } from "react";
 import { z } from "zod";
-import { EmailCodeForm, type Step } from "#/components/email-code-form";
+import type { Step } from "#/components/email-code-form";
+import { EmailCodeForm } from "#/components/email-code-form";
 import {
   OAUTH_PROVIDERS,
   OAuthErrorBanner,

@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { PROJECT_STATUSES, type ProjectStatus } from "#/lib/vocabularies";
+import type { ProjectStatus } from "#/lib/vocabularies";
+import { PROJECT_STATUSES } from "#/lib/vocabularies";
+import type { ActorRole } from "../project-workflow";
 import {
-  type ActorRole,
   assertTransitionAllowed,
   BATCH_TARGETS,
   BATCH_TRANSITIONS,

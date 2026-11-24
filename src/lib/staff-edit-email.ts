@@ -15,12 +15,8 @@
  */
 
 import { formatOfficeDay } from "./day-range";
-import {
-  oneLine,
-  type ProposerEditChange,
-  proposerEditsEmail,
-  type RenderedEmail,
-} from "./email/templates";
+import type { ProposerEditChange, RenderedEmail } from "./email/templates";
+import { oneLine, proposerEditsEmail } from "./email/templates";
 import { formatOfficeTime } from "./pickup-window";
 import { formatEditValue, projectEditFieldLabel } from "./project-edit-fields";
 import type { ProjectStatus } from "./vocabularies";

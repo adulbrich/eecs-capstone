@@ -3,7 +3,8 @@ import { describe, expect, it } from "vitest";
 import { db } from "#/db";
 import { user } from "#/db/schema";
 import { auth } from "#/lib/auth";
-import { PROJECT_STATUSES, type UserRole } from "#/lib/vocabularies";
+import type { UserRole } from "#/lib/vocabularies";
+import { PROJECT_STATUSES } from "#/lib/vocabularies";
 import {
   createCategoryAs,
   setProjectCategoriesAs,

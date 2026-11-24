@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
-import { type ProjectProgram, programLabel } from "#/lib/project-visibility";
+import type { ProjectProgram } from "#/lib/project-visibility";
+import { programLabel } from "#/lib/project-visibility";
 import { listPrograms } from "#/server/programs";
 import { Checkbox } from "./ui/checkbox";
 import { FieldError } from "./ui/field";

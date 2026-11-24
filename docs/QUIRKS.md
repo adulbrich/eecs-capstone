@@ -58,10 +58,6 @@ A server function's URL is `/_serverFn/<sha256 of "src/server/x.ts--<export>_cre
 
 `import type { XInput } from "../x"`, never the schema value, which would pull `createServerFn` into the impl. [ADR-0001](./adr/0001-internal-directory-for-server-only-code.md) has the rule; `verbatimModuleSyntax` turns a dropped `type` into a tsc error.
 
-### `.validator(...)`, not `.inputValidator(...)`
-
-The method is `.validator`. `.inputValidator` no longer exists, so a call is a type error. The plans under `docs/superpowers/plans/` still use it; do not copy it from there.
-
 ### Code that must run at boot goes in a Nitro plugin, not `src/server.ts`
 
 Nitro loads the server entry (`src/server.ts`) on the first request, not at start. Measured on the built output, a throw there leaves the process up and answering 500 on every route, `/api/healthz` included. A plugin listed in `nitro({ plugins })` in `vite.config.ts` runs before the listener binds, so a throw there is exit code 1 and no port. `src/nitro/config-check.ts` is that plugin, and `src/lib/_internal/startup-config.ts` holds the fatal list. The pool warm-up runs on the first request on purpose: [ADR-0052](./adr/0052-the-pool-keeps-a-warm-floor.md).
@@ -81,10 +77,6 @@ The client and SSR builds each hash `src/styles.css`, and only the client build 
 ### The HTTP server's timeouts are only reachable by wrapping `createServer`
 
 Nitro hands srvx no `node` options, so `keepAliveTimeout` and the other server timeouts stay at Node's defaults unless `src/nitro/keep-alive-timeout.ts` wraps `http.createServer`. The numbers are in `src/lib/_internal/keep-alive-timeout.ts`; [ADR-0041](./adr/0041-the-task-outlasts-the-load-balancer-idle-timeout.md) is why.
-
-### Generated route tree
-
-`src/routeTree.gen.ts` is written by the router plugin; boot `npm run dev` to regenerate it after adding a route. `.claude/hooks/guard-edits.mjs` refuses a hand edit.
 
 ---
 
@@ -110,7 +102,7 @@ export const Route = createFileRoute("/projects/")({
 });
 ```
 
-A search-driven loader needs `loaderDeps` to re-run. Every field takes a `.catch`: the router JSON-parses each value before the schema sees it, and a bad value otherwise fails `validateSearch` with a 500. `src/test/route-search-fallbacks.test.ts` enforces it. A `q` field is `searchParamQuerySchema` from `src/lib/search-query.ts`. A param naming where to go next, `?redirect=` on `/sign-in`, goes through `sameOriginPath` (`src/lib/same-origin-path.ts`) ahead of its `.catch`; that is the one off-site check the app owns.
+A search-driven loader needs `loaderDeps` to re-run. A `q` field is `searchParamQuerySchema` from `src/lib/search-query.ts`. A param naming where to go next, `?redirect=` on `/sign-in`, goes through `sameOriginPath` (`src/lib/same-origin-path.ts`) ahead of its `.catch`; that is the one off-site check the app owns.
 
 ### A route component is reused across a param change; key any child that holds a draft
 
@@ -160,10 +152,6 @@ The query cache outlives the session that filled it, and a session can end witho
 
 Zod 4 schemas are Standard Schemas, so `onSubmit: projectFormSchema` type-checks. If it stops, look for a `.default()`: it makes the schema's input type differ from the form's values. Supply defaults through `defaultValues` instead.
 
-### `useForm` generics are unstable; we use a localized `any` for the `Field` helper
-
-The `biome-ignore` reason at each `type AnyForm = any` is the explanation; the forms' public props stay typed.
-
 ### `field.state.meta.errors` is a heterogeneous array
 
 Render every field's errors through `FieldError` (`src/components/ui/field.tsx`), which handles strings and `{ message }` objects alike. A raw render shows nothing, leaving a disabled Save and no message. A `z.boolean()` checkbox cannot fail and needs none.
@@ -191,10 +179,6 @@ The config literal is inferred as a type parameter, so TypeScript's excess-prope
 ### `user.id` is `text`, not `uuid`
 
 Better Auth generates `text` primary keys and we keep the default, so every FK to `user.id` is `text`.
-
-### `additionalFields` are restored across CLI regenerations
-
-`npx @better-auth/cli generate` overwrites `src/db/auth-schema.ts`, and the custom fields come back because they live in `user.additionalFields` in `src/lib/auth.ts`. Change them there; `.claude/hooks/guard-edits.mjs` refuses an edit to the generated file.
 
 ### An additional field without `input: false` is writable by any signed-in user
 
@@ -299,10 +283,6 @@ Cascade rules live in the schema files, never in application code, and `account.
 ### `categories` uniqueness needs an expression index, not a plain UNIQUE
 
 `UNIQUE (domain, coalesce(type, ''), lower(name))`, from `drizzle/0015_categories_unique_name.sql`: every inventory category has `type = null`, and Postgres treats nulls as distinct, so a plain constraint leaves inventory unconstrained. `db-reset.ts` only truncates, so the index outlives a test: the dedupe test drops it and restores it in a `finally`, and a test that drops it and dies disarms every uniqueness assertion after it.
-
-### The status enums take their values from `src/lib/vocabularies.ts`
-
-Each `pgEnum` and every union over a status set derives from an `as const` tuple in `src/lib/vocabularies.ts`; add a status by editing the tuple and generating a migration. `src/lib/__tests__/vocabulary-scan.ts` fails on a complete copy elsewhere in `src/` ([ADR-0014](./adr/0014-status-vocabularies-live-in-src-lib.md)).
 
 ### Retyping a column under a SQL-only partial index
 
@@ -454,7 +434,7 @@ Locally both use the dev database as `user@example.com`, and the end-to-end swee
 
 ### One hydrated button does not mean a hydrated page
 
-Route chunks hydrate after the root layout, so a click on a route's button can land before its handler exists: the click succeeds and nothing happens, and the route's first server calls fire after it. `waitForHydration` in `src/test/shared/playwright.ts` waits for every match, and skips the Solid-rendered TanStack Devtools. Biome refuses `waitForTimeout` and `networkidle` in the browser suites: a fixed sleep once stood in for this guard because `networkidle` never fires while Vite's HMR holds connections open.
+Route chunks hydrate after the root layout, so a click on a route's button can land before its handler exists: the click succeeds and nothing happens, and the route's first server calls fire after it. `waitForHydration` in `src/test/shared/playwright.ts` waits for every match, and skips the Solid-rendered TanStack Devtools.
 
 ### The devtools trigger is hidden whenever an automated browser drives the page
 
@@ -487,10 +467,6 @@ The unit run reads `.env` and `.env.local` into `process.env`, and CI writes nei
 ### A unit test that transitively imports `#/db` passes locally and fails in CI
 
 `src/db/index.ts` throws at import without `DATABASE_URL`, which the unit run gets locally from your dotenv files and CI does not have. Keep pure logic in a module that imports nothing, and let the query layer import it. `DATABASE_URL= npm test` reproduces CI.
-
-### The integration suite refuses to run with embeddings enabled
-
-`vitest.integration.config.ts` sets `BEDROCK_EMBEDDINGS_ENABLED=false`, and `src/test/setup.integration.ts` throws if it did not arrive. Fix the config, not your shell.
 
 ### An integration test reads a refresh only after `settleProjectRefreshes()`
 
@@ -531,15 +507,11 @@ vi.mock("@tanstack/react-router", async (importOriginal) => ({
 
 A rule set to `"on"` takes Biome's default severity, which for many rules is `info` and does not fail `npm run check`, so a rule this repo wants enforced is written `"error"`. A `nursery` rule can change or leave the nursery in any Biome release, so when a Dependabot bump fails `npm run check` on one, look there first.
 
-GritQL plugins live in `biome-plugins/` and are listed under `plugins` in `biome.json`; `npx biome lint --only=plugin` runs them alone. `query-cache.grit` fails a bare `invalidateQueries()` and a `void router.invalidate()` (`docs/UI-CONVENTIONS.md`, "Cache").
-
-### Hard rules
-
-Biome owns the formatting (2-space indent, double quotes) and the import order; do not fight either. `biome.json` excludes `src/routeTree.gen.ts`, `src/styles.css`, `scripts/`, `drizzle/` and `**/*.svg`, so an autofix never reaches a `scripts/` copy that a parity test pins to its `src/` twin; change both by hand. The YAML formatter keeps `bracketSpacing` off, matching the existing flow lists.
+GritQL plugins live in `biome-plugins/` and are listed under `plugins` in `biome.json`; `npx biome lint --only=plugin` runs them alone.
 
 ### The git hooks
 
-`lefthook.yml` runs the checks and `CONTRIBUTING.md` has the table. `prepare` is `lefthook install || true` because neither image stage has `.git`, and the install would otherwise fail the build. `scripts/check-commit-message.mjs` and `scripts/check-prose.mjs` are the one implementation lefthook, CI and the Claude Code hooks share, and `src/test/check-scripts.test.ts` drives them as processes, because the exit code is the contract. They spell the characters they reject as `\u` escapes, since a literal one would fail their own `--all` run.
+`lefthook.yml` runs the checks and `CONTRIBUTING.md` has the table. `prepare` is `lefthook install || true` because neither image stage has `.git`, and the install would otherwise fail the build. `scripts/check-commit-message.mjs` and `scripts/check-prose.mjs` are the one implementation lefthook, CI and the Claude Code hooks share, and `src/test/check-scripts.test.ts` drives them as processes, because the exit code is the contract.
 
 ### Rules deliberately relaxed or deferred
 
@@ -559,15 +531,9 @@ Ultracite already turns off `noVoid` (fire-and-forget `void promise()` is intend
 
 In `*.test.ts(x)`, `__tests__/` and `src/test/`, `biome.json` also turns off `useTopLevelRegex`, `noEmptyBlockStatements`, `useAwait`, `noNonNullAssertion`, `useImportsFirst` (imports follow the hoisted `vi.mock` calls they depend on), `noComponentHookFactories` (a harness component defined inside its test), `useDomQuerySelector` (`getElementById` takes an id as is, where `querySelector` needs it escaped) and `noExcessiveClassesPerFile` (a `vi.mock` factory stubs one class per mocked export).
 
-### Inline suppressions, and options `biome.json` repeats
+### Options `biome.json` sets
 
-Inline ignores cover the Radix group headings in `ui/` and Biome 2.6 calling every case of `orderBySql`'s switch unreachable. Ultracite turns `noNamespaceImport` and `noBarrelFile` off, so `import * as schema` and the schema re-export need none, and Biome warns about any ignore left for a rule that is off.
-
-`noLabelWithoutControl` adds `RadioGroupItem` as a control. Setting an option replaces Ultracite's whole list, so `biome.json` repeats `inputComponents` and `labelComponents`.
-
-### No infinite-loop form passes lint
-
-Biome's `useWhile` rejects `for (;;)` and offers `while (true)` as its safe fix, which `noUnnecessaryConditions` then rejects as always truthy. Give the loop a real condition instead, usually by reading the first item before the loop and the next at the end of its body, as `readCappedBody` in `traffic-request.ts` does.
+`noLabelWithoutControl` adds `RadioGroupItem` as a control. Setting an option replaces Ultracite's whole list, so `biome.json` repeats `inputComponents` and `labelComponents`. The YAML formatter keeps `bracketSpacing` off, matching the existing flow lists.
 
 ### Do not run `biome check --write --unsafe` blindly
 
@@ -575,7 +541,7 @@ Its unsafe fixes changed behaviour here: `viewer!.id` became `viewer?.id`, and a
 
 ### Soft rules / project conventions
 
-Component files are `kebab-case.tsx`, and cross-directory imports inside `src/` use the `#/` alias, except an impl's type-only back-import from its wrapper (`import type { XInput } from "../x"`, see "An impl imports its input types back from its domain's wrapper, type-only"). The prose and commit rules are in [`../AGENTS.md`](../AGENTS.md).
+Cross-directory imports inside `src/` use the `#/` alias, except an impl's type-only back-import from its wrapper (`import type { XInput } from "../x"`, see "An impl imports its input types back from its domain's wrapper, type-only"). The prose and commit rules are in [`../AGENTS.md`](../AGENTS.md).
 
 ---
 
@@ -659,10 +625,6 @@ Sharp is a native binding. Browser image work (the ImageUploader's crop and resi
 
 Image columns hold storage keys (`projects/<id>/<uuid>.webp`), not URLs; `getPublicUrl(key)` in `src/lib/storage.ts` builds the URL at render time.
 
-### One image upload policy, and a scan that has to be mutation-tested
-
-[ADR-0009](./adr/0009-one-image-upload-policy.md). `image-upload-policy.test.ts` fails any file outside the policy module that names two or more image MIME types. If you touch that scan, mutate more than the form it was written for: every narrowing it needed was found by mutation, not by reading.
-
 ### What `image_url` may accept, and where each check sits
 
 A write may set `image_url` only to empty or to one filename directly under the row's own prefix. `assertOwnedKey` (`src/lib/_internal/storage.ts`) checks it through `KeySpace.owns`, which `deleteOwnedObject` shares; `startsWith(prefix)` would accept `../` and render another row's image. Cleanup runs after the row write, never inside the transaction, or a rollback leaves the row pointing at a deleted object.
@@ -679,10 +641,6 @@ export const uploadProjectImage = createServerFn({ method: "POST" })
   });
 ```
 
-### Buffer is not a BlobPart in lib.dom
-
-`new File([buffer], ...)` fails tsc with a BlobPart error. Wrap it: `new File([new Uint8Array(buffer)], ...)`, a view over the same memory.
-
 ### RustFS local bucket bootstrap
 
 A fresh docker volume has no bucket; run `npm run storage:init` once. It is idempotent.
@@ -695,9 +653,9 @@ A fresh docker volume has no bucket; run `npm run storage:init` once. It is idem
 
 If you discover a new framework behavior that surprised you, add it here. The rule of thumb: "if it cost more than 30 minutes to figure out, future-us deserves to find it written down."
 
-Keep the structure: short headline, one-paragraph explanation, code example if relevant. The point of this file is grep-friendly recall, not narrative writing. `scripts/check-doc-size.mjs` holds each `###` entry to 1000 bytes, heading included; code blocks and table rows do not count, since an example states a rule exactly and a table row is reference data. History belongs in git and the PR; the rule belongs here.
+Keep the structure: short headline, one-paragraph explanation, code example if relevant. The point of this file is grep-friendly recall, not narrative writing. History belongs in git and the PR; the rule belongs here.
 
-Two things do not go here. A decision (something chosen, with a trade-off, that a later reader would otherwise re-propose) goes in `docs/adr/`, and the section here that touches it gets a one-line pointer. An ADR is one paragraph under its title, with the consequences as its closing sentences and no `## Consequences` heading. The same check holds it to 1300 bytes after the title line. A term goes in `CONTEXT.md`, with the synonyms to avoid. A rule that restates a module (a transition table, a notification decision) is a pointer at the module and its unit tests, not a copy.
+Four things do not go here. What Biome, the type checker, a test or a hook already reports, unless the failure does not say what to do: cause the mistake and read the output before writing. A decision (something chosen, with a trade-off, that a later reader would otherwise re-propose) goes in `docs/adr/`, and the section here that touches it gets a one-line pointer. An ADR is one paragraph under its title, with the consequences as its closing sentences and no `## Consequences` heading. A term goes in `CONTEXT.md`, with the synonyms to avoid. A rule that restates a module (a transition table, a notification decision) is a pointer at the module and its unit tests, not a copy.
 
 ## Inventory
 

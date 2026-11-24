@@ -8,7 +8,8 @@ import {
   waitFor,
 } from "@testing-library/react";
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
-import { ApproveDialog, type ApproveLine } from "#/components/approve-dialog";
+import type { ApproveLine } from "#/components/approve-dialog";
+import { ApproveDialog } from "#/components/approve-dialog";
 import { approveRequestItem, approveRequestLines } from "#/server/inventory";
 import { deferred } from "./shared/deferred";
 

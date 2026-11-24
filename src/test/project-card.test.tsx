@@ -33,7 +33,8 @@ vi.mock("@tanstack/react-router", () => ({
   ),
 }));
 
-import { ProjectCard, type ProjectSummary } from "#/components/project-card";
+import type { ProjectSummary } from "#/components/project-card";
+import { ProjectCard } from "#/components/project-card";
 import { PROJECT_PLACEHOLDER_IMAGE } from "#/lib/project-image";
 
 afterEach(cleanup);

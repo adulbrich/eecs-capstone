@@ -16,7 +16,8 @@ import {
   OTHER_EMAIL,
   USER_AUTH,
 } from "./constants";
-import { type Db, openDb, sweepOrphans } from "./fixtures";
+import type { Db } from "./fixtures";
+import { openDb, sweepOrphans } from "./fixtures";
 
 export default async function globalSetup() {
   const { db, close } = openDb();

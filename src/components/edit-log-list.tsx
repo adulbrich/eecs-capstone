@@ -1,4 +1,5 @@
-import { type QueryKey, useQuery } from "@tanstack/react-query";
+import type { QueryKey } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { useId, useState } from "react";
 import { errorMessage } from "#/lib/error-message";
 import {

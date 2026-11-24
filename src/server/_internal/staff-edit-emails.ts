@@ -18,31 +18,21 @@
  * which ADR-0019 prefers to a lost email.
  */
 
-import {
-  and,
-  asc,
-  eq,
-  inArray,
-  isNull,
-  lt,
-  or,
-  type SQL,
-  sql,
-} from "drizzle-orm";
+import type { SQL } from "drizzle-orm";
+import { and, asc, eq, inArray, isNull, lt, or, sql } from "drizzle-orm";
 import { db } from "#/db";
 import { projectEditLog, projects, user } from "#/db/schema";
 import { redactQueryError } from "#/lib/_internal/redact-query-error";
-import {
-  buildNotificationConfig,
-  type NotificationConfig,
-} from "#/lib/email/config";
+import type { NotificationConfig } from "#/lib/email/config";
+import { buildNotificationConfig } from "#/lib/email/config";
 import type { RenderedEmail } from "#/lib/email/templates";
 import {
   isBurstReady,
   reclaimBefore,
   staffEditEmail,
 } from "#/lib/staff-edit-email";
-import { emailDispatch, type SendEmailFn } from "./email-dispatch";
+import type { SendEmailFn } from "./email-dispatch";
+import { emailDispatch } from "./email-dispatch";
 import { warnNoStaffInbox } from "./project-emails";
 
 /**

@@ -1,4 +1,5 @@
-import { expect, type Locator, type Page, test } from "@playwright/test";
+import type { Locator, Page } from "@playwright/test";
+import { expect, test } from "@playwright/test";
 import { SEED_RECOMMENDED_TITLES } from "../../../scripts/seed-recommendations";
 import { waitForHydration } from "../shared/playwright";
 import { OTHER_AUTH, USER_AUTH } from "./constants";
