@@ -10,10 +10,8 @@ import {
   warnUnconfiguredProviders,
 } from "#/lib/_internal/auth-config";
 import { authRateLimit } from "#/lib/_internal/auth-rate-limits";
-import {
-  type OnidProfile,
-  onidProfileFromIdToken,
-} from "#/lib/_internal/onid-profile";
+import type { OnidProfile } from "#/lib/_internal/onid-profile";
+import { onidProfileFromIdToken } from "#/lib/_internal/onid-profile";
 import { onidProviderConfig } from "#/lib/_internal/onid-provider";
 import {
   redactingAuthLogger,

@@ -26,10 +26,8 @@ vi.mock("@tanstack/react-router", () => ({
 const { deleteAccount } = vi.hoisted(() => ({ deleteAccount: vi.fn() }));
 vi.mock("#/server/account", () => ({ deleteAccount }));
 
-import {
-  DeleteAccountDialog,
-  type DeletionPreview,
-} from "#/components/delete-account-dialog";
+import type { DeletionPreview } from "#/components/delete-account-dialog";
+import { DeleteAccountDialog } from "#/components/delete-account-dialog";
 
 afterEach(cleanup);
 beforeEach(() => {

@@ -12,24 +12,30 @@ import {
 import { requireUser } from "#/lib/_internal/auth-guards";
 import { buildNotificationConfig } from "#/lib/email/config";
 import { normalizeEmailAddress } from "#/lib/email-address";
-import { type Hold, holdFromInput, holdToColumns } from "#/lib/hold";
+import type { Hold } from "#/lib/hold";
+import { holdFromInput, holdToColumns } from "#/lib/hold";
 import { checkoutFloorDay, dueAtForDay } from "#/lib/inventory-deadlines";
+import type {
+  InventoryNotice,
+  NoticeRecipient,
+} from "#/lib/inventory-notifications";
 import {
-  type InventoryNotice,
-  type NoticeRecipient,
   notificationFor,
   toNotificationRow,
 } from "#/lib/inventory-notifications";
+import type {
+  RequestLineDecision,
+  RequestLineOutcome,
+  TransitionActor,
+  TransitionInput,
+} from "#/lib/inventory-workflow";
 import {
   assertTransitionAllowed,
-  type RequestLineDecision,
-  type RequestLineOutcome,
   resolveLineOutcome,
-  type TransitionActor,
-  type TransitionInput,
 } from "#/lib/inventory-workflow";
 import { resolvePickupTerms } from "#/lib/pickup-window";
-import { assertStaff, type Viewer } from "#/lib/viewer";
+import type { Viewer } from "#/lib/viewer";
+import { assertStaff } from "#/lib/viewer";
 import type { ItemStatus } from "#/lib/vocabularies";
 import type { TransitionInventoryItemInput } from "../inventory";
 import type { EmailOptions } from "./email-dispatch";

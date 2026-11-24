@@ -1,9 +1,9 @@
 import { describe, expect, it } from "vitest";
-import {
-  createTrafficWriter,
-  type TrafficEventRow,
-  type TrafficStore,
+import type {
+  TrafficEventRow,
+  TrafficStore,
 } from "#/server/_internal/traffic-writer";
+import { createTrafficWriter } from "#/server/_internal/traffic-writer";
 
 const VIEWER = "198.51.100.7";
 const BROWSER =

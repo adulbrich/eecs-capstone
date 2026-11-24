@@ -3,7 +3,8 @@ import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import type { PlacementWorkspace } from "#/components/placement/use-placement-workspace";
 import { WorkspaceActions } from "#/components/placement/workspace-actions";
-import { EMPTY_WORKSPACE, type Workspace } from "#/lib/placement/workspace";
+import type { Workspace } from "#/lib/placement/workspace";
+import { EMPTY_WORKSPACE } from "#/lib/placement/workspace";
 
 // Radix's menu relies on DOM APIs jsdom omits (admin-data-table.test.tsx).
 beforeAll(() => {

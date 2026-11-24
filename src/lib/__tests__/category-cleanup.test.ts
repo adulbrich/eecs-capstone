@@ -1,10 +1,9 @@
 import { fc, test } from "@fast-check/vitest";
 import { describe, expect, it } from "vitest";
+import type { CleanupCategory, CleanupProposal } from "#/lib/category-cleanup";
 import {
   buildCleanupTool,
   CLEANUP_MAX_OPERATIONS,
-  type CleanupCategory,
-  type CleanupProposal,
   describeCleanup,
 } from "#/lib/category-cleanup";
 import {

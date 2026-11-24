@@ -3,14 +3,16 @@ import { describe, expect, it } from "vitest";
 import { INVENTORY_ITEM_STATUSES } from "#/lib/vocabularies";
 import { blankText, looseHolder } from "#/test/shared/arbitraries";
 import { holdFromInput } from "../hold";
+import type {
+  RequestLineDecision,
+  TransitionActor,
+  TransitionInput,
+} from "../inventory-workflow";
 import {
   assertTransitionAllowed,
   needsDueAt,
   needsHolder,
-  type RequestLineDecision,
   resolveLineOutcome,
-  type TransitionActor,
-  type TransitionInput,
 } from "../inventory-workflow";
 
 const ADMIN: TransitionActor = { id: "staff-1", role: "admin" };

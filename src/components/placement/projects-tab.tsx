@@ -33,22 +33,21 @@ import {
   SelectTrigger,
   SelectValue,
 } from "#/components/ui/select";
-import { type ImportIssue, parseProjectsCsv } from "#/lib/placement/csv";
+import type { ImportIssue } from "#/lib/placement/csv";
+import { parseProjectsCsv } from "#/lib/placement/csv";
 import { PROJECTS_FORMAT } from "#/lib/placement/formats";
 import { detectPlugin, toStandard } from "#/lib/placement/plugins";
-import {
-  type ColumnMapping,
-  CUSTOM_MAPPINGS,
-} from "#/lib/placement/plugins/custom-mapping";
+import type { ColumnMapping } from "#/lib/placement/plugins/custom-mapping";
+import { CUSTOM_MAPPINGS } from "#/lib/placement/plugins/custom-mapping";
 import { pastedTitles } from "#/lib/placement/plugins/paste";
 import type { WorkspaceProject } from "#/lib/placement/types";
+import type { Workspace } from "#/lib/placement/workspace";
 import {
   contactFor,
   PARAMETER_LIMITS,
   projectsFromPortal,
   pruneTitleMatches,
   removeProject,
-  type Workspace,
 } from "#/lib/placement/workspace";
 import type { SortState } from "#/lib/table-state";
 import { useAction } from "#/lib/use-action";

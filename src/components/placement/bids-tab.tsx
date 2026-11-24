@@ -27,12 +27,11 @@ import { applyPins } from "#/lib/placement/board";
 import { BIDS_FORMAT } from "#/lib/placement/formats";
 import { repointRosterPins } from "#/lib/placement/roster";
 import type { PlacementStudent } from "#/lib/placement/types";
+import type { StoredResult, Workspace } from "#/lib/placement/workspace";
 import {
   isStale,
-  type StoredResult,
   setColumnMapping,
   setReadAs,
-  type Workspace,
 } from "#/lib/placement/workspace";
 import type { SortState } from "#/lib/table-state";
 import { useAdminTable } from "#/lib/use-admin-table";

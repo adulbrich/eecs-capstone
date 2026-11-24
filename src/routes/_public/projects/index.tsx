@@ -11,15 +11,17 @@ import { BookmarksButton } from "#/components/bookmarks-button";
 import { EmptyState } from "#/components/empty-state";
 import { ListingLayout } from "#/components/listing-layout";
 import { ProjectCard } from "#/components/project-card";
+import type { ProjectListRow } from "#/components/project-table-columns";
 import {
   PROJECT_TABLE_COLUMNS,
   PROJECT_TABLE_DEFAULT_SORT,
-  type ProjectListRow,
 } from "#/components/project-table-columns";
+import type {
+  FilterCategory,
+  FilterProgram,
+} from "#/components/projects-filters";
 import {
   countActiveFilters,
-  type FilterCategory,
-  type FilterProgram,
   PROJECTS_FILTER_DEFAULTS,
   ProjectsFilters,
   ProjectsSearchBar,

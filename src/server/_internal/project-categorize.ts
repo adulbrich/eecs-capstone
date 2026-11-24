@@ -17,13 +17,11 @@ import { categories, projectCategories, projects } from "#/db/schema";
 import type { ResponsesFn } from "#/lib/_internal/bedrock-mantle";
 import { categoriesEnabled } from "#/lib/_internal/categories-flag";
 import { redactQueryError } from "#/lib/_internal/redact-query-error";
-import {
-  buildCategorizeSource,
-  buildCategorizeTool,
-  type CategoryOption,
-} from "#/lib/categorize";
+import type { CategoryOption } from "#/lib/categorize";
+import { buildCategorizeSource, buildCategorizeTool } from "#/lib/categorize";
 import { KIND_OF_WORK_TYPE } from "#/lib/default-categories";
-import { type CategorizeRun, runCategorize } from "./categorize-core";
+import type { CategorizeRun } from "./categorize-core";
+import { runCategorize } from "./categorize-core";
 import { readAiRefresh, recordAiRefresh } from "./project-ai-refreshes";
 import {
   lockCategoriesToLink,

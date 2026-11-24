@@ -1,5 +1,7 @@
 /// <reference lib="webworker" />
-import loadHighs, { type Highs } from "highs";
+
+import type { Highs } from "highs";
+import loadHighs from "highs";
 import wasmUrl from "highs/runtime?url";
 import { solvePlacement } from "#/lib/placement/solve";
 import type { PlacementInput } from "#/lib/placement/types";

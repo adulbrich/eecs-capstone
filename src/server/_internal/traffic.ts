@@ -1,15 +1,13 @@
-import { type SQL, sql } from "drizzle-orm";
+import type { SQL } from "drizzle-orm";
+import { sql } from "drizzle-orm";
 import { db } from "#/db";
 import { requireUser } from "#/lib/_internal/auth-guards";
 import { ROLLUP_SETTLE_MS } from "#/lib/_internal/traffic-timing";
 import { comparisonPeriods, localDay, shiftDay } from "#/lib/day-range";
-import {
-  TRAFFIC_FILTERS,
-  TRAFFIC_LISTINGS,
-  type TrafficFilter,
-  type TrafficListing,
-} from "#/lib/traffic-filters";
-import { assertStaff, type Viewer } from "#/lib/viewer";
+import type { TrafficFilter, TrafficListing } from "#/lib/traffic-filters";
+import { TRAFFIC_FILTERS, TRAFFIC_LISTINGS } from "#/lib/traffic-filters";
+import type { Viewer } from "#/lib/viewer";
+import { assertStaff } from "#/lib/viewer";
 import type { TrafficInput } from "../traffic";
 
 /**

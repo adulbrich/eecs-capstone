@@ -9,10 +9,8 @@ import {
 } from "@testing-library/react";
 import { toast } from "sonner";
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
-import {
-  type BatchRow,
-  BatchTransitionDialog,
-} from "#/components/batch-transition-dialog";
+import type { BatchRow } from "#/components/batch-transition-dialog";
+import { BatchTransitionDialog } from "#/components/batch-transition-dialog";
 import type { BatchTarget } from "#/lib/project-workflow";
 import { batchTransitionProjects } from "#/server/projects";
 import { deferred } from "./shared/deferred";

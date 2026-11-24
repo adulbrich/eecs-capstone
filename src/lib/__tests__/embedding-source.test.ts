@@ -1,11 +1,11 @@
 import { test } from "@fast-check/vitest";
 import { describe, expect, it } from "vitest";
 import { buildEmbedConfig } from "#/lib/_internal/bedrock-embed";
+import type { EmbeddableProject } from "#/lib/embedding-source";
 import {
   buildInterestsEmbeddingSource,
   buildProjectEmbeddingSource,
   EMBEDDING_SOURCE_LIMIT,
-  type EmbeddableProject,
   embeddingHash,
 } from "#/lib/embedding-source";
 import { isWellFormed } from "#/test/shared/arbitraries";

@@ -10,9 +10,9 @@ import {
   PRIVATE_NOTES_INVENTORY_HINT,
   STAFF_ONLY_FIELD_HINT,
 } from "#/lib/private-notes";
+import type { itemPayloadSchema } from "#/server/inventory";
 import {
   createInventoryItem,
-  type itemPayloadSchema,
   updateInventoryItem,
   uploadInventoryImage,
 } from "#/server/inventory";

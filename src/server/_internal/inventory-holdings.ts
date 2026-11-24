@@ -1,3 +1,4 @@
+import type { SQL } from "drizzle-orm";
 import {
   and,
   desc,
@@ -7,7 +8,6 @@ import {
   isNull,
   notExists,
   or,
-  type SQL,
   sql,
 } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
@@ -24,21 +24,24 @@ import { requireUser } from "#/lib/_internal/auth-guards";
 import { redactQueryError } from "#/lib/_internal/redact-query-error";
 import { holdEmail, holdFromJoinedRow, holdName } from "#/lib/hold";
 import { compareByDeadline } from "#/lib/inventory-deadlines";
+import type {
+  HoldItemView,
+  MyCustomLineView,
+  MyRequestLineView,
+  StaffCustomLineView,
+} from "#/lib/inventory-visibility";
 import {
-  type HoldItemView,
   holdItemView,
-  type MyCustomLineView,
-  type MyRequestLineView,
   myCustomLineView,
   myRequestLineView,
-  type StaffCustomLineView,
   staffCustomLineView,
 } from "#/lib/inventory-visibility";
-import { assertStaff, type Viewer } from "#/lib/viewer";
+import type { Viewer } from "#/lib/viewer";
+import { assertStaff } from "#/lib/viewer";
+import type { ItemStatus } from "#/lib/vocabularies";
 import {
   INVENTORY_CUSTOM_LINE_STATUSES,
   INVENTORY_REQUEST_ITEM_STATUSES,
-  type ItemStatus,
 } from "#/lib/vocabularies";
 import type { InventoryRequestQueueFilter } from "../inventory";
 import { getCartAs } from "./inventory-cart";

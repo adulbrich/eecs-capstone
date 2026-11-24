@@ -13,9 +13,9 @@ import {
   assertCustomLineTransition,
   assertSourcingNoteEditable,
 } from "#/lib/inventory-custom-workflow";
+import type { InventoryNotice } from "#/lib/inventory-notifications";
 import {
   customLineNotification,
-  type InventoryNotice,
   toNotificationRow,
 } from "#/lib/inventory-notifications";
 import { resolvePickupWindow } from "#/lib/pickup-window";

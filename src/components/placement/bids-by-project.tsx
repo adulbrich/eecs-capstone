@@ -8,9 +8,9 @@ import { RemoveStudentButton } from "#/components/placement/removed-students";
 import type { PlacementWorkspace } from "#/components/placement/use-placement-workspace";
 import { Button } from "#/components/ui/button";
 import { ordinal } from "#/lib/placement/analytics";
+import type { ProjectBidRow } from "#/lib/placement/bids-view";
 import {
   groupByProject,
-  type ProjectBidRow,
   pinnedRows,
   pinSource,
   placedSummary,

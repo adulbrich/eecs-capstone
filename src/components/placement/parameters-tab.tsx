@@ -6,11 +6,8 @@ import { Button } from "#/components/ui/button";
 import { FieldError } from "#/components/ui/field";
 import { Label } from "#/components/ui/label";
 import { Switch } from "#/components/ui/switch";
-import {
-  PARAMETER_LIMITS,
-  type Workspace,
-  type WorkspaceParameters,
-} from "#/lib/placement/workspace";
+import type { Workspace, WorkspaceParameters } from "#/lib/placement/workspace";
+import { PARAMETER_LIMITS } from "#/lib/placement/workspace";
 
 const MAX_PRIORITIES = 20;
 

@@ -7,7 +7,8 @@ import {
   projects,
 } from "#/db/schema";
 import { requireUser } from "#/lib/_internal/auth-guards";
-import { assertStaff, type Viewer } from "#/lib/viewer";
+import type { Viewer } from "#/lib/viewer";
+import { assertStaff } from "#/lib/viewer";
 import { runsInProgram } from "./project-summary";
 
 /** `count(*)` as a number, for every figure here and on the dashboard. */

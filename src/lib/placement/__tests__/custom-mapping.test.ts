@@ -6,8 +6,8 @@ import {
 } from "#/components/placement/column-mapping";
 import { parseBidsCsv } from "#/lib/placement/csv";
 import { toStandard } from "#/lib/placement/plugins";
+import type { ColumnMapping } from "#/lib/placement/plugins/custom-mapping";
 import {
-  type ColumnMapping,
   CUSTOM_MAPPINGS,
   droppedColumns,
   fileHeaders,

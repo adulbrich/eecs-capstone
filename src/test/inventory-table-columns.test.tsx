@@ -32,10 +32,10 @@ vi.mock("@tanstack/react-router", () => ({
 }));
 
 import { AdminDataTable } from "#/components/admin-data-table";
+import type { InventoryListRow } from "#/components/inventory-table-columns";
 import {
   INVENTORY_TABLE_COLUMNS,
   INVENTORY_TABLE_DEFAULT_SORT,
-  type InventoryListRow,
 } from "#/components/inventory-table-columns";
 
 beforeEach(() => {

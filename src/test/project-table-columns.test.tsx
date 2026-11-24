@@ -34,10 +34,10 @@ vi.mock("@tanstack/react-router", () => ({
 
 import { AdminDataTable } from "#/components/admin-data-table";
 import { BookmarkSetProvider } from "#/components/bookmark-set";
+import type { ProjectListRow } from "#/components/project-table-columns";
 import {
   PROJECT_TABLE_COLUMNS,
   PROJECT_TABLE_DEFAULT_SORT,
-  type ProjectListRow,
 } from "#/components/project-table-columns";
 
 afterEach(cleanup);

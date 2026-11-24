@@ -1,11 +1,11 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
+import type { Vocabulary } from "./vocabulary-scan";
 import {
   scan,
   scanFile,
   scannedFileCount,
-  type Vocabulary,
   vocabulariesIn,
 } from "./vocabulary-scan";
 

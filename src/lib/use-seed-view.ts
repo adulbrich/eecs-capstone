@@ -1,5 +1,6 @@
 import { useEffect } from "react";
-import { readStoredView, type ViewMode } from "#/lib/view-preference";
+import type { ViewMode } from "#/lib/view-preference";
+import { readStoredView } from "#/lib/view-preference";
 
 /**
  * Seeds the list view from the persisted preference on first render.

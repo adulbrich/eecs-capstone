@@ -1,9 +1,8 @@
 import { useId, useRef, useState } from "react";
 import { toast } from "sonner";
+import type { BatchCandidate, BatchTarget } from "#/lib/project-workflow";
 import {
   BATCH_TRANSITIONS,
-  type BatchCandidate,
-  type BatchTarget,
   PROJECT_STATUS_LABEL,
   splitBatchCandidates,
 } from "#/lib/project-workflow";

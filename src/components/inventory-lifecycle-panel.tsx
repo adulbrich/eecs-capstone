@@ -16,7 +16,8 @@ import {
 import { formatPickupWindow } from "#/lib/pickup-window";
 import { STAFF_READ_OPTIONS, staffRead } from "#/lib/staff-project-queries";
 import { useAction } from "#/lib/use-action";
-import { INVENTORY_ITEM_STATUSES, type ItemStatus } from "#/lib/vocabularies";
+import type { ItemStatus } from "#/lib/vocabularies";
+import { INVENTORY_ITEM_STATUSES } from "#/lib/vocabularies";
 import {
   hardDeleteInventoryItem,
   listInventoryItemEditLog,
@@ -27,10 +28,10 @@ import { HolderField } from "./holder-field";
 import { InventoryStatusBadge } from "./inventory-status-badge";
 import { LocalTime } from "./local-time";
 import { PanelSection } from "./panel";
+import type { PickupFormValue } from "./pickup-fields";
 import {
   EMPTY_PICKUP,
   PickupFields,
-  type PickupFormValue,
   pickupFormValue,
   pickupPayload,
 } from "./pickup-fields";

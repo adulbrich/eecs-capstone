@@ -1,5 +1,6 @@
 import { Upload } from "lucide-react";
-import { type ReactNode, useCallback, useRef, useState } from "react";
+import type { ReactNode } from "react";
+import { useCallback, useRef, useState } from "react";
 import { Button } from "#/components/ui/button";
 import { FieldError } from "#/components/ui/field";
 

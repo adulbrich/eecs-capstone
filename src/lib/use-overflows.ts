@@ -1,4 +1,5 @@
-import { type RefCallback, useCallback, useState } from "react";
+import type { RefCallback } from "react";
+import { useCallback, useState } from "react";
 
 /**
  * Whether an element's content is taller than the element, so it scrolls.

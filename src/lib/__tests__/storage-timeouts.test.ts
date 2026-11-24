@@ -1,8 +1,5 @@
-import {
-  DeleteObjectCommand,
-  PutObjectCommand,
-  type S3Client,
-} from "@aws-sdk/client-s3";
+import type { S3Client } from "@aws-sdk/client-s3";
+import { DeleteObjectCommand, PutObjectCommand } from "@aws-sdk/client-s3";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   createObjectStorage,

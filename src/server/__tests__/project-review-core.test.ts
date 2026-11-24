@@ -1,11 +1,11 @@
 import { fc, test } from "@fast-check/vitest";
 import { describe, expect, it, vi } from "vitest";
 import type { MantleResponse } from "#/lib/_internal/bedrock-mantle";
+import type { ImprovableField } from "#/lib/project-review-fields";
 import {
   FIELD_LABELS,
   FIELD_MAX_LENGTHS,
   IMPROVABLE_FIELDS,
-  type ImprovableField,
 } from "#/lib/project-review-fields";
 import { PROPOSAL_SCOPE_RULE } from "#/lib/proposal-guidance";
 import {

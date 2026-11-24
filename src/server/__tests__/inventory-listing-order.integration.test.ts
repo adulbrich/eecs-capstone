@@ -4,7 +4,8 @@ import { db } from "#/db";
 import { inventoryItems } from "#/db/schema";
 import { INVENTORY_ITEM_STATUSES } from "#/lib/vocabularies";
 import { listInventoryAs } from "#/server/_internal/inventory-catalog";
-import { INVENTORY_ORDERS, type InventoryOrder } from "#/server/inventory";
+import type { InventoryOrder } from "#/server/inventory";
+import { INVENTORY_ORDERS } from "#/server/inventory";
 
 /**
  * The inventory half of `listing-order.integration.test.ts`, and the same

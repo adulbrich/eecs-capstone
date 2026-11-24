@@ -3,10 +3,10 @@ import { describe, expect, it } from "vitest";
 import { db } from "#/db";
 import { trafficEvents, trafficSalt } from "#/db/schema";
 import { trafficDb } from "#/db/traffic";
+import type { TrafficStore } from "#/server/_internal/traffic-writer";
 import {
   createSaltStore,
   createTrafficWriter,
-  type TrafficStore,
   trafficStore,
 } from "#/server/_internal/traffic-writer";
 

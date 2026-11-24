@@ -1,11 +1,11 @@
-import {
-  DEFAULT_PLACEMENT_PARAMETERS,
-  type Placement,
-  type PlacementInput,
-  type PlacementParameters,
-  type PlacementProject,
-  type PlacementStudent,
+import type {
+  Placement,
+  PlacementInput,
+  PlacementParameters,
+  PlacementProject,
+  PlacementStudent,
 } from "#/lib/placement/types";
+import { DEFAULT_PLACEMENT_PARAMETERS } from "#/lib/placement/types";
 
 // Every name, email and title here is invented. No real bid data is read or
 // committed (#647).

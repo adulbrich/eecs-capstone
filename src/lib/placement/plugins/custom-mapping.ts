@@ -1,18 +1,14 @@
 import Papa from "papaparse";
 import { z } from "zod";
+import type { ImportIssue, Row } from "#/lib/placement/csv";
 import {
   cell,
-  type ImportIssue,
   LEADING_BLANK_LINES,
   normalizeTitle,
   parseRows,
-  type Row,
 } from "#/lib/placement/csv";
-import {
-  type PlacementDataset,
-  STANDARD_FORMATS,
-  writeFormat,
-} from "#/lib/placement/formats";
+import type { PlacementDataset } from "#/lib/placement/formats";
+import { STANDARD_FORMATS, writeFormat } from "#/lib/placement/formats";
 import {
   splitAtSeparator,
   titleInBrackets,

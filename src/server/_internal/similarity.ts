@@ -3,11 +3,11 @@ import { db } from "#/db";
 import { projects } from "#/db/schema";
 import { requireUser } from "#/lib/_internal/auth-guards";
 import type { EmbedFn } from "#/lib/_internal/bedrock-embed";
-import {
-  currentAttempt,
-  type RecomputeSimilarityResult,
-  type SimilarityView,
+import type {
+  RecomputeSimilarityResult,
+  SimilarityView,
 } from "#/lib/ai-refresh";
+import { currentAttempt } from "#/lib/ai-refresh";
 import { assertStaff } from "#/lib/viewer";
 import type { SimilarityInput } from "../similarity";
 import { readAiRefresh } from "./project-ai-refreshes";

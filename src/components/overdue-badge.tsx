@@ -1,9 +1,6 @@
 import type React from "react";
-import {
-  type DeadlineEntry,
-  deadlinePairOf,
-  overdueFlags,
-} from "#/lib/inventory-deadlines";
+import type { DeadlineEntry } from "#/lib/inventory-deadlines";
+import { deadlinePairOf, overdueFlags } from "#/lib/inventory-deadlines";
 import { Badge } from "./ui/badge";
 
 /**

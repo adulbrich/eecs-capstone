@@ -1,10 +1,8 @@
 // @vitest-environment jsdom
 import { cleanup, fireEvent, screen, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import {
-  EditLogList,
-  type EditLogValuesSource,
-} from "#/components/edit-log-list";
+import type { EditLogValuesSource } from "#/components/edit-log-list";
+import { EditLogList } from "#/components/edit-log-list";
 import { renderWithQueryClient } from "./shared/query-client";
 
 afterEach(cleanup);

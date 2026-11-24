@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { ColumnMapping } from "#/lib/placement/plugins/custom-mapping";
 import type { WorkspaceProject } from "#/lib/placement/types";
+import type { StoredResult, Workspace } from "#/lib/placement/workspace";
 import {
   addProject,
   contactFor,
@@ -15,13 +16,11 @@ import {
   removeProject,
   removeStudents,
   restoreStudent,
-  type StoredResult,
   serializeWorkspace,
   setAsideRemoved,
   setColumnMapping,
   setReadAs,
   toPlacementInput,
-  type Workspace,
   withoutContact,
 } from "#/lib/placement/workspace";
 

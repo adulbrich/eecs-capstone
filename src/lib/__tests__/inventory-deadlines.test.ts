@@ -9,18 +9,17 @@ import {
   localInstant,
   shiftDay,
 } from "../day-range";
+import type { DeadlineEntry, StatusChange } from "../inventory-deadlines";
 import {
   attentionSummary,
   checkoutFloorDay,
   compareByDeadline,
-  type DeadlineEntry,
   deadlineOf,
   deadlinePairOf,
   dueAtForDay,
   isOverdue,
   needsAttention,
   overdueFlags,
-  type StatusChange,
 } from "../inventory-deadlines";
 
 /** A fixed clock, because the boundaries are the whole content of the rule. */

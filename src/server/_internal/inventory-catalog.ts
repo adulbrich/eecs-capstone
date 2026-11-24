@@ -1,15 +1,5 @@
-import {
-  and,
-  asc,
-  desc,
-  eq,
-  ilike,
-  inArray,
-  ne,
-  or,
-  type SQL,
-  sql,
-} from "drizzle-orm";
+import type { SQL } from "drizzle-orm";
+import { and, asc, desc, eq, ilike, inArray, ne, or, sql } from "drizzle-orm";
 import { db } from "#/db";
 import {
   categories,
@@ -22,24 +12,23 @@ import {
 } from "#/db/schema";
 import { readSession, requireUser } from "#/lib/_internal/auth-guards";
 import { diffRowFields } from "#/lib/edit-diff";
-import {
-  type Hold,
-  type HoldColumns,
-  holdFromJoinedRow,
-  holdFromStoredRow,
-} from "#/lib/hold";
+import type { Hold, HoldColumns } from "#/lib/hold";
+import { holdFromJoinedRow, holdFromStoredRow } from "#/lib/hold";
 import { assertNoImageKeyOnCreate } from "#/lib/image-upload-policy";
+import type {
+  InventoryItemPublic,
+  InventoryItemStaff,
+  ItemCategory,
+} from "#/lib/inventory-visibility";
 import {
   canReadInventoryItem,
-  type InventoryItemPublic,
-  type InventoryItemStaff,
-  type ItemCategory,
   publicItemView,
   staffItemView,
   visibleStatuses,
 } from "#/lib/inventory-visibility";
 import { HARD_DELETE_HISTORY_REFUSAL } from "#/lib/inventory-workflow";
-import { assertStaff, isStaff, type Viewer } from "#/lib/viewer";
+import type { Viewer } from "#/lib/viewer";
+import { assertStaff, isStaff } from "#/lib/viewer";
 import type {
   CreateInventoryItemInput,
   InventoryOrder,

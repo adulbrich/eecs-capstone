@@ -1,6 +1,6 @@
+import type { ImportIssue } from "#/lib/placement/csv";
 import {
   cell,
-  type ImportIssue,
   missingColumns,
   normalizeTitle,
   parseRows,
@@ -8,11 +8,8 @@ import {
   projectKeysByTitle,
 } from "#/lib/placement/csv";
 import { ROSTER_FORMAT, writeFormat } from "#/lib/placement/formats";
-import {
-  type ProjectCandidate,
-  rankProjects,
-  suggestProject,
-} from "#/lib/placement/match";
+import type { ProjectCandidate } from "#/lib/placement/match";
+import { rankProjects, suggestProject } from "#/lib/placement/match";
 import type { PlacementStudent, WorkspaceProject } from "#/lib/placement/types";
 
 /**

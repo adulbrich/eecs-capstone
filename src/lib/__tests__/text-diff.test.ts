@@ -1,7 +1,8 @@
 import { fc, test } from "@fast-check/vitest";
 import { describe, expect, it } from "vitest";
 import { trickyText } from "#/test/shared/arbitraries";
-import { CONTEXT_LINES, type DiffLine, diffText } from "../text-diff";
+import type { DiffLine } from "../text-diff";
+import { CONTEXT_LINES, diffText } from "../text-diff";
 
 /** A line's text, marked words in brackets, for compact assertions. */
 function show(line: DiffLine): string {

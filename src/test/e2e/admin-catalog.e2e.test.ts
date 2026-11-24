@@ -3,11 +3,11 @@ import { eq } from "drizzle-orm";
 import * as schema from "../../db/schema";
 import { waitForHydration } from "../shared/playwright";
 import { ADMIN_AUTH } from "./constants";
+import type { Db } from "./fixtures";
 import {
   createFixtureCategory,
   createFixtureProgram,
   createFixtureUser,
-  type Db,
   fixtureName,
   readUser,
   userIdByEmail,

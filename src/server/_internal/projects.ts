@@ -19,15 +19,15 @@ import {
   canWritePrivateNotes,
   programLabel,
 } from "#/lib/project-visibility";
+import type { ActorRole, BatchTarget } from "#/lib/project-workflow";
 import {
-  type ActorRole,
   assertTransitionAllowed,
   BATCH_TRANSITIONS,
-  type BatchTarget,
   splitBatchCandidates,
 } from "#/lib/project-workflow";
 import { isOwedStaffEditEmail } from "#/lib/staff-edit-email";
-import { assertStaff, isStaff, type Viewer } from "#/lib/viewer";
+import type { Viewer } from "#/lib/viewer";
+import { assertStaff, isStaff } from "#/lib/viewer";
 import type { ProjectStatus } from "#/lib/vocabularies";
 import type {
   MentorshipInput,
@@ -50,9 +50,9 @@ import {
   notifyTransitionByEmail,
 } from "./project-emails";
 import { isEmbeddableStatus } from "./project-embeddings";
+import type { RefreshDeps } from "./project-refresh";
 import {
   categorizeProjectInBackground,
-  type RefreshDeps,
   refreshProjectInBackground,
   refreshProjectsInBackground,
 } from "./project-refresh";

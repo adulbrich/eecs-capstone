@@ -2,12 +2,12 @@ import { and, eq, inArray, lt, lte, sql } from "drizzle-orm";
 import { db } from "#/db";
 import { projectAiRefreshes } from "#/db/schema";
 import { redactQueryError } from "#/lib/_internal/redact-query-error";
-import {
-  type AiRefreshAttempt,
-  type AiRefreshKind,
-  type AiRefreshTrigger,
-  recordableOutcome,
+import type {
+  AiRefreshAttempt,
+  AiRefreshKind,
+  AiRefreshTrigger,
 } from "#/lib/ai-refresh";
+import { recordableOutcome } from "#/lib/ai-refresh";
 
 /**
  * Records a writer's outcome as the project's last attempt at `kind` (#631),

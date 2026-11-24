@@ -1,12 +1,8 @@
 import { useState } from "react";
 import { useAction } from "#/lib/use-action";
 import { approveRequestItem, approveRequestLines } from "#/server/inventory";
-import {
-  EMPTY_PICKUP,
-  PickupFields,
-  type PickupFormValue,
-  pickupPayload,
-} from "./pickup-fields";
+import type { PickupFormValue } from "./pickup-fields";
+import { EMPTY_PICKUP, PickupFields, pickupPayload } from "./pickup-fields";
 import { EMAIL_SKIP_HINT, SendEmailCheckbox } from "./send-email-checkbox";
 import { Button } from "./ui/button";
 import {

@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { type AiRefreshAttempt, currentAttempt } from "#/lib/ai-refresh";
+import type { AiRefreshAttempt } from "#/lib/ai-refresh";
+import { currentAttempt } from "#/lib/ai-refresh";
 
 const stored = new Date("2026-10-05T22:47:27.411Z");
 

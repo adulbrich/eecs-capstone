@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import type { ProjectRow, VisibleProject } from "../project-visibility";
 import {
   canEditProject,
   canSeePrivateNotes,
@@ -6,11 +7,10 @@ import {
   canSeeStatusHistory,
   canWritePrivateNotes,
   filterCommentsForViewer,
-  type ProjectRow,
   projectDetailView,
-  type VisibleProject,
 } from "../project-visibility";
-import { isStaff, type Viewer } from "../viewer";
+import type { Viewer } from "../viewer";
+import { isStaff } from "../viewer";
 
 const anon: Viewer = null;
 const other: Viewer = { id: "u-other", role: "user" };

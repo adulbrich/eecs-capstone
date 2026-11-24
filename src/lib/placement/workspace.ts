@@ -1,27 +1,25 @@
 import { z } from "zod";
 import { removeFromResult } from "#/lib/placement/board";
-import { type ImportIssue, normalizeTitle } from "#/lib/placement/csv";
+import type { ImportIssue } from "#/lib/placement/csv";
+import { normalizeTitle } from "#/lib/placement/csv";
+import type { ReadAs } from "#/lib/placement/plugins";
+import { readAsChoice, uploadPlugins } from "#/lib/placement/plugins";
+import type { ColumnMapping } from "#/lib/placement/plugins/custom-mapping";
 import {
-  type ReadAs,
-  readAsChoice,
-  uploadPlugins,
-} from "#/lib/placement/plugins";
-import {
-  type ColumnMapping,
   columnMappingId,
   readMapping,
   versionMessage,
 } from "#/lib/placement/plugins/custom-mapping";
 import { repointRosterPins, rosterProjectKey } from "#/lib/placement/roster";
-import {
-  DEFAULT_PLACEMENT_PARAMETERS,
-  type PlacementInput,
-  type PlacementParameters,
-  type PlacementResult,
-  type PlacementStudent,
-  type ProjectContact,
-  type WorkspaceProject,
+import type {
+  PlacementInput,
+  PlacementParameters,
+  PlacementResult,
+  PlacementStudent,
+  ProjectContact,
+  WorkspaceProject,
 } from "#/lib/placement/types";
+import { DEFAULT_PLACEMENT_PARAMETERS } from "#/lib/placement/types";
 
 /**
  * Everything the placement page knows, kept in one localStorage key in the

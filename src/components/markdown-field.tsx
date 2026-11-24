@@ -1,10 +1,7 @@
 import { Bold, Italic, Link2, List, ListOrdered } from "lucide-react";
 import { useRef, useState } from "react";
-import {
-  applyEdit,
-  buildToolbarEdit,
-  type ToolbarAction,
-} from "#/lib/markdown-toolbar";
+import type { ToolbarAction } from "#/lib/markdown-toolbar";
+import { applyEdit, buildToolbarEdit } from "#/lib/markdown-toolbar";
 import { Markdown } from "./markdown";
 import { Button } from "./ui/button";
 import { Textarea } from "./ui/textarea";

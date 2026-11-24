@@ -11,17 +11,16 @@ import {
   parseRosterCsv,
   resolveRosterProjects,
 } from "#/lib/placement/roster";
+import type { MappingNotice, Workspace } from "#/lib/placement/workspace";
 import {
   clearStoredWorkspace,
   currentNotices,
   EMPTY_WORKSPACE,
   inputFingerprint,
   isEmptyWorkspace,
-  type MappingNotice,
   readStoredWorkspace,
   setAsideRemoved,
   WORKSPACE_STORAGE_KEY,
-  type Workspace,
   writeStoredWorkspace,
 } from "#/lib/placement/workspace";
 
