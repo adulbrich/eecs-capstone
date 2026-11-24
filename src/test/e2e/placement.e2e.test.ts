@@ -1774,14 +1774,18 @@ test.describe("placement workspace", () => {
       page.getByRole("button", { name: "Export workspace" })
     ).toBeHidden();
 
-    // The strip hides its last tabs, and its chevron brings them in.
+    // The strip hides its last tabs, and its chevron brings them in. Not a
+    // ratio of 1: the tabs have fractional widths and Chromium stops the scroll
+    // on a whole pixel, so the last tab can end up to half a pixel past the box.
+    // Both sides use the same ratio, or an unscrolled strip could pass both.
+    const inView = { ratio: 0.99 };
     const results = page.getByRole("tab", { name: "Results" });
-    await expect(results).not.toBeInViewport({ ratio: 1 });
+    await expect(results).not.toBeInViewport(inView);
     await page.getByRole("button", { name: "More tabs" }).click();
     await expect(
       page.getByRole("button", { name: "Earlier tabs" })
     ).toBeVisible();
-    await expect(results).toBeInViewport({ ratio: 1 });
+    await expect(results).toBeInViewport(inView);
 
     await page.getByRole("button", { name: "Workspace" }).click();
     await page.getByRole("menuitem", { name: "Clear all data..." }).click();
